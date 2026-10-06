@@ -1,0 +1,302 @@
+import json
+from types import SimpleNamespace
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from smarthome.cloud import CloudBridge
+from smarthome.config import Settings
+from smarthome.main import create_app
+from smarthome.models import Device
+
+API = "/api/v1/cloud"
+SECRET = "secret-cloud-access"
+REFRESH = "secret-cloud-refresh"
+KEY = "0123456789abcdef"
+
+
+class FakeLogin:
+    success = True
+    ready = True
+
+    def qr_code(self, client_id, schema, user_code):
+        self.user_code = user_code
+        return {"success": self.success, "result": {"qrcode": "qr-secret"}, "access_token": SECRET}
+
+    def login_result(self, qr, client_id, user_code):
+        return self.ready, {
+            "terminal_id": "terminal",
+            "endpoint": "https://apigw.iotbing.com",
+            "t": 100,
+            "uid": "user",
+            "expire_time": 3600,
+            "access_token": SECRET,
+            "refresh_token": REFRESH,
+        }
+
+
+class FakeAPI:
+    def __init__(self):
+        self.calls = []
+        self.success = True
+
+    def post(self, path, params, body):
+        self.calls.append((path, body))
+        return {"success": self.success, "result": True, "access_token": SECRET}
+
+
+class FakeManager:
+    def __init__(self, client, user_code, terminal, endpoint, tokens, listener):
+        self.listener = listener
+        self.device_map = {}
+        self.customer_api = FakeAPI()
+        self.refreshes = 0
+
+    def update_device_cache(self):
+        self.refreshes += 1
+        self.device_map = {
+            device.id: device
+            for device in [
+                SimpleNamespace(
+                    id="gateway",
+                    name="Gateway",
+                    local_key=KEY,
+                    ip="203.0.113.10",
+                    sub=False,
+                    category="zigbee",
+                    product_id="prod",
+                    online=True,
+                    support_local=True,
+                    node_id=None,
+                    status={"switch": True},
+                    function={
+                        "switch": SimpleNamespace(code="switch", type="Boolean", values="{}")
+                    },
+                ),
+                SimpleNamespace(
+                    id="child",
+                    name="Sensor",
+                    local_key=KEY,
+                    ip="",
+                    sub=True,
+                    category="wsdcg",
+                    product_id="sensor",
+                    online=True,
+                    support_local=True,
+                    node_id="node-1",
+                    status={"temp_current": 215, "local_key": KEY},
+                    function={},
+                ),
+            ]
+        }
+
+    def query_scenes(self):
+        return [
+            SimpleNamespace(
+                scene_id="scene-1",
+                name="Вечер",
+                home_id=1,
+                enabled=True,
+                actions=[{"secret": SECRET}],
+            )
+        ]
+
+    def unload(self):
+        raise AssertionError("Must not revoke the shared terminal automatically")
+
+
+@pytest.fixture
+def cloud_client(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "inventory.db"),
+        cloud_session_path=str(tmp_path / "cloud.json"),
+        cloud_enabled=True,
+        api_token="test-api-key",
+        display_poll_interval=0,
+    )
+    with TestClient(create_app(settings)) as client:
+        client.headers["X-API-Key"] = "test-api-key"
+        client.app.state.cloud = CloudBridge(settings, FakeLogin, FakeManager)
+        yield client
+
+
+def login(client):
+    response = client.post(API + "/login/qr", json={"user_code": "user-code-private"})
+    assert response.status_code == 201
+    id = response.json()["session_id"]
+    result = client.post(API + f"/login/{id}/confirm")
+    assert result.status_code == 200, result.text
+    return id
+
+
+def test_qr_flow_uses_local_renderer_and_never_returns_tokens(cloud_client):
+    client = cloud_client
+    response = client.post(API + "/login/qr", json={"user_code": "user-code-private"})
+    assert response.status_code == 201
+    assert "qr-secret" not in response.text and "user-code-private" not in response.text
+    qr = client.get(response.json()["qr_url"])
+    assert (
+        qr.status_code == 200
+        and qr.headers["cache-control"] == "no-store"
+        and b"<svg" in qr.content
+    )
+    result = client.post(API + "/login/" + response.json()["session_id"] + "/confirm")
+    assert result.json()["tokens_stored_on_server"] is True
+    for secret in [SECRET, REFRESH, "user-code-private"]:
+        assert secret not in result.text
+    path = client.app.state.cloud.path
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert json.loads(path.read_text())["token_info"]["access_token"] == SECRET
+    assert client.get(API + "/status").json()["connected"] is True
+
+
+def test_refresh_tokens_are_persisted_for_restart(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    bridge.devices()
+    tokens = {
+        **bridge.auth["token_info"],
+        "access_token": "new-access",
+        "refresh_token": "new-refresh",
+    }
+    bridge.manager.listener.update_token(tokens)
+    restarted = CloudBridge(bridge.settings, FakeLogin, FakeManager)
+    assert restarted.auth["token_info"]["access_token"] == "new-access"
+    assert restarted.manager is None
+
+
+def test_devices_and_scene_results_are_whitelisted(cloud_client):
+    login(cloud_client)
+    response = cloud_client.get(API + "/devices")
+    assert response.status_code == 200 and response.json()[0]["has_local_key"] is True
+    for secret in [KEY, SECRET, REFRESH]:
+        assert secret not in response.text
+    assert "local_key" not in response.json()[0]
+    scenes = cloud_client.get(API + "/scenes")
+    assert scenes.json() == [{"id": "scene-1", "name": "Вечер", "home_id": "1", "enabled": True}]
+    assert SECRET not in scenes.text
+    status = cloud_client.get(API + "/devices/child/status")
+    assert (
+        status.status_code == 200
+        and KEY not in status.text
+        and "local_key" not in status.json()["status"]
+    )
+
+
+def test_cloud_import_requires_explicit_gateway_and_preserves_secrets(cloud_client):
+    login(cloud_client)
+    body = {"device_ids": ["gateway", "child"]}
+    assert cloud_client.post(API + "/imports/local-inventory", json=body).status_code == 422
+    assert cloud_client.get("/api/v1/devices").json() == []
+    body["parent_map"] = {"child": "gateway"}
+    assert (
+        cloud_client.post(
+            API + "/imports/local-inventory", json={**body, "dry_run": True}
+        ).status_code
+        == 200
+    )
+    assert cloud_client.get("/api/v1/devices").json() == []
+    response = cloud_client.post(API + "/imports/local-inventory", json=body)
+    assert response.status_code == 200 and KEY not in response.text
+    devices = cloud_client.get("/api/v1/devices").json()
+    parent, child = devices
+    assert parent["ip"] is None and parent["version"] is None and parent["has_local_key"] is True
+    assert (
+        child["transport"] == "zigbee"
+        and child["cid"] == "node-1"
+        and child["parent_id"] == parent["id"]
+    )
+    with Session(cloud_client.app.state.engine) as session:
+        assert all(d.local_key == KEY for d in session.scalars(select(Device)).all())
+
+
+def test_cloud_command_checks_ack_without_claiming_physical_state(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/commands"
+    result = cloud_client.post(path, json={"commands": [{"code": "switch", "value": True}]})
+    assert result.status_code == 200 and result.json()["state_confirmed"] is False
+    manager = cloud_client.app.state.cloud.manager
+    assert manager.customer_api.calls == [
+        ("/v1.1/m/thing/gateway/commands", {"commands": [{"code": "switch", "value": True}]})
+    ]
+    assert SECRET not in result.text
+    for commands in [
+        [{"code": "missing", "value": True}],
+        [{"code": "switch", "value": "true"}],
+        [{"code": "switch", "value": True}] * 2,
+    ]:
+        assert cloud_client.post(path, json={"commands": commands}).status_code == 422
+    assert len(manager.customer_api.calls) == 1
+    manager.customer_api.success = False
+    assert (
+        cloud_client.post(path, json={"commands": [{"code": "switch", "value": False}]}).status_code
+        == 502
+    )
+
+
+def test_pending_expired_and_malformed_authorization_are_safe(cloud_client):
+    start = cloud_client.post(API + "/login/qr", json={"user_code": "code"}).json()
+    item = cloud_client.app.state.cloud.pending[start["session_id"]]
+    item["login"].ready = False
+    assert cloud_client.post(API + "/login/" + start["session_id"] + "/confirm").status_code == 409
+    item["expires"] = 0
+    assert cloud_client.get(start["qr_url"]).status_code == 410
+    assert cloud_client.get(API + "/login/unknown/qr.svg").status_code == 404
+
+
+def test_logout_deletes_only_our_local_session(cloud_client):
+    login(cloud_client)
+    cloud_client.get(API + "/devices")
+    path = cloud_client.app.state.cloud.path
+    response = cloud_client.delete(API + "/session")
+    assert response.json()["remote_authorization_revoked"] is False and not path.exists()
+    assert cloud_client.get(API + "/devices").status_code == 409
+
+
+def test_cloud_is_optional_and_requires_api_token(tmp_path):
+    with TestClient(create_app(Settings(database_path=str(tmp_path / "disabled.db")))) as client:
+        assert client.post(API + "/login/qr", json={"user_code": "code"}).status_code == 503
+        assert client.get(API + "/status").json()["enabled"] is False
+    with TestClient(
+        create_app(Settings(database_path=str(tmp_path / "no-token.db"), cloud_enabled=True))
+    ) as client:
+        assert client.post(API + "/login/qr", json={"user_code": "code"}).status_code == 503
+
+
+def test_qr_routes_require_authorization_and_validate_inputs(cloud_client):
+    cloud_client.headers.clear()
+    assert cloud_client.post(API + "/login/qr", json={"user_code": "code"}).status_code == 401
+    cloud_client.headers["X-API-Key"] = "test-api-key"
+    response = cloud_client.post(API + "/login/qr", json={"user_code": {"bad": SECRET}})
+    assert response.status_code == 422 and SECRET not in response.text
+
+
+def test_upstream_failure_never_leaks_token(cloud_client):
+    class UnsafeLogin(FakeLogin):
+        def qr_code(self, *args):
+            raise RuntimeError(SECRET + KEY)
+
+    cloud_client.app.state.cloud.login_factory = UnsafeLogin
+    response = cloud_client.post(API + "/login/qr", json={"user_code": "code"})
+    assert response.status_code == 502 and SECRET not in response.text and KEY not in response.text
+
+
+def test_local_key_metadata_cloud_does_not_override_custom_aliases(cloud_client):
+    login(cloud_client)
+    cloud_client.post(
+        "/api/v1/devices",
+        json={
+            "name": "Our name",
+            "device_id": "gateway",
+            "aliases": ["stable"],
+            "ip": "192.168.1.20",
+            "version": "3.5",
+        },
+    )
+    response = cloud_client.post(API + "/imports/local-inventory", json={"device_ids": ["gateway"]})
+    assert response.status_code == 200
+    device = cloud_client.get("/api/v1/devices/stable").json()
+    assert device["version"] == "3.5" and device["ip"] == "192.168.1.20"
+    assert device["aliases"] == ["Gateway", "stable"]

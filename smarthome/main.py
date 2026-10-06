@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
@@ -585,6 +585,9 @@ def create_app(settings: Settings | None = None, controller=None):
         engine = make_engine(settings.database_path)
         init_db(engine)
         app.state.engine = engine
+        from .cloud import CloudBridge
+
+        app.state.cloud = CloudBridge(settings)
         from .poller import DisplayPoller
 
         app.state.poller = DisplayPoller(app)
@@ -607,6 +610,17 @@ def create_app(settings: Settings | None = None, controller=None):
     from .display_api import router as display_router
 
     app.include_router(display_router)
+    from .cloud_api import router as cloud_router
+
+    app.include_router(cloud_router)
+
+    @app.get("/cloud", include_in_schema=False)
+    def cloud_setup_page():
+        from pathlib import Path
+
+        return FileResponse(
+            Path(__file__).parent / "static" / "cloud.html", headers={"Cache-Control": "no-store"}
+        )
 
     @app.get("/health", tags=["System"])
     def health():

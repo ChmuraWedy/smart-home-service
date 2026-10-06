@@ -1,0 +1,17 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Подключить Tuya</title><style>body{font:16px system-ui;background:#131a24;color:#e8f0ff;max-width:620px;margin:36px auto;padding:20px}input,button{font:inherit;padding:12px;margin:6px 0;border-radius:8px;width:100%;box-sizing:border-box}button{background:#56b6ff;color:#102030;border:0;cursor:pointer}img{width:280px;background:white;padding:16px}pre{white-space:pre-wrap}label{display:block;margin-top:20px}</style>
+<h1>Подключить Tuya</h1><p>Вход через Smart Life / Tuya Smart. Облачный режим требует интернета. Токены сохраняются на сервере.</p>
+<label>Ключ доступа к нашему сервису<input id="key" type="password" autocomplete="off"></label>
+<label>User Code из приложения Tuya<input id="user" type="password" autocomplete="off"></label>
+<button id="begin">Получить QR-код</button><img id="qr" alt="QR-код для входа" hidden>
+<p id="hint"></p><button id="confirm" hidden>Я подтвердил вход в приложении</button>
+<button id="list">Показать устройства аккаунта</button><pre id="result" role="status"></pre>
+<script>
+let session, imageUrl;
+const key=document.querySelector('#key'), result=document.querySelector('#result');
+async function call(path,method='GET',body){const response=await fetch('/api/v1/cloud'+path,{method,headers:{'X-API-Key':key.value,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});const data=await response.json();if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Ошибка запроса');return data;}
+async function act(fn){try{result.textContent='Подождите…';await fn();}catch(e){result.textContent=e.message;}}
+document.querySelector('#begin').onclick=()=>act(async()=>{const data=await call('/login/qr','POST',{user_code:document.querySelector('#user').value});session=data.session_id;const image=await fetch(data.qr_url,{headers:{'X-API-Key':key.value},cache:'no-store'});if(!image.ok)throw Error('Не удалось получить QR');if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=URL.createObjectURL(await image.blob());const qr=document.querySelector('#qr');qr.src=imageUrl;qr.hidden=false;document.querySelector('#confirm').hidden=false;document.querySelector('#hint').textContent='Сканируйте в Tuya / Smart Life и подтвердите вход. QR действует не более 2 минут.';result.textContent='Ожидается подтверждение в приложении.';});
+document.querySelector('#confirm').onclick=()=>act(async()=>{const data=await call('/login/'+session+'/confirm','POST');result.textContent=data.connected?'Аккаунт подключён. Токены хранятся только на сервере.':'Не подключено';document.querySelector('#qr').hidden=true;document.querySelector('#confirm').hidden=true;document.querySelector('#user').value='';});
+document.querySelector('#list').onclick=()=>act(async()=>{const devices=await call('/devices?refresh=true');result.textContent=devices.map(d=>`${d.name} — ${d.id}\n${d.online?'В сети':'Не в сети'}, локальный ключ: ${d.has_local_key?'доступен на сервере':'нет'}`).join('\n\n')||'Устройств нет';});
+</script></html>

@@ -1,0 +1,3 @@
+-r requirements.txt
+tuya-device-sharing-sdk==0.2.15
+qrcode>=8,<9

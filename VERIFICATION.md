@@ -42,3 +42,7 @@ ruff==0.16.10
 ## Room dashboard update
 
 193 tests passed, including 15 room/group/display checks. Tested partial command failure, ACK without fabricated state, stale motion, selection constraints, deletion/move restrictions, background polling deduplication and persistence across restart. No physical display was attached.
+
+## Optional cloud QR update
+
+204 tests passed; 11 new cloud checks use fake login/manager APIs. Real cloud credentials/QR approval were not supplied, so no real account was connected. Tested local SVG rendering, session file 0600, token refresh persistence, non-disclosure, parent/cid import, command validation and checked acknowledgements. No remote terminal revocation was performed.

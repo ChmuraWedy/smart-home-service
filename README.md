@@ -389,3 +389,7 @@ curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
 ## Панели комнат и группы
 
 [docs/displays.md](docs/displays.md): CRUD групп ламп, сохранение выбора комнаты и widgets, компактный dashboard, фоновое получение показаний и curl-примеры. `SMART_HOME_DISPLAY_POLL_INTERVAL=30` задаёт период опроса выбранных устройств; `0` — только явный refresh.
+
+## Вход Tuya по QR
+
+Optional бесплатный Sharing SDK режим: [docs/qr-login.md](docs/qr-login.md). После включения cloud extra и `SMART_HOME_CLOUD_ENABLED=1` откройте `/cloud`: User Code → QR → подтверждение в приложении. Токены и local_key остаются на сервере. Доступны облачные команды и импорт метаданных в локальный инвентарь.
