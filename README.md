@@ -385,3 +385,7 @@ curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
 ```
 
 Новые capability поля: `read_dp`, `scale`, `offset`, `invert`, `raw_type`, `step`, `value_map`, `write_dps`; color encodings `tuya_hsv`, `tuya_rgbhsv`, `tuya_hsv_json`. Определения без этих полей сохраняют прежнюю семантику. На старте автоматически создаётся таблица наблюдений; каждая температура/влажность/статус имеет собственное время, ACK не обновляет показания.
+
+## Панели комнат и группы
+
+[docs/displays.md](docs/displays.md): CRUD групп ламп, сохранение выбора комнаты и widgets, компактный dashboard, фоновое получение показаний и curl-примеры. `SMART_HOME_DISPLAY_POLL_INTERVAL=30` задаёт период опроса выбранных устройств; `0` — только явный refresh.

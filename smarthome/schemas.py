@@ -399,6 +399,68 @@ class CapabilitiesCommand(Schema):
     values: dict[CapName, JsonValue] = Field(min_length=1, max_length=16)
 
 
+class GroupCreate(Schema):
+    name: Name
+    room_id: PositiveID
+    device_ids: list[PositiveID] = Field(min_length=1, max_length=16)
+
+    @field_validator("device_ids")
+    @classmethod
+    def unique_members(cls, values):
+        if len(set(values)) != len(values):
+            raise ValueError("Group members must be unique")
+        return values
+
+
+class GroupPatch(Patch):
+    non_nullable = {"name", "room_id", "device_ids"}
+    name: Name | None = None
+    room_id: PositiveID | None = None
+    device_ids: list[PositiveID] | None = Field(default=None, min_length=1, max_length=16)
+    _unique_members = field_validator("device_ids")(
+        lambda v: GroupCreate.unique_members(v) if v is not None else v
+    )
+
+
+class GroupRead(GroupCreate):
+    id: int
+
+
+DisplayID = Annotated[str, Field(pattern=r"^[a-z][a-z0-9._-]{0,63}$")]
+
+
+class WidgetSelection(Schema):
+    kind: Literal["device", "group"]
+    id: PositiveID
+    capabilities: list[CapName] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def valid_selection(self):
+        if self.kind == "group" and self.capabilities:
+            raise ValueError("Group widgets do not select individual capabilities")
+        if len(set(self.capabilities)) != len(self.capabilities):
+            raise ValueError("Capabilities must be unique")
+        return self
+
+
+class DisplayConfig(Schema):
+    name: Name
+    room_id: PositiveID
+    widgets: list[WidgetSelection] = Field(default_factory=list, max_length=12)
+
+    @field_validator("widgets")
+    @classmethod
+    def unique_widgets(cls, widgets):
+        targets = [(w.kind, w.id) for w in widgets]
+        if len(set(targets)) != len(targets):
+            raise ValueError("Widget targets must be unique")
+        return widgets
+
+
+class DisplayRead(DisplayConfig):
+    id: str
+
+
 class ImportRequest(Schema):
     devices: JsonValue = Field(
         description="TinyTuya devices.json: list or {devices: [...]} wrapper"

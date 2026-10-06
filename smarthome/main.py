@@ -1,16 +1,16 @@
-import hmac
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from . import __version__
+from .api_dependencies import authenticate, get_session
 from .config import Settings
+from .control import run_command
 from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
@@ -18,7 +18,6 @@ from .models import (
     Device,
     DeviceType,
     Room,
-    utcnow,
 )
 from .schemas import (
     Alias,
@@ -60,25 +59,9 @@ from .service import (
     get_by_ref,
     get_or_404,
     patch_device,
-    record_observations,
     replace_aliases,
 )
 from .tuya import TuyaController
-
-
-def get_session(request: Request):
-    with Session(request.app.state.engine, expire_on_commit=False) as session:
-        yield session
-
-
-token_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-
-def authenticate(request: Request, token: str | None = Depends(token_header)):
-    expected = request.app.state.settings.api_token
-    if expected and not hmac.compare_digest((token or "").encode(), expected.encode()):
-        raise HTTPException(401, "Missing or invalid X-API-Key")
-
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
 
@@ -361,21 +344,6 @@ def children(item_id: EntityRef, session: Session = Depends(get_session)):
     return [device_read(session, item) for item in items]
 
 
-def run_command(request, session, item, command, dps=None):
-    parent = get_or_404(session, Device, item.parent_id) if item.parent_id else None
-    # Release the read transaction while doing blocking LAN I/O. expire_on_commit=False
-    # retains the configuration snapshot used for this command.
-    session.commit()
-    observed = request.app.state.controller.execute(item, parent, dps=dps)
-    observed_at = utcnow()
-    record_observations(session, item, observed, observed_at)
-    commit(session)
-    # Empty control acknowledgement does not prove the requested physical state.
-    return CommandRead(
-        device_id=item.id, command=command, acknowledged=True, dps=observed, observed_at=observed_at
-    )
-
-
 @router.get("/devices/{item_id}/state", response_model=DeviceState, tags=["Control"])
 def normalized_state(
     item_id: EntityRef,
@@ -617,9 +585,14 @@ def create_app(settings: Settings | None = None, controller=None):
         engine = make_engine(settings.database_path)
         init_db(engine)
         app.state.engine = engine
+        from .poller import DisplayPoller
+
+        app.state.poller = DisplayPoller(app)
+        app.state.poller.start()
         try:
             yield
         finally:
+            app.state.poller.stop()
             engine.dispose()
 
     app = FastAPI(
@@ -631,6 +604,9 @@ def create_app(settings: Settings | None = None, controller=None):
     app.state.settings = settings
     app.state.controller = controller or TuyaController(settings)
     app.include_router(router)
+    from .display_api import router as display_router
+
+    app.include_router(display_router)
 
     @app.get("/health", tags=["System"])
     def health():

@@ -17,6 +17,12 @@ class Settings:
         default_factory=lambda: float(os.getenv("SMART_HOME_LOCK_TIMEOUT", "5"))
     )
 
+    display_poll_interval: float = field(
+        default_factory=lambda: float(os.getenv("SMART_HOME_DISPLAY_POLL_INTERVAL", "30"))
+    )
+
     def __post_init__(self):
+        if self.display_poll_interval != 0 and not 10 <= self.display_poll_interval <= 3600:
+            raise ValueError("Display poll interval must be 0 (manual) or 10..3600 seconds")
         if not 0 < self.tuya_timeout <= 30 or not 0 < self.lock_timeout <= 60:
             raise ValueError("Timeouts must be positive: Tuya <=30s, lock <=60s")

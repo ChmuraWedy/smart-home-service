@@ -143,3 +143,56 @@ class DeviceObservation(Base):
     dp: Mapped[str] = mapped_column(String(8), primary_key=True)
     value: Mapped[object] = mapped_column(JSON)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class DeviceGroup(Base):
+    __tablename__ = "device_groups"
+    __table_args__ = (UniqueConstraint("room_id", "name"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="RESTRICT"), index=True)
+    members: Mapped[list["GroupMember"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+        order_by="GroupMember.position",
+    )
+
+
+class GroupMember(Base):
+    __tablename__ = "group_members"
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey("device_groups.id", ondelete="CASCADE"), primary_key=True
+    )
+    device_id: Mapped[int] = mapped_column(
+        ForeignKey("devices.id", ondelete="RESTRICT"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column()
+
+
+class Display(Base):
+    __tablename__ = "displays"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="RESTRICT"), index=True)
+    widgets: Mapped[list["DisplayWidget"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+        order_by="DisplayWidget.position",
+    )
+
+
+class DisplayWidget(Base):
+    __tablename__ = "display_widgets"
+    display_id: Mapped[str] = mapped_column(
+        ForeignKey("displays.id", ondelete="CASCADE"), primary_key=True
+    )
+    position: Mapped[int] = mapped_column(primary_key=True)
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devices.id", ondelete="RESTRICT"), index=True
+    )
+    group_id: Mapped[int | None] = mapped_column(
+        ForeignKey("device_groups.id", ondelete="RESTRICT"), index=True
+    )
+    capabilities: Mapped[list] = mapped_column(JSON, default=list)

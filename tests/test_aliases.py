@@ -265,7 +265,11 @@ def test_upgrade_existing_database_preserves_inventory_and_keys(tmp_path):
     path = tmp_path / "old-version.db"
     engine = create_engine("sqlite:///" + str(path))
     # v0.1.0 schema consists of the same four inventory tables, without alias tables.
-    tables = [table for table in Base.metadata.sorted_tables if not table.name.endswith("_aliases")]
+    tables = [
+        table
+        for table in Base.metadata.sorted_tables
+        if table.name in {"buildings", "rooms", "device_types", "devices"}
+    ]
     Base.metadata.create_all(engine, tables=tables)
     with engine.begin() as connection:
         connection.execute(

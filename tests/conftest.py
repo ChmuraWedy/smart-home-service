@@ -59,7 +59,12 @@ def factory():
 
 @pytest.fixture
 def client(tmp_path, factory):
-    settings = Settings(database_path=str(tmp_path / "test.db"), tuya_timeout=1, lock_timeout=0.1)
+    settings = Settings(
+        database_path=str(tmp_path / "test.db"),
+        tuya_timeout=1,
+        lock_timeout=0.1,
+        display_poll_interval=0,
+    )
     app = create_app(settings, TuyaController(settings, factory))
     with TestClient(app) as test_client:
         yield test_client

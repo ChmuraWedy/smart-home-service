@@ -129,6 +129,9 @@ def validate_device(session: Session, values: dict, item_id: int | None = None):
     elif parent_id is not None or values.get("cid") is not None:
         raise HTTPException(422, "Wi-Fi device cannot have parent_id or cid")
     if item_id is not None:
+        from .dashboard import validate_device_move
+
+        validate_device_move(session, item_id, values.get("room_id"))
         children = session.scalars(select(Device).where(Device.parent_id == item_id)).all()
         if children and (not values["is_gateway"] or values["transport"] != "wifi"):
             raise HTTPException(409, "Gateway has children; detach them before changing its role")
