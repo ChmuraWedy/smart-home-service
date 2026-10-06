@@ -4718,4 +4718,3 @@ lv_font_t panel_font = {
 
 
 #endif /*#if PANEL_FONT*/
-
