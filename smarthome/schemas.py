@@ -4,6 +4,7 @@ from typing import Annotated, ClassVar, Literal
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     JsonValue,
@@ -20,6 +21,36 @@ Version = Literal["3.1", "3.2", "3.3", "3.4", "3.5"]
 PositiveID = Annotated[int, Field(gt=0)]
 
 
+def normalize_alias(value):
+    return value.strip().lower() if isinstance(value, str) else value
+
+
+def normalize_reference(value):
+    value = normalize_alias(value)
+    if isinstance(value, str) and value.isascii() and value.isdecimal():
+        if len(value) > 19 or int(value) > 9223372036854775807:
+            raise ValueError("ID exceeds SQLite integer range")
+    return value
+
+
+Alias = Annotated[
+    str,
+    BeforeValidator(normalize_alias),
+    Field(pattern=r"^[a-z][a-z0-9._-]{0,63}$"),
+]
+EntityRef = Annotated[
+    str,
+    BeforeValidator(normalize_reference),
+    Field(pattern=r"^(?:[1-9][0-9]{0,18}|[a-z][a-z0-9._-]{0,63})$"),
+]
+
+
+def unique_aliases(value):
+    if value is not None and len(value) != len(set(value)):
+        raise ValueError("Aliases must be unique after normalization")
+    return value
+
+
 class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True, allow_inf_nan=False)
 
@@ -33,6 +64,16 @@ class Patch(Schema):
             if getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be null")
         return self
+
+
+class AliasedSchema(Schema):
+    aliases: list[Alias] = Field(default_factory=list, max_length=32)
+    _unique_aliases = field_validator("aliases")(unique_aliases)
+
+
+class AliasedPatch(Patch):
+    aliases: list[Alias] | None = Field(default=None, max_length=32)
+    _unique_aliases = field_validator("aliases")(unique_aliases)
 
 
 class Capability(Schema):
@@ -68,14 +109,14 @@ class Capability(Schema):
 Capabilities = dict[CapName, Capability]
 
 
-class BuildingCreate(Schema):
+class BuildingCreate(AliasedSchema):
     name: Name
     address: str | None = Field(default=None, max_length=500)
     description: str | None = Field(default=None, max_length=4000)
 
 
-class BuildingPatch(Patch):
-    non_nullable = {"name"}
+class BuildingPatch(AliasedPatch):
+    non_nullable = {"name", "aliases"}
     name: Name | None = None
     address: str | None = Field(default=None, max_length=500)
     description: str | None = Field(default=None, max_length=4000)
@@ -85,14 +126,14 @@ class BuildingRead(BuildingCreate):
     id: int
 
 
-class RoomCreate(Schema):
+class RoomCreate(AliasedSchema):
     building_id: PositiveID
     name: Name
     description: str | None = Field(default=None, max_length=4000)
 
 
-class RoomPatch(Patch):
-    non_nullable = {"building_id", "name"}
+class RoomPatch(AliasedPatch):
+    non_nullable = {"building_id", "name", "aliases"}
     building_id: PositiveID | None = None
     name: Name | None = None
     description: str | None = Field(default=None, max_length=4000)
@@ -121,7 +162,7 @@ class DeviceTypeRead(DeviceTypeCreate):
     id: int
 
 
-class DeviceFields(Schema):
+class DeviceFields(AliasedSchema):
     name: Name
     description: str | None = Field(default=None, max_length=4000)
     device_id: Identifier
@@ -174,8 +215,16 @@ class DeviceCreate(DeviceFields):
         return self
 
 
-class DevicePatch(Patch):
-    non_nullable = {"name", "device_id", "transport", "is_gateway", "enabled", "capabilities"}
+class DevicePatch(AliasedPatch):
+    non_nullable = {
+        "name",
+        "device_id",
+        "transport",
+        "is_gateway",
+        "enabled",
+        "capabilities",
+        "aliases",
+    }
     name: Name | None = None
     description: str | None = Field(default=None, max_length=4000)
     device_id: Identifier | None = None
@@ -217,6 +266,10 @@ class DeviceRead(DeviceFields):
     last_seen_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class AliasCreate(Schema):
+    alias: Alias
 
 
 class RoomTree(RoomRead):

@@ -43,10 +43,10 @@ DeviceType ── capabilities ── Device.device_type_id
 Device (wifi, is_gateway=true) ── children.parent_id
 ```
 
-- `Building`: `name`, `address`, `description`.
-- `Room`: `building_id`, `name`, `description`. Имена комнат уникальны внутри здания.
+- `Building`: `name`, `address`, `description`, `aliases`.
+- `Room`: `building_id`, `name`, `description`, `aliases`. Имена комнат уникальны внутри здания.
 - `DeviceType`: уникальный `slug`, `name`, `description`, карта `capabilities`.
-- `Device`: `name`, `description`, `device_type_id`, `building_id`, `room_id`, `device_id`, `local_key`, `ip`, `version`, `transport`, `is_gateway`, `parent_id`, `cid`/`node_id`, `enabled`, `product_id`, `category`, `mac`, карта `capabilities`.
+- `Device`: `name`, `description`, `aliases`, `device_type_id`, `building_id`, `room_id`, `device_id`, `local_key`, `ip`, `version`, `transport`, `is_gateway`, `parent_id`, `cid`/`node_id`, `enabled`, `product_id`, `category`, `mac`, карта `capabilities`.
 - `device_id` — строковый идентификатор Tuya. `id` и `parent_id` в API — числовые идентификаторы SQLite, это разные поля.
 - `Gateway` представлен устройством с `is_gateway=true`, `transport=wifi`. Список шлюзов: `GET /api/v1/devices?is_gateway=true`.
 - `cid` — адрес дочернего узла, **не** его Tuya `device_id`. `node_id` — входной алиас `cid`; в ответе оба поля содержат одно значение. Пара `(parent_id, cid)` уникальна.
@@ -55,6 +55,49 @@ Device (wifi, is_gateway=true) ── children.parent_id
 - Удаление объектов с зависимостями возвращает 409. Удаление здания не удаляет автоматически комнаты и устройства. Gateway нельзя удалить или лишить роли шлюза, пока у него есть children.
 
 Обновления делаются через `PATCH`: не переданные поля сохраняются, `null` очищает только nullable-поля. Карта `capabilities` при PATCH заменяется целиком на соответствующем уровне.
+
+## Алиасы зданий, комнат и устройств
+
+Каждый Building, Room и Device может иметь до 32 алиасов, например `home`, `kitchen`, `kitchen_light`, `first-floor.lamp`. Алиасы передаются массивом `aliases` при создании или PATCH. Массив заменяется целиком; отсутствие поля сохраняет алиасы, `[]` очищает их, `null` отклоняется. В ответах алиасы отсортированы.
+
+Алиасы приводятся к нижнему регистру, пробелы по краям убираются. После нормализации допускается 1–64 символа: первая латинская буква `a-z`, далее `a-z`, цифры, `_`, `-`, `.`. Чисто числовые алиасы запрещены, поэтому они не конфликтуют с числовыми ID. Дубли внутри массива возвращают 422; занятый алиас — 409 без частичного изменения объекта.
+
+Уникальность действует **в пределах типа сущности во всём сервисе**. У двух комнат даже в разных зданиях не может быть одинакового алиаса; используйте, например, `home.kitchen` и `office.kitchen`. Здание, комната и устройство могут использовать один и тот же алиас: их адреса различаются префиксом ресурса. DeviceType продолжает использовать числовой ID и свой `slug`.
+
+Во всех адресах `buildings/{id}`, `rooms/{id}`, `devices/{id}`, включая hierarchy, children, status и команды, вместо ID можно передать алиас. Числовые ссылки в JSON (`building_id`, `room_id`, `parent_id`) и существующие фильтры по ID остаются числовыми. Списки поддерживают дополнительный точный фильтр `?alias=...`; неизвестный алиас в адресе возвращает 404, а в фильтре — пустой список.
+
+Для каждого из ресурсов `buildings`, `rooms`, `devices` также доступны:
+
+| Метод | Путь | Результат |
+|---|---|---|
+| GET | `/{resource}/{id_or_alias}/aliases` | Массив алиасов |
+| POST | `/{resource}/{id_or_alias}/aliases` | Добавить один: `{"alias":"..."}`, 201 и обновлённый объект |
+| DELETE | `/{resource}/{id_or_alias}/aliases/{alias}` | Удалить один, 204 |
+
+При удалении объекта освобождаются его алиасы. Алиасы не обходят проверки зависимостей, авторизацию или правила Zigbee. В TinyTuya передаётся исходный Tuya `device_id`, а child по-прежнему использует настоящий parent + cid.
+
+```sh
+export BASE=http://127.0.0.1:8000/api/v1
+export TOKEN='replace-with-a-long-random-token'
+# Здесь 1 и 3 — существующие числовые ID из вашего инвентаря.
+curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"aliases":["home"]}' "$BASE/buildings/1"
+curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"aliases":["kitchen"]}' "$BASE/rooms/1"
+curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"aliases":["kitchen_light","main_lamp"]}' "$BASE/devices/3"
+
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/buildings/home/hierarchy"
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/rooms/kitchen/devices"
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices?alias=kitchen_light"
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/status"
+curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/commands/on"
+curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"alias":"evening_light"}' "$BASE/devices/kitchen_light/aliases"
+curl -sS -X DELETE -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/aliases/evening_light"
+```
+
+Обновление базы с v0.1.0 не требует экспорта/повторного импорта: при старте автоматически создаются только три новые таблицы алиасов, существующие таблицы и ключи сохраняются. После обновления у старых объектов `aliases:[]`. Перед обновлением рабочей установки сделайте штатную резервную копию базы.
 
 ## REST API
 
@@ -87,7 +130,7 @@ Device (wifi, is_gateway=true) ── children.parent_id
 | POST | `/devices/{id}/commands/temperature` | Capability `temperature` |
 | POST | `/imports/tinytuya` | Атомарный импорт JSON |
 
-Фильтры устройств: `building_id`, `room_id`, `device_type_id`, `parent_id`, `is_gateway`, `transport=wifi|zigbee`, `unassigned=true` (нет ни комнаты, ни здания). Фильтр комнат: `building_id`. Вложенные списки и hierarchy возвращаются целиком; для большого инвентаря используйте списковые API с пагинацией.
+Фильтры устройств: `building_id`, `room_id`, `device_type_id`, `parent_id`, `is_gateway`, `transport=wifi|zigbee`, `unassigned=true` (нет ни комнаты, ни здания), `alias`. Фильтры комнат: `building_id`, `alias`; зданий — `alias`. Вложенные списки и hierarchy возвращаются целиком; для большого инвентаря используйте списковые API с пагинацией.
 
 Ошибки: 401 — токен, 404 — объект отсутствует, 409 — конфликт/нет нужной конфигурации, 422 — неверные поля/связи/значения capability, 502 — ошибка Tuya/непригодный ответ, 503 — занят gateway или БД, 504 — нет ответа/тайм-аут. Ошибки валидации возвращают путь поля и тип ошибки без исходного значения.
 
@@ -192,7 +235,7 @@ curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
 
 Поддерживается список объектов или оболочка `{"devices":[...]}`. Для идентификатора принимаются `id`, `device_id`, `gwId`; ключа — `key`, `local_key`; версии — `version`, `ver`; child — `cid`, `node_id`; родителя — `parent`, `gateway_id`, `parent_device_id`. В исходных TinyTuya-файлах parent содержит строковый Tuya ID шлюза, который преобразуется в числовой `parent_id` базы.
 
-Записи объединяются по Tuya device ID. Snapshot дополняет/обновляет IP, версию и доступные реквизиты. Пустые поля не стирают существующие реквизиты. В snapshot могут отсутствовать children; они сохраняются из devices.json. `data`, DPS snapshot и произвольные raw/cloud поля не импортируются: старый снимок не считается текущим статусом. Capabilities настраиваются отдельно после импорта. См. [формат snapshot TinyTuya](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/scanner.py) и [parent-поля wizard](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/wizard.py).
+Записи объединяются по Tuya device ID. Snapshot дополняет/обновляет IP, версию и доступные реквизиты. Пустые поля не стирают существующие реквизиты. В snapshot могут отсутствовать children; они сохраняются из devices.json. Дополнительное поле `aliases` импортируется для устройств: отсутствие сохраняет текущие алиасы, `[]` очищает. Конфликт алиасов откатывает весь импорт. `data`, DPS snapshot и произвольные raw/cloud поля не импортируются: старый снимок не считается текущим статусом. Capabilities настраиваются отдельно после импорта. См. [формат snapshot TinyTuya](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/scanner.py) и [parent-поля wizard](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/wizard.py).
 
 Импорт — upsert, повторный запуск не создаёт дубликаты. Явные поля размещения в запросе применяются ко всем импортируемым устройствам; не переданные сохраняются. Родители обрабатываются до children независимо от порядка строк; упомянутые прямые устройства помечаются шлюзами. Если parent неизвестен, импорт не угадывает его по ключу: передайте `parent_map` или исправьте `parent` в источнике. Нет parent/cid, конфликт идентификаторов или неверные поля — откат **всего** импорта. `dry_run=true` выполняет проверки и откатывает изменения; на новой базе таблицы всё равно создаются.
 
@@ -229,7 +272,7 @@ rm /tmp/smart-home-import.json
 
 `local_key` — write-only поле: его можно создать, заменить через PATCH или очистить `null`. В обычных ответах, hierarchy, импорте и ошибках ключ не возвращается. Есть только `has_local_key`. Endpoint раскрытия ключа отсутствует. Gateway ключ используется для всех его children. Ключ должен содержать 16 печатных ASCII-символов. Исключения и сырые `Payload` TinyTuya не попадают в API-ответы; отладочное логирование TinyTuya не включено. IP — конкретный unicast IPv4, соответствующий LAN-транспорту TinyTuya; `0.0.0.0` не принимается, чтобы не запускать неявный discovery.
 
-SQLite хранит ключи в открытом виде, поэтому файл базы создаётся с правами 0600. Используйте `umask 077` для запуска, импорта и резервных копий; не кладите реальную базу или TinyTuya JSON в Git. Примеры содержат только вымышленные реквизиты. Отдельное шифрование секретов и роли пользователей — возможное дальнейшее расширение. Для резервной копии остановите сервис и скопируйте базу или используйте штатный SQLite backup API. `create_all` создаёт начальную схему, но не выполняет миграции существующей схемы при будущих изменениях моделей.
+SQLite хранит ключи в открытом виде, поэтому файл базы создаётся с правами 0600. Используйте `umask 077` для запуска, импорта и резервных копий; не кладите реальную базу или TinyTuya JSON в Git. Примеры содержат только вымышленные реквизиты. Отдельное шифрование секретов и роли пользователей — возможное дальнейшее расширение. Для резервной копии остановите сервис и скопируйте базу или используйте штатный SQLite backup API. `create_all` создаёт начальную схему и новые таблицы алиасов для обновления v0.1.0 → v0.2.0; изменение колонок в будущих версиях потребует отдельной миграции.
 
 ## Orange Pi / OpenWrt
 
@@ -257,18 +300,18 @@ python -m pytest -q
 ruff check .
 ```
 
-Тесты проверяют CRUD, hierarchy, ссылки и запрет удаления зависимостей, секреты, атомарный импорт/dry-run, Wi-Fi и gateway/cid, тайм-ауты, ACK без DPS, capability mapping и блокировку gateway. Отдельные проверки создают реальные объекты TinyTuya и проверяют child payload для 3.3/3.4/3.5 без сетевого соединения. Реальное оборудование не подключалось. Фактические результаты и версии окружения — в `VERIFICATION.md`.
+Тесты проверяют CRUD, hierarchy, ссылки и запрет удаления зависимостей, секреты, атомарный импорт/dry-run, Wi-Fi и gateway/cid, тайм-ауты, ACK без DPS, capability mapping и блокировку gateway. Для алиасов проверяются CRUD/поиск/команды, уникальность и откат конфликтов, удаление и повторное использование, импорт, авторизация и обновление существующей базы. Отдельные проверки создают реальные объекты TinyTuya и проверяют child payload для 3.3/3.4/3.5 без сетевого соединения. Реальное оборудование не подключалось. Фактические результаты и версии окружения — в `VERIFICATION.md`.
 
 Точки расширения: `tuya.py` — транспорт/receive loop, `service.py` — capability mapping и инварианты, `importer.py` — адаптер TinyTuya-файлов, `models.py` — хранилище. MQTT, расписания, сценарии, постоянный Zigbee event loop и multi-worker locks в первую версию не входят.
 
 ## Версионирование
 
-Исходники хранятся в Git, основная ветка — `main`. Начальная версия отмечена тегом `v0.1.0`; изменения версий описаны в `CHANGELOG.md`. Базы данных, локальные настройки, реальные TinyTuya-файлы и виртуальные окружения исключены через `.gitignore`.
+Исходники хранятся в Git, основная ветка — `main`. Начальная версия отмечена тегом `v0.1.0`, поддержка алиасов — `v0.2.0`; изменения версий описаны в `CHANGELOG.md`. Базы данных, локальные настройки, реальные TinyTuya-файлы и виртуальные окружения исключены через `.gitignore`.
 
 ```sh
 git status
 git log --oneline --decorate
-git show v0.1.0
+git show v0.2.0
 ```
 
 Первый коммит создан от имени `Codex` с локальным техническим адресом `codex@localhost`. Перед своими коммитами задайте имя и email через `git config user.name` и `git config user.email`; глобальные настройки не менялись.
@@ -276,7 +319,7 @@ git show v0.1.0
 Git bundle содержит исходники, историю и теги и позволяет восстановить репозиторий без удалённого сервера:
 
 ```sh
-git clone smart-home-service-v0.1.0.bundle smart-home-service
+git clone smart-home-service-v0.2.0.bundle smart-home-service
 cd smart-home-service
 git log --oneline --decorate
 ```

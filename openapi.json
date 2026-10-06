@@ -3,7 +3,7 @@
   "info": {
     "title": "Smart Home Local API",
     "description": "SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "paths": {
     "/api/v1/buildings": {
@@ -63,6 +63,22 @@
           }
         ],
         "parameters": [
+          {
+            "name": "alias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Alias"
+            }
+          },
           {
             "name": "offset",
             "in": "query",
@@ -133,7 +149,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -178,7 +194,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -233,7 +249,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -273,7 +289,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -324,7 +340,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -427,6 +443,22 @@
             }
           },
           {
+            "name": "alias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Alias"
+            }
+          },
+          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -496,7 +528,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -541,7 +573,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -596,7 +628,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -636,7 +668,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -976,6 +1008,22 @@
         ],
         "parameters": [
           {
+            "name": "alias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Alias"
+            }
+          },
+          {
             "name": "building_id",
             "in": "query",
             "required": false,
@@ -1152,7 +1200,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1197,7 +1245,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1252,7 +1300,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1292,7 +1340,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1343,7 +1391,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1390,7 +1438,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1437,7 +1485,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1494,7 +1542,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1551,7 +1599,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1608,7 +1656,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           },
@@ -1674,7 +1722,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1731,7 +1779,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1788,7 +1836,7 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "integer",
+              "type": "string",
               "title": "Item Id"
             }
           }
@@ -1871,6 +1919,474 @@
         ]
       }
     },
+    "/api/v1/buildings/{item_id}/aliases": {
+      "get": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Buildings Aliases",
+        "operationId": "buildings_aliases_api_v1_buildings__item_id__aliases_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+                  },
+                  "title": "Response Buildings Aliases Api V1 Buildings  Item Id  Aliases Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Buildings Add Alias",
+        "operationId": "buildings_add_alias_api_v1_buildings__item_id__aliases_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/buildings/{item_id}/aliases/{alias}": {
+      "delete": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Buildings Delete Alias",
+        "operationId": "buildings_delete_alias_api_v1_buildings__item_id__aliases__alias__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "alias",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alias"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{item_id}/aliases": {
+      "get": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Rooms Aliases",
+        "operationId": "rooms_aliases_api_v1_rooms__item_id__aliases_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+                  },
+                  "title": "Response Rooms Aliases Api V1 Rooms  Item Id  Aliases Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Rooms Add Alias",
+        "operationId": "rooms_add_alias_api_v1_rooms__item_id__aliases_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rooms/{item_id}/aliases/{alias}": {
+      "delete": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Rooms Delete Alias",
+        "operationId": "rooms_delete_alias_api_v1_rooms__item_id__aliases__alias__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "alias",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alias"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{item_id}/aliases": {
+      "get": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Devices Aliases",
+        "operationId": "devices_aliases_api_v1_devices__item_id__aliases_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+                  },
+                  "title": "Response Devices Aliases Api V1 Devices  Item Id  Aliases Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Devices Add Alias",
+        "operationId": "devices_add_alias_api_v1_devices__item_id__aliases_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AliasCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{item_id}/aliases/{alias}": {
+      "delete": {
+        "tags": [
+          "Aliases"
+        ],
+        "summary": "Devices Delete Alias",
+        "operationId": "devices_delete_alias_api_v1_devices__item_id__aliases__alias__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "alias",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Alias"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -1893,8 +2409,30 @@
   },
   "components": {
     "schemas": {
+      "AliasCreate": {
+        "properties": {
+          "alias": {
+            "type": "string",
+            "title": "Alias"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "alias"
+        ],
+        "title": "AliasCreate"
+      },
       "BuildingCreate": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "name": {
             "type": "string",
             "maxLength": 120,
@@ -1936,6 +2474,21 @@
       },
       "BuildingPatch": {
         "properties": {
+          "aliases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliases"
+          },
           "name": {
             "anyOf": [
               {
@@ -1981,6 +2534,15 @@
       },
       "BuildingRead": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "name": {
             "type": "string",
             "maxLength": 120,
@@ -2027,6 +2589,15 @@
       },
       "BuildingTree": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "name": {
             "type": "string",
             "maxLength": 120,
@@ -2255,6 +2826,14 @@
       },
       "DeviceCreate": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "name": {
             "type": "string",
             "maxLength": 120,
@@ -2477,6 +3056,21 @@
       },
       "DevicePatch": {
         "properties": {
+          "aliases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliases"
+          },
           "name": {
             "anyOf": [
               {
@@ -2732,6 +3326,15 @@
       },
       "DeviceRead": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "name": {
             "type": "string",
             "maxLength": 120,
@@ -3237,6 +3840,14 @@
       "JsonValue": {},
       "RoomCreate": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "building_id": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
@@ -3272,6 +3883,21 @@
       },
       "RoomPatch": {
         "properties": {
+          "aliases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aliases"
+          },
           "building_id": {
             "anyOf": [
               {
@@ -3317,6 +3943,15 @@
       },
       "RoomRead": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "building_id": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
@@ -3357,6 +3992,15 @@
       },
       "RoomTree": {
         "properties": {
+          "aliases": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
           "building_id": {
             "type": "integer",
             "exclusiveMinimum": 0.0,

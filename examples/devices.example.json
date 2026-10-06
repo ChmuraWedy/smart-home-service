@@ -2,6 +2,7 @@
   {
     "id": "demo_zigbee_relay",
     "name": "Zigbee relay",
+    "aliases": ["kitchen_relay"],
     "sub": true,
     "parent": "demo_gateway",
     "node_id": "0011223344556677",
@@ -10,6 +11,7 @@
   {
     "id": "demo_gateway",
     "name": "Tuya gateway",
+    "aliases": ["tuya_gateway"],
     "key": "0123456789abcdef",
     "product_id": "demo_gateway_product",
     "category": "wg2"
@@ -17,6 +19,7 @@
   {
     "id": "demo_wifi_outlet",
     "name": "Wi-Fi outlet",
+    "aliases": ["wifi_outlet"],
     "key": "fedcba9876543210",
     "category": "cz"
   }

@@ -5,7 +5,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Building, Device, DeviceType, Room
+from .models import (
+    Building,
+    BuildingAlias,
+    Device,
+    DeviceAlias,
+    DeviceType,
+    Room,
+    RoomAlias,
+    utcnow,
+)
 from .schemas import Capability, DeviceRead
 
 
@@ -13,6 +22,49 @@ def get_or_404(session: Session, model, item_id: int):
     item = session.get(model, item_id)
     if item is None:
         raise HTTPException(404, f"{model.__name__} not found")
+    return item
+
+
+ALIAS_MODELS = {
+    Building: (BuildingAlias, "building_id"),
+    Room: (RoomAlias, "room_id"),
+    Device: (DeviceAlias, "device_id"),
+}
+
+
+def get_by_ref(session: Session, model, reference: str):
+    if reference.isascii() and reference.isdecimal():
+        return get_or_404(session, model, int(reference))
+    alias_model, owner_field = ALIAS_MODELS[model]
+    alias = session.get(alias_model, reference.strip().lower())
+    if alias is None:
+        raise HTTPException(404, f"{model.__name__} alias not found")
+    return get_or_404(session, model, getattr(alias, owner_field))
+
+
+def replace_aliases(session: Session, item, aliases: list[str]):
+    alias_model, owner_field = ALIAS_MODELS[type(item)]
+    with session.no_autoflush:
+        query = select(alias_model).where(alias_model.alias.in_(aliases))
+        if item.id is not None:
+            query = query.where(getattr(alias_model, owner_field) != item.id)
+        if session.scalar(query) is not None:
+            raise HTTPException(409, "Alias is already assigned to another object of this type")
+        existing = {entry.alias: entry for entry in item.alias_entries}
+        if isinstance(item, Device) and set(existing) != set(aliases):
+            item.updated_at = utcnow()
+        item.alias_entries = [
+            existing[alias] if alias in existing else alias_model(alias=alias)
+            for alias in sorted(aliases)
+        ]
+
+
+def create_aliased(session: Session, model, body):
+    values = body.model_dump(mode="json")
+    aliases = values.pop("aliases")
+    item = model(**values)
+    replace_aliases(session, item, aliases)
+    session.add(item)
     return item
 
 
@@ -76,13 +128,17 @@ def validate_device(session: Session, values: dict, item_id: int | None = None):
 
 
 def create_device(session: Session, body):
-    item = Device(**validate_device(session, device_values(body)))
+    values = device_values(body)
+    aliases = values.pop("aliases")
+    item = Device(**validate_device(session, values))
+    replace_aliases(session, item, aliases)
     session.add(item)
     return item
 
 
 def patch_device(session: Session, item: Device, body):
     delta = device_values(body, patch=True)
+    aliases = delta.pop("aliases", None)
     values = {column.name: getattr(item, column.name) for column in Device.__table__.columns}
     # A room change without an explicit building change follows the new room's building.
     if delta.get("room_id") is not None and "building_id" not in delta:
@@ -92,6 +148,8 @@ def patch_device(session: Session, item: Device, body):
     for key in delta:
         setattr(item, key, values[key])
     item.building_id = values["building_id"]
+    if aliases is not None:
+        replace_aliases(session, item, aliases)
     return item
 
 

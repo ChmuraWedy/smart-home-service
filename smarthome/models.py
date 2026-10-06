@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow():
@@ -12,15 +12,27 @@ class Base(DeclarativeBase):
     pass
 
 
-class Building(Base):
+class AliasOwner:
+    @property
+    def aliases(self) -> list[str]:
+        return sorted(entry.alias for entry in self.alias_entries)
+
+
+class Building(AliasOwner, Base):
     __tablename__ = "buildings"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
     address: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text)
+    alias_entries: Mapped[list["BuildingAlias"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+        order_by="BuildingAlias.alias",
+    )
 
 
-class Room(Base):
+class Room(AliasOwner, Base):
     __tablename__ = "rooms"
     __table_args__ = (UniqueConstraint("building_id", "name"),)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -29,6 +41,12 @@ class Room(Base):
     )
     name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text)
+    alias_entries: Mapped[list["RoomAlias"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+        order_by="RoomAlias.alias",
+    )
 
 
 class DeviceType(Base):
@@ -40,7 +58,7 @@ class DeviceType(Base):
     capabilities: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
-class Device(Base):
+class Device(AliasOwner, Base):
     __tablename__ = "devices"
     __table_args__ = (UniqueConstraint("parent_id", "cid"),)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -77,3 +95,29 @@ class Device(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+    alias_entries: Mapped[list["DeviceAlias"]] = relationship(
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+        order_by="DeviceAlias.alias",
+    )
+
+
+class BuildingAlias(Base):
+    __tablename__ = "building_aliases"
+    alias: Mapped[str] = mapped_column(String(64), primary_key=True)
+    building_id: Mapped[int] = mapped_column(
+        ForeignKey("buildings.id", ondelete="CASCADE"), index=True
+    )
+
+
+class RoomAlias(Base):
+    __tablename__ = "room_aliases"
+    alias: Mapped[str] = mapped_column(String(64), primary_key=True)
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), index=True)
+
+
+class DeviceAlias(Base):
+    __tablename__ = "device_aliases"
+    alias: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)

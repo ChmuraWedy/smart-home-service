@@ -9,11 +9,23 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
+from . import __version__
 from .config import Settings
 from .db import init_db, make_engine
 from .importer import import_tinytuya
-from .models import Building, Device, DeviceType, Room, utcnow
+from .models import (
+    Building,
+    BuildingAlias,
+    Device,
+    DeviceAlias,
+    DeviceType,
+    Room,
+    RoomAlias,
+    utcnow,
+)
 from .schemas import (
+    Alias,
+    AliasCreate,
     BuildingCreate,
     BuildingPatch,
     BuildingRead,
@@ -27,6 +39,7 @@ from .schemas import (
     DeviceTypePatch,
     DeviceTypeRead,
     DPSCommand,
+    EntityRef,
     ImportRequest,
     RoomCreate,
     RoomPatch,
@@ -37,10 +50,13 @@ from .schemas import (
 from .service import (
     capability_dps,
     commit,
+    create_aliased,
     create_device,
     device_read,
+    get_by_ref,
     get_or_404,
     patch_device,
+    replace_aliases,
 )
 from .tuya import TuyaController
 
@@ -62,9 +78,13 @@ def authenticate(request: Request, token: str | None = Depends(token_header)):
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
 
 
-def update_fields(item, body):
-    for name, value in body.model_dump(mode="json", exclude_unset=True).items():
+def update_fields(item, body, session):
+    values = body.model_dump(mode="json", exclude_unset=True)
+    aliases = values.pop("aliases", None)
+    for name, value in values.items():
         setattr(item, name, value)
+    if aliases is not None:
+        replace_aliases(session, item, aliases)
 
 
 def assert_empty(session, model, *conditions):
@@ -74,56 +94,61 @@ def assert_empty(session, model, *conditions):
 
 @router.post("/buildings", response_model=BuildingRead, status_code=201, tags=["Buildings"])
 def add_building(body: BuildingCreate, session: Session = Depends(get_session)):
-    item = Building(**body.model_dump())
-    session.add(item)
+    item = create_aliased(session, Building, body)
     commit(session)
     return item
 
 
 @router.get("/buildings", response_model=list[BuildingRead], tags=["Buildings"])
 def list_buildings(
+    alias: Alias | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
 ):
-    return session.scalars(select(Building).order_by(Building.id).offset(offset).limit(limit)).all()
+    query = select(Building)
+    if alias is not None:
+        query = query.join(BuildingAlias).where(BuildingAlias.alias == alias)
+    return session.scalars(query.order_by(Building.id).offset(offset).limit(limit)).all()
 
 
 @router.get("/buildings/{item_id}", response_model=BuildingRead, tags=["Buildings"])
-def read_building(item_id: int, session: Session = Depends(get_session)):
-    return get_or_404(session, Building, item_id)
+def read_building(item_id: EntityRef, session: Session = Depends(get_session)):
+    return get_by_ref(session, Building, item_id)
 
 
 @router.patch("/buildings/{item_id}", response_model=BuildingRead, tags=["Buildings"])
-def edit_building(item_id: int, body: BuildingPatch, session: Session = Depends(get_session)):
-    item = get_or_404(session, Building, item_id)
-    update_fields(item, body)
+def edit_building(item_id: EntityRef, body: BuildingPatch, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Building, item_id)
+    update_fields(item, body, session)
     commit(session)
     return item
 
 
 @router.delete("/buildings/{item_id}", status_code=204, tags=["Buildings"])
-def delete_building(item_id: int, session: Session = Depends(get_session)):
-    item = get_or_404(session, Building, item_id)
-    assert_empty(session, Room, Room.building_id == item_id)
-    assert_empty(session, Device, Device.building_id == item_id)
+def delete_building(item_id: EntityRef, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Building, item_id)
+    assert_empty(session, Room, Room.building_id == item.id)
+    assert_empty(session, Device, Device.building_id == item.id)
     session.delete(item)
     commit(session)
     return Response(status_code=204)
 
 
 @router.get("/buildings/{item_id}/rooms", response_model=list[RoomRead], tags=["Buildings"])
-def building_rooms(item_id: int, session: Session = Depends(get_session)):
-    get_or_404(session, Building, item_id)
-    return session.scalars(select(Room).where(Room.building_id == item_id).order_by(Room.id)).all()
+def building_rooms(item_id: EntityRef, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Building, item_id)
+    return session.scalars(select(Room).where(Room.building_id == item.id).order_by(Room.id)).all()
 
 
 @router.get("/buildings/{item_id}/hierarchy", response_model=BuildingTree, tags=["Buildings"])
-def hierarchy(item_id: int, session: Session = Depends(get_session)):
-    building = get_or_404(session, Building, item_id)
-    rooms = session.scalars(select(Room).where(Room.building_id == item_id).order_by(Room.id)).all()
+def hierarchy(item_id: EntityRef, session: Session = Depends(get_session)):
+    building = get_by_ref(session, Building, item_id)
+    rooms = session.scalars(
+        select(Room).where(Room.building_id == building.id).order_by(Room.id)
+    ).all()
     devices = session.scalars(
-        select(Device).where(Device.building_id == item_id).order_by(Device.id)
+        select(Device).where(Device.building_id == building.id).order_by(Device.id)
     ).all()
     return BuildingTree(
         **BuildingRead.model_validate(building).model_dump(),
@@ -141,8 +166,7 @@ def hierarchy(item_id: int, session: Session = Depends(get_session)):
 @router.post("/rooms", response_model=RoomRead, status_code=201, tags=["Rooms"])
 def add_room(body: RoomCreate, session: Session = Depends(get_session)):
     get_or_404(session, Building, body.building_id)
-    item = Room(**body.model_dump())
-    session.add(item)
+    item = create_aliased(session, Room, body)
     commit(session)
     return item
 
@@ -150,6 +174,7 @@ def add_room(body: RoomCreate, session: Session = Depends(get_session)):
 @router.get("/rooms", response_model=list[RoomRead], tags=["Rooms"])
 def list_rooms(
     building_id: int | None = None,
+    alias: Alias | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
@@ -157,40 +182,42 @@ def list_rooms(
     query = select(Room)
     if building_id is not None:
         query = query.where(Room.building_id == building_id)
+    if alias is not None:
+        query = query.join(RoomAlias).where(RoomAlias.alias == alias)
     return session.scalars(query.order_by(Room.id).offset(offset).limit(limit)).all()
 
 
 @router.get("/rooms/{item_id}", response_model=RoomRead, tags=["Rooms"])
-def read_room(item_id: int, session: Session = Depends(get_session)):
-    return get_or_404(session, Room, item_id)
+def read_room(item_id: EntityRef, session: Session = Depends(get_session)):
+    return get_by_ref(session, Room, item_id)
 
 
 @router.patch("/rooms/{item_id}", response_model=RoomRead, tags=["Rooms"])
-def edit_room(item_id: int, body: RoomPatch, session: Session = Depends(get_session)):
-    item = get_or_404(session, Room, item_id)
+def edit_room(item_id: EntityRef, body: RoomPatch, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Room, item_id)
     if body.building_id is not None:
         get_or_404(session, Building, body.building_id)
         if body.building_id != item.building_id:
-            assert_empty(session, Device, Device.room_id == item_id)
-    update_fields(item, body)
+            assert_empty(session, Device, Device.room_id == item.id)
+    update_fields(item, body, session)
     commit(session)
     return item
 
 
 @router.delete("/rooms/{item_id}", status_code=204, tags=["Rooms"])
-def delete_room(item_id: int, session: Session = Depends(get_session)):
-    item = get_or_404(session, Room, item_id)
-    assert_empty(session, Device, Device.room_id == item_id)
+def delete_room(item_id: EntityRef, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Room, item_id)
+    assert_empty(session, Device, Device.room_id == item.id)
     session.delete(item)
     commit(session)
     return Response(status_code=204)
 
 
 @router.get("/rooms/{item_id}/devices", response_model=list[DeviceRead], tags=["Rooms"])
-def room_devices(item_id: int, session: Session = Depends(get_session)):
-    get_or_404(session, Room, item_id)
+def room_devices(item_id: EntityRef, session: Session = Depends(get_session)):
+    room = get_by_ref(session, Room, item_id)
     items = session.scalars(
-        select(Device).where(Device.room_id == item_id).order_by(Device.id)
+        select(Device).where(Device.room_id == room.id).order_by(Device.id)
     ).all()
     return [device_read(session, item) for item in items]
 
@@ -222,7 +249,7 @@ def read_type(item_id: int, session: Session = Depends(get_session)):
 @router.patch("/device-types/{item_id}", response_model=DeviceTypeRead, tags=["Device types"])
 def edit_type(item_id: int, body: DeviceTypePatch, session: Session = Depends(get_session)):
     item = get_or_404(session, DeviceType, item_id)
-    update_fields(item, body)
+    update_fields(item, body, session)
     commit(session)
     return item
 
@@ -245,6 +272,7 @@ def add_device(body: DeviceCreate, session: Session = Depends(get_session)):
 
 @router.get("/devices", response_model=list[DeviceRead], tags=["Devices"])
 def list_devices(
+    alias: Alias | None = None,
     building_id: int | None = None,
     room_id: int | None = None,
     device_type_id: int | None = None,
@@ -257,6 +285,8 @@ def list_devices(
     session: Session = Depends(get_session),
 ):
     query = select(Device)
+    if alias is not None:
+        query = query.join(DeviceAlias).where(DeviceAlias.alias == alias)
     for column, value in (
         (Device.building_id, building_id),
         (Device.room_id, room_id),
@@ -274,31 +304,31 @@ def list_devices(
 
 
 @router.get("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
-def read_device(item_id: int, session: Session = Depends(get_session)):
-    return device_read(session, get_or_404(session, Device, item_id))
+def read_device(item_id: EntityRef, session: Session = Depends(get_session)):
+    return device_read(session, get_by_ref(session, Device, item_id))
 
 
 @router.patch("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
-def edit_device(item_id: int, body: DevicePatch, session: Session = Depends(get_session)):
-    item = patch_device(session, get_or_404(session, Device, item_id), body)
+def edit_device(item_id: EntityRef, body: DevicePatch, session: Session = Depends(get_session)):
+    item = patch_device(session, get_by_ref(session, Device, item_id), body)
     commit(session)
     return device_read(session, item)
 
 
 @router.delete("/devices/{item_id}", status_code=204, tags=["Devices"])
-def delete_device(item_id: int, session: Session = Depends(get_session)):
-    item = get_or_404(session, Device, item_id)
-    assert_empty(session, Device, Device.parent_id == item_id)
+def delete_device(item_id: EntityRef, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Device, item_id)
+    assert_empty(session, Device, Device.parent_id == item.id)
     session.delete(item)
     commit(session)
     return Response(status_code=204)
 
 
 @router.get("/devices/{item_id}/children", response_model=list[DeviceRead], tags=["Devices"])
-def children(item_id: int, session: Session = Depends(get_session)):
-    get_or_404(session, Device, item_id)
+def children(item_id: EntityRef, session: Session = Depends(get_session)):
+    item = get_by_ref(session, Device, item_id)
     items = session.scalars(
-        select(Device).where(Device.parent_id == item_id).order_by(Device.id)
+        select(Device).where(Device.parent_id == item.id).order_by(Device.id)
     ).all()
     return [device_read(session, item) for item in items]
 
@@ -322,19 +352,19 @@ def run_command(request, session, item, command, dps=None):
 
 @router.get("/devices/{item_id}/status", response_model=CommandRead, tags=["Control"])
 @router.post("/devices/{item_id}/commands/status", response_model=CommandRead, tags=["Control"])
-def status(item_id: int, request: Request, session: Session = Depends(get_session)):
-    return run_command(request, session, get_or_404(session, Device, item_id), "status")
+def status(item_id: EntityRef, request: Request, session: Session = Depends(get_session)):
+    return run_command(request, session, get_by_ref(session, Device, item_id), "status")
 
 
 def switch(item_id, request, session, body, on):
-    item = get_or_404(session, Device, item_id)
+    item = get_by_ref(session, Device, item_id)
     dps = {body.dp: on} if body.dp else capability_dps(session, item, "switch", on)
     return run_command(request, session, item, "on" if on else "off", dps)
 
 
 @router.post("/devices/{item_id}/commands/on", response_model=CommandRead, tags=["Control"])
 def turn_on(
-    item_id: int,
+    item_id: EntityRef,
     request: Request,
     body: SwitchCommand = SwitchCommand(),
     session: Session = Depends(get_session),
@@ -344,7 +374,7 @@ def turn_on(
 
 @router.post("/devices/{item_id}/commands/off", response_model=CommandRead, tags=["Control"])
 def turn_off(
-    item_id: int,
+    item_id: EntityRef,
     request: Request,
     body: SwitchCommand = SwitchCommand(),
     session: Session = Depends(get_session),
@@ -354,13 +384,13 @@ def turn_off(
 
 @router.post("/devices/{item_id}/commands/set_dps", response_model=CommandRead, tags=["Control"])
 def set_dps(
-    item_id: int, request: Request, body: DPSCommand, session: Session = Depends(get_session)
+    item_id: EntityRef, request: Request, body: DPSCommand, session: Session = Depends(get_session)
 ):
-    return run_command(request, session, get_or_404(session, Device, item_id), "set_dps", body.dps)
+    return run_command(request, session, get_by_ref(session, Device, item_id), "set_dps", body.dps)
 
 
 def set_capability(item_id, request, session, capability, value):
-    item = get_or_404(session, Device, item_id)
+    item = get_by_ref(session, Device, item_id)
     dps = capability_dps(session, item, capability, value)
     return run_command(request, session, item, capability, dps)
 
@@ -369,7 +399,7 @@ def set_capability(item_id, request, session, capability, value):
     "/devices/{item_id}/capabilities/{capability}", response_model=CommandRead, tags=["Control"]
 )
 def capability_value(
-    item_id: int,
+    item_id: EntityRef,
     capability: str,
     body: CapabilityCommand,
     request: Request,
@@ -380,14 +410,20 @@ def capability_value(
 
 @router.post("/devices/{item_id}/commands/brightness", response_model=CommandRead, tags=["Control"])
 def brightness(
-    item_id: int, body: CapabilityCommand, request: Request, session: Session = Depends(get_session)
+    item_id: EntityRef,
+    body: CapabilityCommand,
+    request: Request,
+    session: Session = Depends(get_session),
 ):
     return set_capability(item_id, request, session, "brightness", body.value)
 
 
 @router.post("/devices/{item_id}/commands/color", response_model=CommandRead, tags=["Control"])
 def color(
-    item_id: int, body: CapabilityCommand, request: Request, session: Session = Depends(get_session)
+    item_id: EntityRef,
+    body: CapabilityCommand,
+    request: Request,
+    session: Session = Depends(get_session),
 ):
     return set_capability(item_id, request, session, "color", body.value)
 
@@ -396,7 +432,10 @@ def color(
     "/devices/{item_id}/commands/temperature", response_model=CommandRead, tags=["Control"]
 )
 def temperature(
-    item_id: int, body: CapabilityCommand, request: Request, session: Session = Depends(get_session)
+    item_id: EntityRef,
+    body: CapabilityCommand,
+    request: Request,
+    session: Session = Depends(get_session),
 ):
     return set_capability(item_id, request, session, "temperature", body.value)
 
@@ -404,6 +443,50 @@ def temperature(
 @router.post("/imports/tinytuya", tags=["Import"])
 def import_devices(body: ImportRequest, session: Session = Depends(get_session)):
     return import_tinytuya(session, body)
+
+
+def register_alias_routes(resource, model, read_schema):
+    path = "/" + resource + "/{item_id}/aliases"
+
+    @router.get(path, response_model=list[Alias], tags=["Aliases"], name=f"{resource}_aliases")
+    def list_aliases(item_id: EntityRef, session: Session = Depends(get_session)):
+        return get_by_ref(session, model, item_id).aliases
+
+    @router.post(
+        path,
+        response_model=read_schema,
+        status_code=201,
+        tags=["Aliases"],
+        name=f"{resource}_add_alias",
+    )
+    def add_alias(item_id: EntityRef, body: AliasCreate, session: Session = Depends(get_session)):
+        item = get_by_ref(session, model, item_id)
+        if body.alias in item.aliases:
+            raise HTTPException(409, "Alias already exists on this object")
+        if len(item.aliases) >= 32:
+            raise HTTPException(422, "Object cannot have more than 32 aliases")
+        replace_aliases(session, item, [*item.aliases, body.alias])
+        commit(session)
+        return device_read(session, item) if model is Device else read_schema.model_validate(item)
+
+    @router.delete(
+        path + "/{alias}", status_code=204, tags=["Aliases"], name=f"{resource}_delete_alias"
+    )
+    def delete_alias(item_id: EntityRef, alias: Alias, session: Session = Depends(get_session)):
+        item = get_by_ref(session, model, item_id)
+        if alias not in item.aliases:
+            raise HTTPException(404, "Alias not found on this object")
+        replace_aliases(session, item, [name for name in item.aliases if name != alias])
+        commit(session)
+        return Response(status_code=204)
+
+
+for resource, model, schema in (
+    ("buildings", Building, BuildingRead),
+    ("rooms", Room, RoomRead),
+    ("devices", Device, DeviceRead),
+):
+    register_alias_routes(resource, model, schema)
 
 
 def create_app(settings: Settings | None = None, controller=None):
@@ -421,7 +504,7 @@ def create_app(settings: Settings | None = None, controller=None):
 
     app = FastAPI(
         title="Smart Home Local API",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
         description="SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
     )
@@ -431,7 +514,7 @@ def create_app(settings: Settings | None = None, controller=None):
 
     @app.get("/health", tags=["System"])
     def health():
-        return {"status": "ok", "version": "0.1.0"}
+        return {"status": "ok", "version": __version__}
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_request, exc):

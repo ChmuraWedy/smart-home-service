@@ -113,6 +113,8 @@ def import_tinytuya(session, request):
                         values[field] = raw[field]
                 if "version" in raw:
                     values["version"] = str(raw["version"])
+                if "aliases" in raw:
+                    values["aliases"] = raw["aliases"]
                 if current is None:
                     values.setdefault("name", device_id)
                 if plan["child"]:
@@ -146,7 +148,7 @@ def import_tinytuya(session, request):
                 except ValidationError:
                     raise HTTPException(
                         422,
-                        "Invalid Tuya metadata in import (IP, key length, protocol version or field type)",
+                        "Invalid Tuya metadata or aliases in import (IP, key length, protocol version or field type)",
                     ) from None
                 existing[device_id] = item
                 if not plan["child"] and (not item.ip or not item.version or not item.local_key):
