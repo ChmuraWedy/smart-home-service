@@ -131,3 +131,15 @@ class DeviceAlias(Base):
     __tablename__ = "device_aliases"
     alias: Mapped[str] = mapped_column(String(64), primary_key=True)
     device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
+
+
+class DeviceObservation(Base):
+    """Per-DP timestamps: an ACK or unrelated sensor reading never refreshes a value."""
+
+    __tablename__ = "device_observations"
+    device_id: Mapped[int] = mapped_column(
+        ForeignKey("devices.id", ondelete="CASCADE"), primary_key=True
+    )
+    dp: Mapped[str] = mapped_column(String(8), primary_key=True)
+    value: Mapped[object] = mapped_column(JSON)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

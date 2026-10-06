@@ -11,12 +11,13 @@ from .models import (
     BuildingAlias,
     Device,
     DeviceAlias,
+    DeviceObservation,
     DeviceType,
     Room,
     RoomAlias,
     utcnow,
 )
-from .schemas import Alias, Capability, DeviceRead
+from .schemas import Alias, Capability, CapabilityState, DeviceRead, DeviceState
 from .search import fold_name, get_by_alias, get_by_name
 
 
@@ -190,35 +191,68 @@ def capability_dps(session: Session, item: Device, name: str, value):
             409, "Capability is not mapped; configure device/type capabilities or use set_dps"
         )
     spec = Capability.model_validate(definition)
-    if not spec.writable:
-        raise HTTPException(422, "Capability is read-only")
-    valid = {
-        "boolean": type(value) is bool,
-        "integer": type(value) is int,
-        "number": type(value) in (int, float),
-        "string": isinstance(value, str),
-        "object": isinstance(value, dict),
-    }[spec.type]
-    if not valid:
-        raise HTTPException(422, f"Capability requires {spec.type}")
-    if spec.minimum is not None and value < spec.minimum:
-        raise HTTPException(422, "Value is below capability minimum")
-    if spec.maximum is not None and value > spec.maximum:
-        raise HTTPException(422, "Value exceeds capability maximum")
-    if spec.enum is not None and not any(
-        type(value) is type(option) and value == option for option in spec.enum
-    ):
-        raise HTTPException(422, "Value is not in capability enum")
-    if spec.encoding == "tuya_hsv":
-        from pydantic import ValidationError
+    from .capabilities import command_dps
 
-        from .schemas import HSV
+    return command_dps(spec, value)
 
-        try:
-            hsv = HSV.model_validate(value)
-        except ValidationError:
-            raise HTTPException(
-                422, "Color requires h:0..360, s:0..1000, v:0..1000 integers"
-            ) from None
-        value = f"{hsv.h:04x}{hsv.s:04x}{hsv.v:04x}"
-    return {spec.dp: value}
+
+def capability_values_dps(session, item, values):
+    from .capabilities import merge_commands
+
+    return merge_commands(
+        capability_dps(session, item, name, value) for name, value in values.items()
+    )
+
+
+def record_observations(session, item, observed, observed_at):
+    if observed:
+        item.last_dps = {**(item.last_dps or {}), **observed}
+    for dp, value in observed.items():
+        observation = session.get(DeviceObservation, (item.id, dp))
+        if observation is None:
+            observation = DeviceObservation(device_id=item.id, dp=dp)
+            session.add(observation)
+        observation.value, observation.observed_at = value, observed_at
+    item.last_seen_at = observed_at
+
+
+def device_state(session, item, *, max_age=60, now=None):
+    from .capabilities import decode
+
+    now = now or utcnow()
+    observations = {
+        row.dp: row
+        for row in session.scalars(
+            select(DeviceObservation).where(DeviceObservation.device_id == item.id)
+        ).all()
+    }
+    values = {}
+    for name, definition in effective_capabilities(session, item).items():
+        spec = Capability.model_validate(definition)
+        if not spec.readable:
+            continue
+        row = observations.get(spec.read_dp or spec.dp)
+        state = CapabilityState()
+        if row is not None:
+            timestamp = (
+                row.observed_at.replace(tzinfo=timezone.utc)
+                if row.observed_at.tzinfo is None
+                else row.observed_at
+            )
+            state.observed_at = timestamp
+            state.stale = (now - timestamp).total_seconds() > max_age
+            try:
+                state.value = decode(spec, row.value)
+                state.known = True
+            except (ValueError, TypeError, OverflowError):
+                state.stale = True
+        values[name] = state
+    parent = session.get(Device, item.parent_id) if item.parent_id else None
+    enabled = item.enabled and (parent is None or parent.enabled)
+    return DeviceState(
+        device_id=item.id,
+        name=item.name,
+        enabled=enabled,
+        available=enabled and any(v.known and not v.stale for v in values.values()),
+        values=values,
+    )

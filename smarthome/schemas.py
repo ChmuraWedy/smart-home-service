@@ -94,6 +94,14 @@ class AliasedPatch(Patch):
     _unique_aliases = field_validator("aliases")(unique_aliases)
 
 
+Scalar = str | int | float | bool
+
+
+class ValueMapping(Schema):
+    value: Scalar
+    raw: Scalar
+
+
 class Capability(Schema):
     dp: DP
     type: Literal["boolean", "integer", "number", "string", "object"]
@@ -103,7 +111,15 @@ class Capability(Schema):
     maximum: float | None = None
     enum: list[JsonValue] | None = None
     unit: str | None = Field(default=None, max_length=40)
-    encoding: Literal["raw", "tuya_hsv"] = "raw"
+    encoding: Literal["raw", "tuya_hsv", "tuya_rgbhsv", "tuya_hsv_json"] = "raw"
+    read_dp: DP | None = None
+    scale: float = Field(default=1, gt=0)
+    offset: float = 0
+    invert: bool = False
+    raw_type: Literal["integer", "number"] | None = None
+    step: float | None = Field(default=None, gt=0)
+    value_map: list[ValueMapping] = Field(default_factory=list, max_length=32)
+    write_dps: dict[DP, JsonValue] = Field(default_factory=dict, max_length=16)
 
     @field_validator("dp", mode="before")
     @classmethod
@@ -119,8 +135,41 @@ class Capability(Schema):
             "number",
         }:
             raise ValueError("Numeric bounds require a numeric capability")
-        if self.encoding == "tuya_hsv" and self.type != "object":
-            raise ValueError("tuya_hsv requires an object capability")
+        numeric = self.type in {"integer", "number"}
+        if self.encoding != "raw" and self.type != "object":
+            raise ValueError("Color encoding requires an object capability")
+        if not numeric and (self.scale != 1 or self.offset != 0 or self.raw_type or self.step):
+            raise ValueError("Scaling/step/raw_type require a numeric capability")
+        if (
+            self.invert
+            and self.type != "boolean"
+            and not (numeric and self.minimum is not None and self.maximum is not None)
+        ):
+            raise ValueError("Invert requires a boolean or bounded numeric capability")
+        if self.dp in self.write_dps:
+            raise ValueError("write_dps must not overwrite the capability DP")
+        if self.value_map and (
+            self.encoding != "raw"
+            or self.scale != 1
+            or self.offset != 0
+            or self.invert
+            or self.raw_type
+        ):
+            raise ValueError("value_map cannot be combined with encoding/scaling/invert/raw_type")
+        for field in ("value", "raw"):
+            values = [(type(getattr(x, field)), getattr(x, field)) for x in self.value_map]
+            if len(set(values)) != len(values):
+                raise ValueError("value_map must be reversible without duplicates")
+        for entry in self.value_map:
+            valid = {
+                "boolean": type(entry.value) is bool,
+                "integer": type(entry.value) is int,
+                "number": type(entry.value) in (int, float),
+                "string": isinstance(entry.value, str),
+                "object": False,
+            }[self.type]
+            if not valid:
+                raise ValueError("value_map values must match the capability type")
         return self
 
 
@@ -329,6 +378,25 @@ class CommandRead(Schema):
     acknowledged: bool
     dps: dict[str, JsonValue]
     observed_at: datetime
+
+
+class CapabilityState(Schema):
+    value: JsonValue | None = None
+    known: bool = False
+    stale: bool = True
+    observed_at: datetime | None = None
+
+
+class DeviceState(Schema):
+    device_id: int
+    name: str
+    enabled: bool
+    available: bool
+    values: dict[str, CapabilityState]
+
+
+class CapabilitiesCommand(Schema):
+    values: dict[CapName, JsonValue] = Field(min_length=1, max_length=16)
 
 
 class ImportRequest(Schema):

@@ -3,7 +3,7 @@
   "info": {
     "title": "Smart Home Local API",
     "description": "SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "paths": {
     "/api/v1/buildings": {
@@ -795,6 +795,75 @@
         }
       }
     },
+    "/api/v1/profiles": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "List Profiles",
+        "operationId": "list_profiles_api_v1_profiles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profiles/{identifier}": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Read Profile",
+        "operationId": "read_profile_api_v1_profiles__identifier__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/device-types": {
       "post": {
         "tags": [
@@ -1532,6 +1601,136 @@
                     "$ref": "#/components/schemas/DeviceRead"
                   },
                   "title": "Response Children Api V1 Devices  Item Id  Children Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{item_id}/state": {
+      "get": {
+        "tags": [
+          "Control"
+        ],
+        "summary": "Normalized State",
+        "operationId": "normalized_state_api_v1_devices__item_id__state_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Refresh"
+            }
+          },
+          {
+            "name": "max_age",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 86400,
+              "minimum": 1,
+              "default": 60,
+              "title": "Max Age"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{item_id}/commands/capabilities": {
+      "post": {
+        "tags": [
+          "Control"
+        ],
+        "summary": "Set Capabilities",
+        "operationId": "set_capabilities_api_v1_devices__item_id__commands_capabilities_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilitiesCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandRead"
                 }
               }
             }
@@ -3688,6 +3887,27 @@
         ],
         "title": "BuildingTree"
       },
+      "CapabilitiesCommand": {
+        "properties": {
+          "values": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,63}$": {
+                "$ref": "#/components/schemas/JsonValue"
+              }
+            },
+            "type": "object",
+            "maxProperties": 16,
+            "minProperties": 1,
+            "title": "Values"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "values"
+        ],
+        "title": "CapabilitiesCommand"
+      },
       "Capability": {
         "properties": {
           "dp": {
@@ -3768,10 +3988,85 @@
             "type": "string",
             "enum": [
               "raw",
-              "tuya_hsv"
+              "tuya_hsv",
+              "tuya_rgbhsv",
+              "tuya_hsv_json"
             ],
             "title": "Encoding",
             "default": "raw"
+          },
+          "read_dp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]{0,4}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Dp"
+          },
+          "scale": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Scale",
+            "default": 1
+          },
+          "offset": {
+            "type": "number",
+            "title": "Offset",
+            "default": 0
+          },
+          "invert": {
+            "type": "boolean",
+            "title": "Invert",
+            "default": false
+          },
+          "raw_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "integer",
+                  "number"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Type"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "value_map": {
+            "items": {
+              "$ref": "#/components/schemas/ValueMapping"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Value Map"
+          },
+          "write_dps": {
+            "patternProperties": {
+              "^[1-9][0-9]{0,4}$": {
+                "$ref": "#/components/schemas/JsonValue"
+              }
+            },
+            "type": "object",
+            "maxProperties": 16,
+            "title": "Write Dps"
           }
         },
         "additionalProperties": false,
@@ -3794,6 +4089,45 @@
           "value"
         ],
         "title": "CapabilityCommand"
+      },
+      "CapabilityState": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "known": {
+            "type": "boolean",
+            "title": "Known",
+            "default": false
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": true
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CapabilityState"
       },
       "CommandRead": {
         "properties": {
@@ -4621,6 +4955,43 @@
         ],
         "title": "DeviceRead"
       },
+      "DeviceState": {
+        "properties": {
+          "device_id": {
+            "type": "integer",
+            "title": "Device Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "values": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CapabilityState"
+            },
+            "type": "object",
+            "title": "Values"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "name",
+          "enabled",
+          "available",
+          "values"
+        ],
+        "title": "DeviceState"
+      },
       "DeviceTypeCreate": {
         "properties": {
           "slug": {
@@ -5140,6 +5511,51 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValueMapping": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Value"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Raw"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "raw"
+        ],
+        "title": "ValueMapping"
       }
     },
     "securitySchemes": {

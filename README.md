@@ -367,3 +367,21 @@ git log --oneline --decorate
 ```
 
 ZIP содержит исходники соответствующего тега без служебного каталога `.git`; для сохранения истории используйте bundle.
+
+## Профили и нормализованное управление
+
+Сравнение LocalTuya, Tuya Local и официальной Tuya, реализованные категории и границы совместимости: [docs/integrations.md](docs/integrations.md).
+
+```sh
+# Явно выбранный профиль; DPS нужно сверить с вашим устройством.
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/profiles/bulb-v2"
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/state?refresh=true"
+curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"values":{"switch":true,"color":{"h":120,"s":1000,"v":500}}}' \
+  "$BASE/devices/kitchen_light/commands/capabilities"
+# Белый режим и цветовая температура:
+curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"value":4600}' "$BASE/devices/kitchen_light/capabilities/color_temperature"
+```
+
+Новые capability поля: `read_dp`, `scale`, `offset`, `invert`, `raw_type`, `step`, `value_map`, `write_dps`; color encodings `tuya_hsv`, `tuya_rgbhsv`, `tuya_hsv_json`. Определения без этих полей сохраняют прежнюю семантику. На старте автоматически создаётся таблица наблюдений; каждая температура/влажность/статус имеет собственное время, ACK не обновляет показания.

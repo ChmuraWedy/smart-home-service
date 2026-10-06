@@ -27,11 +27,13 @@ from .schemas import (
     BuildingPatch,
     BuildingRead,
     BuildingTree,
+    CapabilitiesCommand,
     CapabilityCommand,
     CommandRead,
     DeviceCreate,
     DevicePatch,
     DeviceRead,
+    DeviceState,
     DeviceTypeCreate,
     DeviceTypePatch,
     DeviceTypeRead,
@@ -49,13 +51,16 @@ from .schemas import (
 from .search import alias_filters, fold_name, get_by_alias, get_by_name, name_filters
 from .service import (
     capability_dps,
+    capability_values_dps,
     commit,
     create_aliased,
     create_device,
     device_read,
+    device_state,
     get_by_ref,
     get_or_404,
     patch_device,
+    record_observations,
     replace_aliases,
 )
 from .tuya import TuyaController
@@ -226,6 +231,22 @@ def room_devices(item_id: EntityRef, session: Session = Depends(get_session)):
     return [device_read(session, item) for item in items]
 
 
+@router.get("/profiles", tags=["Profiles"])
+def list_profiles():
+    from .profiles import PROFILES, profile
+
+    return [profile(identifier) for identifier in PROFILES]
+
+
+@router.get("/profiles/{identifier}", tags=["Profiles"])
+def read_profile(identifier: str):
+    from .profiles import PROFILES, profile
+
+    if identifier not in PROFILES:
+        raise HTTPException(404, "Profile not found")
+    return profile(identifier)
+
+
 @router.post("/device-types", response_model=DeviceTypeRead, status_code=201, tags=["Device types"])
 def add_type(body: DeviceTypeCreate, session: Session = Depends(get_session)):
     item = DeviceType(**body.model_dump(mode="json"))
@@ -347,14 +368,40 @@ def run_command(request, session, item, command, dps=None):
     session.commit()
     observed = request.app.state.controller.execute(item, parent, dps=dps)
     observed_at = utcnow()
-    if observed:
-        item.last_dps = {**(item.last_dps or {}), **observed}
-    item.last_seen_at = observed_at
+    record_observations(session, item, observed, observed_at)
     commit(session)
     # Empty control acknowledgement does not prove the requested physical state.
     return CommandRead(
         device_id=item.id, command=command, acknowledged=True, dps=observed, observed_at=observed_at
     )
+
+
+@router.get("/devices/{item_id}/state", response_model=DeviceState, tags=["Control"])
+def normalized_state(
+    item_id: EntityRef,
+    request: Request,
+    refresh: bool = False,
+    max_age: int = Query(60, ge=1, le=86400),
+    session: Session = Depends(get_session),
+):
+    item = get_by_ref(session, Device, item_id)
+    if refresh:
+        run_command(request, session, item, "status")
+    return device_state(session, item, max_age=max_age)
+
+
+@router.post(
+    "/devices/{item_id}/commands/capabilities", response_model=CommandRead, tags=["Control"]
+)
+def set_capabilities(
+    item_id: EntityRef,
+    body: CapabilitiesCommand,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    item = get_by_ref(session, Device, item_id)
+    dps = capability_values_dps(session, item, body.values)
+    return run_command(request, session, item, "capabilities", dps)
 
 
 @router.get("/devices/{item_id}/status", response_model=CommandRead, tags=["Control"])

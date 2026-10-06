@@ -34,3 +34,7 @@ ruff==0.16.10
 ## Alias lookup update
 
 123 API/transport/import/search tests passed; ruff check passed. Added tests for automatic Cyrillic names, alias query lookup, ambiguity scopes, rename, read/write round trip and capacity. No physical Tuya device was used.
+
+## Device variants update
+
+178 tests passed, including 55 new representative device/profile checks. Wi-Fi and parent/cid Zigbee commands use a fake transport; color vectors also match installed TinyTuya helpers. Ruff passed. Physical hardware and all third-party catalog entries have not been tested.
