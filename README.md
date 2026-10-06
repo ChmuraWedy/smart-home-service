@@ -2,6 +2,8 @@
 
 Python RESTful-сервис для локального управления зданиями, комнатами, типами устройств и устройствами Tuya. Стек: FastAPI, синхронный SQLAlchemy 2, SQLite, TinyTuya и PyCryptodome с AES-GCM. Python 3.10+. Docker не требуется.
 
+Добавлены [прошивка Yellow Display / CYD](firmware/cyd/README.md), [группы и выбор устройств](docs/displays.md), [необязательный User Code + QR вход](docs/qr-login.md) и [разбор интеграций Home Assistant](docs/integrations.md). Изменения разделены на локальные Git-коммиты.
+
 ## Быстрый запуск
 
 ```sh

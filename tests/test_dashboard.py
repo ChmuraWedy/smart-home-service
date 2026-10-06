@@ -102,6 +102,39 @@ def test_group_ack_without_state_does_not_claim_on(client, demo_room, factory):
     assert client.get(API + f"/groups/{group['id']}/state").json()["state"] == "unknown"
 
 
+def test_panel_room_selection_includes_building_names_and_paginates(client, demo_room):
+    room, _, _ = demo_room
+    home = client.post(API + "/buildings", json={"name": "Дача"}).json()
+    other = client.post(
+        API + "/rooms", json={"name": room["name"], "building_id": home["id"]}
+    ).json()
+    path = API + "/displays/new-panel/rooms"
+    first = client.get(path, params={"limit": 1}).json()
+    assert first["more"] is True and first["rooms"] == [
+        {"id": room["id"], "name": room["name"], "building_name": "Дом"}
+    ]
+    second = client.get(path, params={"offset": 1, "limit": 1}).json()
+    assert second["more"] is False and second["rooms"][0]["id"] == other["id"]
+    assert second["rooms"][0]["building_name"] == "Дача"
+    assert client.get(path, params={"limit": 25}).status_code == 422
+
+
+def test_panel_options_paginates_groups_and_devices_independently(client, demo_room):
+    room, devices, group = demo_room
+    second = client.post(
+        API + "/groups",
+        json={"name": "Второй свет", "room_id": room["id"], "device_ids": [devices[0]["id"]]},
+    ).json()
+    path = API + "/displays/new-panel/options"
+    first = client.get(path, params={"room_id": room["id"], "limit": 1}).json()
+    assert first["more_devices"] is True and first["more_groups"] is True
+    assert [g["id"] for g in first["groups"]] == [group["id"]]
+    next_page = client.get(path, params={"room_id": room["id"], "limit": 1, "offset": 1}).json()
+    assert next_page["more_devices"] is True and next_page["more_groups"] is False
+    assert [g["id"] for g in next_page["groups"]] == [second["id"]]
+    assert "local_key" not in str(first) and "ip" not in first["devices"][0]
+
+
 def test_group_partial_failure_reports_each_member(client, demo_room):
     _, devices, group = demo_room
 

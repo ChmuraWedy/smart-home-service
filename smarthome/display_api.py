@@ -14,7 +14,7 @@ from .dashboard import (
     validate_group,
     validate_group_change,
 )
-from .models import Device, DeviceGroup, Display, DisplayWidget, GroupMember, Room
+from .models import Building, Device, DeviceGroup, Display, DisplayWidget, GroupMember, Room
 from .schemas import DisplayConfig, DisplayID, DisplayRead, GroupCreate, GroupPatch, GroupRead
 from .service import capability_dps, commit, get_or_404
 
@@ -166,6 +166,30 @@ def delete_display(display_id: DisplayID, session: Session = Depends(get_session
     return Response(status_code=204)
 
 
+@router.get("/displays/{display_id}/rooms", tags=["Displays"])
+def display_rooms(
+    display_id: DisplayID,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(12, ge=1, le=24),
+    session: Session = Depends(get_session),
+):
+    rows = session.execute(
+        select(Room, Building.name)
+        .join(Building, Room.building_id == Building.id)
+        .order_by(Room.id)
+        .offset(offset)
+        .limit(limit + 1)
+    ).all()
+    return {
+        "rooms": [
+            {"id": room.id, "name": room.name, "building_name": building_name}
+            for room, building_name in rows[:limit]
+        ],
+        "more": len(rows) > limit,
+        "offset": offset,
+    }
+
+
 @router.get("/displays/{display_id}/options", tags=["Displays"])
 def display_options(
     display_id: DisplayID,
@@ -183,12 +207,17 @@ def display_options(
         .limit(limit + 1)
     ).all()
     groups = session.scalars(
-        select(DeviceGroup).where(DeviceGroup.room_id == room_id).order_by(DeviceGroup.id)
+        select(DeviceGroup)
+        .where(DeviceGroup.room_id == room_id)
+        .order_by(DeviceGroup.id)
+        .offset(offset)
+        .limit(limit + 1)
     ).all()
     return {
         "room_id": room_id,
         "devices": [device_card(session, d) for d in devices[:limit]],
-        "groups": [group_read(g).model_dump() for g in groups],
+        "groups": [group_read(g).model_dump() for g in groups[:limit]],
+        "more_groups": len(groups) > limit,
         "offset": offset,
         "more_devices": len(devices) > limit,
     }

@@ -14,3 +14,6 @@ data/
 devices.json
 snapshot.json
 tuya-raw.json
+
+firmware/cyd/.pio/
+firmware/cyd/include/panel_config.h
