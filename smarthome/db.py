@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool
 
 from .models import Base
+from .search import fold_name
 
 
 def make_engine(path: str):
@@ -25,6 +26,7 @@ def make_engine(path: str):
 
     @event.listens_for(engine, "connect")
     def configure_sqlite(connection, _):
+        connection.create_function("unicode_casefold", 1, fold_name, deterministic=True)
         cursor = connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA busy_timeout=10000")

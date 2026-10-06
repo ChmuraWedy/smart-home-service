@@ -16,6 +16,7 @@ from .models import (
     utcnow,
 )
 from .schemas import Capability, DeviceRead
+from .search import get_by_name
 
 
 def get_or_404(session: Session, model, item_id: int):
@@ -33,6 +34,8 @@ ALIAS_MODELS = {
 
 
 def get_by_ref(session: Session, model, reference: str):
+    if reference.startswith("name:"):
+        return get_by_name(session, model, reference[5:])
     if reference.isascii() and reference.isdecimal():
         return get_or_404(session, model, int(reference))
     alias_model, owner_field = ALIAS_MODELS[model]

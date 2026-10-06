@@ -26,6 +26,11 @@ def normalize_alias(value):
 
 
 def normalize_reference(value):
+    if isinstance(value, str) and value.strip()[:5].lower() == "name:":
+        name = value.strip()[5:].strip()
+        if not name or len(name) > 120:
+            raise ValueError("Name reference requires 1..120 characters")
+        return "name:" + name
     value = normalize_alias(value)
     if isinstance(value, str) and value.isascii() and value.isdecimal():
         if len(value) > 19 or int(value) > 9223372036854775807:
@@ -41,7 +46,16 @@ Alias = Annotated[
 EntityRef = Annotated[
     str,
     BeforeValidator(normalize_reference),
-    Field(pattern=r"^(?:[1-9][0-9]{0,18}|[a-z][a-z0-9._-]{0,63})$"),
+    Field(
+        pattern=r"^(?:[1-9][0-9]{0,18}|[a-z][a-z0-9._-]{0,63}|name:.+)$",
+        max_length=125,
+        description="Numeric ID, alias, or explicit exact name reference: name:Розетка",
+    ),
+]
+NameQuery = Annotated[
+    str,
+    BeforeValidator(lambda value: value.strip() if isinstance(value, str) else value),
+    Field(min_length=1, max_length=120),
 ]
 
 

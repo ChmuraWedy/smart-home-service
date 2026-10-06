@@ -41,12 +41,15 @@ from .schemas import (
     DPSCommand,
     EntityRef,
     ImportRequest,
+    NameQuery,
+    PositiveID,
     RoomCreate,
     RoomPatch,
     RoomRead,
     RoomTree,
     SwitchCommand,
 )
+from .search import get_by_name, name_filters
 from .service import (
     capability_dps,
     commit,
@@ -102,11 +105,13 @@ def add_building(body: BuildingCreate, session: Session = Depends(get_session)):
 @router.get("/buildings", response_model=list[BuildingRead], tags=["Buildings"])
 def list_buildings(
     alias: Alias | None = None,
+    name: NameQuery | None = None,
+    q: NameQuery | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
 ):
-    query = select(Building)
+    query = name_filters(select(Building), Building, name=name, q=q)
     if alias is not None:
         query = query.join(BuildingAlias).where(BuildingAlias.alias == alias)
     return session.scalars(query.order_by(Building.id).offset(offset).limit(limit)).all()
@@ -175,11 +180,13 @@ def add_room(body: RoomCreate, session: Session = Depends(get_session)):
 def list_rooms(
     building_id: int | None = None,
     alias: Alias | None = None,
+    name: NameQuery | None = None,
+    q: NameQuery | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
 ):
-    query = select(Room)
+    query = name_filters(select(Room), Room, name=name, q=q)
     if building_id is not None:
         query = query.where(Room.building_id == building_id)
     if alias is not None:
@@ -232,13 +239,14 @@ def add_type(body: DeviceTypeCreate, session: Session = Depends(get_session)):
 
 @router.get("/device-types", response_model=list[DeviceTypeRead], tags=["Device types"])
 def list_types(
+    name: NameQuery | None = None,
+    q: NameQuery | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
 ):
-    return session.scalars(
-        select(DeviceType).order_by(DeviceType.id).offset(offset).limit(limit)
-    ).all()
+    query = name_filters(select(DeviceType), DeviceType, name=name, q=q)
+    return session.scalars(query.order_by(DeviceType.id).offset(offset).limit(limit)).all()
 
 
 @router.get("/device-types/{item_id}", response_model=DeviceTypeRead, tags=["Device types"])
@@ -273,6 +281,8 @@ def add_device(body: DeviceCreate, session: Session = Depends(get_session)):
 @router.get("/devices", response_model=list[DeviceRead], tags=["Devices"])
 def list_devices(
     alias: Alias | None = None,
+    name: NameQuery | None = None,
+    q: NameQuery | None = None,
     building_id: int | None = None,
     room_id: int | None = None,
     device_type_id: int | None = None,
@@ -284,7 +294,7 @@ def list_devices(
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_session),
 ):
-    query = select(Device)
+    query = name_filters(select(Device), Device, name=name, q=q)
     if alias is not None:
         query = query.join(DeviceAlias).where(DeviceAlias.alias == alias)
     for column, value in (
@@ -443,6 +453,42 @@ def temperature(
 @router.post("/imports/tinytuya", tags=["Import"])
 def import_devices(body: ImportRequest, session: Session = Depends(get_session)):
     return import_tinytuya(session, body)
+
+
+def register_name_lookup(resource, model, read_schema):
+    @router.get(
+        "/lookup/" + resource,
+        response_model=read_schema,
+        tags=["Search"],
+        name=f"{resource}_lookup_by_name",
+    )
+    def lookup_by_name(
+        name: NameQuery,
+        building_id: PositiveID | None = None,
+        room_id: PositiveID | None = None,
+        parent_id: PositiveID | None = None,
+        device_type_id: PositiveID | None = None,
+        session: Session = Depends(get_session),
+    ):
+        item = get_by_name(
+            session,
+            model,
+            name,
+            building_id=building_id,
+            room_id=room_id,
+            parent_id=parent_id,
+            device_type_id=device_type_id,
+        )
+        return device_read(session, item) if model is Device else read_schema.model_validate(item)
+
+
+for resource, model, schema in (
+    ("buildings", Building, BuildingRead),
+    ("rooms", Room, RoomRead),
+    ("devices", Device, DeviceRead),
+    ("device-types", DeviceType, DeviceTypeRead),
+):
+    register_name_lookup(resource, model, schema)
 
 
 def register_alias_routes(resource, model, read_schema):

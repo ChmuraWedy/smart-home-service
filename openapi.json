@@ -3,7 +3,7 @@
   "info": {
     "title": "Smart Home Local API",
     "description": "SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
     "/api/v1/buildings": {
@@ -80,6 +80,42 @@
             }
           },
           {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -150,6 +186,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -195,6 +233,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -250,6 +290,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -290,6 +332,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -341,6 +385,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -459,6 +505,42 @@
             }
           },
           {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -529,6 +611,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -574,6 +658,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -629,6 +715,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -669,6 +757,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -758,6 +848,42 @@
           }
         ],
         "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
           {
             "name": "offset",
             "in": "query",
@@ -1024,6 +1150,42 @@
             }
           },
           {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
             "name": "building_id",
             "in": "query",
             "required": false,
@@ -1201,6 +1363,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1246,6 +1410,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1301,6 +1467,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1341,6 +1509,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1392,6 +1562,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1439,6 +1611,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1486,6 +1660,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1543,6 +1719,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1600,6 +1778,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1657,6 +1837,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           },
@@ -1723,6 +1905,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1780,6 +1964,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1837,6 +2023,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1919,6 +2107,474 @@
         ]
       }
     },
+    "/api/v1/lookup/buildings": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Buildings Lookup By Name",
+        "operationId": "buildings_lookup_by_name_api_v1_lookup_buildings_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Name"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lookup/rooms": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Rooms Lookup By Name",
+        "operationId": "rooms_lookup_by_name_api_v1_lookup_rooms_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Name"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lookup/devices": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Devices Lookup By Name",
+        "operationId": "devices_lookup_by_name_api_v1_lookup_devices_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Name"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/lookup/device-types": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Device-Types Lookup By Name",
+        "operationId": "device_types_lookup_by_name_api_v1_lookup_device_types_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Name"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceTypeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/buildings/{item_id}/aliases": {
       "get": {
         "tags": [
@@ -1938,6 +2594,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -1988,6 +2646,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -2045,6 +2705,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           },
@@ -2094,6 +2756,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -2144,6 +2808,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -2201,6 +2867,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           },
@@ -2250,6 +2918,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -2300,6 +2970,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           }
@@ -2357,6 +3029,8 @@
             "required": true,
             "schema": {
               "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, alias, or explicit exact name reference: name:Розетка",
               "title": "Item Id"
             }
           },
