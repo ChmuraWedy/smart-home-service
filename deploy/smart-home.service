@@ -1,0 +1,23 @@
+[Unit]
+Description=Smart Home Local REST API
+After=network.target
+
+[Service]
+Type=simple
+User=smarthome
+Group=smarthome
+WorkingDirectory=/opt/smart-home-service
+Environment=SMART_HOME_DB=/var/lib/smart-home/smarthome.db
+EnvironmentFile=-/etc/smart-home-service.env
+ExecStart=/opt/smart-home-service/.venv/bin/python -m uvicorn smarthome.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/smart-home
+
+[Install]
+WantedBy=multi-user.target

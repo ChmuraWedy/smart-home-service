@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-home-service"
+version = "0.1.0"
+description = "Local smart-home REST API with SQLite and TinyTuya gateway support"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "SQLAlchemy>=2.0,<2.1",
+  "pydantic>=2.9,<3", "tinytuya>=1.17,<2", "pycryptodome>=3.20,<4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "httpx>=0.27,<1", "ruff>=0.9,<1"]
+
+[project.scripts]
+smart-home = "smarthome.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["smarthome*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008", "E501"]

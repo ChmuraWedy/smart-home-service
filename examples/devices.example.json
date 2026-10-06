@@ -1,0 +1,23 @@
+[
+  {
+    "id": "demo_zigbee_relay",
+    "name": "Zigbee relay",
+    "sub": true,
+    "parent": "demo_gateway",
+    "node_id": "0011223344556677",
+    "category": "kg"
+  },
+  {
+    "id": "demo_gateway",
+    "name": "Tuya gateway",
+    "key": "0123456789abcdef",
+    "product_id": "demo_gateway_product",
+    "category": "wg2"
+  },
+  {
+    "id": "demo_wifi_outlet",
+    "name": "Wi-Fi outlet",
+    "key": "fedcba9876543210",
+    "category": "cz"
+  }
+]

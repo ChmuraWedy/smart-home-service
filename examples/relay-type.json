@@ -1,0 +1,8 @@
+{
+  "slug": "relay",
+  "name": "Relay / outlet (example DPS)",
+  "description": "Verify switch DP against your specific device",
+  "capabilities": {
+    "switch": {"dp": "1", "type": "boolean"}
+  }
+}

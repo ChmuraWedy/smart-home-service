@@ -1,0 +1,12 @@
+{
+  "slug": "bulb-v2",
+  "name": "Bulb v2 (example DPS)",
+  "description": "Common bulb layout, not universal: verify each DP and range",
+  "capabilities": {
+    "switch": {"dp": "20", "type": "boolean"},
+    "mode": {"dp": "21", "type": "string", "enum": ["white", "colour"]},
+    "brightness": {"dp": "22", "type": "integer", "minimum": 10, "maximum": 1000, "unit": "raw"},
+    "temperature": {"dp": "23", "type": "integer", "minimum": 0, "maximum": 1000, "unit": "raw"},
+    "color": {"dp": "24", "type": "object", "encoding": "tuya_hsv"}
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "timestamp": 1791324000,
+  "devices": [
+    {
+      "id": "demo_gateway",
+      "ip": "192.168.1.20",
+      "ver": "3.5",
+      "name": "Tuya gateway",
+      "key": "",
+      "origin": "broadcast"
+    },
+    {
+      "id": "demo_wifi_outlet",
+      "ip": "192.168.1.40",
+      "ver": "3.3",
+      "name": "Wi-Fi outlet",
+      "key": "",
+      "origin": "broadcast"
+    }
+  ]
+}
