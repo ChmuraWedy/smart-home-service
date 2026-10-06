@@ -24,5 +24,12 @@ int main() {
     assert(panel::numericValue(583, 5, 35, .5) == 22.5);
     assert(panel::numericValue(1000, 5, 35, .5) == 35);
     assert(panel::numericValue(0, 5, 35, .5) == 5);
+    panel::Model saved;
+    saved.chooseRoom(10); saved.toggle({1, true}, true); saved.toggle({5, false}, true); saved.checkpoint();
+    saved.chooseRoom(20); saved.toggle({9, false}, true);
+    saved.back(); assert(saved.page == panel::Page::Rooms);
+    saved.back(); assert(saved.page == panel::Page::Dashboard && saved.room == 10);
+    assert(saved.count == 2 && saved.contains({1, true}) && saved.contains({5, false}));
+    assert(!saved.contains({9, false}));
     return 0;
 }

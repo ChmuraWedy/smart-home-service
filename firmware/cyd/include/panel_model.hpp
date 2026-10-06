@@ -14,6 +14,11 @@ struct Model {
     uint32_t activeDevice = 0;
     Target selected[capacity];
     size_t count = 0;
+    Target savedSelected[capacity];
+    size_t savedCount = 0;
+    uint32_t savedRoom = 0;
+    void checkpoint() { savedRoom = room; savedCount = count; for (size_t i = 0; i < count; ++i) savedSelected[i] = selected[i]; }
+    void cancelSelection() { room = savedRoom; count = savedCount; for (size_t i = 0; i < count; ++i) selected[i] = savedSelected[i]; page = Page::Dashboard; }
     void chooseRoom(uint32_t id) { if (room != id) { room = id; count = 0; } page = Page::Selection; }
     bool contains(Target item) const { for (size_t i = 0; i < count; ++i) if (selected[i].id == item.id && selected[i].group == item.group) return true; return false; }
     bool toggle(Target item, bool checked) {
@@ -34,6 +39,7 @@ struct Model {
         if (page == Page::Color) page = Page::Device;
         else if (page == Page::Device && activeGroup) page = Page::Group;
         else if (page == Page::Selection) page = Page::Rooms;
+        else if (page == Page::Rooms) cancelSelection();
         else page = Page::Dashboard;
     }
 };

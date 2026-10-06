@@ -393,12 +393,19 @@ static void clicked(lv_event_t *event) {
     case ActionKind::Next: pageOffset += 8; loadPage(); break;
     case ActionKind::Previous: pageOffset = max(0, pageOffset - 8); loadPage(); break;
     case ActionKind::Save: {
-        DynamicJsonDocument config(4096); config["name"] = PANEL_NAME; config["room_id"] = model.room;
+        DynamicJsonDocument config(16384), previous(16384);
+        deserializeJson(previous, prefs.getString("selection", ""));
+        config["name"] = PANEL_NAME; config["room_id"] = model.room;
         JsonArray widgets = config.createNestedArray("widgets");
         for (size_t i = 0; i < model.count; ++i) {
             JsonObject target = widgets.createNestedObject();
             target["kind"] = model.selected[i].group ? "group" : "device"; target["id"] = model.selected[i].id;
+            // Keep explicit capability selections configured through REST for retained tiles.
+            for (JsonObject old : previous["widgets"].as<JsonArray>())
+                if (old["id"] == target["id"] && old["kind"] == target["kind"])
+                    target["capabilities"] = old["capabilities"];
         }
+        if (config.overflowed()) { notice("Конфигурация слишком большая"); break; }
         String payload; serializeJson(config, payload); send(RequestKind::Save, "PUT", displayPath(), payload);
         notice("Сохранение…"); break;
     }
@@ -436,6 +443,7 @@ static void restoreConfig(JsonDocument &config) {
     for (JsonObject target : config["widgets"].as<JsonArray>())
         model.toggle({target["id"].as<uint32_t>(), target["kind"] == "group"}, true);
     configured = model.room > 0;
+    model.checkpoint();
 }
 static void handle(Result *result) {
     busy = false;
@@ -506,7 +514,7 @@ void setup() {
     panelId = PANEL_ID;
     if (!panelId.length()) { panelId = "panel-" + WiFi.macAddress(); panelId.replace(":", ""); panelId.toLowerCase(); }
     prefs.begin("smart-panel", false);
-    DynamicJsonDocument config(4096);
+    DynamicJsonDocument config(16384);
     String saved = prefs.getString("selection", "");
     if (saved.length() && !deserializeJson(config, saved)) restoreConfig(config);
     jobs = xQueueCreate(1, sizeof(Job *)); replies = xQueueCreate(1, sizeof(Result *));

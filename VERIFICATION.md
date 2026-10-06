@@ -1,6 +1,6 @@
 # Проверка проекта
 
-Дата: 7 октября 2026. Версия сервиса: 0.8.0. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
+Дата: 7 октября 2026. Версия сервиса: 0.8.1. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
 
 - `python -m pytest -q`: **117 passed** (45 первоначальных, 41 проверка алиасов и 31 проверка поиска по названию).
 - `ruff check .`: **All checks passed**.
@@ -55,3 +55,7 @@ ruff==0.16.10
 - Static RAM reported by linker: **115340–115396 bytes of 327680**; application flash **1085357–1094561 bytes of 3145728**. These are build figures, not measured free heap under Wi-Fi/HTTP/LVGL load. The firmware includes bounded responses and JSON documents; runtime operation needs a physical board test.
 - No display was flashed, no hardware pins/touch calibration were verified on a physical board, and no real Tuya command or cloud account login was performed.
 - Built wheel `smart_home_service-0.8.0-py3-none-any.whl` and installed it into a separate directory. A real localhost Uvicorn process using that installed package passed HTTP checks for health/version, authentication, packaged `/cloud` page, automatic name alias lookup, room/building selection and a three-lamp group dashboard. The process was stopped after the check; no real device command was sent.
+
+## Panel selection fix / 0.8.1
+
+206 Python tests passed again; Ruff passed. Native C++ assertions now also verify cancellation restores the previously saved room and tiles. All five full firmware builds passed after the fix: static RAM 115444–115500 bytes, flash 1087981–1097145 bytes. Built the 0.8.1 wheel; OpenAPI and package metadata updated. Actual board, touch, device and cloud login limitations remain as above.
