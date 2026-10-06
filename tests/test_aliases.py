@@ -31,7 +31,7 @@ def create_owner(client, resource, *, aliases=None, suffix="1", building_id=None
 @pytest.mark.parametrize("resource", ["buildings", "rooms", "devices"])
 def test_alias_crud_lookup_normalization_and_filter(client, resource):
     item = create_owner(client, resource, aliases=[" Primary.Name ", "other_alias"])
-    assert item["aliases"] == ["other_alias", "primary.name"]
+    assert item["aliases"] == [item["name"], "other_alias", "primary.name"]
     path = API + "/" + resource
     assert client.get(path + "/Primary.Name").json()["id"] == item["id"]
     assert client.get(path + f"/{item['id']}/aliases").json() == item["aliases"]
@@ -39,7 +39,12 @@ def test_alias_crud_lookup_normalization_and_filter(client, resource):
     assert client.get(path + "?alias=missing").json() == []
     response = client.post(path + "/primary.name/aliases", json={"alias": " Added-Alias "})
     assert response.status_code == 201, response.text
-    assert response.json()["aliases"] == ["added-alias", "other_alias", "primary.name"]
+    assert response.json()["aliases"] == [
+        item["name"],
+        "added-alias",
+        "other_alias",
+        "primary.name",
+    ]
     assert KEY not in response.text
     assert client.delete(path + "/added-alias/aliases/ADDED-ALIAS").status_code == 204
     assert client.get(path + "/added-alias").status_code == 404
@@ -47,7 +52,7 @@ def test_alias_crud_lookup_normalization_and_filter(client, resource):
     response = client.patch(
         path + "/primary.name", json={"name": "Updated", "aliases": ["renamed"]}
     )
-    assert response.status_code == 200 and response.json()["aliases"] == ["renamed"]
+    assert response.status_code == 200 and response.json()["aliases"] == ["Updated", "renamed"]
     assert client.get(path + "/primary.name").status_code == 404
     assert client.get(path + "/renamed").json()["name"] == "Updated"
     assert client.delete(path + "/renamed").status_code == 204
@@ -97,7 +102,10 @@ def test_invalid_aliases_do_not_modify_object(client, resource, aliases):
     item = create_owner(client, resource, aliases=["valid"])
     response = client.patch(API + f"/{resource}/{item['id']}", json={"aliases": aliases})
     assert response.status_code == 422, response.text
-    assert client.get(API + f"/{resource}/{item['id']}").json()["aliases"] == ["valid"]
+    assert client.get(API + f"/{resource}/{item['id']}").json()["aliases"] == [
+        item["name"],
+        "valid",
+    ]
 
 
 def test_aliases_are_scoped_by_entity_type(client):
@@ -133,15 +141,18 @@ def test_alias_hierarchy_and_delete_guards(client, gateway, child):
         ).status_code
         == 200
     )
-    assert client.get(API + "/buildings/home/rooms").json()[0]["aliases"] == ["kitchen"]
+    assert client.get(API + "/buildings/home/rooms").json()[0]["aliases"] == ["Kitchen"]
     assert {d["id"] for d in client.get(API + "/rooms/kitchen/devices").json()} == {
         gateway["id"],
         child["id"],
     }
     tree = client.get(API + "/buildings/home/hierarchy").json()
-    assert tree["aliases"] == ["home"] and tree["rooms"][0]["aliases"] == ["kitchen"]
+    assert tree["aliases"] == ["House", "home"] and tree["rooms"][0]["aliases"] == ["Kitchen"]
     assert KEY not in str(tree)
-    assert client.get(API + "/devices/hub/children").json()[0]["aliases"] == ["relay"]
+    assert client.get(API + "/devices/hub/children").json()[0]["aliases"] == [
+        child["name"],
+        "relay",
+    ]
     for path in ("buildings/home", "rooms/kitchen", "devices/hub"):
         assert client.delete(API + "/" + path).status_code == 409
     assert client.delete(API + "/devices/relay").status_code == 204
@@ -222,10 +233,13 @@ def test_aliases_clear_preserve_and_capacity(client, direct):
     path = API + f"/devices/{direct['id']}"
     aliases = [f"alias-{index:02}" for index in range(32)]
     assert client.patch(path, json={"aliases": aliases}).status_code == 200
-    assert client.patch(path, json={"description": "Keep aliases"}).json()["aliases"] == aliases
+    assert client.patch(path, json={"description": "Keep aliases"}).json()["aliases"] == [
+        direct["name"],
+        *aliases,
+    ]
     assert client.post(path + "/aliases", json={"alias": "extra"}).status_code == 422
     assert client.patch(path, json={"aliases": [*aliases, "extra"]}).status_code == 422
-    assert client.patch(path, json={"aliases": []}).json()["aliases"] == []
+    assert client.patch(path, json={"aliases": []}).json()["aliases"] == [direct["name"]]
     assert client.get(API + "/devices/alias-00").status_code == 404
 
 
@@ -267,7 +281,7 @@ def test_upgrade_existing_database_preserves_inventory_and_keys(tmp_path):
             item = client.get(API + "/devices").json()[0]
             assert item["device_id"] == "old-device" and item["has_local_key"] is True
             if not restart:
-                assert item["aliases"] == []
+                assert item["aliases"] == [item["name"]]
                 assert (
                     client.patch(
                         API + f"/devices/{item['id']}", json={"aliases": ["old-outlet"]}

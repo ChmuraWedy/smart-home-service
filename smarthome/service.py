@@ -1,6 +1,7 @@
 from datetime import timezone
 
 from fastapi import HTTPException
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -15,8 +16,8 @@ from .models import (
     RoomAlias,
     utcnow,
 )
-from .schemas import Capability, DeviceRead
-from .search import get_by_name
+from .schemas import Alias, Capability, DeviceRead
+from .search import fold_name, get_by_alias, get_by_name
 
 
 def get_or_404(session: Session, model, item_id: int):
@@ -38,14 +39,21 @@ def get_by_ref(session: Session, model, reference: str):
         return get_by_name(session, model, reference[5:])
     if reference.isascii() and reference.isdecimal():
         return get_or_404(session, model, int(reference))
-    alias_model, owner_field = ALIAS_MODELS[model]
-    alias = session.get(alias_model, reference.strip().lower())
-    if alias is None:
-        raise HTTPException(404, f"{model.__name__} alias not found")
-    return get_or_404(session, model, getattr(alias, owner_field))
+    return get_by_alias(session, model, reference)
 
 
 def replace_aliases(session: Session, item, aliases: list[str]):
+    # Clients may round-trip the read representation, including the human name.
+    aliases = [alias for alias in aliases if fold_name(alias) != fold_name(item.name)]
+    try:
+        aliases = [TypeAdapter(Alias).validate_python(alias) for alias in aliases]
+    except ValidationError:
+        raise HTTPException(
+            422,
+            "Custom aliases require 1..64 ASCII letters/digits/._- and must start with a letter; the current name is automatic",
+        ) from None
+    if len(aliases) > 32 or len(aliases) != len(set(aliases)):
+        raise HTTPException(422, "At most 32 unique custom aliases are allowed")
     alias_model, owner_field = ALIAS_MODELS[type(item)]
     with session.no_autoflush:
         query = select(alias_model).where(alias_model.alias.in_(aliases))

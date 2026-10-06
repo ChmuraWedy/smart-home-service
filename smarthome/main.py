@@ -15,12 +15,9 @@ from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
     Building,
-    BuildingAlias,
     Device,
-    DeviceAlias,
     DeviceType,
     Room,
-    RoomAlias,
     utcnow,
 )
 from .schemas import (
@@ -49,7 +46,7 @@ from .schemas import (
     RoomTree,
     SwitchCommand,
 )
-from .search import get_by_name, name_filters
+from .search import alias_filters, fold_name, get_by_alias, get_by_name, name_filters
 from .service import (
     capability_dps,
     commit,
@@ -104,7 +101,7 @@ def add_building(body: BuildingCreate, session: Session = Depends(get_session)):
 
 @router.get("/buildings", response_model=list[BuildingRead], tags=["Buildings"])
 def list_buildings(
-    alias: Alias | None = None,
+    alias: NameQuery | None = None,
     name: NameQuery | None = None,
     q: NameQuery | None = None,
     offset: int = Query(0, ge=0),
@@ -113,7 +110,7 @@ def list_buildings(
 ):
     query = name_filters(select(Building), Building, name=name, q=q)
     if alias is not None:
-        query = query.join(BuildingAlias).where(BuildingAlias.alias == alias)
+        query = alias_filters(query, Building, alias)
     return session.scalars(query.order_by(Building.id).offset(offset).limit(limit)).all()
 
 
@@ -179,7 +176,7 @@ def add_room(body: RoomCreate, session: Session = Depends(get_session)):
 @router.get("/rooms", response_model=list[RoomRead], tags=["Rooms"])
 def list_rooms(
     building_id: int | None = None,
-    alias: Alias | None = None,
+    alias: NameQuery | None = None,
     name: NameQuery | None = None,
     q: NameQuery | None = None,
     offset: int = Query(0, ge=0),
@@ -190,7 +187,7 @@ def list_rooms(
     if building_id is not None:
         query = query.where(Room.building_id == building_id)
     if alias is not None:
-        query = query.join(RoomAlias).where(RoomAlias.alias == alias)
+        query = alias_filters(query, Room, alias)
     return session.scalars(query.order_by(Room.id).offset(offset).limit(limit)).all()
 
 
@@ -280,7 +277,7 @@ def add_device(body: DeviceCreate, session: Session = Depends(get_session)):
 
 @router.get("/devices", response_model=list[DeviceRead], tags=["Devices"])
 def list_devices(
-    alias: Alias | None = None,
+    alias: NameQuery | None = None,
     name: NameQuery | None = None,
     q: NameQuery | None = None,
     building_id: int | None = None,
@@ -296,7 +293,7 @@ def list_devices(
 ):
     query = name_filters(select(Device), Device, name=name, q=q)
     if alias is not None:
-        query = query.join(DeviceAlias).where(DeviceAlias.alias == alias)
+        query = alias_filters(query, Device, alias)
     for column, value in (
         (Device.building_id, building_id),
         (Device.room_id, room_id),
@@ -491,10 +488,37 @@ for resource, model, schema in (
     register_name_lookup(resource, model, schema)
 
 
+def register_alias_lookup(resource, model, read_schema):
+    @router.get(
+        "/lookup/" + resource + "/alias",
+        response_model=read_schema,
+        tags=["Search"],
+        name=f"{resource}_lookup_by_alias",
+    )
+    def lookup_by_alias(
+        alias: NameQuery,
+        building_id: PositiveID | None = None,
+        room_id: PositiveID | None = None,
+        parent_id: PositiveID | None = None,
+        device_type_id: PositiveID | None = None,
+        session: Session = Depends(get_session),
+    ):
+        item = get_by_alias(
+            session,
+            model,
+            alias,
+            building_id=building_id,
+            room_id=room_id,
+            parent_id=parent_id,
+            device_type_id=device_type_id,
+        )
+        return device_read(session, item) if model is Device else read_schema.model_validate(item)
+
+
 def register_alias_routes(resource, model, read_schema):
     path = "/" + resource + "/{item_id}/aliases"
 
-    @router.get(path, response_model=list[Alias], tags=["Aliases"], name=f"{resource}_aliases")
+    @router.get(path, response_model=list[str], tags=["Aliases"], name=f"{resource}_aliases")
     def list_aliases(item_id: EntityRef, session: Session = Depends(get_session)):
         return get_by_ref(session, model, item_id).aliases
 
@@ -507,9 +531,9 @@ def register_alias_routes(resource, model, read_schema):
     )
     def add_alias(item_id: EntityRef, body: AliasCreate, session: Session = Depends(get_session)):
         item = get_by_ref(session, model, item_id)
-        if body.alias in item.aliases:
+        if any(fold_name(body.alias) == fold_name(alias) for alias in item.aliases):
             raise HTTPException(409, "Alias already exists on this object")
-        if len(item.aliases) >= 32:
+        if len(item.alias_entries) >= 32:
             raise HTTPException(422, "Object cannot have more than 32 aliases")
         replace_aliases(session, item, [*item.aliases, body.alias])
         commit(session)
@@ -520,6 +544,8 @@ def register_alias_routes(resource, model, read_schema):
     )
     def delete_alias(item_id: EntityRef, alias: Alias, session: Session = Depends(get_session)):
         item = get_by_ref(session, model, item_id)
+        if fold_name(alias) == fold_name(item.name):
+            raise HTTPException(409, "The name alias is automatic; rename the object instead")
         if alias not in item.aliases:
             raise HTTPException(404, "Alias not found on this object")
         replace_aliases(session, item, [name for name in item.aliases if name != alias])
@@ -532,6 +558,7 @@ for resource, model, schema in (
     ("rooms", Room, RoomRead),
     ("devices", Device, DeviceRead),
 ):
+    register_alias_lookup(resource, model, schema)
     register_alias_routes(resource, model, schema)
 
 

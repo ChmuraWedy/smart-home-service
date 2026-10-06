@@ -15,7 +15,17 @@ class Base(DeclarativeBase):
 class AliasOwner:
     @property
     def aliases(self) -> list[str]:
-        return sorted(entry.alias for entry in self.alias_entries)
+        from .search import fold_name
+
+        # The current human name is an automatic alias, including on old databases.
+        return [
+            self.name,
+            *sorted(
+                entry.alias
+                for entry in self.alias_entries
+                if fold_name(entry.alias) != fold_name(self.name)
+            ),
+        ]
 
 
 class Building(AliasOwner, Base):

@@ -30,3 +30,7 @@ ruff==0.16.10
 ```
 
 Тестовая среда выдала одно предупреждение Starlette о будущей замене `httpx` в TestClient; тесты прошли. Файл `requirements.txt` содержит диапазоны совместимых версий: на Python 3.10/другой архитектуре resolver может выбрать другие версии зависимостей. Работоспособность всего диапазона версий отдельно не проверялась. Ресурсы RAM/flash на OpenWrt не измерялись; Python и нативные crypto/Pydantic-пакеты нужно учитывать в образе устройства.
+
+## Alias lookup update
+
+123 API/transport/import/search tests passed; ruff check passed. Added tests for automatic Cyrillic names, alias query lookup, ambiguity scopes, rename, read/write round trip and capacity. No physical Tuya device was used.

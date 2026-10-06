@@ -181,8 +181,9 @@ def test_unicode_composition_slashes_numeric_names_and_alias_collision(client):
     numeric = create_item(client, "devices", "123")
     assert client.get(API + "/devices/name:123").json()["id"] == numeric["id"]
     named = create_item(client, "devices", "light")
-    aliased = create_item(client, "devices", "Other", aliases=["light"])
-    assert client.get(API + "/devices/light").json()["id"] == aliased["id"]
+    create_item(client, "devices", "Other", aliases=["light"])
+    assert client.get(API + "/devices/light").status_code == 409
+    assert client.get(API + "/lookup/devices/alias", params={"alias": "light"}).status_code == 409
     assert client.get(API + "/devices/name:light").json()["id"] == named["id"]
 
 

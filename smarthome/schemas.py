@@ -81,12 +81,16 @@ class Patch(Schema):
 
 
 class AliasedSchema(Schema):
-    aliases: list[Alias] = Field(default_factory=list, max_length=32)
+    aliases: list[NameQuery] = Field(default_factory=list, max_length=33)
+    _normalize_aliases = field_validator("aliases")(lambda v: [normalize_alias(x) for x in v])
     _unique_aliases = field_validator("aliases")(unique_aliases)
 
 
 class AliasedPatch(Patch):
-    aliases: list[Alias] | None = Field(default=None, max_length=32)
+    aliases: list[NameQuery] | None = Field(default=None, max_length=33)
+    _normalize_aliases = field_validator("aliases")(
+        lambda v: [normalize_alias(x) for x in v] if v is not None else v
+    )
     _unique_aliases = field_validator("aliases")(unique_aliases)
 
 
@@ -138,6 +142,8 @@ class BuildingPatch(AliasedPatch):
 
 class BuildingRead(BuildingCreate):
     id: int
+    aliases: list[str] = Field(default_factory=list, max_length=33)
+    _normalize_aliases = field_validator("aliases")(lambda v: v)
 
 
 class RoomCreate(AliasedSchema):
@@ -155,6 +161,8 @@ class RoomPatch(AliasedPatch):
 
 class RoomRead(RoomCreate):
     id: int
+    aliases: list[str] = Field(default_factory=list, max_length=33)
+    _normalize_aliases = field_validator("aliases")(lambda v: v)
 
 
 class DeviceTypeCreate(Schema):
@@ -274,6 +282,8 @@ class DevicePatch(AliasedPatch):
 
 class DeviceRead(DeviceFields):
     id: int
+    aliases: list[str] = Field(default_factory=list, max_length=33)
+    _normalize_aliases = field_validator("aliases")(lambda v: v)
     node_id: str | None
     has_local_key: bool
     last_dps: dict[str, JsonValue] | None

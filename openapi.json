@@ -3,7 +3,7 @@
   "info": {
     "title": "Smart Home Local API",
     "description": "SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/api/v1/buildings": {
@@ -70,7 +70,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
                 },
                 {
                   "type": "null"
@@ -495,7 +497,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
                 },
                 {
                   "type": "null"
@@ -1140,7 +1144,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
                 },
                 {
                   "type": "null"
@@ -2575,6 +2581,123 @@
         }
       }
     },
+    "/api/v1/lookup/buildings/alias": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Buildings Lookup By Alias",
+        "operationId": "buildings_lookup_by_alias_api_v1_lookup_buildings_alias_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Alias"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildingRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/buildings/{item_id}/aliases": {
       "get": {
         "tags": [
@@ -2608,8 +2731,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+                    "type": "string"
                   },
                   "title": "Response Buildings Aliases Api V1 Buildings  Item Id  Aliases Get"
                 }
@@ -2737,6 +2859,123 @@
         }
       }
     },
+    "/api/v1/lookup/rooms/alias": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Rooms Lookup By Alias",
+        "operationId": "rooms_lookup_by_alias_api_v1_lookup_rooms_alias_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Alias"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/rooms/{item_id}/aliases": {
       "get": {
         "tags": [
@@ -2770,8 +3009,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+                    "type": "string"
                   },
                   "title": "Response Rooms Aliases Api V1 Rooms  Item Id  Aliases Get"
                 }
@@ -2899,6 +3137,123 @@
         }
       }
     },
+    "/api/v1/lookup/devices/alias": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Devices Lookup By Alias",
+        "operationId": "devices_lookup_by_alias_api_v1_lookup_devices_alias_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "title": "Alias"
+            }
+          },
+          {
+            "name": "building_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Building Id"
+            }
+          },
+          {
+            "name": "room_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Room Id"
+            }
+          },
+          {
+            "name": "parent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Id"
+            }
+          },
+          {
+            "name": "device_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Type Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/devices/{item_id}/aliases": {
       "get": {
         "tags": [
@@ -2932,8 +3287,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "string",
-                    "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+                    "type": "string"
                   },
                   "title": "Response Devices Aliases Api V1 Devices  Item Id  Aliases Get"
                 }
@@ -3101,10 +3455,12 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "name": {
@@ -3152,10 +3508,12 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
                 },
                 "type": "array",
-                "maxItems": 32
+                "maxItems": 33
               },
               {
                 "type": "null"
@@ -3210,11 +3568,10 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "name": {
@@ -3265,11 +3622,10 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "name": {
@@ -3502,10 +3858,12 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "name": {
@@ -3734,10 +4092,12 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
                 },
                 "type": "array",
-                "maxItems": 32
+                "maxItems": 33
               },
               {
                 "type": "null"
@@ -4002,11 +4362,10 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "name": {
@@ -4516,10 +4875,12 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "building_id": {
@@ -4561,10 +4922,12 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
                 },
                 "type": "array",
-                "maxItems": 32
+                "maxItems": 33
               },
               {
                 "type": "null"
@@ -4619,11 +4982,10 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "building_id": {
@@ -4668,11 +5030,10 @@
         "properties": {
           "aliases": {
             "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+              "type": "string"
             },
             "type": "array",
-            "maxItems": 32,
+            "maxItems": 33,
             "title": "Aliases"
           },
           "building_id": {
