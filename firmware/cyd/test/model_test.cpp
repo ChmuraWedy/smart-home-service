@@ -31,5 +31,11 @@ int main() {
     saved.back(); assert(saved.page == panel::Page::Dashboard && saved.room == 10);
     assert(saved.count == 2 && saved.contains({1, true}) && saved.contains({5, false}));
     assert(!saved.contains({9, false}));
+    assert(panel::utf8PrefixLength("Комната", 14, 3) == 2);
+    assert(panel::utf8PrefixLength("Комната", 14, 4) == 4);
+    assert(panel::utf8PrefixLength("abc", 3, 2) == 2);
+    assert(panel::utf8PrefixLength("abc", 3, 4) == 3);
+    assert(panel::utf8PrefixLength("\xf0\x9f\x98\x80", 4, 3) == 0);
+    assert(panel::utf8PrefixLength("\xf0\x9f\x98\x80", 4, 4) == 4);
     return 0;
 }

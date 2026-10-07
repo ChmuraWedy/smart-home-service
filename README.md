@@ -390,7 +390,7 @@ curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
 
 ## Панели комнат и группы
 
-[docs/displays.md](docs/displays.md): CRUD групп ламп, сохранение выбора комнаты и widgets, компактный dashboard, фоновое получение показаний и curl-примеры. `SMART_HOME_DISPLAY_POLL_INTERVAL=30` задаёт период опроса выбранных устройств; `0` — только явный refresh.
+[docs/displays.md](docs/displays.md): выбор комнаты и произвольного списка устройств/групп для отображения, сохранение конфигурации каждой панели, CRUD групп устройств с общим питанием, компактный dashboard, фоновое получение показаний и curl-примеры. Главный экран формируется из выбранного списка, показания и управление определяются capabilities. `SMART_HOME_DISPLAY_POLL_INTERVAL=30` задаёт период опроса выбранных устройств; `0` — только явный refresh.
 
 ## Вход Tuya по QR
 

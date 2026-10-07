@@ -44,6 +44,13 @@ struct Model {
     }
 };
 inline bool fresh(bool known, bool stale, bool connected) { return known && !stale && connected; }
+// Preserve complete UTF-8 glyphs when bounding status text for the small display.
+inline size_t utf8PrefixLength(const char *text, size_t length, size_t maximum) {
+    if (length <= maximum) return length;
+    size_t end = maximum;
+    while (end > 0 && (static_cast<uint8_t>(text[end]) & 0xc0) == 0x80) --end;
+    return end;
+}
 inline double numericValue(int tick, double min, double max, double step) {
     double value = min + (max-min) * tick / 1000.0;
     if (step > 0) value = min + std::round((value-min)/step) * step;

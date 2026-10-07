@@ -1,6 +1,6 @@
 # Проверка проекта
 
-Дата: 7 октября 2026. Версия сервиса: 0.8.1. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
+Дата: 7 октября 2026. Версия сервиса: 0.8.2. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
 
 - `python -m pytest -q`: **117 passed** (45 первоначальных, 41 проверка алиасов и 31 проверка поиска по названию).
 - `ruff check .`: **All checks passed**.
@@ -59,3 +59,7 @@ ruff==0.16.10
 ## Panel selection fix / 0.8.1
 
 206 Python tests passed again; Ruff passed. Native C++ assertions now also verify cancellation restores the previously saved room and tiles. All five full firmware builds passed after the fix: static RAM 115444–115500 bytes, flash 1087981–1097145 bytes. Built the 0.8.1 wheel; OpenAPI and package metadata updated. Actual board, touch, device and cloud login limitations remain as above.
+
+## Arbitrary panel selection / 0.8.2
+
+207 Python tests passed; Ruff and whitespace checks passed. Added a different-room selection test with a cover, a fan group and a metering plug: room-scoped options, exact selected widget order, position/power readings, group members and removal of unselected tiles. Generic firmware summaries now iterate readable capabilities rather than a list limited to the initial room example. Native C++ assertions cover safe UTF-8 status text bounds; all five full firmware builds passed. No physical board was available.

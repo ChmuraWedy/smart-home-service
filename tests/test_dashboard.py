@@ -102,6 +102,84 @@ def test_group_ack_without_state_does_not_claim_on(client, demo_room, factory):
     assert client.get(API + f"/groups/{group['id']}/state").json()["state"] == "unknown"
 
 
+def test_panel_selects_arbitrary_room_devices_and_groups_without_example_tiles(
+    client, demo_room, factory
+):
+    original_room, _, _ = demo_room
+    room = client.post(
+        API + "/rooms", json={"name": "Кабинет", "building_id": original_room["building_id"]}
+    ).json()
+    inventory = []
+    for index, (name, kind) in enumerate(
+        [
+            ("Вентилятор 1", "fan"),
+            ("Вентилятор 2", "fan"),
+            ("Розетка", "plug-meter"),
+            ("Штора", "cover"),
+            ("Не выбранное реле", "relay"),
+        ]
+    ):
+        result = client.post(
+            API + "/devices",
+            json={
+                "name": name,
+                "device_id": f"office-{index}",
+                "room_id": room["id"],
+                "ip": f"192.168.1.{80 + index}",
+                "version": "3.5",
+                "local_key": "0123456789abcdef",
+                "capabilities": profile(kind)["capabilities"],
+            },
+        )
+        assert result.status_code == 201
+        inventory.append(result.json())
+    group = client.post(
+        API + "/groups",
+        json={
+            "name": "Вентиляция",
+            "room_id": room["id"],
+            "device_ids": [d["id"] for d in inventory[:2]],
+        },
+    ).json()
+    path = API + "/displays/office-panel"
+    options = client.get(path + "/options", params={"room_id": room["id"]}).json()
+    assert {d["id"] for d in options["devices"]} == {d["id"] for d in inventory}
+    assert [g["id"] for g in options["groups"]] == [group["id"]]
+    widgets = [
+        {"kind": "device", "id": inventory[3]["id"]},
+        {"kind": "group", "id": group["id"]},
+        {"kind": "device", "id": inventory[2]["id"]},
+    ]
+    response = client.put(path, json={"name": "Кабинет", "room_id": room["id"], "widgets": widgets})
+    assert response.status_code == 200
+    for item, dps in zip(
+        inventory[:4],
+        [
+            {"1": True},
+            {"1": False},
+            {"1": False, "18": 1250, "19": 250, "20": 2300},
+            {"1": "stop", "2": 73},
+        ],
+        strict=True,
+    ):
+        factory.result = {"dps": dps}
+        assert client.get(API + f"/devices/{item['id']}/status").status_code == 200
+    dashboard = client.get(path + "/dashboard").json()
+    assert dashboard["room_name"] == "Кабинет"
+    assert [w["name"] for w in dashboard["widgets"]] == ["Штора", "Вентиляция", "Розетка"]
+    cover, ventilation, plug = dashboard["widgets"]
+    assert cover["values"]["position"]["value"] == 73
+    assert ventilation["state"] == "mixed"
+    assert plug["values"]["power"]["value"] == 25
+    assert [m["name"] for m in ventilation["members"]] == ["Вентилятор 1", "Вентилятор 2"]
+    # Removing a tile also removes it from the dashboard; members never become standalone tiles.
+    response = client.put(
+        path, json={"name": "Кабинет", "room_id": room["id"], "widgets": [widgets[2]]}
+    )
+    assert response.status_code == 200
+    assert [w["name"] for w in client.get(path + "/dashboard").json()["widgets"]] == ["Розетка"]
+
+
 def test_panel_room_selection_includes_building_names_and_paginates(client, demo_room):
     room, _, _ = demo_room
     home = client.post(API + "/buildings", json={"name": "Дача"}).json()

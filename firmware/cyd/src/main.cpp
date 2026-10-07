@@ -162,6 +162,18 @@ static String caption(const String &name) {
     if (name == "color") return "Цвет";
     if (name == "position") return "Положение";
     if (name == "speed") return "Скорость";
+    if (name == "power") return "Мощность";
+    if (name == "current") return "Ток";
+    if (name == "voltage") return "Напряжение";
+    if (name == "battery") return "Батарея";
+    if (name == "illuminance") return "Освещённость";
+    if (name == "target_humidity") return "Заданная влажность";
+    if (name == "oscillation") return "Поворот";
+    if (name == "mode") return "Режим";
+    if (name == "control") return "Управление";
+    if (name == "command") return "Команда";
+    if (name == "press") return "Нажатие";
+    if (name.startsWith("switch_")) return "Канал " + name.substring(7);
     return name;
 }
 static String readingText(JsonObject card, const char *name) {
@@ -171,29 +183,32 @@ static String readingText(JsonObject card, const char *name) {
     if (value.is<bool>()) {
         bool yes = value.as<bool>();
         if (String(name) == "motion" || String(name) == "presence") return yes ? "есть движение" : "нет движения";
-        return yes ? "вкл" : "выкл";
+        if (String(name) == "switch" || String(name).startsWith("switch_")) return yes ? "вкл" : "выкл";
+        return yes ? "да" : "нет";
     }
-    if (value.is<JsonObject>()) return "цвет задан";
+    if (String(name) == "color" && value.is<JsonObject>()) return "цвет задан";
     String text; serializeJson(value, text);
     if (value.is<const char *>()) text = value.as<const char *>();
     String unit = card["capabilities"][name]["unit"] | "";
-    return text + (unit.length() ? " " + unit : "");
+    text += unit.length() ? " " + unit : "";
+    if (text.length() > 80) text = text.substring(0, panel::utf8PrefixLength(text.c_str(), text.length(), 80)) + "…";
+    return text;
 }
 static String deviceSummary(JsonObject card) {
     String text = card["name"] | "Устройство";
-    for (JsonPair pair : card["values"].as<JsonObject>()) {
+    for (JsonPair pair : card["capabilities"].as<JsonObject>()) {
         String key = pair.key().c_str();
-        if (key == "switch" || key == "temperature" || key == "humidity" || key == "motion" || key == "presence")
-            text += "\n" + caption(key) + ": " + readingText(card, pair.key().c_str());
+        if (!(pair.value()["readable"] | true)) continue;
+        text += "\n" + caption(key) + ": " + readingText(card, pair.key().c_str());
     }
     return text;
 }
 static String groupSummary(JsonObject item) {
     String state = connected() ? String(item["state"] | "unknown") : "unknown";
-    String text = item["name"] | "Группа ламп";
+    String text = item["name"] | "Группа устройств";
     if (state == "on") return text + "\nВсе включены";
     if (state == "off") return text + "\nВсе выключены";
-    if (state == "mixed") return text + "\nВключена часть ламп";
+    if (state == "mixed") return text + "\nЧасть устройств включена";
     return text + "\nНет актуальных данных";
 }
 static void slidersChanged(lv_event_t *event) {
