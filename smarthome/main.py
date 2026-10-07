@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
@@ -608,6 +609,14 @@ def create_app(settings: Settings | None = None, controller=None):
         description="SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
     )
     app.state.settings = settings
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.cors_origins),
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["X-API-Key", "Content-Type"],
+            allow_credentials=False,
+        )
     app.state.controller = controller or TuyaController(settings)
     app.include_router(router)
     from .display_api import router as display_router
@@ -619,11 +628,9 @@ def create_app(settings: Settings | None = None, controller=None):
 
     @app.get("/cloud", include_in_schema=False)
     def cloud_setup_page():
-        from pathlib import Path
-
-        return FileResponse(
-            Path(__file__).parent / "static" / "cloud.html", headers={"Cache-Control": "no-store"}
-        )
+        if not settings.frontend_url:
+            raise HTTPException(404, "The web UI runs separately; see frontend/README.md")
+        return RedirectResponse(settings.frontend_url, headers={"Cache-Control": "no-store"})
 
     @app.get("/health", tags=["System"])
     def health():

@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,14 @@ class Settings:
     cloud_timeout: float = field(
         default_factory=lambda: float(os.getenv("SMART_HOME_CLOUD_TIMEOUT", "10"))
     )
+    cors_origins: tuple[str, ...] = field(
+        default_factory=lambda: tuple(
+            value.strip()
+            for value in os.getenv("SMART_HOME_CORS_ORIGINS", "").split(",")
+            if value.strip()
+        )
+    )
+    frontend_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_FRONTEND_URL", ""))
 
     def __post_init__(self):
         if self.display_poll_interval != 0 and not 10 <= self.display_poll_interval <= 3600:
@@ -49,3 +58,28 @@ class Settings:
             raise ValueError("Timeouts must be positive: Tuya <=30s, lock <=60s")
         if not 0 < self.cloud_timeout <= 30:
             raise ValueError("Developer cloud timeout must be >0 and <=30s")
+        for origin in self.cors_origins:
+            self._http_url(origin, origin_only=True)
+        if self.frontend_url:
+            self._http_url(self.frontend_url)
+
+    @staticmethod
+    def _http_url(value, origin_only=False):
+        try:
+            parsed = urlsplit(value)
+            valid = (
+                isinstance(value, str)
+                and not any(c.isspace() or not c.isprintable() for c in value)
+                and parsed.scheme in {"http", "https"}
+                and bool(parsed.hostname)
+                and parsed.username is None
+                and parsed.password is None
+                and not parsed.query
+                and not parsed.fragment
+                and (not origin_only or parsed.path == "")
+            )
+            _ = parsed.port  # Validate the port, including out-of-range values.
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        if not valid:
+            raise ValueError("Configure an HTTP(S) URL; CORS entries must be exact origins")
