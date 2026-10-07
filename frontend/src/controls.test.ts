@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloudCommands, cloudReading, cloudSpec, cloudSpecs, displayReading, hexToHsv, hsvToHex, isStale, localSpec, validateControlValue } from './controls';
+import { cloudCommands, cloudReading, cloudSpec, cloudSpecs, displayReading, hexToHsv, hsvToHex, isStale, localSpec, motionState, validateControlValue } from './controls';
 import type { CloudFunction, CloudFunctions } from './api';
 
 const fn = (code: string, type: string, values: unknown = {}): CloudFunction => ({ code, type, values: JSON.stringify(values) });
@@ -64,6 +64,31 @@ describe('metadata-driven controls', () => {
     expect(isStale(reading, Date.parse('2026-10-08T10:00:59Z'), true)).toBe(false);
     expect(isStale(reading, Date.parse('2026-10-08T10:01:01Z'), true)).toBe(true);
     expect(isStale({ ...reading, observed_at: undefined }, Date.now(), true)).toBe(true);
+  });
+  it.each(['pir', 'pir_state'])('decodes read-only %s without turning unknown or absent values into no motion', key => {
+    const spec = cloudSpec(fn(key, 'Enum', { range: ['pir', 'none'] }), false);
+    expect(displayReading(spec, cloudReading(spec, 'pir'))).toBe('Движение обнаружено');
+    expect(displayReading(spec, cloudReading(spec, 'none'))).toBe('Движения нет');
+    expect(spec.writable).toBe(false);
+    for (const raw of [undefined, null, 'unknown', 'presence', 0, 1, false, true]) {
+      const reading = cloudReading(spec, raw);
+      expect(reading.known).toBe(false);
+      expect(motionState(spec, reading)).toBeNull();
+      expect(displayReading(spec, reading)).toBe('Нет данных');
+    }
+    const other = cloudSpec(fn('mode', 'Enum', { range: ['pir', 'none'] }), false);
+    expect(displayReading(other, cloudReading(other, 'none'))).toBe('none');
+    const local = localSpec('motion', { type: 'boolean', readable: true, writable: false });
+    expect(displayReading(local, { value: false, known: true, stale: false })).toBe('Движения нет');
+  });
+  it('keeps the actual unitless legacy battery value instead of inventing a percentage', () => {
+    const spec = cloudSpec(fn('battery', 'Integer', { unit: '', min: 0, max: 500, scale: 0, step: 1 }), false);
+    expect(displayReading(spec, cloudReading(spec, 90))).toBe('90');
+    expect(spec.unit).toBe('');
+    expect(spec.help).toBe('Единица измерения не указана устройством.');
+    const percentage = cloudSpec(fn('battery_percentage', 'Integer', { unit: '%', min: 0, max: 100, scale: 0, step: 1 }), false);
+    expect(displayReading(percentage, cloudReading(percentage, 90))).toBe('90 %');
+    expect(percentage.help).toBeUndefined();
   });
   it.each([['#ff0000', { h: 0, s: 1000, v: 1000 }], ['#00ff00', { h: 120, s: 1000, v: 1000 }], ['#0000ff', { h: 240, s: 1000, v: 1000 }], ['#000000', { h: 0, s: 0, v: 0 }]])('uses independent RGB/HSV vectors for %s', (hex, hsv) => {
     expect(hexToHsv(hex as string)).toEqual(hsv);

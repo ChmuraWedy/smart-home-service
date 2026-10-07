@@ -71,6 +71,37 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
+  it('shows a gateway PIR sensor with no writable functions and refreshes its motion without sending commands', async () => {
+    const device = { id: 'cloud-motion-sensor', name: 'Датчик ванной', category: 'pir', sub: true, online: true, has_local_key: true };
+    const ranges = [{ code: 'pir', type: 'Enum', values: '{"range":["pir","none"]}' },
+      { code: 'battery', type: 'Integer', values: '{"unit":"","min":0,"max":500,"scale":0,"step":1}' }];
+    const requests: { method: string; provider: string | null }[] = [];
+    let motion = 'pir';
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      requests.push({ method: init?.method || 'GET', provider: url.searchParams.get('provider') });
+      if (url.pathname.endsWith('/functions')) return json({ device_id: device.id, functions: [], status_range: ranges });
+      return json({ device_id: device.id, online: true, source: 'cloud', status_range: ranges, status: { pir: motion, battery: 90 }, device_update_time: 1 });
+    });
+    render(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    expect(await screen.findByText('Движение обнаружено')).toBeInTheDocument();
+    expect(screen.getByText('90')).toBeInTheDocument();
+    expect(screen.getByText('Единица измерения не указана устройством.')).toBeInTheDocument();
+    expect(screen.getByText(/Снимок получен:/)).not.toHaveTextContent('1970');
+    expect(screen.getByText('Датчик движения')).toBeInTheDocument();
+    expect(screen.getByText('Через шлюз')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Включить' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Применить' })).toBeNull();
+    const user = userEvent.setup(); motion = 'none';
+    await user.click(screen.getByRole('button', { name: 'Обновить статус' }));
+    expect(await screen.findByText('Движения нет')).toBeInTheDocument();
+    expect(requests.every(request => request.method === 'GET' && request.provider === 'sharing')).toBe(true);
+    motion = 'unknown';
+    await user.click(screen.getByRole('button', { name: 'Обновить статус' }));
+    expect(await screen.findByText('Нет данных')).toBeInTheDocument();
+    expect(screen.queryByText('Движения нет')).toBeNull();
+    expect(requests.every(request => request.method === 'GET')).toBe(true);
+  });
   it.each(['sharing', 'developer'] as const)('sends one explicit %s command and keeps the observed state separate from ACK', async provider => {
     const server = cloudServer(); const user = userEvent.setup();
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);

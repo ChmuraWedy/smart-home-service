@@ -6,8 +6,10 @@ export type ControlSpec = {
   key: string; label: string; kind: 'boolean' | 'number' | 'enum' | 'color' | 'text' | 'json' | 'unsupported';
   readable: boolean; writable: boolean; minimum?: number; maximum?: number; step?: number;
   integer?: boolean; choices?: JsonValue[]; unit?: string;
-  factor?: number; colorScale?: { s: number; v: number }; reason?: string;
+  factor?: number; colorScale?: { s: number; v: number }; reason?: string; help?: string; indicator?: 'motion';
 };
+
+const MOTION_KEYS = new Set(['motion', 'pir', 'pir_state']);
 
 const LABELS: Record<string, string> = {
   switch: 'Питание', switch_led: 'Питание', brightness: 'Яркость', bright_value: 'Яркость', bright_value_v2: 'Яркость',
@@ -15,7 +17,7 @@ const LABELS: Record<string, string> = {
   temp_value: 'Цветовая температура', temp_value_v2: 'Цветовая температура', target_temperature: 'Заданная температура',
   temp_set: 'Заданная температура', temp_set_f: 'Заданная температура', temperature: 'Температура', temp_current: 'Температура',
   humidity: 'Влажность', humidity_value: 'Влажность', target_humidity: 'Заданная влажность', motion: 'Движение',
-  pir: 'Движение', presence_state: 'Присутствие', battery: 'Батарея', battery_percentage: 'Батарея',
+  pir: 'Движение', pir_state: 'Движение', presence_state: 'Присутствие', battery: 'Батарея', battery_percentage: 'Батарея',
   mode: 'Режим', work_mode: 'Режим', speed: 'Скорость', fan_speed_enum: 'Скорость', position: 'Положение',
   percent_control: 'Положение', control: 'Действие', oscillation: 'Поворот', power: 'Мощность', cur_power: 'Мощность',
   voltage: 'Напряжение', current: 'Ток', child_lock: 'Блокировка', command: 'Команда', press: 'Нажатие',
@@ -36,7 +38,8 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 const rounded = (value: number) => Number(value.toPrecision(12));
 
 export function localSpec(key: string, cap: Capability): ControlSpec {
-  const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: cap.unit || undefined };
+  const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: cap.unit || undefined,
+    indicator: !cap.writable && MOTION_KEYS.has(key) && cap.type === 'boolean' ? 'motion' as const : undefined };
   if (cap.enum?.length) return { ...base, kind: 'enum', choices: cap.enum };
   switch (cap.type) {
     case 'boolean': return { ...base, kind: 'boolean' };
@@ -61,7 +64,8 @@ function cloudColorScale(fn: CloudFunction, limits: Record<string, unknown>): { 
 }
 
 export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
-  const base = { key: fn.code, label: labelFor(fn.code), readable: true, writable };
+  const base = { key: fn.code, label: labelFor(fn.code), readable: true, writable,
+    indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
   const unit = typeof limits.unit === 'string' ? limits.unit : undefined;
   if (fn.type === 'Boolean') return { ...base, kind: 'boolean' };
@@ -80,6 +84,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
       minimum: finite(limits.min) ? limits.min * factor : undefined,
       maximum: finite(limits.max) ? limits.max * factor : undefined,
       step: (finite(limits.step) ? limits.step : 1) * factor, unit: displayUnit,
+      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? 'Единица измерения не указана устройством.' : undefined,
       reason: !writable || validBounds ? undefined : 'Нет корректного диапазона; управление недоступно.' };
   }
   if (fn.type === 'Enum') {
@@ -98,7 +103,8 @@ export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot)
   const result = new Map<string, ControlSpec>();
   for (const fn of [...(definitions.status_range || []), ...(snapshot.status_range || [])]) result.set(fn.code, cloudSpec(fn, false));
   for (const fn of definitions.functions) result.set(fn.code, cloudSpec(fn, true));
-  for (const key of Object.keys(snapshot.status)) if (!result.has(key)) result.set(key, { key, label: labelFor(key), kind: 'unsupported', readable: true, writable: false });
+  for (const key of Object.keys(snapshot.status)) if (!result.has(key)) result.set(key, { key, label: labelFor(key), kind: 'unsupported', readable: true, writable: false,
+    indicator: MOTION_KEYS.has(key) ? 'motion' : undefined });
   return [...result.values()];
 }
 
@@ -115,7 +121,20 @@ export function cloudReading(spec: ControlSpec, raw: JsonValue | undefined): Rea
     known = finite(color.h) && finite(color.s) && finite(color.v) && color.h >= 0 && color.h <= 360 && color.s >= 0 && color.s <= scale.s && color.v >= 0 && color.v <= scale.v;
     value = known ? { h: Math.round(color.h as number), s: Math.round((color.s as number) * 1000 / scale.s), v: Math.round((color.v as number) * 1000 / scale.v) } : null;
   }
+  if (spec.indicator === 'motion') {
+    const validMotion = spec.kind === 'enum' ? (raw === 'pir' || raw === 'none') && (!spec.choices?.length || spec.choices.includes(raw)) : typeof raw === 'boolean' || raw === 'pir' || raw === 'none';
+    known = known && validMotion;
+    value = known ? raw! : null;
+  }
   return { value, known, stale: !known };
+}
+
+export function motionState(spec: ControlSpec, reading: Reading | undefined): boolean | null | undefined {
+  if (spec.indicator !== 'motion') return;
+  if (!reading?.known || reading.value === null) return null;
+  if (reading.value === true || reading.value === 'pir') return true;
+  if (reading.value === false || reading.value === 'none') return false;
+  return null;
 }
 
 export function isStale(reading: Reading | undefined, now: number, local: boolean): boolean {
@@ -127,6 +146,8 @@ export function isStale(reading: Reading | undefined, now: number, local: boolea
 
 export function displayReading(spec: ControlSpec, reading: Reading | undefined): string {
   if (!reading?.known || reading.value === null) return 'Нет данных';
+  const motion = motionState(spec, reading);
+  if (motion !== undefined) return motion === null ? 'Нет данных' : motion ? 'Движение обнаружено' : 'Движения нет';
   const value = reading.value;
   if (typeof value === 'boolean') return ['switch', 'switch_led'].includes(spec.key) || spec.key.startsWith('switch_') ? (value ? 'Включено' : 'Выключено') : (value ? 'Да' : 'Нет');
   if (spec.kind === 'color' && typeof value === 'object' && !Array.isArray(value)) return `Тон ${value.h}°, насыщенность ${rounded(Number(value.s) / 10)}%, яркость ${rounded(Number(value.v) / 10)}%`;

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiError } from '../api';
 import type { JsonValue } from '../api';
-import { displayReading, hexToHsv, hsvToHex, isStale, optionLabel, sameValue, validateControlValue } from '../controls';
+import { displayReading, hexToHsv, hsvToHex, isStale, motionState, optionLabel, sameValue, validateControlValue } from '../controls';
 import type { ControlSpec, HSV } from '../controls';
 import type { Reading } from '../home-api';
 
@@ -100,6 +100,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
   spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<void>;
 }) {
   const fresh = reading?.known && !isStale(reading, now, local);
+  const motion = motionState(spec, reading);
   const [draft, setDraft] = useState('');
   const [color, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
   const [dirty, setDirty] = useState(false), [error, setError] = useState('');
@@ -129,9 +130,10 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
   }
   return <section className={'capability' + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
     <div className="capability-heading"><h3>{spec.label}</h3>{!spec.writable && <span className="read-only">Только чтение</span>}</div>
-    {spec.readable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
+    {spec.readable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {reading?.observed_at && <p className="help">Показание: {new Date(reading.observed_at).toLocaleString('ru-RU')}</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}
+    {spec.help && <p className="help">{spec.help}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
       <button disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === true)} onClick={() => void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === false)} onClick={() => void send(false)}>Выключить</button>
