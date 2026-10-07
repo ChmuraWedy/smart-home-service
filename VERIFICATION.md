@@ -1,5 +1,11 @@
 # Проверка проекта
 
+## Tuya discovery capture — 2026-10-07
+
+Seven new capture tests passed; Ruff passed. Tests cover plain/ECB/GCM discovery decoding without a device key, malformed/nonobject packets, replacement-file permissions, private raw/decoded output, unknown version handling, closed sockets and no payload/ID/token disclosure in stdout. Core service and firmware were unchanged; the prior 254 service tests remain the latest full-suite result.
+
+Real capture: 498 decoded UDP packets (496 device messages plus two own discovery requests), discovering 13 devices, including all three recently re-paired Wi-Fi lamps after a standard discovery probe. Sharing metadata matched their IDs and confirmed current local-key availability; a recently activated Zigbee remote had node_id. No local_key was present in the captured lamp packets; `token` was Boolean. Capture stopped after the user's completion message. No device control, LAN status query, scene change or SQLite import was performed. No full TLS or Zigbee RF capture was obtained. Private raw files and exact IDs/keys are excluded from Git; see [packet-capture.md](docs/packet-capture.md).
+
 ## Developer authorization update — 2026-10-07
 
 **254 Python tests passed**, including 32 new Developer checks; Ruff passed. Tests cover both published Tuya signature vectors, signed request bodies and sorted/encoded queries, token expiry, all seven fixed HTTPS regions, timeouts and one command attempt, pagination and cursor rejection, sample Device ID → account UID, secure credential persistence/restart, atomic-write rollback, malformed/symlink files, authentication, secret non-disclosure, independent QR state, writable-function validation/ACK, and gateway/cid import with dry-run and WAN-IP rejection. OpenAPI updated. No new runtime dependency was introduced.
