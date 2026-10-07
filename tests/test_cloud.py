@@ -148,8 +148,70 @@ def test_qr_flow_uses_local_renderer_and_never_returns_tokens(cloud_client):
         assert secret not in result.text
     path = client.app.state.cloud.path
     assert path.stat().st_mode & 0o777 == 0o600
-    assert json.loads(path.read_text())["token_info"]["access_token"] == SECRET
-    assert client.get(API + "/status").json()["connected"] is True
+    saved = json.loads(path.read_text())
+    assert saved["token_info"]["access_token"] == SECRET
+    assert saved["user_code"] == "user-code-private"
+    status = client.get(API + "/status")
+    assert status.json()["connected"] is True
+    assert status.json()["has_saved_user_code"] is True
+    assert "user-code-private" not in status.text
+
+
+@pytest.mark.parametrize("body", [{}, {"user_code": None}])
+def test_saved_user_code_requires_an_initial_confirmed_login(cloud_client, body):
+    assert cloud_client.get(API + "/status").json()["has_saved_user_code"] is False
+    assert cloud_client.post(API + "/login/qr", json=body).status_code == 422
+    bridge = cloud_client.app.state.cloud
+    assert bridge.auth is None and bridge.pending == {} and not bridge.path.exists()
+
+
+def test_repeat_qr_reuses_saved_code_after_restart_without_disclosure(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    restarted = CloudBridge(bridge.settings, FakeLogin, FakeManager)
+    cloud_client.app.state.cloud = restarted
+    response = cloud_client.post(API + "/login/qr", json={})
+    assert response.status_code == 201
+    item = restarted.pending[response.json()["session_id"]]
+    assert item["login"].user_code == "user-code-private"
+    for secret in ("user-code-private", SECRET, REFRESH):
+        assert secret not in response.text
+    assert restarted.path.stat().st_mode & 0o777 == 0o600
+
+
+def test_failed_or_expired_repeat_login_keeps_saved_code(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    response = cloud_client.post(API + "/login/qr", json={})
+    id = response.json()["session_id"]
+    bridge.pending[id]["login"].ready = False
+    assert cloud_client.post(API + f"/login/{id}/confirm").status_code == 409
+    bridge.pending[id]["expires"] = 0
+    assert cloud_client.get(response.json()["qr_url"]).status_code == 410
+    assert cloud_client.post(API + "/login/qr", json={}).status_code == 201
+    assert bridge.auth["user_code"] == "user-code-private"
+    assert json.loads(bridge.path.read_text())["user_code"] == "user-code-private"
+
+
+def test_new_user_code_replaces_saved_account_only_after_confirmation(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    response = cloud_client.post(API + "/login/qr", json={"user_code": "another-private-code"})
+    id = response.json()["session_id"]
+    assert bridge.pending[id]["login"].user_code == "another-private-code"
+    assert bridge.auth["user_code"] == "user-code-private"
+    assert json.loads(bridge.path.read_text())["user_code"] == "user-code-private"
+    bridge.pending[id]["login"].ready = False
+    assert cloud_client.post(API + f"/login/{id}/confirm").status_code == 409
+    repeat = cloud_client.post(API + "/login/qr", json={}).json()
+    assert bridge.pending[repeat["session_id"]]["user_code"] == "user-code-private"
+    bridge.pending[id]["login"].ready = True
+    assert cloud_client.post(API + f"/login/{id}/confirm").status_code == 200
+    restarted = CloudBridge(bridge.settings, FakeLogin, FakeManager)
+    cloud_client.app.state.cloud = restarted
+    repeat = cloud_client.post(API + "/login/qr", json={})
+    assert repeat.status_code == 201 and "another-private-code" not in repeat.text
+    assert restarted.pending[repeat.json()["session_id"]]["user_code"] == "another-private-code"
 
 
 def test_refresh_tokens_are_persisted_for_restart(cloud_client):
@@ -253,6 +315,8 @@ def test_logout_deletes_only_our_local_session(cloud_client):
     response = cloud_client.delete(API + "/session")
     assert response.json()["remote_authorization_revoked"] is False and not path.exists()
     assert cloud_client.get(API + "/devices").status_code == 409
+    assert cloud_client.get(API + "/status").json()["has_saved_user_code"] is False
+    assert cloud_client.post(API + "/login/qr", json={}).status_code == 422
 
 
 def test_cloud_is_optional_and_requires_api_token(tmp_path):
@@ -271,6 +335,7 @@ def test_qr_routes_require_authorization_and_validate_inputs(cloud_client):
     cloud_client.headers["X-API-Key"] = "test-api-key"
     response = cloud_client.post(API + "/login/qr", json={"user_code": {"bad": SECRET}})
     assert response.status_code == 422 and SECRET not in response.text
+    assert cloud_client.post(API + "/login/qr", json={"user_code": ""}).status_code == 422
 
 
 def test_upstream_failure_never_leaks_token(cloud_client):

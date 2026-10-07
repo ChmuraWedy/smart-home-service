@@ -1,6 +1,6 @@
 # Проверка проекта
 
-Дата: 7 октября 2026. Версия сервиса: 0.8.2. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
+Дата: 7 октября 2026. Версия сервиса: 0.8.3. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
 
 - `python -m pytest -q`: **117 passed** (45 первоначальных, 41 проверка алиасов и 31 проверка поиска по названию).
 - `ruff check .`: **All checks passed**.
@@ -63,3 +63,7 @@ ruff==0.16.10
 ## Arbitrary panel selection / 0.8.2
 
 207 Python tests passed; Ruff and whitespace checks passed. Added a different-room selection test with a cover, a fan group and a metering plug: room-scoped options, exact selected widget order, position/power readings, group members and removal of unselected tiles. Generic firmware summaries now iterate readable capabilities rather than a list limited to the initial room example. Native C++ assertions cover safe UTF-8 status text bounds; all five full firmware builds passed. No physical board was available.
+
+## Saved User Code / 0.8.3
+
+212 Python tests passed, including 16 cloud checks; Ruff passed. Repeated QR login accepts an omitted or null User Code and uses the code from the previously confirmed session. Tests cover no saved session, restart, non-disclosure in responses, QR expiration, pending account changes and explicit logout. The existing session file remains `0600`; changing accounts replaces the saved code only after successful confirmation. A real localhost service was restarted with its saved session: the updated page detected the saved code while its field stayed empty. OpenAPI and package metadata updated. Firmware is unchanged in this update.

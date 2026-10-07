@@ -3,7 +3,7 @@
   "info": {
     "title": "Smart Home Local API",
     "description": "SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
-    "version": "0.8.2"
+    "version": "0.8.3"
   },
   "paths": {
     "/api/v1/buildings": {
@@ -6728,19 +6728,23 @@
       "QRLogin": {
         "properties": {
           "user_code": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "format": "password",
-            "title": "User Code",
-            "writeOnly": true
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Code"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "user_code"
-        ],
         "title": "QRLogin"
       },
       "RoomCreate": {

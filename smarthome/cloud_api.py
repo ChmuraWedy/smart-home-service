@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/v1/cloud", tags=["Cloud"], dependencies=[Depends
 
 
 class QRLogin(Schema):
-    user_code: SecretStr = Field(min_length=1, max_length=128, repr=False)
+    user_code: SecretStr | None = Field(default=None, min_length=1, max_length=128, repr=False)
 
 
 class CloudImport(Schema):
@@ -51,6 +51,7 @@ def cloud_status(request: Request):
     return {
         "enabled": bridge.settings.cloud_enabled,
         "connected": bool(bridge.auth),
+        "has_saved_user_code": bool(bridge.auth),
         "client_id": bridge.settings.cloud_client_id,
         "transport": "internet",
         "scene_edit_supported": False,
@@ -59,7 +60,8 @@ def cloud_status(request: Request):
 
 @router.post("/login/qr", status_code=201)
 def begin_login(body: QRLogin, request: Request):
-    return request.app.state.cloud.begin_login(body.user_code.get_secret_value())
+    user_code = body.user_code.get_secret_value() if body.user_code is not None else None
+    return request.app.state.cloud.begin_login(user_code)
 
 
 @router.get("/login/{session_id}/qr.svg")

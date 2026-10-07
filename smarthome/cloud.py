@@ -112,9 +112,13 @@ class CloudBridge:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
-    def begin_login(self, user_code):
+    def begin_login(self, user_code=None):
         self.require_enabled()
         with self.lock:
+            if user_code is None and self.auth is not None:
+                user_code = self.auth["user_code"]
+            if user_code is None:
+                raise HTTPException(422, "Enter User Code first; no saved code is available")
             now = time.time()
             self.pending = {
                 key: value for key, value in self.pending.items() if value["expires"] > now
