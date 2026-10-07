@@ -1,5 +1,11 @@
 # Проверка проекта
 
+## Developer authorization update — 2026-10-07
+
+**254 Python tests passed**, including 32 new Developer checks; Ruff passed. Tests cover both published Tuya signature vectors, signed request bodies and sorted/encoded queries, token expiry, all seven fixed HTTPS regions, timeouts and one command attempt, pagination and cursor rejection, sample Device ID → account UID, secure credential persistence/restart, atomic-write rollback, malformed/symlink files, authentication, secret non-disclosure, independent QR state, writable-function validation/ACK, and gateway/cid import with dry-run and WAN-IP rejection. OpenAPI updated. No new runtime dependency was introduced.
+
+Browser verification used an isolated local app with fake Tuya responses: saved service access, selected Developer, saved the pair with `us-e`, verified fields became hidden, connected and listed three fake devices, opened empty replacement fields, cancelled, reloaded and restored the saved region/connection; QR login remained available. The real localhost page was reloaded and left on the new Developer form with empty credentials. The user's existing QR session was preserved; no real Developer credentials, Developer account login, hardware command or real inventory import was used. Screenshot: workspace `deliverables/tuya-developer-login.png`. Firmware is unchanged.
+
 Дата: 7 октября 2026. Версия сервиса: 0.8.3. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
 
 - `python -m pytest -q`: **117 passed** (45 первоначальных, 41 проверка алиасов и 31 проверка поиска по названию).
