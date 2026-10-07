@@ -131,6 +131,39 @@ def login(client):
     return id
 
 
+def test_cloud_sensor_ranges_are_readonly_private_and_preserve_scaling(cloud_client):
+    login(cloud_client)
+    device = cloud_client.app.state.cloud.device("child")
+    device.status_range = {
+        "temp_current": SimpleNamespace(
+            code="temp_current", type="Integer",
+            values='{"min":-400,"max":850,"scale":1,"step":1,"unit":"°C"}',
+            local_key=KEY,
+        ),
+        "local_key": SimpleNamespace(code="local_key", type="String", values=KEY),
+    }
+    for path in ("/status", "/functions"):
+        response = cloud_client.get(API + "/devices/child" + path)
+        assert response.status_code == 200 and response.headers["cache-control"] == "no-store"
+        assert response.json()["status_range"] == [{
+            "code": "temp_current", "type": "Integer",
+            "values": '{"min":-400,"max":850,"scale":1,"step":1,"unit":"°C"}',
+        }]
+        assert KEY not in response.text and SECRET not in response.text
+    response = cloud_client.post(API + "/devices/child/commands", json={
+        "commands": [{"code": "temp_current", "value": 230}],
+    })
+    assert response.status_code == 422
+    assert cloud_client.app.state.cloud.manager.customer_api.calls == []
+
+
+def test_cloud_ranges_optional_and_authenticated(cloud_client):
+    login(cloud_client)
+    assert cloud_client.get(API + "/devices/gateway/functions").json()["status_range"] == []
+    cloud_client.headers.clear()
+    assert cloud_client.get(API + "/devices/child/functions").status_code == 401
+
+
 def test_qr_flow_uses_local_renderer_and_never_returns_tokens(cloud_client):
     client = cloud_client
     response = client.post(API + "/login/qr", json={"user_code": "user-code-private"})

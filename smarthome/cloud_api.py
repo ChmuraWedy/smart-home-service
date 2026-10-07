@@ -78,6 +78,15 @@ def safe_device(device):
     return result
 
 
+def safe_status_ranges(device):
+    # Read-only sensor ranges are separate from the writable function list.
+    return [
+        {key: getattr(spec, key, None) for key in ("code", "type", "values")}
+        for spec in getattr(device, "status_range", {}).values()
+        if getattr(spec, "code", None) not in {"local_key", "key", "access_token", "refresh_token"}
+    ]
+
+
 @router.get("/status")
 def cloud_status(request: Request, response: Response):
     bridge = request.app.state.cloud
@@ -238,6 +247,7 @@ def cloud_device_status(
             and value != getattr(device, "local_key", None)
         },
         "device_update_time": getattr(device, "update_time", None),
+        "status_range": safe_status_ranges(device),
     }
 
 
@@ -250,7 +260,11 @@ def cloud_device_functions(
         bridge.writable_device(device_id) if provider == "developer" else bridge.device(device_id)
     )
     response.headers["Cache-Control"] = "no-store"
-    return {"device_id": device.id, "functions": safe_device(device)["functions"]}
+    return {
+        "device_id": device.id,
+        "functions": safe_device(device)["functions"],
+        "status_range": safe_status_ranges(device),
+    }
 
 
 @router.post("/devices/{device_id}/commands")
