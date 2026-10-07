@@ -115,3 +115,9 @@ Verified the revised localhost page in the browser: reload automatically restore
 ## Shared child keys as gateway candidates / 2026-10-07
 
 A further read-only Sharing SDK metadata query returned 44 devices and 42 nonempty keys. Of 23 records flagged `sub=true`, 21 had a key; those 21 records shared only two distinct keys, with group sizes 16 and 5. Both keys encoded to 16 bytes. The two `wg2` records had no key, so the other two `sub=true` records were gateways themselves. Keys were compared in memory, and only aggregate counts were printed. This matches the documented possibility that Sharing API places a gateway key on its children; it does not confirm which key belongs to which physical gateway or whether either gateway accepts LAN control. No LAN request, device command or inventory import was performed. No implementation changed, so the 222-test result remains the last full test run.
+
+## Reported ESP32-2432S028 board / 2026-10-08
+
+The owner reported `ESP32-2432S028 XXSR69` and two USB connectors. The existing `cyd-028r-st7789` environment is now the initial default, based on the Sunton R v3 definition and witnessmenow CYD2USB setup. The README records this as a provisional choice, retains the ILI9341 alternative, and distinguishes the panel's direct REST API connection from the separate React frontend. No verified LCD/revision mapping was found for `XXSR69`.
+
+`pio run -d firmware/cyd` selected the new default and completed successfully using the example Wi-Fi/API placeholders, with no private `panel_config.h` present. Linker figures: 115444 bytes static RAM of 327680, 1089121 bytes application flash of 3145728. `git diff --check` passed. This configuration/documentation update does not change panel logic or the backend; no hardware was flashed, no LCD/touch behavior was verified, and no device command was sent.
