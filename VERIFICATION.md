@@ -71,3 +71,7 @@ ruff==0.16.10
 ## Real Sharing SDK authorization / 2026-10-07
 
 The owner approved the service QR login in Smart Life. A read-only metadata query returned 44 devices: 42 reported a local key, 42 reported local support, and 23 children had a node ID. Both displayed gateways had no local key, so this does not establish usable local Zigbee control. The saved session and User Code survived a real service restart. No device commands, scene writes or imports into the SQLite inventory were performed. Credential values and real device identifiers are excluded from this report and Git. Earlier sections above describe verification at their respective development stages before this authorization.
+
+## Saved User Code field visibility / 2026-10-07
+
+Verified the updated localhost page in the browser against the saved session: after checking the service access key, the User Code field is hidden and the «Хочу изменить» link is visible. Clicking the link reveals an empty field and focuses it. Reloading the page and checking the access key returns to the hidden-field state. No new User Code was submitted and no QR login or device command was initiated. This update changes only the page and documentation; the 212-test backend result above remains the last full test run.
