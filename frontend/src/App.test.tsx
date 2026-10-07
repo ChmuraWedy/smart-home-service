@@ -57,7 +57,12 @@ async function restored() {
 
 describe('cloud UI journeys', () => {
   it('restores access, hides saved credentials, and allows an empty change followed by cancellation', async () => {
-    await restored(); const user = userEvent.setup();
+    const backend = await restored(); const user = userEvent.setup();
+    expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
+    expect(screen.getByText(/Авторизация сохранена на сервере/)).toBeInTheDocument();
+    expect(screen.getByText('Устройства ещё не загружены')).toBeInTheDocument();
+    expect(screen.queryByText('Подключите Tuya-аккаунт')).not.toBeInTheDocument();
+    expect(backend.calls).toEqual([{ path: '/api/v1/cloud/status', method: 'GET', body: undefined, token: TOKEN }]);
     expect(screen.queryByLabelText('User Code')).not.toBeInTheDocument();
     expect(document.querySelector('#access-token')).toHaveAttribute('type', 'hidden');
     await user.click(within(screen.getByRole('region', { name: 'Подключение Tuya' })).getByRole('link', { name: 'Хочу изменить' }));
@@ -137,6 +142,8 @@ describe('cloud UI journeys', () => {
   it('creates a QR on the API host, confirms login, and releases the image URL', async () => {
     stored(); const backend = fakeApi({ connected: false }); render(<App />);
     await screen.findByText('API подключён'); const user = userEvent.setup();
+    expect(screen.getByRole('heading', { name: 'Подключить Tuya' })).toBeInTheDocument();
+    expect(screen.getByText('Подключите Tuya-аккаунт')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Получить QR-код' }));
     await screen.findByAltText('QR-код для входа в Tuya');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]) === BASE + '/api/v1/cloud/login/qr-session/qr.svg')).toBe(true);
@@ -146,6 +153,7 @@ describe('cloud UI journeys', () => {
     expect(screen.queryByAltText('QR-код для входа в Tuya')).not.toBeInTheDocument();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:qr-test');
     expect(screen.getByRole('button', { name: 'Показать устройства' })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
   });
 
   it('expires the QR, removes the confirmation action, and allows a new login', async () => {

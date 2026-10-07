@@ -16,7 +16,7 @@ export function DeviceList({ devices, loaded, ready, busy, onLoad, onControl }: 
       <h3>{device.name || 'Без названия'}</h3><p className="device-id">{device.id}</p>
       <div className="device-meta"><span>{device.sub ? 'Через шлюз' : 'Прямое подключение'}</span><span className={device.has_local_key ? 'key-available' : 'muted'}>{device.has_local_key ? 'Ключ на сервере' : 'Ключ недоступен'}</span></div>
       <button className="secondary compact full-width" disabled={!ready || busy} onClick={() => onControl(device)}>Управлять</button>
-    </li>)}</ul> : <div className="empty-state"><span aria-hidden="true">⌂</span><h3>{loaded ? (devices.length ? 'Ничего не найдено' : 'Устройств пока нет') : 'Подключите Tuya-аккаунт'}</h3>
-      <p>{loaded ? (devices.length ? 'Попробуйте другое название или ID.' : 'Добавьте устройства в Smart Life и обновите список.') : 'После подключения здесь появится список ваших устройств.'}</p></div>}
+    </li>)}</ul> : <div className="empty-state"><span aria-hidden="true">⌂</span><h3>{loaded ? (devices.length ? 'Ничего не найдено' : 'Устройств пока нет') : ready ? 'Устройства ещё не загружены' : 'Подключите Tuya-аккаунт'}</h3>
+      <p>{loaded ? (devices.length ? 'Попробуйте другое название или ID.' : 'Добавьте устройства в Smart Life и обновите список.') : ready ? 'Нажмите «Показать устройства», чтобы загрузить их из подключённого аккаунта.' : 'После подключения здесь появится список ваших устройств.'}</p></div>}
   </section>;
 }

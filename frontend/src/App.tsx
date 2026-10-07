@@ -158,7 +158,7 @@ export function App() {
     <main>
       <nav className="app-nav" aria-label="Раздел приложения"><button className="secondary" aria-current={view === 'control' ? 'page' : undefined} disabled={locked} onClick={() => { setView('control'); setNotice({ text: '' }); }}>Управление</button><button className="secondary" aria-current={view === 'connections' ? 'page' : undefined} disabled={locked} onClick={() => { setView('connections'); setNotice({ text: '' }); }}>Подключения</button></nav>
       {view === 'connections' ? <>
-      <div className="page-heading"><p className="eyebrow">Подключения</p><h1>Подключить Tuya</h1><p className="muted">Свяжите аккаунт и получите доступ к устройствам. Облачное подключение требует интернета.</p></div>
+      <div className="page-heading"><p className="eyebrow">Подключения</p><h1>{ready && accountConnected ? 'Tuya подключена' : 'Подключить Tuya'}</h1><p className="muted">{ready && accountConnected ? 'Сохранённое подключение готово к управлению устройствами через интернет.' : 'Свяжите аккаунт и получите доступ к устройствам. Облачное подключение требует интернета.'}</p></div>
       <input id="access-token" type="hidden" value={connection.token} readOnly />
       <div className="workspace">
         <section className="card setup" aria-label="Подключение Tuya">
@@ -168,7 +168,7 @@ export function App() {
           </div>
           {provider === 'sharing' ? <div className="provider-panel">
             <p className="eyebrow">Вход через приложение</p><h2>Smart Life / Tuya Smart</h2>
-            <p className="muted">Сохраните User Code, затем подтвердите вход с помощью QR-кода.</p>
+            <p className="muted">{ready && status?.connected ? 'Tuya-аккаунт подключён. Авторизация сохранена на сервере; повторный QR-вход нужен для смены аккаунта или восстановления доступа.' : 'Сохраните User Code, затем подтвердите вход с помощью QR-кода.'}</p>
             {!ready ? <p className="saved-summary">{status && !status.enabled ? 'Облачный режим выключен на сервере.' : 'Сначала сохраните доступ к API в настройках подключения.'}</p> : <>
               {showCodeForm ? <UserCodeForm busy={busy} canCancel={Boolean(status?.has_saved_user_code)} onSave={saveCode} onCancel={() => setEditingCode(false)} /> : <p className="saved-summary">User Code сохранён на сервере. <a href="#user-code" aria-controls="user-code" aria-expanded={false} aria-disabled={busy} onClick={event => {
                 event.preventDefault(); if (!busyRef.current) { setEditingCode(true); setQR(null); setNotice({ text: '' }); }

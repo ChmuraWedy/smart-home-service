@@ -1,5 +1,9 @@
 # Проверка проекта
 
+## Restored account presentation — 2026-10-08
+
+**53 frontend tests passed**; TypeScript and production build passed. Existing connection journeys now verify a restored authenticated account is identified as connected without a new QR request, an unloaded inventory is not mistaken for a missing account, and a fresh QR flow changes the heading after confirmation. Credentials, authentication checks and device transport are unchanged. The real backend was inspected read-only: Sharing connected, saved User Code present, cloud transport through the internet. No Tuya login or device command was performed.
+
 ## PIR sensor properties and presentation — 2026-10-08
 
 Read-only inspection of the authorized Sharing API found one matching device, `Bath2 motion`: category `pir`, sub-device through a gateway, online, no writable functions. Its actual status definitions were `pir` Enum (`pir`/`none`) and legacy `battery` Integer (unit empty, range 0–500, scale 0, step 1); the inspected snapshot reported `pir` and battery 90. The active SQLite database `data/qr-check/smarthome.db` contained **zero devices** and no matching local record. No import, mapping, credential change, LAN query or device command was performed. The documented Tuya PIR status set confirms separate legacy unitless battery and explicit `battery_percentage` definitions; this implementation does not assume a percentage for the legacy value.
