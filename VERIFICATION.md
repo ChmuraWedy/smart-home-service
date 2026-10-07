@@ -1,5 +1,9 @@
 # Проверка проекта
 
+## Saved service-key UI — 2026-10-08
+
+All **49 frontend tests passed** after updating the existing connection checks for the hidden saved-key message, empty focused replacement, required key for another API address, invalid replacement preserving the working connection, and cancellation without requests or credential changes. TypeScript and production build passed (JS 271.73 kB, 83.43 kB gzip). Browser verification on the running React UI confirmed the message/link, opening an empty password field and cancellation restoring the summary. The check used a separate temporary tab; the user's open device control was left alone. No real key replacement, device command or Tuya login was performed. Screenshot: workspace `deliverables/react-saved-service-key.png`. Backend is unchanged.
+
 ## React device controls — 2026-10-08
 
 **276 Python tests passed**; Ruff passed. Two new backend checks verify read-only cloud sensor range metadata, scaling/unit preservation, field whitelisting, credential non-disclosure, optional ranges, authentication and rejection of sensor writes. Existing Wi-Fi and gateway/child transport checks remain in the full suite.

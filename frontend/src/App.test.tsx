@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
@@ -60,13 +60,13 @@ describe('cloud UI journeys', () => {
     await restored(); const user = userEvent.setup();
     expect(screen.queryByLabelText('User Code')).not.toBeInTheDocument();
     expect(document.querySelector('#access-token')).toHaveAttribute('type', 'hidden');
-    await user.click(screen.getByRole('link', { name: 'Хочу изменить' }));
+    await user.click(within(screen.getByRole('region', { name: 'Подключение Tuya' })).getByRole('link', { name: 'Хочу изменить' }));
     expect(screen.getByLabelText('User Code')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Отменить изменение' }));
     expect(screen.queryByLabelText('User Code')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Access ID / Secret' }));
     expect(screen.queryByLabelText('Access Secret')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: 'Хочу изменить' }));
+    await user.click(within(screen.getByRole('region', { name: 'Подключение Tuya' })).getByRole('link', { name: 'Хочу изменить' }));
     expect(screen.getByLabelText('Access ID')).toHaveValue('');
     expect(screen.getByLabelText('Access Secret')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Отменить изменение' }));
@@ -81,19 +81,32 @@ describe('cloud UI journeys', () => {
     await user.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
     await screen.findByText('Подключение сохранено.');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual({ baseUrl: BASE, token: TOKEN });
-    expect(screen.getByLabelText('Ключ доступа к сервису')).toHaveValue('');
+    expect(screen.queryByLabelText('Ключ доступа к сервису')).not.toBeInTheDocument();
+    expect(screen.getByText('Ключ доступа к сервису сохранён в этом браузере.')).toBeInTheDocument();
     expect(screen.queryByLabelText('User Code')).not.toBeInTheDocument();
   });
 
   it('does not overwrite a valid stored key after an invalid replacement', async () => {
-    await restored(); const user = userEvent.setup();
+    const backend = await restored(); const user = userEvent.setup();
     await user.click(screen.getByText('Настройки подключения'));
+    const access = within(screen.getByRole('form', { name: 'Доступ к сервису' }));
+    expect(access.queryByLabelText('Ключ доступа к сервису')).not.toBeInTheDocument();
+    await user.click(access.getByRole('link', { name: 'Хочу изменить' }));
+    expect(access.getByLabelText('Ключ доступа к сервису')).toHaveValue('');
+    expect(access.getByLabelText('Ключ доступа к сервису')).toHaveFocus();
     await user.type(screen.getByLabelText('Ключ доступа к сервису'), 'wrong-key');
     await user.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
     await screen.findByRole('alert');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).token).toBe(TOKEN);
     expect(screen.getByText('API подключён')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeEnabled();
+    const requests = backend.calls.length;
+    await user.click(access.getByRole('button', { name: 'Отменить изменение' }));
+    expect(access.queryByLabelText('Ключ доступа к сервису')).not.toBeInTheDocument();
+    expect(backend.calls).toHaveLength(requests);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).token).toBe(TOKEN);
+    await user.click(access.getByRole('link', { name: 'Хочу изменить' }));
+    expect(access.getByLabelText('Ключ доступа к сервису')).toHaveValue('');
   });
 
   it('requires a new key when changing servers and never sends the saved one to the new host', async () => {
@@ -101,8 +114,9 @@ describe('cloud UI journeys', () => {
     await user.click(screen.getByText('Настройки подключения'));
     await user.clear(screen.getByLabelText('Адрес API'));
     await user.type(screen.getByLabelText('Адрес API'), 'http://other-api.test:8000');
+    expect(screen.getByLabelText('Ключ доступа к сервису')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
-    await screen.findByText('Введите ключ доступа для этого API.');
+    expect(screen.getByLabelText('Ключ доступа к сервису')).toBeInvalid();
     expect(backend.calls).toHaveLength(1);
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).baseUrl).toBe(BASE);
   });
