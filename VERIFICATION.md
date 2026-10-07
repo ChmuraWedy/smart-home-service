@@ -70,7 +70,7 @@ ruff==0.16.10
 
 ## Real Sharing SDK authorization / 2026-10-07
 
-The owner approved the service QR login in Smart Life. A read-only metadata query returned 44 devices: 42 reported a local key, 42 reported local support, and 23 children had a node ID. Both displayed gateways had no local key, so this does not establish usable local Zigbee control. The saved session and User Code survived a real service restart. No device commands, scene writes or imports into the SQLite inventory were performed. Credential values and real device identifiers are excluded from this report and Git. Earlier sections above describe verification at their respective development stages before this authorization.
+The owner approved the service QR login in Smart Life. A read-only metadata query returned 44 devices: 42 reported a local key, 42 reported local support, and 23 records with `sub=true` had a node ID. Both displayed gateway records had no local key; the shared-child-key investigation below qualifies this observation. The saved session and User Code survived a real service restart. No device commands, scene writes or imports into the SQLite inventory were performed. Credential values and real device identifiers are excluded from this report and Git. Earlier sections above describe verification at their respective development stages before this authorization.
 
 ## Saved User Code field visibility / 2026-10-07
 
@@ -85,3 +85,7 @@ In the real localhost browser page, verified both save buttons and change links.
 ## Hidden service access token / 2026-10-07
 
 Verified the revised localhost page in the browser: reload automatically restored the saved token and read the authorized User Code status. The token input has type `hidden`, the access-key editor is invisible in the normal form, and «Настройки подключения» is collapsed. Expanding settings reveals the empty editor and its save button; closing settings restores the normal form. The server still requires `X-API-Key`, and the page source does not contain the configured server token. This update changes only HTML/JavaScript and documentation; the 222-test backend run above remains the last full test run. No new credential was saved, QR login initiated or device command sent during this check.
+
+## Shared child keys as gateway candidates / 2026-10-07
+
+A further read-only Sharing SDK metadata query returned 44 devices and 42 nonempty keys. Of 23 records flagged `sub=true`, 21 had a key; those 21 records shared only two distinct keys, with group sizes 16 and 5. Both keys encoded to 16 bytes. The two `wg2` records had no key, so the other two `sub=true` records were gateways themselves. Keys were compared in memory, and only aggregate counts were printed. This matches the documented possibility that Sharing API places a gateway key on its children; it does not confirm which key belongs to which physical gateway or whether either gateway accepts LAN control. No LAN request, device command or inventory import was performed. No implementation changed, so the 222-test result remains the last full test run.
