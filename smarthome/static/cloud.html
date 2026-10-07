@@ -1,25 +1,150 @@
-<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Подключить Tuya</title><style>body{font:16px system-ui;background:#131a24;color:#e8f0ff;max-width:620px;margin:36px auto;padding:20px}input,button{font:inherit;padding:12px;margin:6px 0;border-radius:8px;width:100%;box-sizing:border-box}button{background:#56b6ff;color:#102030;border:0;cursor:pointer}button:disabled{opacity:.5;cursor:default}a{color:#56b6ff;text-underline-offset:3px}img{width:280px;background:white;padding:16px}pre{white-space:pre-wrap}label{display:block;margin-top:20px}</style>
-<h1>Подключить Tuya</h1><p>Вход через Smart Life / Tuya Smart. Облачный режим требует интернета. Токены сохраняются на сервере.</p>
-<label>Ключ доступа к нашему сервису<input id="key" type="password" autocomplete="off"></label>
-<p><span id="saved">Введите ключ доступа к нашему сервису.</span> <a id="change" href="#user-code" aria-controls="user-code" aria-expanded="false" hidden>Хочу изменить</a></p>
-<div id="user-code" hidden>
-<label>User Code из приложения Tuya<input id="user" type="password" autocomplete="off"></label>
-<p>Smart Life / Tuya Smart → Я → ⚙️ → Аккаунт и безопасность → User Code внизу экрана. После подтверждённого входа код сохраняется на сервере для повторного входа.</p>
-</div>
-<button id="begin" disabled>Получить QR-код</button><img id="qr" alt="QR-код для входа" hidden>
-<p id="hint"></p><button id="confirm" hidden>Я подтвердил вход в приложении</button>
-<button id="list">Показать устройства аккаунта</button><pre id="result" role="status"></pre>
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Подключить Tuya</title>
+<style>
+body{font:16px system-ui;background:#131a24;color:#e8f0ff;max-width:620px;margin:36px auto;padding:20px}
+input,button{font:inherit;padding:12px;margin:6px 0;border-radius:8px;width:100%;box-sizing:border-box}
+button{background:#56b6ff;color:#102030;border:0;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+a{color:#56b6ff;text-underline-offset:3px}
+img{width:280px;max-width:100%;box-sizing:border-box;background:white;padding:16px}
+pre{white-space:pre-wrap}
+label{display:block;margin-top:20px}
+section{margin:24px 0}
+</style>
+<h1>Подключить Tuya</h1>
+<p>Вход через Smart Life / Tuya Smart. Облачный режим требует интернета. Токены сохраняются на сервере.</p>
+<section aria-label="Ключ доступа">
+  <p><span id="key-saved">Введите ключ доступа к нашему сервису.</span> <a id="change-key" href="#access-key" aria-controls="access-key" aria-expanded="true" hidden>Хочу изменить</a></p>
+  <div id="access-key">
+    <label>Ключ доступа к нашему сервису<input id="key" type="password" autocomplete="off"></label>
+    <button id="save-key">Сохранить ключ доступа</button>
+  </div>
+</section>
+<section aria-label="User Code">
+  <p><span id="saved">Сначала сохраните ключ доступа.</span> <a id="change" href="#user-code" aria-controls="user-code" aria-expanded="false" hidden>Хочу изменить</a></p>
+  <div id="user-code" hidden>
+    <label>User Code из приложения Tuya<input id="user" type="password" autocomplete="off"></label>
+    <p>Smart Life / Tuya Smart → Я → ⚙️ → Аккаунт и безопасность → User Code внизу экрана.</p>
+    <button id="save-user" disabled>Сохранить User Code</button>
+  </div>
+</section>
+<button id="begin" disabled>Получить QR-код</button>
+<img id="qr" alt="QR-код для входа" hidden>
+<p id="hint"></p>
+<button id="confirm" hidden>Я подтвердил вход в приложении</button>
+<button id="list" disabled>Показать устройства аккаунта</button>
+<pre id="result" role="status"></pre>
 <script>
-let session, imageUrl;
-const key=document.querySelector('#key'), user=document.querySelector('#user'), saved=document.querySelector('#saved'), result=document.querySelector('#result'), userCode=document.querySelector('#user-code'), change=document.querySelector('#change'), begin=document.querySelector('#begin');
-async function call(path,method='GET',body){const response=await fetch('/api/v1/cloud'+path,{method,headers:{'X-API-Key':key.value,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});const data=await response.json();if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Ошибка запроса');return data;}
-async function savedStatus(){const checkedKey=key.value;const status=await call('/status');if(key.value!==checkedKey)return;const hasSaved=status.has_saved_user_code===true;userCode.hidden=hasSaved;change.hidden=!hasSaved;change.setAttribute('aria-expanded','false');if(hasSaved)user.value='';saved.textContent=hasSaved?'User Code сохранён.':'Введите User Code для первого входа.';begin.disabled=false;}
-change.onclick=(event)=>{event.preventDefault();userCode.hidden=false;change.hidden=true;change.setAttribute('aria-expanded','true');saved.textContent='Введите новый User Code.';user.focus();};
-let savedStatusTimer;
-key.addEventListener('input',()=>{clearTimeout(savedStatusTimer);userCode.hidden=true;change.hidden=true;user.value='';begin.disabled=true;saved.textContent=key.value?'Проверяем сохранённый код…':'Введите ключ доступа к нашему сервису.';savedStatusTimer=setTimeout(()=>{const checkedKey=key.value;if(checkedKey)savedStatus().catch(()=>{if(key.value===checkedKey)saved.textContent='Введите действующий ключ доступа к нашему сервису.';});},250);});
-async function act(fn){try{result.textContent='Подождите…';await fn();}catch(e){result.textContent=e.message;}}
-begin.onclick=()=>act(async()=>{const code=userCode.hidden?'':user.value.trim();if(!userCode.hidden&&!code)throw Error('Введите User Code.');const data=await call('/login/qr','POST',code?{user_code:code}:{});session=data.session_id;const image=await fetch(data.qr_url,{headers:{'X-API-Key':key.value},cache:'no-store'});if(!image.ok)throw Error('Не удалось получить QR');if(imageUrl)URL.revokeObjectURL(imageUrl);imageUrl=URL.createObjectURL(await image.blob());const qr=document.querySelector('#qr');qr.src=imageUrl;qr.hidden=false;document.querySelector('#confirm').hidden=false;document.querySelector('#hint').textContent='Сканируйте в Tuya / Smart Life и подтвердите вход. QR действует не более 2 минут.';result.textContent='Ожидается подтверждение в приложении.';});
-document.querySelector('#confirm').onclick=()=>act(async()=>{const data=await call('/login/'+session+'/confirm','POST');result.textContent=data.connected?'Аккаунт подключён. User Code и токены сохранены на сервере для повторного входа.':'Не подключено';document.querySelector('#qr').hidden=true;document.querySelector('#confirm').hidden=true;user.value='';await savedStatus();});
-document.querySelector('#list').onclick=()=>act(async()=>{const devices=await call('/devices?refresh=true');result.textContent=devices.map(d=>`${d.name} — ${d.id}\n${d.online?'В сети':'Не в сети'}, локальный ключ: ${d.has_local_key?'доступен на сервере':'нет'}`).join('\n\n')||'Устройств нет';});
-</script></html>
+const storageKey='smart-home.cloud.api-key';
+const element=id=>document.getElementById(id);
+const key=element('key'), user=element('user'), keyForm=element('access-key'), userForm=element('user-code');
+const changeKey=element('change-key'), changeUser=element('change');
+const saveKey=element('save-key'), saveUser=element('save-user'), begin=element('begin'), confirm=element('confirm'), list=element('list'), result=element('result');
+let accessKey='', session, imageUrl, hasSavedCode=false, connected=false, enabled=false, busy=false;
+
+function controls(){
+  const ready=!!accessKey&&keyForm.hidden&&enabled;
+  saveKey.disabled=busy;
+  saveUser.disabled=busy||!ready;
+  begin.disabled=busy||!ready||!hasSavedCode||!userForm.hidden;
+  list.disabled=busy||!ready||!connected;
+  confirm.disabled=busy||!ready||!session;
+  key.disabled=user.disabled=busy;
+}
+function keyView(saved){
+  keyForm.hidden=saved;
+  changeKey.hidden=!saved;
+  changeKey.setAttribute('aria-expanded',String(!saved));
+  element('key-saved').textContent=saved?'Ключ доступа сохранён в этом браузере.':'Введите ключ доступа к нашему сервису.';
+  controls();
+}
+function codeView(status){
+  hasSavedCode=status.has_saved_user_code===true;
+  connected=status.connected===true;
+  enabled=status.enabled!==false;
+  userForm.hidden=hasSavedCode||!enabled;
+  changeUser.hidden=!hasSavedCode||!enabled;
+  changeUser.setAttribute('aria-expanded',String(!userForm.hidden));
+  user.value='';
+  element('saved').textContent=!enabled?'Облачный режим выключен на сервере.':hasSavedCode?(status.saved_user_code_requires_login?'User Code сохранён на сервере. Подтвердите QR-вход.':'User Code сохранён на сервере.'):'Введите и сохраните User Code.';
+  controls();
+}
+function clearQR(){
+  session=undefined;
+  element('qr').hidden=confirm.hidden=true;
+  element('hint').textContent='';
+  if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=undefined;}
+  controls();
+}
+async function call(path,method='GET',body,token=accessKey){
+  let response;
+  try{response=await fetch('/api/v1/cloud'+path,{method,headers:{'X-API-Key':token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});}
+  catch{throw Error('Не удалось связаться с сервисом.');}
+  const data=await response.json();
+  if(response.status===401)throw Error('Ключ доступа недействителен.');
+  if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Ошибка запроса');
+  return data;
+}
+async function act(fn){
+  if(busy)return;
+  busy=true;controls();result.textContent='Подождите…';
+  try{await fn();}catch(error){result.textContent=error.message;}
+  finally{busy=false;controls();}
+}
+saveKey.onclick=()=>act(async()=>{
+  const candidate=key.value.trim();
+  if(!candidate)throw Error('Введите ключ доступа.');
+  const status=await call('/status','GET',undefined,candidate);
+  try{localStorage.setItem(storageKey,candidate);}
+  catch{throw Error('Не удалось сохранить ключ в этом браузере. Проверьте настройки хранилища.');}
+  accessKey=candidate;key.value='';clearQR();keyView(true);codeView(status);
+  result.textContent='Ключ доступа сохранён в этом браузере.';
+});
+saveUser.onclick=()=>act(async()=>{
+  const code=user.value.trim();
+  if(!code)throw Error('Введите User Code.');
+  const status=await call('/user-code','PUT',{user_code:code});
+  clearQR();codeView(status);
+  result.textContent=status.saved_user_code_requires_login?'User Code сохранён. Для подключения аккаунта подтвердите QR-вход.':'User Code сохранён на сервере.';
+});
+changeKey.onclick=event=>{
+  event.preventDefault();if(busy)return;
+  clearQR();key.value='';keyView(false);key.focus();result.textContent='';
+};
+changeUser.onclick=event=>{
+  event.preventDefault();if(busy)return;
+  clearQR();userForm.hidden=false;changeUser.hidden=true;changeUser.setAttribute('aria-expanded','true');
+  element('saved').textContent='Введите и сохраните новый User Code.';
+  controls();user.focus();result.textContent='';
+};
+begin.onclick=()=>act(async()=>{
+  clearQR();
+  const data=await call('/login/qr','POST',{});
+  const image=await fetch(data.qr_url,{headers:{'X-API-Key':accessKey},cache:'no-store'});
+  if(!image.ok)throw Error('Не удалось получить QR');
+  session=data.session_id;imageUrl=URL.createObjectURL(await image.blob());
+  element('qr').src=imageUrl;element('qr').hidden=false;confirm.hidden=false;
+  element('hint').textContent='Сканируйте в Tuya / Smart Life и подтвердите вход. QR действует не более 2 минут.';
+  result.textContent='Ожидается подтверждение в приложении.';
+});
+confirm.onclick=()=>act(async()=>{
+  await call('/login/'+session+'/confirm','POST');
+  clearQR();codeView(await call('/status'));
+  result.textContent='Аккаунт подключён. User Code и токены сохранены на сервере.';
+});
+list.onclick=()=>act(async()=>{
+  const devices=await call('/devices?refresh=true');
+  result.textContent=devices.map(device=>`${device.name} — ${device.id}\n${device.online?'В сети':'Не в сети'}, локальный ключ: ${device.has_local_key?'доступен на сервере':'нет'}`).join('\n\n')||'Устройств нет';
+});
+act(async()=>{
+  try{accessKey=localStorage.getItem(storageKey)||'';}catch{accessKey='';}
+  if(!accessKey){result.textContent='';return;}
+  keyView(true);
+  try{codeView(await call('/status'));result.textContent='';}
+  catch{accessKey='';keyView(false);result.textContent='Не удалось проверить сохранённый ключ. Сохраните действующий ключ или проверьте доступность сервиса.';}
+});
+</script>
+</html>

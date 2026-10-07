@@ -4414,6 +4414,50 @@
         ]
       }
     },
+    "/api/v1/cloud/user-code": {
+      "put": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Save User Code",
+        "operationId": "save_user_code_api_v1_cloud_user_code_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedUserCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/api/v1/cloud/login/qr": {
       "post": {
         "tags": [
@@ -6957,6 +7001,24 @@
           "devices"
         ],
         "title": "RoomTree"
+      },
+      "SavedUserCode": {
+        "properties": {
+          "user_code": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "format": "password",
+            "title": "User Code",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user_code"
+        ],
+        "title": "SavedUserCode"
       },
       "SwitchCommand": {
         "properties": {

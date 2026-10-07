@@ -3,7 +3,7 @@ from ipaddress import ip_address, ip_network
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import Field, JsonValue, SecretStr
+from pydantic import Field, JsonValue, SecretStr, field_validator
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
@@ -15,6 +15,18 @@ router = APIRouter(prefix="/api/v1/cloud", tags=["Cloud"], dependencies=[Depends
 
 class QRLogin(Schema):
     user_code: SecretStr | None = Field(default=None, min_length=1, max_length=128, repr=False)
+
+
+class SavedUserCode(Schema):
+    user_code: SecretStr = Field(min_length=1, max_length=128, repr=False)
+
+    @field_validator("user_code")
+    @classmethod
+    def trim_user_code(cls, value):
+        code = value.get_secret_value().strip()
+        if not code:
+            raise ValueError("User Code must not be blank")
+        return SecretStr(code)
 
 
 class CloudImport(Schema):
@@ -46,16 +58,25 @@ def safe_device(device):
 
 
 @router.get("/status")
-def cloud_status(request: Request):
+def cloud_status(request: Request, response: Response):
     bridge = request.app.state.cloud
-    return {
-        "enabled": bridge.settings.cloud_enabled,
-        "connected": bool(bridge.auth),
-        "has_saved_user_code": bool(bridge.auth),
-        "client_id": bridge.settings.cloud_client_id,
-        "transport": "internet",
-        "scene_edit_supported": False,
-    }
+    response.headers["Cache-Control"] = "no-store"
+    with bridge.lock:
+        return {
+            "enabled": bridge.settings.cloud_enabled,
+            "connected": bool(bridge.auth),
+            "has_saved_user_code": bool(bridge.login_user_code),
+            "saved_user_code_requires_login": bridge.saved_code_requires_login,
+            "client_id": bridge.settings.cloud_client_id,
+            "transport": "internet",
+            "scene_edit_supported": False,
+        }
+
+
+@router.put("/user-code")
+def save_user_code(body: SavedUserCode, request: Request, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return request.app.state.cloud.save_user_code(body.user_code.get_secret_value())
 
 
 @router.post("/login/qr", status_code=201)

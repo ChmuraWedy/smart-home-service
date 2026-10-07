@@ -23,14 +23,34 @@ class CloudBridge:
         self.lock = threading.RLock()
         self.pending = {}
         self.auth = None
+        self.saved_user_code = None
         self.manager = None
         if settings.cloud_enabled and self.path.exists():
             if self.path.is_symlink():
                 raise ValueError("Cloud session file must not be a symlink")
             with self.path.open() as stream:
-                self.auth = json.load(stream)
-            self._validate_auth(self.auth)
+                stored = json.load(stream)
+            if not isinstance(stored, dict):
+                raise ValueError("Invalid cloud session structure")
+            if "saved_user_code" in stored:
+                code = stored["saved_user_code"]
+                if not isinstance(code, str) or not code.strip() or len(code) > 128:
+                    raise ValueError("Invalid saved User Code")
+                self.saved_user_code = code
+            if set(stored) != {"saved_user_code"}:
+                self._validate_auth(stored)
+                self.auth = {key: value for key, value in stored.items() if key != "saved_user_code"}
             self.path.chmod(0o600)
+
+    @property
+    def login_user_code(self):
+        return self.saved_user_code or (self.auth["user_code"] if self.auth else None)
+
+    @property
+    def saved_code_requires_login(self):
+        return bool(self.login_user_code) and (
+            self.auth is None or self.login_user_code != self.auth["user_code"]
+        )
 
     def require_enabled(self):
         if not self.settings.cloud_enabled:
@@ -96,7 +116,11 @@ class CloudBridge:
             raise ValueError("Unexpected Tuya cloud endpoint")
 
     def _save(self):
-        self._validate_auth(self.auth)
+        if self.auth is not None:
+            self._validate_auth(self.auth)
+        stored = dict(self.auth or {})
+        if self.saved_user_code is not None:
+            stored["saved_user_code"] = self.saved_user_code
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if self.path.is_symlink():
             raise HTTPException(503, "Cloud session path must not be a symlink")
@@ -104,7 +128,7 @@ class CloudBridge:
         try:
             with os.fdopen(fd, "w") as stream:
                 os.fchmod(stream.fileno(), 0o600)
-                json.dump(self.auth, stream)
+                json.dump(stored, stream)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, self.path)
@@ -112,11 +136,28 @@ class CloudBridge:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
+    def save_user_code(self, user_code):
+        self.require_enabled()
+        with self.lock:
+            previous = self.saved_user_code
+            self.saved_user_code = user_code
+            try:
+                self._save()
+            except Exception:
+                self.saved_user_code = previous
+                raise HTTPException(503, "User Code could not be saved securely") from None
+            self.pending.clear()
+            return {
+                "has_saved_user_code": True,
+                "connected": bool(self.auth),
+                "saved_user_code_requires_login": self.saved_code_requires_login,
+            }
+
     def begin_login(self, user_code=None):
         self.require_enabled()
         with self.lock:
-            if user_code is None and self.auth is not None:
-                user_code = self.auth["user_code"]
+            if user_code is None:
+                user_code = self.login_user_code
             if user_code is None:
                 raise HTTPException(422, "Enter User Code first; no saved code is available")
             now = time.time()
@@ -208,11 +249,14 @@ class CloudBridge:
             except (ValueError, TypeError):
                 raise HTTPException(502, "Tuya returned invalid authorization data") from None
             previous = self.auth
+            previous_code = self.saved_user_code
             self.auth = auth
+            self.saved_user_code = auth["user_code"]
             try:
                 self._save()
             except Exception:
                 self.auth = previous
+                self.saved_user_code = previous_code
                 raise HTTPException(
                     503, "Cloud authorization could not be saved securely"
                 ) from None
@@ -305,7 +349,7 @@ class CloudBridge:
         self.require_enabled()
         with self.lock:
             # Local deletion only. SDK unload() can revoke the shared HA terminal remotely.
-            self.auth, self.manager, self.pending = None, None, {}
+            self.auth, self.saved_user_code, self.manager, self.pending = None, None, None, {}
             if self.path.exists() and not self.path.is_symlink():
                 self.path.unlink()
             return {

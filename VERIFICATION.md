@@ -75,3 +75,9 @@ The owner approved the service QR login in Smart Life. A read-only metadata quer
 ## Saved User Code field visibility / 2026-10-07
 
 Verified the updated localhost page in the browser against the saved session: after checking the service access key, the User Code field is hidden and the «Хочу изменить» link is visible. Clicking the link reveals an empty field and focuses it. Reloading the page and checking the access key returns to the hidden-field state. No new User Code was submitted and no QR login or device command was initiated. This update changes only the page and documentation; the 212-test backend result above remains the last full test run.
+
+## Separate credential save buttons / 2026-10-07
+
+**222 Python tests passed**; Ruff passed. Ten added checks cover saving User Code before authorization without contacting Tuya, `0600` persistence and restart, non-disclosure, legacy session loading, preserving the current account during a code change and token refresh, invalid inputs and authorization, rejection of malformed preference files, and atomic-write failure with rollback and temporary-file cleanup. The OpenAPI snapshot includes the new authenticated `PUT /api/v1/cloud/user-code` endpoint.
+
+In the real localhost browser page, verified both save buttons and change links. Saved the existing service access key in browser storage and saved the already-confirmed User Code again on the server; both fields disappeared. An invalid replacement access key was rejected without overwriting the saved key. Reloading restored the valid key automatically and kept both fields hidden. No new account authorization, device command or scene change was performed; credentials remain excluded from Git and screenshots.
