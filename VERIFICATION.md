@@ -1,5 +1,11 @@
 # Проверка проекта
 
+## First-time Tuya device pairing capture — 2026-10-07
+
+Recorded 216 decoded UDP packets and nine discovered devices: 163 device messages, 51 discovery requests from another client (`from=app`), and two own standard REQ_DEVINFO requests. A read-only Sharing inventory query returned 46 devices against the previous snapshot's 45. The one new direct record (`kg`, `sub=false`) had creation/activation times after capture began; its ID matched one UDP 7000 / `6699` discovery response with Tuya version 3.5.
+
+The new response contained no local_key/localKey/key field; `token` was Boolean. A current local key was available through the authorized Sharing API, and its value was not saved in metadata snapshots or the report. Capture stopped after the user's completion message. No LAN status/control, scene change, SQLite import, full TLS registration capture or Zigbee RF capture was performed. Raw files, names, IPs and IDs remain in the private Git-ignored capture directory. This update changes documentation only; no test run was needed, and the prior verification results below remain unchanged.
+
 ## Tuya discovery capture — 2026-10-07
 
 Seven new capture tests passed; Ruff passed. Tests cover plain/ECB/GCM discovery decoding without a device key, malformed/nonobject packets, replacement-file permissions, private raw/decoded output, unknown version handling, closed sockets and no payload/ID/token disclosure in stdout. Core service and firmware were unchanged; the prior 254 service tests remain the latest full-suite result.
