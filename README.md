@@ -395,3 +395,5 @@ curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
 ## Вход Tuya по QR
 
 Optional бесплатный Sharing SDK режим: [docs/qr-login.md](docs/qr-login.md). После включения cloud extra и `SMART_HOME_CLOUD_ENABLED=1` откройте `/cloud`: User Code → QR → подтверждение в приложении. Токены и local_key остаются на сервере. Доступны облачные команды и импорт метаданных в локальный инвентарь.
+
+Проверка публичного Smart Life Web после реального входа: [docs/smart-life-web.md](docs/smart-life-web.md). Подтверждены доступ к списку/комнатам и связям шлюзов с дочерними устройствами; выдача `local_key` и `cid` веб-API пока не подтверждена.
