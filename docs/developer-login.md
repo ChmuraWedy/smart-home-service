@@ -1,6 +1,6 @@
 # Access ID / Access Secret
 
-Второй способ авторизации работает независимо от QR-сеанса. На `/cloud` выберите **Access ID / Secret**, введите реквизиты проекта Tuya и его дата-центр, нажмите **Сохранить реквизиты**, затем **Проверить и подключить**. После успешной проверки доступен список устройств.
+Второй способ авторизации работает независимо от QR-сеанса. В [отдельном React UI](../frontend/README.md) выберите **Access ID / Secret**, введите реквизиты проекта Tuya и его дата-центр, нажмите **Сохранить реквизиты**, затем **Проверить и подключить**. После успешной проверки доступен список устройств. Прежний `/cloud` на Python-сервисе теперь может перенаправлять к UI через `SMART_HOME_FRONTEND_URL`.
 
 Access ID / Client ID и Access Secret / Client Secret находятся в Overview облачного проекта на [Tuya Developer Platform](https://iot.tuya.com/). Привяжите Smart Life через Devices → Link Tuya App Account и авторизуйте необходимые API IoT Core и авторизации. Доступ зависит от разрешений и действующего плана проекта; сервис не создаёт проект и не покупает подписку. [Инструкция TinyTuya Wizard](https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys).
 

@@ -5,6 +5,8 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+node_modules/
+frontend/coverage/
 data/
 *.db*
 *.sqlite*

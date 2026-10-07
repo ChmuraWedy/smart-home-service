@@ -1,5 +1,13 @@
 # Проверка проекта
 
+## Separate React frontend — 2026-10-08
+
+**274 Python tests passed**, including 13 new origin/preflight/header/authentication/default-disabled/redirect/configuration checks. Ruff passed. **20 frontend tests passed**: server/key restoration and verified saving, invalid replacement rollback, requiring a new key when changing API hosts, independent User Code/Developer saves, explicit providers, cross-origin QR URL resolution and rejection of unrelated URLs, confirmation/expiry/blob cleanup, disabled cloud and invalid access, device name/ID search and text escaping, error handling and request timeout without retry. `pnpm build` passed TypeScript checking and production compilation with pinned React 19.3.0 / Vite 8.3.3 / TypeScript 7.0.2. Output JS: 238.73 kB (74.53 kB gzip); CSS: 7.10 kB (2.33 kB gzip). Dependencies are fixed in pnpm-lock.yaml.
+
+Browser verification used the production dist served by a plain Python static server on 5174 and a separate fake API on 8766. Verified initial access saving and collapsed settings, saved User Code hidden, QR SVG loading across ports and confirmation, two Sharing devices and search, saving Developer credentials with us-e and hidden fields, explicit connect and three Developer devices. No actual cloud authorization or hardware commands were used in these browser checks. Screenshot with fake devices: workspace deliverables/react-ui.png. Responsive CSS is included; no physical mobile/display test was performed.
+
+The real API was restarted on 8765 using its original database/session/key, with only localhost UI origins allowed. Read-only HTTP checks confirmed the saved Tuya session and User Code, actual CORS response, compatibility 307 redirect from /cloud, and the independent React dev server on 5173. The browser's new UI origin requires entering the service key once; no new Tuya QR login is needed. Real credentials/device data were not placed in frontend source, bundle, screenshots or Git. A Python wheel built from a clean source copy contains neither React assets nor embedded HTML. Firmware and device transports are unchanged.
+
 ## First-time Tuya device pairing capture — 2026-10-07
 
 Recorded 216 decoded UDP packets and nine discovered devices: 163 device messages, 51 discovery requests from another client (`from=app`), and two own standard REQ_DEVINFO requests. A read-only Sharing inventory query returned 46 devices against the previous snapshot's 45. The one new direct record (`kg`, `sub=false`) had creation/activation times after capture began; its ID matched one UDP 7000 / `6699` discovery response with Tuya version 3.5.
