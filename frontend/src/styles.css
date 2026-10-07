@@ -8,6 +8,56 @@
   color-scheme:dark;
 }
 
+.app-nav { display:flex; gap:8px; margin-top:24px; }
+.app-nav button[aria-current=page] { color:#a4dfcf; border-color:#77b5a7; background:#203b35; }
+.control-center { padding:24px; }
+.control-filters { display:grid; grid-template-columns:1fr 1fr 1.5fr; gap:16px; margin:24px 0; }
+.device-grid.local-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.group-card { border-color:#527c70; background:#182b2d; }
+.group-card>.reading { margin-top:14px; font-size:14px; }
+.card-readings { margin:16px 0; font-size:12px; }
+.card-readings p { display:flex; gap:10px; justify-content:space-between; align-items:baseline; padding:5px 0; }
+.card-readings strong { text-align:right; font-weight:500; }
+.unknown { color:#a1b1c5; }
+.pagination { display:flex; justify-content:center; align-items:center; gap:18px; margin-top:24px; }
+.control-dialog { padding:24px; width:min(840px,calc(100% - 32px)); max-height:calc(100dvh - 32px); border:1px solid #4b5e71; border-radius:18px; background:#182331; color:#e7edf5; box-shadow:0 24px 120px #0008; }
+.control-dialog::backdrop { background:#050c14ba; backdrop-filter:blur(4px); }
+.control-header,.control-toolbar { display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.control-header { position:sticky; top:-24px; z-index:1; background:#182331; padding:14px 0 20px; border-bottom:1px solid #344254; }
+.control-header h2 { overflow-wrap:anywhere; }
+.control-toolbar { margin:18px 0 12px; }
+.control-toolbar .help { margin:0; }
+.capability-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:20px 0; }
+.capability { padding:18px; border:1px solid #344558; border-radius:12px; background:#121e2b; min-width:0; }
+.capability-heading { display:flex; align-items:center; gap:10px; justify-content:space-between; }
+.capability-heading h3 { font-size:15px; overflow-wrap:anywhere; }
+.read-only { color:#a1b1c5; font-size:10px; white-space:nowrap; }
+.reading { font-size:18px; margin:10px 0; overflow-wrap:anywhere; }
+.reading.unknown { font-size:15px; }
+.stale-tag { display:inline-block; font-size:10px; border:1px solid #6b6554; border-radius:5px; padding:1px 5px; margin-left:7px; color:#dfc98e; }
+.capability label { font-size:12px; }
+.power-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+.power-actions button { flex:1; font-size:13px; }
+.power-actions button[aria-pressed=true] { outline:1px solid #b0f1da; outline-offset:2px; }
+.apply-control { margin-top:12px; width:100%; }
+input[type=range] { accent-color:#8cd7c6; cursor:pointer; width:100%; padding:0; border:0; margin:8px 0; min-height:24px; height:24px; background:transparent; }
+input[type=color] { width:100%; height:48px; cursor:pointer; padding:4px; }
+.color-editor label { margin-top:12px; }
+.color-control { grid-column:1/-1; }
+.color-editor { display:grid; grid-template-columns:1fr 1fr; gap:8px 18px; }
+.color-value { float:right; color:#a1b1c5; }
+textarea { width:100%; margin-top:7px; resize:vertical; min-height:90px; background:#101a26; border:1px solid #425366; border-radius:8px; padding:10px; color:#e7edf5; font:inherit; }
+.field-error,.control-feedback.error { color:#ffb3ac; }
+.field-error { font-size:13px; margin-top:12px; overflow-wrap:anywhere; }
+.control-feedback { display:flex; align-items:baseline; gap:8px; color:#b2dece; font-size:13px; min-height:30px; margin-top:20px; overflow-wrap:anywhere; }
+.control-feedback .spinner { flex:none; }
+.group-members { list-style:none; padding:0; margin:20px 0; }
+.group-members li { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 0; border-top:1px solid #344254; }
+.group-members h3 { font-size:15px; overflow-wrap:anywhere; }
+.group-members .help { margin:5px 0 0; }
+@media(max-width:860px) { .device-grid.local-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .control-filters { grid-template-columns:1fr 1fr; } .control-filters>label:last-child { grid-column:1/-1; } }
+@media(max-width:520px) { .control-center,.control-dialog { padding:18px; } .device-grid.local-grid,.capability-grid,.control-filters,.color-editor { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .control-header { top:-18px; } .group-members li { flex-direction:column; align-items:stretch; } }
+
 * {
   box-sizing:border-box;
 }

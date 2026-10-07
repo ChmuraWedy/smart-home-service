@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { CloudDevice } from '../api';
 
-export function DeviceList({ devices, loaded, ready, busy, onLoad }: {
-  devices: CloudDevice[]; loaded: boolean; ready: boolean; busy: boolean; onLoad: () => void;
+export function DeviceList({ devices, loaded, ready, busy, onLoad, onControl }: {
+  devices: CloudDevice[]; loaded: boolean; ready: boolean; busy: boolean; onLoad: () => void; onControl: (device: CloudDevice) => void;
 }) {
   const [search, setSearch] = useState('');
   const needle = search.trim().toLocaleLowerCase();
@@ -15,6 +15,7 @@ export function DeviceList({ devices, loaded, ready, busy, onLoad }: {
       <div className="device-heading"><span className="device-symbol" aria-hidden="true">◇</span><span className={'presence ' + (device.online ? 'online' : '')}>{device.online ? 'В сети' : 'Не в сети'}</span></div>
       <h3>{device.name || 'Без названия'}</h3><p className="device-id">{device.id}</p>
       <div className="device-meta"><span>{device.sub ? 'Через шлюз' : 'Прямое подключение'}</span><span className={device.has_local_key ? 'key-available' : 'muted'}>{device.has_local_key ? 'Ключ на сервере' : 'Ключ недоступен'}</span></div>
+      <button className="secondary compact full-width" disabled={!ready || busy} onClick={() => onControl(device)}>Управлять</button>
     </li>)}</ul> : <div className="empty-state"><span aria-hidden="true">⌂</span><h3>{loaded ? (devices.length ? 'Ничего не найдено' : 'Устройств пока нет') : 'Подключите Tuya-аккаунт'}</h3>
       <p>{loaded ? (devices.length ? 'Попробуйте другое название или ID.' : 'Добавьте устройства в Smart Life и обновите список.') : 'После подключения здесь появится список ваших устройств.'}</p></div>}
   </section>;

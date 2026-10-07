@@ -30,6 +30,14 @@ export type DeveloperCredentials = {
   sample_device_id: string | null;
 };
 export type QRLogin = { session_id: string; qr_url: string; expires_in: number };
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null };
+export type CloudFunctions = { device_id: string; functions: CloudFunction[]; status_range?: CloudFunction[] };
+export type CloudSnapshot = {
+  device_id: string; online: boolean; source: string;
+  status: Record<string, JsonValue>; device_update_time?: number | null; status_range?: CloudFunction[];
+};
+export type CloudCommandResult = { acknowledged: boolean; state_confirmed: boolean };
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -94,10 +102,14 @@ export class CloudApi {
     }
   }
 
-  private async json<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
-    const response = await this.response('/api/v1/cloud' + path, method, body, signal);
+  protected async request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+    const response = await this.response('/api/v1' + path, method, body, signal);
     try { return await response.json() as T; }
     catch { throw new Error('Сервис вернул неожиданный ответ.'); }
+  }
+
+  private json<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+    return this.request<T>('/cloud' + path, method, body, signal);
   }
 
   status(signal?: AbortSignal) { return this.json<CloudStatus>('/status', 'GET', undefined, signal); }
@@ -107,6 +119,15 @@ export class CloudApi {
   beginQR() { return this.json<QRLogin>('/login/qr', 'POST', {}); }
   confirmQR(session: string) { return this.json<{ connected: boolean }>('/login/' + encodeURIComponent(session) + '/confirm', 'POST'); }
   devices(provider: Provider) { return this.json<CloudDevice[]>('/devices?refresh=true&provider=' + provider); }
+  deviceFunctions(id: string, provider: Provider, signal?: AbortSignal) {
+    return this.json<CloudFunctions>('/devices/' + encodeURIComponent(id) + '/functions?provider=' + provider, 'GET', undefined, signal);
+  }
+  deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal) {
+    return this.json<CloudSnapshot>('/devices/' + encodeURIComponent(id) + '/status?refresh=true&provider=' + provider, 'GET', undefined, signal);
+  }
+  sendDeviceCommands(id: string, provider: Provider, commands: { code: string; value: JsonValue }[]) {
+    return this.json<CloudCommandResult>('/devices/' + encodeURIComponent(id) + '/commands?provider=' + provider, 'POST', { commands });
+  }
 
   async qrImage(login: QRLogin): Promise<Blob> {
     // Resolve only this account's QR endpoint on the configured API. Never send

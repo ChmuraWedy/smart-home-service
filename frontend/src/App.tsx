@@ -5,11 +5,17 @@ import { loadConnection, saveConnection } from './connection';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { DeveloperForm, REGIONS, UserCodeForm } from './components/CredentialForms';
 import { DeviceList } from './components/DeviceList';
+import { CloudControl } from './components/CloudControl';
+import { ControlCenter } from './components/ControlCenter';
+import { HomeApi } from './home-api';
 
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
 
 export function App() {
+  const [view, setView] = useState<'connections' | 'control'>('connections');
+  const [selectedCloud, setSelectedCloud] = useState<CloudDevice | null>(null);
+  const [localOpen, setLocalOpen] = useState(false);
   const [connection, setConnection] = useState<Connection>(() => loadConnection());
   const [status, setStatus] = useState<CloudStatus | null>(null);
   const [provider, setProvider] = useState<Provider>('sharing');
@@ -23,7 +29,8 @@ export function App() {
   const [remaining, setRemaining] = useState(0);
   const [devices, setDevices] = useState<CloudDevice[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const api = useMemo(() => new CloudApi(connection), [connection]);
+  const api = useMemo(() => new HomeApi(connection), [connection]);
+  const locked = busy || Boolean(selectedCloud) || localOpen;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
   const showCodeForm = ready && (!status?.has_saved_user_code || editingCode);
@@ -35,6 +42,7 @@ export function App() {
     try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
     verified.current = next;
     setConnection(next); setStatus(null); setQR(null); setDevices([]); setLoaded(false);
+    setSelectedCloud(null); setLocalOpen(false); setView('connections');
   }
 
   useEffect(() => {
@@ -69,7 +77,7 @@ export function App() {
   }, [qr]);
 
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
-    if (busyRef.current) return;
+    if (busyRef.current || selectedCloud || localOpen) return;
     busyRef.current = true; setBusy(true); setNotice({ text: '' });
     try { await work(); }
     catch (error) {
@@ -148,13 +156,15 @@ export function App() {
     <header className="app-header"><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span>Ваш дом под управлением</span></div></div>
       <span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? 'API подключён' : 'API не подключён'}</span></header>
     <main>
+      <nav className="app-nav" aria-label="Раздел приложения"><button className="secondary" aria-current={view === 'control' ? 'page' : undefined} disabled={locked} onClick={() => { setView('control'); setNotice({ text: '' }); }}>Управление</button><button className="secondary" aria-current={view === 'connections' ? 'page' : undefined} disabled={locked} onClick={() => { setView('connections'); setNotice({ text: '' }); }}>Подключения</button></nav>
+      {view === 'connections' ? <>
       <div className="page-heading"><p className="eyebrow">Подключения</p><h1>Подключить Tuya</h1><p className="muted">Свяжите аккаунт и получите доступ к устройствам. Облачное подключение требует интернета.</p></div>
       <input id="access-token" type="hidden" value={connection.token} readOnly />
       <div className="workspace">
         <section className="card setup" aria-label="Подключение Tuya">
           <div className="method-tabs" role="group" aria-label="Способ подключения">
-            <button aria-pressed={provider === 'sharing'} disabled={busy} onClick={() => chooseProvider('sharing')}>Smart Life / QR</button>
-            <button aria-pressed={provider === 'developer'} disabled={busy} onClick={() => chooseProvider('developer')}>Access ID / Secret</button>
+            <button aria-pressed={provider === 'sharing'} disabled={locked} onClick={() => chooseProvider('sharing')}>Smart Life / QR</button>
+            <button aria-pressed={provider === 'developer'} disabled={locked} onClick={() => chooseProvider('developer')}>Access ID / Secret</button>
           </div>
           {provider === 'sharing' ? <div className="provider-panel">
             <p className="eyebrow">Вход через приложение</p><h2>Smart Life / Tuya Smart</h2>
@@ -180,10 +190,12 @@ export function App() {
           </div>}
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>User Code, реквизиты Tuya, токены и локальные ключи остаются на Python-сервисе.</p></div>
         </section>
-        <DeviceList key={provider} devices={devices} loaded={loaded} ready={ready && accountConnected} busy={busy} onLoad={() => void loadDevices()} />
+        <DeviceList key={provider} devices={devices} loaded={loaded} ready={ready && accountConnected} busy={locked} onLoad={() => void loadDevices()} onControl={setSelectedCloud} />
       </div>
+      </> : <><div className="page-heading"><p className="eyebrow">Ваш дом</p><h1>Управление устройствами</h1><p className="muted">Выберите комнату, откройте устройство или группу и настройте доступные функции.</p></div><ControlCenter api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} onLock={setLocalOpen} /></>}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />Подождите…</> : notice.text}</div>
-      <ConnectionSettings connection={connection} connected={Boolean(status)} busy={busy} onSave={saveAccess} />
+      <ConnectionSettings connection={connection} connected={Boolean(status)} busy={locked} onSave={saveAccess} />
+      {selectedCloud && <CloudControl key={provider + selectedCloud.id} api={api} device={selectedCloud} provider={provider} onClose={() => setSelectedCloud(null)} onAuthError={invalidateConnection} />}
     </main>
     <footer><span>Smart Home · Tuya</span></footer>
   </div>;
