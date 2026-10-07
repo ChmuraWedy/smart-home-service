@@ -35,9 +35,17 @@ class Settings:
     cloud_schema: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_CLOUD_SCHEMA", "haauthorize")
     )
+    developer_session_path: str = field(
+        default_factory=lambda: os.getenv("SMART_HOME_DEVELOPER_SESSION", "")
+    )
+    cloud_timeout: float = field(
+        default_factory=lambda: float(os.getenv("SMART_HOME_CLOUD_TIMEOUT", "10"))
+    )
 
     def __post_init__(self):
         if self.display_poll_interval != 0 and not 10 <= self.display_poll_interval <= 3600:
             raise ValueError("Display poll interval must be 0 (manual) or 10..3600 seconds")
         if not 0 < self.tuya_timeout <= 30 or not 0 < self.lock_timeout <= 60:
             raise ValueError("Timeouts must be positive: Tuya <=30s, lock <=60s")
+        if not 0 < self.cloud_timeout <= 30:
+            raise ValueError("Developer cloud timeout must be >0 and <=30s")

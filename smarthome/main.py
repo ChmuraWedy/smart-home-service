@@ -588,6 +588,9 @@ def create_app(settings: Settings | None = None, controller=None):
         from .cloud import CloudBridge
 
         app.state.cloud = CloudBridge(settings)
+        from .developer_cloud import DeveloperBridge
+
+        app.state.developer_cloud = DeveloperBridge(settings)
         from .poller import DisplayPoller
 
         app.state.poller = DisplayPoller(app)

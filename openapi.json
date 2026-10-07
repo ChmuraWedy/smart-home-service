@@ -4414,6 +4414,120 @@
         ]
       }
     },
+    "/api/v1/cloud/developer/status": {
+      "get": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Developer Status",
+        "operationId": "developer_status_api_v1_cloud_developer_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cloud/developer/credentials": {
+      "put": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Developer Credentials",
+        "operationId": "developer_credentials_api_v1_cloud_developer_credentials_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeveloperCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Developer Logout",
+        "operationId": "developer_logout_api_v1_cloud_developer_credentials_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cloud/developer/connect": {
+      "post": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Developer Connect",
+        "operationId": "developer_connect_api_v1_cloud_developer_connect_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/api/v1/cloud/user-code": {
       "put": {
         "tags": [
@@ -4638,6 +4752,20 @@
               "default": false,
               "title": "Refresh"
             }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
           }
         ],
         "responses": {
@@ -4669,15 +4797,36 @@
         ],
         "summary": "Import Local Inventory",
         "operationId": "import_local_inventory_api_v1_cloud_imports_local_inventory_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CloudImport"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -4698,12 +4847,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/cloud/devices/{device_id}/status": {
@@ -4739,6 +4883,82 @@
               "type": "boolean",
               "default": false,
               "title": "Refresh"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cloud/devices/{device_id}/functions": {
+      "get": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Cloud Device Functions",
+        "operationId": "cloud_device_functions_api_v1_cloud_devices__device_id__functions_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
             }
           }
         ],
@@ -4788,6 +5008,20 @@
               "pattern": "^\\S+$",
               "title": "Device Id"
             }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
           }
         ],
         "requestBody": {
@@ -4829,6 +5063,27 @@
         ],
         "summary": "Cloud Scenes",
         "operationId": "cloud_scenes_api_v1_cloud_scenes_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4837,13 +5092,18 @@
                 "schema": {}
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "APIKeyHeader": []
-          }
-        ]
+        }
       }
     },
     "/health": {
@@ -5524,6 +5784,61 @@
           "dps"
         ],
         "title": "DPSCommand"
+      },
+      "DeveloperCredentials": {
+        "properties": {
+          "access_id": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "format": "password",
+            "title": "Access Id",
+            "writeOnly": true
+          },
+          "access_secret": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "format": "password",
+            "title": "Access Secret",
+            "writeOnly": true
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "eu",
+              "eu-w",
+              "us",
+              "us-e",
+              "cn",
+              "in",
+              "sg"
+            ],
+            "title": "Region"
+          },
+          "sample_device_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^\\S+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Device Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "access_id",
+          "access_secret",
+          "region"
+        ],
+        "title": "DeveloperCredentials"
       },
       "DeviceCreate": {
         "properties": {
