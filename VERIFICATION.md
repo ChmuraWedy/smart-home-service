@@ -67,3 +67,7 @@ ruff==0.16.10
 ## Saved User Code / 0.8.3
 
 212 Python tests passed, including 16 cloud checks; Ruff passed. Repeated QR login accepts an omitted or null User Code and uses the code from the previously confirmed session. Tests cover no saved session, restart, non-disclosure in responses, QR expiration, pending account changes and explicit logout. The existing session file remains `0600`; changing accounts replaces the saved code only after successful confirmation. A real localhost service was restarted with its saved session: the updated page detected the saved code while its field stayed empty. OpenAPI and package metadata updated. Firmware is unchanged in this update.
+
+## Real Sharing SDK authorization / 2026-10-07
+
+The owner approved the service QR login in Smart Life. A read-only metadata query returned 44 devices: 42 reported a local key, 42 reported local support, and 23 children had a node ID. Both displayed gateways had no local key, so this does not establish usable local Zigbee control. The saved session and User Code survived a real service restart. No device commands, scene writes or imports into the SQLite inventory were performed. Credential values and real device identifiers are excluded from this report and Git. Earlier sections above describe verification at their respective development stages before this authorization.
