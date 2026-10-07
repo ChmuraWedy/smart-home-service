@@ -8,23 +8,18 @@ body{font:16px system-ui;background:#131a24;color:#e8f0ff;max-width:620px;margin
 input,button{font:inherit;padding:12px;margin:6px 0;border-radius:8px;width:100%;box-sizing:border-box}
 button{background:#56b6ff;color:#102030;border:0;cursor:pointer}
 button:disabled{opacity:.5;cursor:default}
-a{color:#56b6ff;text-underline-offset:3px}
+a{color:#56b6ff;text-underline-offset:3px;white-space:nowrap}
 img{width:280px;max-width:100%;box-sizing:border-box;background:white;padding:16px}
 pre{white-space:pre-wrap}
 label{display:block;margin-top:20px}
 section{margin:24px 0}
+details{margin-top:28px}summary{cursor:pointer;color:#a9bbd2}
 </style>
 <h1>Подключить Tuya</h1>
 <p>Вход через Smart Life / Tuya Smart. Облачный режим требует интернета. Токены сохраняются на сервере.</p>
-<section aria-label="Ключ доступа">
-  <p><span id="key-saved">Введите ключ доступа к нашему сервису.</span> <a id="change-key" href="#access-key" aria-controls="access-key" aria-expanded="true" hidden>Хочу изменить</a></p>
-  <div id="access-key">
-    <label>Ключ доступа к нашему сервису<input id="key" type="password" autocomplete="off"></label>
-    <button id="save-key">Сохранить ключ доступа</button>
-  </div>
-</section>
+<input id="access-token" type="hidden">
 <section aria-label="User Code">
-  <p><span id="saved">Сначала сохраните ключ доступа.</span> <a id="change" href="#user-code" aria-controls="user-code" aria-expanded="false" hidden>Хочу изменить</a></p>
+  <p><span id="saved">Проверяем подключение…</span> <a id="change" href="#user-code" aria-controls="user-code" aria-expanded="false" hidden>Хочу изменить</a></p>
   <div id="user-code" hidden>
     <label>User Code из приложения Tuya<input id="user" type="password" autocomplete="off"></label>
     <p>Smart Life / Tuya Smart → Я → ⚙️ → Аккаунт и безопасность → User Code внизу экрана.</p>
@@ -37,16 +32,22 @@ section{margin:24px 0}
 <button id="confirm" hidden>Я подтвердил вход в приложении</button>
 <button id="list" disabled>Показать устройства аккаунта</button>
 <pre id="result" role="status"></pre>
+<details id="access-settings">
+  <summary>Настройки подключения</summary>
+  <p>При первом подключении этого браузера укажите ключ доступа к сервису. После сохранения он будет использоваться автоматически.</p>
+  <label>Ключ доступа к нашему сервису<input id="key" type="password" autocomplete="off"></label>
+  <button id="save-key">Сохранить ключ доступа</button>
+</details>
 <script>
 const storageKey='smart-home.cloud.api-key';
 const element=id=>document.getElementById(id);
-const key=element('key'), user=element('user'), keyForm=element('access-key'), userForm=element('user-code');
-const changeKey=element('change-key'), changeUser=element('change');
+const key=element('key'), accessToken=element('access-token'), accessSettings=element('access-settings'), user=element('user'), userForm=element('user-code');
+const changeUser=element('change');
 const saveKey=element('save-key'), saveUser=element('save-user'), begin=element('begin'), confirm=element('confirm'), list=element('list'), result=element('result');
-let accessKey='', session, imageUrl, hasSavedCode=false, connected=false, enabled=false, busy=false;
+let session, imageUrl, hasSavedCode=false, connected=false, enabled=false, busy=false;
 
 function controls(){
-  const ready=!!accessKey&&keyForm.hidden&&enabled;
+  const ready=!!accessToken.value&&enabled;
   saveKey.disabled=busy;
   saveUser.disabled=busy||!ready;
   begin.disabled=busy||!ready||!hasSavedCode||!userForm.hidden;
@@ -55,10 +56,8 @@ function controls(){
   key.disabled=user.disabled=busy;
 }
 function keyView(saved){
-  keyForm.hidden=saved;
-  changeKey.hidden=!saved;
-  changeKey.setAttribute('aria-expanded',String(!saved));
-  element('key-saved').textContent=saved?'Ключ доступа сохранён в этом браузере.':'Введите ключ доступа к нашему сервису.';
+  accessSettings.open=!saved;
+  if(!saved)element('saved').textContent='Подтвердите доступ в настройках подключения.';
   controls();
 }
 function codeView(status){
@@ -79,12 +78,15 @@ function clearQR(){
   if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=undefined;}
   controls();
 }
-async function call(path,method='GET',body,token=accessKey){
+async function call(path,method='GET',body,token=accessToken.value){
   let response;
   try{response=await fetch('/api/v1/cloud'+path,{method,headers:{'X-API-Key':token,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});}
   catch{throw Error('Не удалось связаться с сервисом.');}
   const data=await response.json();
-  if(response.status===401)throw Error('Ключ доступа недействителен.');
+  if(response.status===401){
+    if(token===accessToken.value){accessToken.value='';enabled=false;keyView(false);}
+    throw Error('Ключ доступа недействителен.');
+  }
   if(!response.ok)throw Error(typeof data.detail==='string'?data.detail:'Ошибка запроса');
   return data;
 }
@@ -100,8 +102,8 @@ saveKey.onclick=()=>act(async()=>{
   const status=await call('/status','GET',undefined,candidate);
   try{localStorage.setItem(storageKey,candidate);}
   catch{throw Error('Не удалось сохранить ключ в этом браузере. Проверьте настройки хранилища.');}
-  accessKey=candidate;key.value='';clearQR();keyView(true);codeView(status);
-  result.textContent='Ключ доступа сохранён в этом браузере.';
+  accessToken.value=candidate;key.value='';clearQR();keyView(true);codeView(status);
+  result.textContent='Подключение сохранено.';
 });
 saveUser.onclick=()=>act(async()=>{
   const code=user.value.trim();
@@ -110,10 +112,6 @@ saveUser.onclick=()=>act(async()=>{
   clearQR();codeView(status);
   result.textContent=status.saved_user_code_requires_login?'User Code сохранён. Для подключения аккаунта подтвердите QR-вход.':'User Code сохранён на сервере.';
 });
-changeKey.onclick=event=>{
-  event.preventDefault();if(busy)return;
-  clearQR();key.value='';keyView(false);key.focus();result.textContent='';
-};
 changeUser.onclick=event=>{
   event.preventDefault();if(busy)return;
   clearQR();userForm.hidden=false;changeUser.hidden=true;changeUser.setAttribute('aria-expanded','true');
@@ -123,7 +121,7 @@ changeUser.onclick=event=>{
 begin.onclick=()=>act(async()=>{
   clearQR();
   const data=await call('/login/qr','POST',{});
-  const image=await fetch(data.qr_url,{headers:{'X-API-Key':accessKey},cache:'no-store'});
+  const image=await fetch(data.qr_url,{headers:{'X-API-Key':accessToken.value},cache:'no-store'});
   if(!image.ok)throw Error('Не удалось получить QR');
   session=data.session_id;imageUrl=URL.createObjectURL(await image.blob());
   element('qr').src=imageUrl;element('qr').hidden=false;confirm.hidden=false;
@@ -140,11 +138,11 @@ list.onclick=()=>act(async()=>{
   result.textContent=devices.map(device=>`${device.name} — ${device.id}\n${device.online?'В сети':'Не в сети'}, локальный ключ: ${device.has_local_key?'доступен на сервере':'нет'}`).join('\n\n')||'Устройств нет';
 });
 act(async()=>{
-  try{accessKey=localStorage.getItem(storageKey)||'';}catch{accessKey='';}
-  if(!accessKey){result.textContent='';return;}
+  try{accessToken.value=localStorage.getItem(storageKey)||'';}catch{accessToken.value='';}
+  if(!accessToken.value){keyView(false);result.textContent='';return;}
   keyView(true);
   try{codeView(await call('/status'));result.textContent='';}
-  catch{accessKey='';keyView(false);result.textContent='Не удалось проверить сохранённый ключ. Сохраните действующий ключ или проверьте доступность сервиса.';}
+  catch{accessToken.value='';enabled=false;keyView(false);result.textContent='Не удалось подключиться. Проверьте настройки подключения или доступность сервиса.';}
 });
 </script>
 </html>
