@@ -18,7 +18,7 @@ export function useClock() {
   return now;
 }
 
-export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSignal) => Promise<T>, onAuthError: () => void) {
+export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSignal) => Promise<T>, onAuthError: () => void, poll?: (current:T, signal:AbortSignal) => Promise<T>) {
   const [data, setData] = useState<T | null>(null);
   const [busy, setBusy] = useState(true);
   const [readOK, setReadOK] = useState(false);
@@ -26,6 +26,9 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   const lock = useRef(true), alive = useRef(false), authError = useRef(onAuthError);
   authError.current = onAuthError;
   const abort = useRef<AbortController | null>(null);
+  const pollAbort = useRef<AbortController | null>(null), epoch = useRef(0), current = useRef(data);
+  current.current = data;
+  const cancelPoll = () => { epoch.current++; pollAbort.current?.abort(); pollAbort.current = null; };
   const unauthorized = (error: unknown) => { if (error instanceof ApiError && error.status === 401) authError.current(); };
 
   useEffect(() => {
@@ -39,8 +42,23 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
     }).finally(() => {
       if (alive.current && !controller.signal.aborted) { lock.current = false; setBusy(false); }
     });
-    return () => { alive.current = false; controller.abort(); abort.current?.abort(); };
+    return () => { alive.current = false; controller.abort(); abort.current?.abort(); cancelPoll(); };
   }, [load]);
+
+  useEffect(() => {
+    if (!poll) return;
+    const timer = setInterval(() => {
+      if (!alive.current || lock.current || current.current === null || pollAbort.current || document.visibilityState === 'hidden') return;
+      const controller = new AbortController(), version = epoch.current;
+      pollAbort.current = controller;
+      void poll(current.current,controller.signal).then(value => {
+        if (alive.current && !controller.signal.aborted && version === epoch.current && !lock.current) { setData(value); setNotice(previous => previous.text.startsWith('Автообновление недоступно:') ? {text:''} : previous); }
+      }).catch(error => {
+        if (alive.current && !controller.signal.aborted && version === epoch.current) { setNotice({text:'Автообновление недоступно: '+errorText(error),error:true}); unauthorized(error); }
+      }).finally(() => { if (pollAbort.current === controller) pollAbort.current = null; });
+    },3000);
+    return () => { clearInterval(timer); cancelPoll(); };
+  }, [poll]);
 
   async function read() {
     const controller = new AbortController(); abort.current = controller;
@@ -49,6 +67,7 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   }
   async function refresh() {
     if (lock.current) return;
+    cancelPoll();
     lock.current = true; setBusy(true); setNotice({ text: '' });
     try { await read(); if (alive.current) setNotice({ text: 'Статус запрошен заново.' }); }
     catch (error) { if (alive.current) { setReadOK(false); setNotice({ text: errorText(error), error: true }); unauthorized(error); } }
@@ -56,6 +75,7 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   }
   async function execute(send: () => Promise<Receipt>) {
     if (lock.current || !readOK) return;
+    cancelPoll();
     lock.current = true; setBusy(true); setNotice({ text: '' });
     try {
       const receipt = await send();
@@ -108,11 +128,12 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
   const [dirty, setDirty] = useState(false), [error, setError] = useState('');
   const fingerprint = JSON.stringify([reading?.value, reading?.known, reading?.stale, reading?.observed_at]);
   useEffect(() => {
+    if (dirty) return; // A new report must not erase an unapplied user draft.
     const value = fresh ? reading!.value : null;
     setDraft(value === null ? '' : spec.kind === 'enum' ? String(spec.choices?.findIndex(option => sameValue(option, value)) ?? -1) : spec.kind === 'json' ? JSON.stringify(value, null, 2) : String(value));
     if (spec.kind === 'color' && value && typeof value === 'object' && !Array.isArray(value)) setColor(value as HSV);
     setDirty(false); setError('');
-  }, [fingerprint, spec.key]);
+  }, [fingerprint, spec.key, dirty]);
 
   const change = (value: string) => { setDraft(value); setDirty(true); setError(''); };
   const changeColor = (value: HSV) => { setColor(value); setDirty(true); setError(''); };
@@ -134,6 +155,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
     <div className="capability-heading"><h3>{spec.label}</h3>{!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}</div>
     {spec.readable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {reading?.observed_at && <p className="help">Показание: {new Date(reading.observed_at).toLocaleString('ru-RU')}</p>}
+    {!local && reading?.known && spec.readable && <p className="help">{reading.source === 'tuya_event' ? 'Отчёт устройства' : 'Сохранённый снимок Tuya'}{reading.source === 'tuya_event' && !reading.observed_at && reading.received_at ? ' · получен '+new Date(reading.received_at).toLocaleString('ru-RU') : ''}</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}
     {spec.help && <p className="help">{spec.help}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">

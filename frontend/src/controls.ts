@@ -129,7 +129,7 @@ export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot)
   return [...result.values()];
 }
 
-export function cloudReading(spec: ControlSpec, raw: JsonValue | undefined): Reading {
+export function cloudReading(spec: ControlSpec, raw: JsonValue | undefined, observation?: {observed_at:string|null; received_at:string}): Reading {
   if (!spec.readable) return { value: null, known: false, stale: true };
   let value: JsonValue = raw ?? null;
   let known = raw !== undefined && raw !== null;
@@ -156,7 +156,7 @@ export function cloudReading(spec: ControlSpec, raw: JsonValue | undefined): Rea
     known = known && validMotion;
     value = known ? raw! : null;
   }
-  return { value, known, stale: !known };
+  return { value, known, stale: !known, ...(observation && known ? {source:'tuya_event',observed_at:observation.observed_at,received_at:observation.received_at} : {}) };
 }
 
 export function motionState(spec: ControlSpec, reading: Reading | undefined): boolean | null | undefined {

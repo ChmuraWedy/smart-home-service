@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, CloudSnapshot, Provider } from '../api';
 import { cloudCommands, cloudReading, cloudSpecs } from '../controls';
@@ -10,16 +10,28 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; onClose: () => void; onAuthError: () => void;
 }) {
   const [mappingBusy,setMappingBusy] = useState(false);
+  const metadata = useMemo(() => ({value:null as CloudFunctions|null}),[api,device.id,provider]);
+  const checked = (snapshot:CloudSnapshot) => {
+    if (snapshot.device_id !== device.id || !snapshot.status || typeof snapshot.status !== 'object' || Array.isArray(snapshot.status)) throw new Error('Сервис вернул неожиданные данные устройства.');
+    return snapshot;
+  };
+  const receiptTime = (snapshot:CloudSnapshot) => snapshot.snapshot_received_at && Number.isFinite(Date.parse(snapshot.snapshot_received_at)) ? Date.parse(snapshot.snapshot_received_at) : Date.now();
   const load = useCallback(async (_refresh: boolean, signal?: AbortSignal) => {
-    const [definitions, snapshot] = await Promise.all([api.deviceFunctions(device.id, provider, signal), api.deviceSnapshot(device.id, provider, signal)]);
+    const [definitions, snapshot] = await Promise.all([metadata.value ? Promise.resolve(metadata.value) : api.deviceFunctions(device.id, provider, signal), api.deviceSnapshot(device.id, provider, signal)]);
     if (definitions.device_id !== device.id || snapshot.device_id !== device.id || !Array.isArray(definitions.functions) || !snapshot.status || typeof snapshot.status !== 'object') throw new Error('Сервис вернул неожиданные данные устройства.');
-    return { definitions, snapshot, fetchedAt: Date.now() };
-  }, [api, device.id, provider]);
-  const session = useControlSession<{ definitions: CloudFunctions; snapshot: CloudSnapshot; fetchedAt: number }>(load, onAuthError);
+    if (!signal?.aborted) metadata.value = definitions;
+    return { definitions, snapshot:checked(snapshot), fetchedAt: receiptTime(snapshot) };
+  }, [api, device.id, provider,metadata]);
+  type Data = { definitions: CloudFunctions; snapshot: CloudSnapshot; fetchedAt: number };
+  const poll = useCallback(async (current:Data, signal:AbortSignal) => {
+    const snapshot = checked(await api.deviceSnapshot(device.id,provider,signal,false));
+    return {...current,snapshot,fetchedAt:snapshot.snapshot_received_at ? receiptTime(snapshot) : current.fetchedAt};
+  },[api,device.id,provider]);
+  const session = useControlSession<Data>(load, onAuthError, provider === 'sharing' && !mappingBusy ? poll : undefined);
   const now = useClock();
   const specs = session.data ? cloudSpecs(session.data.definitions, session.data.snapshot) : [];
   const basic = specs.filter(spec => !spec.advanced), advanced = specs.filter(spec => spec.advanced);
-  const field = (spec: ControlSpec) => <CapabilityField key={spec.key} spec={spec} reading={cloudReading(spec, session.data!.snapshot.status[spec.key])} now={now} local={false} disabled={mappingBusy || session.busy || !session.readOK || !session.data!.snapshot.online} onSend={value => session.execute(async () => {
+  const field = (spec: ControlSpec) => <CapabilityField key={spec.key} spec={spec} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} disabled={mappingBusy || session.busy || !session.readOK || !session.data!.snapshot.online} onSend={value => session.execute(async () => {
     const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, session.data!.definitions));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
     return { text: 'Команда принята.' };
@@ -28,6 +40,7 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><button className="secondary compact" disabled={session.busy || mappingBusy} onClick={() => void session.refresh()}>Обновить статус</button></div>
     <p className="help">{specs.some(spec => spec.writable) ? 'Облачный снимок состояния. Принятие команды не подтверждает изменение устройства; облако может вернуть прежнее показание.' : 'Последнее известное состояние в облаке. Обновите статус для получения нового снимка.'}</p>
     {session.data && <p className="help">Снимок получен: {new Date(session.data.fetchedAt).toLocaleString('ru-RU')}</p>}
+    {provider === 'sharing' && session.data && <p className="help">{session.data.snapshot.event_stream_connected ? 'Приём отчётов устройства подключён. Новые состояния появляются автоматически.' : 'Свежих отчётов пока нет или соединение ещё устанавливается. Сохранённый снимок Tuya может запаздывать.'}</p>}
     {session.data && !session.data.snapshot.online && <p className="saved-summary">Устройство не в сети. Обновите статус после восстановления связи.</p>}
     {basic.length > 0 && <div className="capability-grid">{basic.map(field)}</div>}
     {advanced.length > 0 && <details className="cloud-properties advanced-controls"><summary>Эффекты и дополнительные параметры</summary>

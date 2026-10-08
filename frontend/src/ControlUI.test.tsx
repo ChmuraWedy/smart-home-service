@@ -72,6 +72,67 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
+  it('polls only the local report cache, updates channel 2 and preserves an edited brightness draft', async () => {
+    vi.useFakeTimers({toFake:['setInterval','clearInterval']});
+    const reads:string[]=[];
+    let report=false;
+    vi.mocked(fetch).mockImplementation(async (input,init) => {
+      expect(init?.method).toBe('GET');
+      const url=new URL(String(input)); reads.push(url.pathname+url.search);
+      if(url.pathname.endsWith('/functions')) return json({device_id:'cloud-lamp',functions:[
+        {code:'switch_1',type:'Boolean',values:'{}'}, {code:'switch_2',type:'Boolean',values:'{}'},
+        {code:'bright_value_v2',type:'Integer',values:{min:10,max:1000,scale:0,step:10}},
+      ]});
+      return json({device_id:'cloud-lamp',online:true,status:{switch_1:false,switch_2:report,bright_value_v2:report?600:500},
+        snapshot_received_at:'2026-10-08T07:00:00Z',event_stream_connected:true,
+        status_observations:report?{switch_2:{observed_at:'2026-10-08T07:01:00Z',received_at:'2026-10-08T07:01:00.2Z'}}:{}});
+    });
+    const view=render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    try {
+      const channel=await screen.findByRole('region',{name:'Канал 2'});
+      expect(within(channel).getByText('Выключено')).toBeInTheDocument();
+      const input=screen.getByRole('spinbutton',{name:'Яркость (%)'});
+      fireEvent.change(input,{target:{value:'70'}});
+      report=true;
+      await act(async () => { vi.advanceTimersByTime(3000); });
+      expect(within(channel).getByText('Включено')).toBeInTheDocument();
+      expect(within(channel).getByText('Отчёт устройства')).toBeInTheDocument();
+      expect(input).toHaveValue(70);
+      expect(reads.filter(path=>path.includes('/functions'))).toHaveLength(1);
+      expect(reads.filter(path=>path.includes('/status?refresh=true'))).toHaveLength(1);
+      expect(reads.filter(path=>path.includes('/status?refresh=false'))).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button',{name:'Обновить статус'}));
+      await act(async()=>{});
+      expect(reads.filter(path=>path.includes('/functions'))).toHaveLength(1);
+      view.unmount();
+      const count=reads.length;
+      await act(async () => { vi.advanceTimersByTime(6000); });
+      expect(reads).toHaveLength(count);
+    } finally { view.unmount(); vi.useRealTimers(); }
+  });
+
+  it('ignores a late cache poll after an explicit status refresh', async () => {
+    vi.useFakeTimers({toFake:['setInterval','clearInterval']});
+    let fresh=0, resolvePoll:(value:Response)=>void=()=>{};
+    const snapshot=(on:boolean)=>({device_id:'cloud-lamp',online:true,status:{switch_2:on}});
+    vi.mocked(fetch).mockImplementation(async input => {
+      const url=new URL(String(input));
+      if(url.pathname.endsWith('/functions')) return json({device_id:'cloud-lamp',functions:[{code:'switch_2',type:'Boolean',values:'{}'}]});
+      if(url.searchParams.get('refresh')==='false') return new Promise<Response>(resolve=>{resolvePoll=resolve;});
+      return json(snapshot(++fresh>1));
+    });
+    const view=render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    try {
+      const channel=await screen.findByRole('region',{name:'Канал 2'});
+      await act(async()=>{vi.advanceTimersByTime(3000);});
+      fireEvent.click(screen.getByRole('button',{name:'Обновить статус'}));
+      await act(async()=>{});
+      expect(within(channel).getByText('Включено')).toBeInTheDocument();
+      await act(async()=>{resolvePoll(json(snapshot(false)));});
+      expect(within(channel).getByText('Включено')).toBeInTheDocument();
+    } finally {view.unmount();vi.useRealTimers();}
+  });
+
   it('stages a typed music command using the actual 255 range and sends only after Apply', async () => {
     const schema={change_mode:{range:['direct','gradient']},bright:{min:0,max:1000},temperature:{min:0,max:1000},h:{min:0,max:360},s:{min:0,max:255},v:{min:0,max:255}};
     const functions=[{code:'music_data',type:'Json',values:schema},{code:'work_mode',type:'Enum',values:{range:['white','music']}}];

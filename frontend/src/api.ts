@@ -39,6 +39,8 @@ export type CloudFunctions = { device_id: string; functions: CloudFunction[]; st
 export type CloudSnapshot = {
   device_id: string; online: boolean; source: string;
   status: Record<string, JsonValue>; device_update_time?: number | null; status_range?: CloudFunction[];
+  snapshot_received_at?: string | null; event_stream_connected?: boolean;
+  status_observations?: Record<string, {observed_at: string | null; received_at: string}>;
 };
 export type CloudCommandResult = { acknowledged: boolean; state_confirmed: boolean };
 
@@ -125,8 +127,8 @@ export class CloudApi {
   deviceFunctions(id: string, provider: Provider, signal?: AbortSignal) {
     return this.json<CloudFunctions>('/devices/' + encodeURIComponent(id) + '/functions?provider=' + provider, 'GET', undefined, signal);
   }
-  deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal) {
-    return this.json<CloudSnapshot>('/devices/' + encodeURIComponent(id) + '/status?refresh=true&provider=' + provider, 'GET', undefined, signal);
+  deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true) {
+    return this.json<CloudSnapshot>('/devices/' + encodeURIComponent(id) + '/status?refresh=' + refresh + '&provider=' + provider, 'GET', undefined, signal);
   }
   sendDeviceCommands(id: string, provider: Provider, commands: { code: string; value: JsonValue }[]) {
     return this.json<CloudCommandResult>('/devices/' + encodeURIComponent(id) + '/commands?provider=' + provider, 'POST', { commands });
