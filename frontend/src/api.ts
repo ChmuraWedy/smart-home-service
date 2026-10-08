@@ -22,6 +22,7 @@ export type CloudDevice = {
   online: boolean;
   sub?: boolean;
   has_local_key: boolean;
+  node_id?: string | null;
 };
 export type DeveloperCredentials = {
   access_id: string;
@@ -111,6 +112,10 @@ export class CloudApi {
     const response = await this.response('/api/v1' + path, method, body, signal);
     try { return await response.json() as T; }
     catch { throw new Error('Сервис вернул неожиданный ответ.'); }
+  }
+
+  protected async deleteResource(path: string): Promise<void> {
+    await this.response('/api/v1' + path, 'DELETE');
   }
 
   private json<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {

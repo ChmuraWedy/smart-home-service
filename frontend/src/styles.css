@@ -691,3 +691,27 @@ footer {
     padding:25px 10px;
   }
 }
+/* Device observation before inventory registration. */
+.device-survey { max-width: 1000px; margin-inline: auto; padding: 24px; }
+.survey-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.survey-form-grid label, .survey-prompt label { display: flex; flex-direction: column; gap: 8px; }
+.survey-prompt { background: var(--surface-soft, #19252d); border: 1px solid var(--border, #34454e); border-radius: 14px; padding: 20px; margin-block: 20px; }
+.survey-prompt p { line-height: 1.6; }
+.survey-toolbar, .survey-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; justify-content: space-between; }
+.survey-footer { margin-top: 24px; }
+.survey-readings ul, .survey-history ol { list-style: none; padding: 0; }
+.survey-readings li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, 1fr); gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border, #34454e); }
+.survey-readings li > div { display: flex; flex-direction: column; gap: 6px; }
+.survey-readings output { text-align: right; overflow-wrap: anywhere; white-space: pre-wrap; }
+.survey-readings .survey-checkbox { grid-column: 1 / -1; }
+.survey-history { margin-top: 24px; }
+.survey-history ol { max-height: 320px; overflow: auto; }
+.survey-history li { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border, #34454e); overflow-wrap: anywhere; }
+.survey-checkbox { display: flex; align-items: center; gap: 10px; }
+.survey-checkbox input { width: auto; margin: 0; }
+@media (max-width: 640px) {
+  .survey-form-grid { grid-template-columns: 1fr; }
+  .survey-readings li { grid-template-columns: 1fr; }
+  .survey-readings output { text-align: left; }
+  .survey-footer button { width: 100%; }
+}

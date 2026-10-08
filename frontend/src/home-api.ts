@@ -1,5 +1,5 @@
 import { CloudApi } from './api';
-import type { JsonValue } from './api';
+import type { JsonValue, Provider } from './api';
 
 export type Capability = {
   type: 'boolean' | 'integer' | 'number' | 'string' | 'object';
@@ -12,6 +12,7 @@ export type LocalDevice = {
   id: number; device_id: string; name: string; aliases: string[]; building_id: number | null;
   room_id: number | null; transport: 'wifi' | 'zigbee'; parent_id: number | null; cid: string | null;
   enabled: boolean; capabilities: Record<string, Capability>;
+  is_gateway?: boolean; ip?: string | null; version?: string | null; has_local_key?: boolean;
 };
 export type Building = { id: number; name: string; aliases: string[] };
 export type Room = { id: number; building_id: number; name: string; aliases: string[] };
@@ -19,6 +20,22 @@ export type Group = { id: number; name: string; room_id: number; device_ids: num
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
 export type GroupResult = { all_acknowledged: boolean; results: { device_id: number; acknowledged: boolean }[] };
 export type Inventory = { buildings: Building[]; rooms: Room[]; devices: LocalDevice[]; groups: Group[] };
+export type DeviceDraft = {
+  name: string; device_id: string; transport: 'wifi' | 'zigbee'; is_gateway: boolean;
+  ip: string | null; version: string | null; parent_id: number | null; cid: string | null;
+  local_key?: string;
+};
+export type ObservationReading = {
+  key: string; code: string | null; dp: string | null; value: JsonValue;
+  received_at: string | null; source: 'local' | 'cloud'; can_write: boolean;
+};
+export type ObservationChange = ObservationReading & { previous: JsonValue; detected_at: string; action: string };
+export type ObservationSession = {
+  session_id: string; device_id: string; mode: 'local' | 'cloud'; expires_in: number;
+  interval_seconds: number; sample_count: number; has_local_key: boolean;
+  readings: ObservationReading[]; changes: ObservationChange[];
+};
+export type ObservationAction = 'observe' | 'power' | 'brightness' | 'temperature' | 'color' | 'sensor' | 'button';
 
 export class HomeApi extends CloudApi {
   private async list<T>(path: string, signal?: AbortSignal): Promise<T[]> {
@@ -48,4 +65,14 @@ export class HomeApi extends CloudApi {
   }
   groupState(id: number, signal?: AbortSignal) { return this.request<GroupState>(`/groups/${id}/state`, 'GET', undefined, signal); }
   groupCommand(id: number, command: 'on' | 'off') { return this.request<GroupResult>(`/groups/${id}/commands/${command}`, 'POST'); }
+  beginObservation(draft: DeviceDraft, mode: 'local' | 'cloud', provider?: Provider, signal?: AbortSignal) {
+    return this.request<ObservationSession>('/commissioning', 'POST', { draft, mode, provider: provider || null }, signal);
+  }
+  observationSample(id: string, action: ObservationAction, signal?: AbortSignal) {
+    return this.request<ObservationSession>(`/commissioning/${encodeURIComponent(id)}/samples`, 'POST', { action }, signal);
+  }
+  async cancelObservation(id: string) { await this.deleteResource(`/commissioning/${encodeURIComponent(id)}`); }
+  registerObservation(id: string, body: { name: string; aliases: string[]; room_id: number | null; building_id: number | null; reviewed: true; writable: string[] }) {
+    return this.request<LocalDevice>(`/commissioning/${encodeURIComponent(id)}/register`, 'POST', body);
+  }
 }
