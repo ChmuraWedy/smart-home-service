@@ -13,9 +13,11 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
+from .sharing_state import SharingState
+
 
 class CloudBridge:
-    def __init__(self, settings, login_factory=None, manager_factory=None):
+    def __init__(self, settings, login_factory=None, manager_factory=None, mq_factory=None):
         self.settings = settings
         self.path = Path(settings.cloud_session_path or (settings.database_path + ".cloud.json"))
         self.login_factory = login_factory
@@ -25,6 +27,7 @@ class CloudBridge:
         self.auth = None
         self.saved_user_code = None
         self.manager = None
+        self.state = SharingState(self, mq_factory)
         if settings.cloud_enabled and self.path.exists():
             if self.path.is_symlink():
                 raise ValueError("Cloud session file must not be a symlink")
@@ -260,6 +263,7 @@ class CloudBridge:
                 raise HTTPException(
                     503, "Cloud authorization could not be saved securely"
                 ) from None
+            self.state.stop()
             self.manager = None
             self.pending.clear()
             return {"connected": True, "tokens_stored_on_server": True}
@@ -271,10 +275,13 @@ class CloudBridge:
         if self.manager is None:
             _, factory = self._factories()
             bridge = self
+            authorization = self.auth
 
             class TokenListener:
                 def update_token(self, token_info):
                     with bridge.lock:
+                        if bridge.auth is not authorization:
+                            return  # A late callback must not overwrite another account.
                         bridge.auth["token_info"] = dict(token_info)
                         bridge._save()
 
@@ -293,7 +300,7 @@ class CloudBridge:
             manager = self._manager()
             try:
                 if refresh or not manager.device_map:
-                    manager.update_device_cache()
+                    self.state.inventory(manager)
             except Exception:
                 raise HTTPException(
                     502, "Tuya cloud device query failed; reauthenticate if needed"
@@ -301,10 +308,30 @@ class CloudBridge:
             return list(manager.device_map.values())
 
     def device(self, id, refresh=False):
-        matches = [d for d in self.devices(refresh) if d.id == id]
-        if not matches:
-            raise HTTPException(404, "Device is not part of the authorized account")
-        return matches[0]
+        with self.lock:
+            self.devices()
+            device = self._manager().device_map.get(id)
+            if device is None:
+                raise HTTPException(404, "Device is not part of the authorized account")
+            if refresh:
+                return self.device_status(id, True)
+            return device
+
+    def writable_device(self, id):
+        with self.lock:
+            device = self.device(id)
+            try:
+                return self.state.definitions(self._manager(), device)
+            except Exception:
+                raise HTTPException(502, "Tuya device definitions query failed") from None
+
+    def device_status(self, id, refresh=False):
+        with self.lock:
+            return self.state.status(self._manager(), self.device(id), refresh)
+
+    def close(self):
+        with self.lock:
+            self.state.stop()
 
     def send_commands(self, id, commands):
         self.device(id)
@@ -349,6 +376,9 @@ class CloudBridge:
         self.require_enabled()
         with self.lock:
             # Local deletion only. SDK unload() can revoke the shared HA terminal remotely.
+            self.state.stop()
+            if self.auth is not None:
+                self.state.stored("clear")
             self.auth, self.saved_user_code, self.manager, self.pending = None, None, None, {}
             if self.path.exists() and not self.path.is_symlink():
                 self.path.unlink()

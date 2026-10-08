@@ -248,11 +248,7 @@ def cloud_device_status(
     provider: Provider = "sharing",
 ):
     bridge = cloud_bridge(request, provider)
-    device = (
-        bridge.device_status(device_id, refresh)
-        if provider == "developer"
-        else bridge.device(device_id, refresh)
-    )
+    device = bridge.device_status(device_id, refresh)
     response.headers["Cache-Control"] = "no-store"
     return {
         "device_id": device.id,
@@ -267,6 +263,13 @@ def cloud_device_status(
             and value != getattr(device, "local_key", None)
         },
         "device_update_time": getattr(device, "update_time", None),
+        "snapshot_received_at": getattr(device, "snapshot_received_at", None),
+        "event_stream_connected": getattr(device, "event_stream_connected", False),
+        "status_observations": {
+            code: observation
+            for code, observation in getattr(device, "status_observations", {}).items()
+            if code not in {"local_key", "key", "access_token", "refresh_token"}
+        },
         "status_range": safe_status_ranges(device),
     }
 
@@ -276,9 +279,7 @@ def cloud_device_functions(
     device_id: Identifier, request: Request, response: Response, provider: Provider = "sharing"
 ):
     bridge = cloud_bridge(request, provider)
-    device = (
-        bridge.writable_device(device_id) if provider == "developer" else bridge.device(device_id)
-    )
+    device = bridge.writable_device(device_id)
     response.headers["Cache-Control"] = "no-store"
     return {
         "device_id": device.id,
@@ -293,11 +294,7 @@ def cloud_commands(
 ):
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
-        device = (
-            bridge.writable_device(device_id)
-            if provider == "developer"
-            else bridge.device(device_id)
-        )
+        device = bridge.writable_device(device_id)
         validate_cloud_commands(device, body.commands)
         return bridge.send_commands(device_id, [command.model_dump() for command in body.commands])
 

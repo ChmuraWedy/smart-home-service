@@ -600,6 +600,7 @@ def create_app(settings: Settings | None = None, controller=None):
             yield
         finally:
             app.state.poller.stop()
+            app.state.cloud.close()
             engine.dispose()
 
     app = FastAPI(

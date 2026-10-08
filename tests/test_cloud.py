@@ -148,6 +148,17 @@ def test_verified_dp_mapping_metadata_is_private_and_handles_ambiguity(cloud_cli
     assert cloud_client.get(API + "/devices/gateway/functions").json()["functions"][0]["dp_id"] == 20
 
 
+def test_late_token_refresh_cannot_restore_logged_out_session(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    bridge.device("gateway")
+    listener = bridge.manager.listener
+    old_tokens = dict(bridge.auth["token_info"])
+    bridge.logout()
+    listener.update_token(old_tokens)
+    assert bridge.auth is None and not bridge.path.exists()
+
+
 @pytest.mark.parametrize("kind", ["remote", "zigbee_group", "multi_control"])
 def test_device_maps_are_persistent_manual_records_without_cloud_commands(cloud_client, kind):
     login(cloud_client)

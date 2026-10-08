@@ -332,7 +332,7 @@ class DeveloperBridge:
 
     def device_status(self, id, refresh=False):
         with self.lock:
-            device = self.device(id, refresh)
+            device = self.device(id)
             rows = self._request("GET", "/v1.0/iot-03/devices/" + quote(id, safe="") + "/status")
             if not isinstance(rows, list) or any(
                 not isinstance(row, dict)

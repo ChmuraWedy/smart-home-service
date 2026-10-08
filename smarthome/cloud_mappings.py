@@ -130,16 +130,8 @@ def save_mapping(device_id, mapping_id, body, request, provider, session):
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
         scope = scope_for(bridge, provider)
-        source = (
-            bridge.writable_device(device_id)
-            if provider == "developer"
-            else bridge.device(device_id)
-        )
-        target = (
-            bridge.writable_device(body.target_device_id)
-            if provider == "developer"
-            else bridge.device(body.target_device_id)
-        )
+        source = bridge.writable_device(device_id)
+        target = bridge.writable_device(body.target_device_id)
         if device_id == body.target_device_id and body.source_code == body.target_code:
             raise HTTPException(422, "A device parameter cannot map to itself")
         entry = session.get(CloudDeviceMapping, mapping_id) if mapping_id else CloudDeviceMapping()
