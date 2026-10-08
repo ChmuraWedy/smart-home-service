@@ -12,6 +12,8 @@
 .app-nav button[aria-current=page] { color:#a4dfcf; border-color:#77b5a7; background:#203b35; }
 .control-center { padding:24px; }
 .control-filters { display:grid; grid-template-columns:1fr 1fr 1.5fr; gap:16px; margin:24px 0; }
+.device-route { margin:16px 0; }
+.workspace.connections-workspace { display:block; max-width:660px; }
 .device-grid.local-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .group-card { border-color:#527c70; background:#182b2d; }
 .group-card>.reading { margin-top:14px; font-size:14px; }

@@ -17,7 +17,7 @@ const light: LocalDevice = { id: 1, device_id: 'wifi-lamp', name: 'Лампа к
 const child: LocalDevice = { ...light, id: 2, device_id: 'zigbee-lamp', name: 'Лампа Zigbee', aliases: ['child_light'], transport: 'zigbee', parent_id: 9, cid: 'child-node' };
 const thermostat: LocalDevice = { ...light, id: 3, device_id: 'thermostat', name: 'Термостат', aliases: ['heater'], room_id: 2,
   capabilities: { target_temperature: { type: 'number', readable: true, writable: true, minimum: 5, maximum: 35, step: .5, unit: '°C' }, temperature: { type: 'number', readable: true, writable: false, unit: '°C' }, mode: { type: 'integer', readable: true, writable: true, enum: [0, 1] } } };
-const sensor: LocalDevice = { ...child, id: 4, name: 'Датчик', aliases: ['sensor'], capabilities: { humidity: { type: 'number', readable: true, writable: false, unit: '%' }, motion: { type: 'boolean', readable: true, writable: false } } };
+const sensor: LocalDevice = { ...child, id: 4, device_id: 'motion-sensor', name: 'Датчик', aliases: ['sensor'], capabilities: { humidity: { type: 'number', readable: true, writable: false, unit: '%' }, motion: { type: 'boolean', readable: true, writable: false } } };
 const group = { id: 1, name: 'Свет кухни', room_id: 1, device_ids: [1, 2] };
 const cloudDevice = { id: 'cloud-lamp', name: 'Облачная лампа', online: true, has_local_key: false };
 

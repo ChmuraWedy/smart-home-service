@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
-import type { CloudDevice, CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
+import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
 import { loadConnection, saveConnection } from './connection';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { DeveloperForm, REGIONS, UserCodeForm } from './components/CredentialForms';
-import { DeviceList } from './components/DeviceList';
-import { CloudControl } from './components/CloudControl';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 
@@ -13,10 +11,9 @@ type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
 
 export function App() {
-  const [view, setView] = useState<'connections' | 'control'>('connections');
-  const [selectedCloud, setSelectedCloud] = useState<CloudDevice | null>(null);
-  const [localOpen, setLocalOpen] = useState(false);
   const [connection, setConnection] = useState<Connection>(() => loadConnection());
+  const [view, setView] = useState<'connections' | 'control'>(() => connection.token ? 'control' : 'connections');
+  const [controlOpen, setControlOpen] = useState(false);
   const [status, setStatus] = useState<CloudStatus | null>(null);
   const [provider, setProvider] = useState<Provider>('sharing');
   const [notice, setNotice] = useState<Notice>({ text: '' });
@@ -27,10 +24,8 @@ export function App() {
   const [editingDeveloper, setEditingDeveloper] = useState(false);
   const [qr, setQR] = useState<QR | null>(null);
   const [remaining, setRemaining] = useState(0);
-  const [devices, setDevices] = useState<CloudDevice[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const api = useMemo(() => new HomeApi(connection), [connection]);
-  const locked = busy || Boolean(selectedCloud) || localOpen;
+  const locked = busy || controlOpen;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
   const showCodeForm = ready && (!status?.has_saved_user_code || editingCode);
@@ -41,8 +36,8 @@ export function App() {
     const next = { ...connection, token: '' };
     try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
     verified.current = next;
-    setConnection(next); setStatus(null); setQR(null); setDevices([]); setLoaded(false);
-    setSelectedCloud(null); setLocalOpen(false); setView('connections');
+    setConnection(next); setStatus(null); setQR(null);
+    setControlOpen(false); setView('connections');
   }
 
   useEffect(() => {
@@ -77,7 +72,7 @@ export function App() {
   }, [qr]);
 
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
-    if (busyRef.current || selectedCloud || localOpen) return;
+    if (busyRef.current || controlOpen) return;
     busyRef.current = true; setBusy(true); setNotice({ text: '' });
     try { await work(); }
     catch (error) {
@@ -96,7 +91,7 @@ export function App() {
     const nextStatus = await new CloudApi(next).status();
     saveConnection(next);
     verified.current = next;
-    setConnection(next); setStatus(nextStatus); setQR(null); setDevices([]); setLoaded(false);
+    setConnection(next); setStatus(nextStatus); setQR(null);
     setEditingCode(false); setEditingDeveloper(false);
     setNotice({ text: 'Подключение сохранено.' });
   });
@@ -105,7 +100,7 @@ export function App() {
     if (!code.trim()) throw new Error('Введите User Code.');
     const saved = await api.saveCode(code.trim());
     setStatus(current => current ? { ...current, ...saved } : null);
-    setEditingCode(false); setQR(null); setDevices([]); setLoaded(false);
+    setEditingCode(false); setQR(null);
     setNotice({ text: saved.saved_user_code_requires_login ? 'User Code сохранён. Подтвердите QR-вход.' : 'User Code сохранён на сервере.' });
   }, true);
 
@@ -113,7 +108,7 @@ export function App() {
     if (!credentials.access_id || !credentials.access_secret) throw new Error('Введите Access ID и Access Secret.');
     const saved = await api.saveDeveloper(credentials);
     setStatus(current => current ? { ...current, developer: saved } : null);
-    setEditingDeveloper(false); setDevices([]); setLoaded(false);
+    setEditingDeveloper(false);
     setNotice({ text: 'Реквизиты сохранены на сервере. Теперь проверьте подключение.' });
   }, true);
 
@@ -135,20 +130,13 @@ export function App() {
   const confirmQR = () => run(async () => {
     if (!qr) return;
     await api.confirmQR(qr.session);
-    setQR(null); setStatus(await api.status()); setDevices([]); setLoaded(false);
+    setQR(null); setStatus(await api.status());
     setNotice({ text: 'Аккаунт подключён. User Code и токены сохранены на сервере.' });
-  }, true);
-
-  const loadDevices = () => run(async () => {
-    const result = await api.devices(provider);
-    if (!Array.isArray(result)) throw new Error('Сервис вернул неожиданный список устройств.');
-    setDevices(result); setLoaded(true);
-    setNotice({ text: `Список обновлён. Устройств: ${result.length}.` });
   }, true);
 
   function chooseProvider(value: Provider) {
     if (busyRef.current) return;
-    setProvider(value); setQR(null); setDevices([]); setLoaded(false); setNotice({ text: '' });
+    setProvider(value); setQR(null); setNotice({ text: '' });
   }
 
   const regionName = REGIONS.find(item => item.value === developer.region)?.label;
@@ -156,11 +144,11 @@ export function App() {
     <header className="app-header"><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span>Ваш дом под управлением</span></div></div>
       <span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? 'API подключён' : 'API не подключён'}</span></header>
     <main>
+      <input id="access-token" type="hidden" value={connection.token} readOnly />
       <nav className="app-nav" aria-label="Раздел приложения"><button className="secondary" aria-current={view === 'control' ? 'page' : undefined} disabled={locked} onClick={() => { setView('control'); setNotice({ text: '' }); }}>Управление</button><button className="secondary" aria-current={view === 'connections' ? 'page' : undefined} disabled={locked} onClick={() => { setView('connections'); setNotice({ text: '' }); }}>Подключения</button></nav>
       {view === 'connections' ? <>
       <div className="page-heading"><p className="eyebrow">Подключения</p><h1>{ready && accountConnected ? 'Tuya подключена' : 'Подключить Tuya'}</h1><p className="muted">{ready && accountConnected ? 'Сохранённое подключение готово к управлению устройствами через интернет.' : 'Свяжите аккаунт и получите доступ к устройствам. Облачное подключение требует интернета.'}</p></div>
-      <input id="access-token" type="hidden" value={connection.token} readOnly />
-      <div className="workspace">
+      <div className="workspace connections-workspace">
         <section className="card setup" aria-label="Подключение Tuya">
           <div className="method-tabs" role="group" aria-label="Способ подключения">
             <button aria-pressed={provider === 'sharing'} disabled={locked} onClick={() => chooseProvider('sharing')}>Smart Life / QR</button>
@@ -190,12 +178,10 @@ export function App() {
           </div>}
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>User Code, реквизиты Tuya, токены и локальные ключи остаются на Python-сервисе.</p></div>
         </section>
-        <DeviceList key={provider} devices={devices} loaded={loaded} ready={ready && accountConnected} busy={locked} onLoad={() => void loadDevices()} onControl={setSelectedCloud} />
       </div>
-      </> : <><div className="page-heading"><p className="eyebrow">Ваш дом</p><h1>Управление устройствами</h1><p className="muted">Выберите комнату, откройте устройство или группу и настройте доступные функции.</p></div><ControlCenter api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} onLock={setLocalOpen} /></>}
+      </> : <><div className="page-heading"><p className="eyebrow">Ваш дом</p><h1>Управление устройствами</h1><p className="muted">Выберите комнату, откройте устройство или группу и настройте доступные функции.</p></div><ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => setView('connections')} /></>}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />Подождите…</> : notice.text}</div>
-      <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
-      {selectedCloud && <CloudControl key={provider + selectedCloud.id} api={api} device={selectedCloud} devices={devices} provider={provider} onClose={() => setSelectedCloud(null)} onAuthError={invalidateConnection} />}
+      {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>
     <footer><span>Smart Home · Tuya</span></footer>
   </div>;

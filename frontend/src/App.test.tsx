@@ -40,6 +40,7 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
       status.connected = true; status.saved_user_code_requires_login = false;
       return json({ connected: true });
     }
+    if (['/api/v1/buildings','/api/v1/rooms','/api/v1/groups','/api/v1/devices'].includes(path)) return json([]);
     if (path.endsWith('/devices')) return json([
       { id: 'device-1', name: 'Лампа кухни', category: 'dj', online: true, sub: false, has_local_key: true },
       { id: 'device-2', name: '<script>alert(1)</script>', online: false, sub: true, has_local_key: false },
@@ -49,20 +50,36 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
   return { calls, status };
 }
 
-async function restored() {
+async function restored(connections = true) {
   stored(); const backend = fakeApi(); render(<App />);
   await screen.findByText('API подключён');
+  if (connections) await userEvent.setup().click(screen.getByRole('button', { name: 'Подключения' }));
   return backend;
 }
 
 describe('cloud UI journeys', () => {
+  it('opens the common device list after restoring access and uses Connections only for account settings', async () => {
+    const backend = await restored(false); const user = userEvent.setup();
+    expect(await screen.findByRole('heading', { name: 'Лампа кухни' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Управление' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByText('Локальное управление')).toBeNull();
+    expect(screen.queryByText(/Облачные устройства доступны на вкладке/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Получить QR-код' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Подключения' }));
+    expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Лампа кухни' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Показать устройства' })).toBeNull();
+    expect(backend.calls.every(call => call.method === 'GET')).toBe(true);
+  });
+
   it('restores access, hides saved credentials, and allows an empty change followed by cancellation', async () => {
     const backend = await restored(); const user = userEvent.setup();
     expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
     expect(screen.getByText(/Авторизация сохранена на сервере/)).toBeInTheDocument();
-    expect(screen.getByText('Устройства ещё не загружены')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Устройства и группы/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Подключите Tuya-аккаунт')).not.toBeInTheDocument();
-    expect(backend.calls).toEqual([{ path: '/api/v1/cloud/status', method: 'GET', body: undefined, token: TOKEN }]);
+    expect(backend.calls.filter(call => call.path === '/api/v1/cloud/status')).toEqual([{ path: '/api/v1/cloud/status', method: 'GET', body: undefined, token: TOKEN }]);
+    expect(backend.calls.every(call => call.method === 'GET')).toBe(true);
     expect(screen.queryByLabelText('User Code')).not.toBeInTheDocument();
     expect(document.querySelector('#access-token')).toHaveAttribute('type', 'hidden');
     await user.click(within(screen.getByRole('region', { name: 'Подключение Tuya' })).getByRole('link', { name: 'Хочу изменить' }));
@@ -116,19 +133,21 @@ describe('cloud UI journeys', () => {
 
   it('requires a new key when changing servers and never sends the saved one to the new host', async () => {
     const backend = await restored(); const user = userEvent.setup();
+    const requests = backend.calls.length;
     await user.click(screen.getByText('Настройки подключения'));
     await user.clear(screen.getByLabelText('Адрес API'));
     await user.type(screen.getByLabelText('Адрес API'), 'http://other-api.test:8000');
     expect(screen.getByLabelText('Ключ доступа к сервису')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
     expect(screen.getByLabelText('Ключ доступа к сервису')).toBeInvalid();
-    expect(backend.calls).toHaveLength(1);
+    expect(backend.calls).toHaveLength(requests);
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).baseUrl).toBe(BASE);
   });
 
   it('saves User Code separately without starting login or retaining the code in browser storage', async () => {
     stored(); const backend = fakeApi({ connected: false, has_saved_user_code: false });
     render(<App />); await screen.findByText('API подключён'); const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Подключения' }));
     expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
     await user.type(screen.getByLabelText('User Code'), 'private-code');
     await user.click(screen.getByRole('button', { name: 'Сохранить User Code' }));
@@ -142,8 +161,9 @@ describe('cloud UI journeys', () => {
   it('creates a QR on the API host, confirms login, and releases the image URL', async () => {
     stored(); const backend = fakeApi({ connected: false }); render(<App />);
     await screen.findByText('API подключён'); const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Подключения' }));
     expect(screen.getByRole('heading', { name: 'Подключить Tuya' })).toBeInTheDocument();
-    expect(screen.getByText('Подключите Tuya-аккаунт')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Управлять' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Получить QR-код' }));
     await screen.findByAltText('QR-код для входа в Tuya');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]) === BASE + '/api/v1/cloud/login/qr-session/qr.svg')).toBe(true);
@@ -152,13 +172,15 @@ describe('cloud UI journeys', () => {
     await screen.findByText('Аккаунт подключён. User Code и токены сохранены на сервере.');
     expect(screen.queryByAltText('QR-код для входа в Tuya')).not.toBeInTheDocument();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:qr-test');
-    expect(screen.getByRole('button', { name: 'Показать устройства' })).toBeEnabled();
     expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Управление' }));
+    expect(await screen.findByRole('heading', { name: 'Лампа кухни' })).toBeInTheDocument();
   });
 
   it('expires the QR, removes the confirmation action, and allows a new login', async () => {
     vi.useFakeTimers(); stored(); fakeApi({ connected: false });
     await act(async () => { render(<App />); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Подключения' })); });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Получить QR-код' })); });
     expect(screen.getByAltText('QR-код для входа в Tuya')).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
@@ -170,6 +192,7 @@ describe('cloud UI journeys', () => {
   it('saves Developer credentials independently and connects only on the separate action', async () => {
     stored(); const backend = fakeApi({ developer: { configured: false, connected: false } });
     render(<App />); await screen.findByText('API подключён'); const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Подключения' }));
     await user.click(screen.getByRole('button', { name: 'Access ID / Secret' }));
     await user.type(screen.getByLabelText('Access ID'), 'project-id');
     await user.type(screen.getByLabelText('Access Secret'), 'private-secret');
@@ -182,17 +205,17 @@ describe('cloud UI journeys', () => {
     expect(backend.calls.find(call => call.method === 'PUT')?.body).toEqual({ access_id: 'project-id', access_secret: 'private-secret', region: 'us-e', sample_device_id: null });
     await user.click(screen.getByRole('button', { name: 'Проверить и подключить' }));
     await screen.findByText('Tuya Developer подключён. Найдено устройств: 2.');
-    await user.click(screen.getByRole('button', { name: 'Показать устройства' }));
+    await user.click(screen.getByRole('button', { name: 'Управление' }));
     await screen.findByText('Лампа кухни');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]).endsWith('provider=developer'))).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Подключения' }));
     await user.click(screen.getByRole('button', { name: 'Smart Life / QR' }));
     expect(screen.getByText('User Code сохранён на сервере.')).toBeInTheDocument();
     expect(screen.queryByText('Лампа кухни')).not.toBeInTheDocument();
   });
 
   it('searches names and IDs and renders device names as text', async () => {
-    await restored(); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Показать устройства' }));
+    await restored(false); const user = userEvent.setup();
     await screen.findByText('Лампа кухни');
     expect(screen.getByText('<script>alert(1)</script>')).toBeInTheDocument();
     expect(document.querySelector('script')).toBeNull();
@@ -207,9 +230,11 @@ describe('cloud UI journeys', () => {
 
   it('handles a disabled cloud adapter while keeping connection settings available', async () => {
     stored(); fakeApi({ enabled: false }); render(<App />);
+    await screen.findByText('API подключён');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Подключения' }));
     await screen.findByText('Облачный режим выключен на сервере.');
     expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Показать устройства' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Показать устройства' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Адрес API')).toHaveValue(BASE);
   });
 
