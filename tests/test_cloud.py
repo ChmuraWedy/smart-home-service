@@ -131,6 +131,96 @@ def login(client):
     return id
 
 
+def test_verified_dp_mapping_metadata_is_private_and_handles_ambiguity(cloud_client):
+    login(cloud_client)
+    device = cloud_client.app.state.cloud.device("gateway")
+    device.local_strategy = {
+        20: {"status_code": "switch", "config_item": {"secret": KEY}},
+        "21": {"status_code": "switch"},
+        "bad": {"status_code": "switch"},
+        999: {"status_code": "switch"},
+    }
+    response = cloud_client.get(API + "/devices/gateway/functions")
+    assert response.json()["functions"][0]["dp_ids"] == [20, 21]
+    assert "dp_id" not in response.json()["functions"][0]
+    assert KEY not in response.text and "config_item" not in response.text
+    del device.local_strategy["21"]
+    assert cloud_client.get(API + "/devices/gateway/functions").json()["functions"][0]["dp_id"] == 20
+
+
+@pytest.mark.parametrize("kind", ["remote", "zigbee_group", "multi_control"])
+def test_device_maps_are_persistent_manual_records_without_cloud_commands(cloud_client, kind):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    source = bridge.device("child")
+    source.status_range = {"press": SimpleNamespace(code="press", type="Enum", values='{"range":["single","double"]}')}
+    source.local_strategy = {1: {"status_code": "press"}}
+    target = bridge.device("gateway")
+    target.local_strategy = {20: {"status_code": "switch"}}
+    path = API + "/devices/child/mappings"
+    body = {"kind": kind, "source_code": "press", "target_device_id": "gateway", "target_code": "switch"}
+    response = cloud_client.post(path, json=body)
+    assert response.status_code == 201, response.text
+    entry = response.json()
+    assert entry["source_device_id"] == "child" and entry["source_dp_id"] == 1 and entry["target_dp_id"] == 20
+    assert entry["origin"] == "manual" and entry["applied_to_tuya"] is False
+    assert KEY not in response.text and SECRET not in response.text
+    listing = cloud_client.get(path)
+    assert listing.json()["mappings"] == [entry] and listing.json()["tuya_bindings_available"] is False
+    assert cloud_client.get(API + "/devices/gateway/mappings").json()["mappings"] == [entry]
+    assert cloud_client.post(path, json=body).status_code == 409
+    assert cloud_client.put(path + f'/{entry["id"]}', json={**body, "kind":"multi_control"}).status_code == 200
+    assert cloud_client.delete(path + f'/{entry["id"]}').status_code == 204
+    assert cloud_client.get(path).json()["mappings"] == []
+    assert bridge.manager.customer_api.calls == []
+
+
+def test_maps_reject_unavailable_devices_codes_wrong_dp_and_cross_account_access(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    gateway = bridge.device("gateway")
+    gateway.local_strategy = {20: {"status_code":"switch"}}
+    child = bridge.device("child")
+    child.status_range = {"motion": SimpleNamespace(code="motion", type="Boolean", values="{}")}
+    path = API + "/devices/child/mappings"
+    body = {"kind":"remote", "source_code":"motion", "target_device_id":"gateway", "target_code":"switch"}
+    for changes in [{"source_code":"missing"}, {"target_code":"local_key"}, {"target_dp_id":21}, {"source_dp_id":True}]:
+        assert cloud_client.post(path,json={**body,**changes}).status_code == 422
+    assert cloud_client.post(path,json={**body,"target_device_id":"missing"}).status_code == 404
+    entry = cloud_client.post(path,json=body).json()
+    assert entry["source_dp_id"] is None  # Unknown is retained, not guessed from order.
+    bridge.auth["token_info"]["uid"] = "another-account"
+    assert cloud_client.get(path).json()["mappings"] == []
+    assert cloud_client.delete(path + f'/{entry["id"]}').status_code == 404
+    cloud_client.headers.clear()
+    assert cloud_client.get(path).status_code == 401
+    assert bridge.manager.customer_api.calls == []
+
+
+def test_raw_lighting_commands_validate_base64_and_advertised_byte_limit(cloud_client):
+    login(cloud_client)
+    device = cloud_client.app.state.cloud.device("gateway")
+    device.function["power_memory"] = SimpleNamespace(code="power_memory",type="Raw",values='{"maxlen":"12"}')
+    path = API + "/devices/gateway/commands"
+    for value in [True, {}, "not base64!", "AAAAAAAAAAAAAAAAAA=="]:
+        assert cloud_client.post(path,json={"commands":[{"code":"power_memory","value":value}]}).status_code == 422
+    value = "AAEAAAAAAAAAAAAA"  # Documented v0: last state, five zero uint16 fields.
+    assert cloud_client.post(path,json={"commands":[{"code":"power_memory","value":value}]}).status_code == 200
+    assert len(cloud_client.app.state.cloud.manager.customer_api.calls) == 1
+
+
+def test_json_light_commands_respect_device_specific_effect_ranges(cloud_client):
+    login(cloud_client)
+    device = cloud_client.app.state.cloud.device("gateway")
+    schema = {"h":{"min":0,"max":360,"step":1},"s":{"min":0,"max":255,"step":1},"v":{"min":0,"max":255,"step":1}}
+    device.function["control_data"] = SimpleNamespace(code="control_data",type="Json",values=json.dumps(schema))
+    path = API + "/devices/gateway/commands"
+    for value in [{"h":120,"s":1000,"v":1000},{"h":True,"s":255,"v":255},{"h":120,"s":255},"invalid"]:
+        assert cloud_client.post(path,json={"commands":[{"code":"control_data","value":value}]}).status_code == 422
+    assert cloud_client.app.state.cloud.manager.customer_api.calls == []
+    assert cloud_client.post(path,json={"commands":[{"code":"control_data","value":{"h":120,"s":255,"v":255}}]}).status_code == 200
+
+
 def test_cloud_sensor_ranges_are_readonly_private_and_preserve_scaling(cloud_client):
     login(cloud_client)
     device = cloud_client.app.state.cloud.device("child")

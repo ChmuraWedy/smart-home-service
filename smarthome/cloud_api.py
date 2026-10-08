@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 from ipaddress import ip_address, ip_network
 from typing import Annotated, Literal
@@ -67,12 +69,30 @@ class CloudCommands(Schema):
     commands: list[CloudCommand] = Field(min_length=1, max_length=16)
 
 
+def safe_spec(device, spec):
+    result = {key: getattr(spec, key, None) for key in ("code", "type", "values")}
+    ids = set()
+    strategy = getattr(device, "local_strategy", None)
+    for dp, row in (strategy.items() if isinstance(strategy, dict) else ()):
+        if isinstance(row, dict) and row.get("status_code") == result["code"]:
+            if str(dp).isascii() and str(dp).isdecimal() and 1 <= int(dp) <= 255:
+                ids.add(int(dp))
+    dp = getattr(spec, "dp_id", None)
+    if type(dp) is int and 1 <= dp <= 255:
+        ids.add(dp)
+    if ids:
+        result["dp_ids"] = sorted(ids)
+        if len(ids) == 1:
+            result["dp_id"] = next(iter(ids))
+    return result
+
+
 def safe_device(device):
     fields = ("id", "name", "category", "product_id", "online", "sub", "node_id", "support_local")
     result = {name: getattr(device, name, None) for name in fields}
     result["has_local_key"] = bool(getattr(device, "local_key", None))
     result["functions"] = [
-        {key: getattr(f, key, None) for key in ("code", "type", "values")}
+        safe_spec(device, f)
         for f in getattr(device, "function", {}).values()
     ]
     return result
@@ -81,7 +101,7 @@ def safe_device(device):
 def safe_status_ranges(device):
     # Read-only sensor ranges are separate from the writable function list.
     return [
-        {key: getattr(spec, key, None) for key in ("code", "type", "values")}
+        safe_spec(device, spec)
         for spec in getattr(device, "status_range", {}).values()
         if getattr(spec, "code", None) not in {"local_key", "key", "access_token", "refresh_token"}
     ]
@@ -294,15 +314,34 @@ def validate_cloud_commands(device, commands):
             limits = json.loads(function.values or "{}")
         except (ValueError, TypeError):
             limits = {}
+        if not isinstance(limits, dict):
+            limits = {}
         valid = {
             "Boolean": type(command.value) is bool,
             "Integer": type(command.value) is int,
             "Enum": isinstance(command.value, str),
             "Json": isinstance(command.value, (dict, str)),
             "String": isinstance(command.value, str),
+            "Raw": isinstance(command.value, str),
         }.get(function.type, False)
         if not valid:
             raise HTTPException(422, "Cloud command value does not match its function type")
+        if function.type == "Raw":
+            try:
+                decoded = base64.b64decode(command.value, validate=True)
+                maximum = int(limits.get("maxlen", 16384))
+                if maximum < 0 or len(decoded) > min(maximum, 16384):
+                    raise ValueError
+            except (ValueError, TypeError, binascii.Error):
+                raise HTTPException(422, "Raw command requires valid base64 within its byte limit") from None
+        if function.type == "Json" and limits and command.code in {
+            "music_data", "control_data", "colour_data", "colour_data_v2", "scene_data_v2"
+        }:
+            try:
+                value = json.loads(command.value) if isinstance(command.value, str) else command.value
+            except ValueError:
+                raise HTTPException(422, "Lighting command requires a JSON object") from None
+            validate_lighting_object(value, limits)
         if function.type == "Enum" and command.value not in limits.get("range", []):
             raise HTTPException(422, "Cloud command enum value is not allowed")
         if function.type == "Integer":
@@ -312,6 +351,30 @@ def validate_cloud_commands(device, commands):
                 raise HTTPException(422, "Cloud command number is outside its range")
             if limits.get("step") and (command.value - limits.get("min", 0)) % limits["step"]:
                 raise HTTPException(422, "Cloud command number does not match its step")
+
+
+def validate_lighting_object(value, schema):
+    if not isinstance(value, dict) or set(value) != set(schema):
+        raise HTTPException(422, "Lighting command fields do not match the device schema")
+    for key, rule in schema.items():
+        if not isinstance(rule, dict):
+            raise HTTPException(422, "Invalid lighting schema")
+        current = value[key]
+        if "range" in rule:
+            if not isinstance(current, str) or current not in rule["range"]:
+                raise HTTPException(422, "Lighting command enum value is not allowed")
+        elif "min" in rule and "max" in rule:
+            if type(current) is not int or not rule["min"] <= current <= rule["max"]:
+                raise HTTPException(422, "Lighting command value is outside its range")
+            if rule.get("step") and (current - rule["min"]) % rule["step"]:
+                raise HTTPException(422, "Lighting command value does not match its step")
+        elif key == "scene_units":
+            if not isinstance(current, list) or not 1 <= len(current) <= 32:
+                raise HTTPException(422, "Lighting scene requires 1..32 steps")
+            for unit in current:
+                validate_lighting_object(unit, rule)
+        else:
+            validate_lighting_object(current, rule)
 
 
 @router.get("/scenes")

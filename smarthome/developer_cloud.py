@@ -360,6 +360,7 @@ class DeveloperBridge:
                 "enum": "Enum",
                 "string": "String",
                 "json": "Json",
+                "raw": "Raw",
             }
             for row in rows:
                 if (
@@ -373,6 +374,7 @@ class DeveloperBridge:
                     code=row["code"],
                     type=types.get(row["type"], row["type"]),
                     values=json.dumps(values) if isinstance(values, dict) else values,
+                    dp_id=row.get("dp_id", row.get("dpId")),
                 )
             device.function = functions
             return device

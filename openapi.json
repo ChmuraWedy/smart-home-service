@@ -5106,6 +5106,285 @@
         }
       }
     },
+    "/api/v1/cloud/devices/{device_id}/mappings": {
+      "get": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "List Mappings",
+        "operationId": "list_mappings_api_v1_cloud_devices__device_id__mappings_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Create Mapping",
+        "operationId": "create_mapping_api_v1_cloud_devices__device_id__mappings_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cloud/devices/{device_id}/mappings/{mapping_id}": {
+      "put": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Update Mapping",
+        "operationId": "update_mapping_api_v1_cloud_devices__device_id__mappings__mapping_id__put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Mapping Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Delete Mapping",
+        "operationId": "delete_mapping_api_v1_cloud_devices__device_id__mappings__mapping_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "title": "Mapping Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -7084,6 +7363,71 @@
         "title": "ImportRequest"
       },
       "JsonValue": {},
+      "MappingInput": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "remote",
+              "zigbee_group",
+              "multi_control"
+            ],
+            "title": "Kind"
+          },
+          "source_code": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
+            "title": "Source Code"
+          },
+          "source_dp_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 255.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dp Id"
+          },
+          "target_device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Target Device Id"
+          },
+          "target_code": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]{0,127}$",
+            "title": "Target Code"
+          },
+          "target_dp_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 255.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Dp Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "source_code",
+          "target_device_id",
+          "target_code"
+        ],
+        "title": "MappingInput"
+      },
       "QRLogin": {
         "properties": {
           "user_code": {

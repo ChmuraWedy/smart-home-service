@@ -622,7 +622,7 @@ def create_app(settings: Settings | None = None, controller=None):
     from .display_api import router as display_router
 
     app.include_router(display_router)
-    from .cloud_api import router as cloud_router
+    from .cloud_mappings import router as cloud_router
 
     app.include_router(cloud_router)
 
