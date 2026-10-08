@@ -7,6 +7,18 @@ const definitions = (functions: CloudFunction[]): CloudFunctions => ({ device_id
 const mode = fn('work_mode', 'Enum', { range: ['white', 'colour'] });
 
 describe('metadata-driven controls', () => {
+  it.each(['music_data', 'control_data'])('does not turn %s command echoes into observed state', code => {
+    for (const type of ['Json', 'String']) {
+      const spec = cloudSpec(fn(code, type), true);
+      expect(spec.readable).toBe(false);
+      expect(spec.writable).toBe(true);
+      for (const raw of ['', '{"h":120,"s":255,"v":255}', { h: 120, s: 255, v: 255 }]) {
+        expect(cloudReading(spec, raw)).toEqual({ value: null, known: false, stale: true });
+      }
+    }
+    // The same shape under a custom code has no documented send-only semantics.
+    expect(cloudSpec(fn('custom_effect', 'Json'), true).readable).toBe(true);
+  });
   it.each(['colour_data', 'colour_data_v2'])('encodes %s from normalized HSV and batches the actual supported mode', code => {
     const spec = cloudSpec(fn(code, 'Json'), true);
     const maximum = code === 'colour_data' ? 255 : 1000;
@@ -45,7 +57,7 @@ describe('metadata-driven controls', () => {
     expect(() => cloudCommands(specs[0], 20, definitions([]))).toThrow('чтения');
   });
   it('disables malformed numeric/enum/raw metadata instead of guessing limits', () => {
-    for (const spec of [cloudSpec(fn('bright', 'Integer', { min: 20 }), true), cloudSpec(fn('mode', 'Enum', { range: 'white' }), true), cloudSpec(fn('raw', 'Raw'), true)]) expect(spec.writable).toBe(false);
+    for (const spec of [cloudSpec(fn('bright', 'Integer', { min: 20 }), true), cloudSpec(fn('mode', 'Enum', { range: 'white' }), true), cloudSpec(fn('raw', 'Raw', {maxlen:-1}), true), cloudSpec(fn('unknown', 'Custom'), true)]) expect(spec.writable).toBe(false);
     expect(cloudReading(cloudSpec(fn('switch', 'Boolean'), true), 'false').known).toBe(false);
     expect(cloudReading(cloudSpec(fn('temp', 'Integer'), false), false).known).toBe(false);
   });

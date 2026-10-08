@@ -31,7 +31,10 @@ export type DeveloperCredentials = {
 };
 export type QRLogin = { session_id: string; qr_url: string; expires_in: number };
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null };
+export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null; dp_id?: number; dp_ids?: number[] };
+export type MappingInput = { kind: 'remote' | 'zigbee_group' | 'multi_control'; source_code: string; source_dp_id: number | null; target_device_id: string; target_code: string; target_dp_id: number | null };
+export type DeviceMapping = MappingInput & { id: number; source_device_id: string; origin: 'manual'; applied_to_tuya: false };
+export type MappingList = { device_id: string; provider: Provider; tuya_bindings_available: false; mappings: DeviceMapping[] };
 export type CloudFunctions = { device_id: string; functions: CloudFunction[]; status_range?: CloudFunction[] };
 export type CloudSnapshot = {
   device_id: string; online: boolean; source: string;
@@ -127,6 +130,15 @@ export class CloudApi {
   }
   sendDeviceCommands(id: string, provider: Provider, commands: { code: string; value: JsonValue }[]) {
     return this.json<CloudCommandResult>('/devices/' + encodeURIComponent(id) + '/commands?provider=' + provider, 'POST', { commands });
+  }
+  deviceMappings(id: string, provider: Provider, signal?: AbortSignal) {
+    return this.json<MappingList>('/devices/' + encodeURIComponent(id) + '/mappings?provider=' + provider, 'GET', undefined, signal);
+  }
+  saveDeviceMapping(id: string, provider: Provider, body: MappingInput, mappingId?: number) {
+    return this.json<DeviceMapping>('/devices/' + encodeURIComponent(id) + '/mappings' + (mappingId ? '/' + mappingId : '') + '?provider=' + provider, mappingId ? 'PUT' : 'POST', body);
+  }
+  async deleteDeviceMapping(id: string, provider: Provider, mappingId: number) {
+    await this.response('/api/v1/cloud/devices/' + encodeURIComponent(id) + '/mappings/' + mappingId + '?provider=' + provider, 'DELETE');
   }
 
   async qrImage(login: QRLogin): Promise<Blob> {

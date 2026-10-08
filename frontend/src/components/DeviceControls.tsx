@@ -5,6 +5,8 @@ import type { JsonValue } from '../api';
 import { displayReading, hexToHsv, hsvToHex, isStale, motionState, optionLabel, sameValue, validateControlValue } from '../controls';
 import type { ControlSpec, HSV } from '../controls';
 import type { Reading } from '../home-api';
+import { defaultObject } from '../lighting';
+import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFields';
 
 export type ControlNotice = { text: string; error?: boolean };
 export type Receipt = ControlNotice;
@@ -121,7 +123,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
         if (spec.kind === 'number') { if (!draft.trim()) throw new Error('Введите значение.'); parsed = Number(draft); }
         else if (spec.kind === 'enum') parsed = spec.choices?.[Number(draft)] ?? null;
         else if (spec.kind === 'color') parsed = color;
-        else if (spec.kind === 'json') { try { parsed = JSON.parse(draft); } catch { throw new Error('Введите корректный JSON-объект.'); } }
+      else if (spec.kind === 'json') { try { parsed = JSON.parse(draft); } catch { throw new Error('Введите корректный JSON-объект.'); } }
         else parsed = draft;
       }
       validateControlValue(spec, parsed!);
@@ -129,7 +131,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
     } catch (failure) { setError(errorText(failure)); }
   }
   return <section className={'capability' + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-heading"><h3>{spec.label}</h3>{!spec.writable && <span className="read-only">Только чтение</span>}</div>
+    <div className="capability-heading"><h3>{spec.label}</h3>{!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}</div>
     {spec.readable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {reading?.observed_at && <p className="help">Показание: {new Date(reading.observed_at).toLocaleString('ru-RU')}</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}
@@ -137,7 +139,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
       <button disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === true)} onClick={() => void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === false)} onClick={() => void send(false)}>Выключить</button>
-    </div> : <form onSubmit={event => { event.preventDefault(); if (!disabled && dirty) void send(); }}>
+    </div> : <form onSubmit={event => { event.preventDefault(); if (!disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
       {spec.kind === 'number' && <>
         {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + ' — ползунок'} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
         <label>{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}<input type="number" value={draft} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Выберите значение" /></label>
@@ -149,8 +151,14 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
         {(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<span className="color-value">{axis === 'h' ? color.h + '°' : color[axis] / 10 + '%'}</span><input type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}
       </div>}
       {spec.kind === 'text' && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
-      {spec.kind === 'json' && <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>}
-      <button className="compact apply-control" disabled={disabled || !dirty || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">Применить</button>
+      {spec.kind === 'json' && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
+      {spec.kind === 'raw' && <>
+        {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
+        <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
+        <label>Данные производителя (base64)<textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} /></label>
+        <p className="help">Размер после декодирования: до {spec.maximumBytes} байт. Изменение отправляется только кнопкой «Применить».</p>
+      </>}
+      <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">Применить</button>
     </form>)}
     {error && <p className="field-error" role="alert">{error}</p>}
   </section>;

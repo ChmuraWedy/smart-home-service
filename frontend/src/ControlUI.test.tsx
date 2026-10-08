@@ -5,6 +5,7 @@ import { CloudApi } from './api';
 import { HomeApi } from './home-api';
 import type { Capability, DeviceState, LocalDevice } from './home-api';
 import { CloudControl } from './components/CloudControl';
+import { DeviceMappings } from './components/DeviceMappings';
 import { ControlCenter } from './components/ControlCenter';
 import { LocalControl, GroupControl } from './components/LocalControls';
 
@@ -71,6 +72,69 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
+  it('stages a typed music command using the actual 255 range and sends only after Apply', async () => {
+    const schema={change_mode:{range:['direct','gradient']},bright:{min:0,max:1000},temperature:{min:0,max:1000},h:{min:0,max:360},s:{min:0,max:255},v:{min:0,max:255}};
+    const functions=[{code:'music_data',type:'Json',values:schema},{code:'work_mode',type:'Enum',values:{range:['white','music']}}];
+    const writes:unknown[]=[];
+    vi.mocked(fetch).mockImplementation(async(input,init) => {
+      if(init?.method==='POST') {writes.push(JSON.parse(String(init.body)));return json({acknowledged:true});}
+      if(String(input).includes('/functions')) return json({device_id:cloudDevice.id,functions});
+      return json({device_id:cloudDevice.id,online:true,source:'cloud',status:{music_data:'',work_mode:'white'}});
+    });
+    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const user=userEvent.setup();
+    await user.click(await screen.findByText('Эффекты и дополнительные параметры'));
+    const music=screen.getByRole('region',{name:'Светомузыка'});
+    expect(within(music).queryByRole('textbox')).toBeNull();
+    await user.selectOptions(within(music).getByLabelText('music_data.change_mode'),'gradient');
+    fireEvent.change(within(music).getByLabelText('Выбор цвета'),{target:{value:'#00ff00'}});
+    expect(within(music).getByLabelText('music_data.s')).toHaveValue(255);
+    expect(writes).toHaveLength(0);
+    await user.click(within(music).getByRole('button',{name:'Применить'}));
+    await screen.findByText(/Команда принята.*Статус запрошен заново/);
+    expect(writes).toEqual([{commands:[{code:'work_mode',value:'music'},{code:'music_data',value:{change_mode:'gradient',bright:0,temperature:0,h:120,s:255,v:255}}]}]);
+    expect(music.querySelector('.reading')).toBeNull();
+  });
+  it('separates lighting payloads from everyday controls and sends remote_switch only as a lamp flag', async () => {
+    const functions = [
+      { code: 'switch_led', type: 'Boolean', values: '{}' },
+      { code: 'music_data', type: 'Json', values: '{}' },
+      { code: 'control_data', type: 'Json', values: '{}' },
+      { code: 'remote_switch', type: 'Boolean', values: '{}' },
+      { code: 'power_memory', type: 'Raw', values: '{}' },
+    ];
+    const writes: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      if (init?.method === 'POST') { writes.push(JSON.parse(String(init.body))); return json({ acknowledged: true }); }
+      if (url.pathname.endsWith('/functions')) return json({ device_id: cloudDevice.id, functions, status_range: functions });
+      return json({ device_id: cloudDevice.id, online: true, source: 'cloud', status: { switch_led: true, music_data: '', control_data: '', remote_switch: true, power_memory: 'AAEAAAAAAAAAAAAA' } });
+    });
+    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const power = await screen.findByRole('region', { name: 'Питание' });
+    expect(power.closest('details')).toBeNull();
+    const summary = screen.getByText('Эффекты и дополнительные параметры');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
+    expect(writes).toHaveLength(0);
+    const user = userEvent.setup(); await user.click(summary);
+    expect(summary.closest('details')).toHaveAttribute('open');
+    for (const name of ['Светомузыка', 'Переход света']) {
+      const command = screen.getByRole('region', { name });
+      expect(command.querySelector('.reading')).toBeNull();
+      expect(within(command).getByText('Команда')).toBeInTheDocument();
+      expect(within(command).getByRole('textbox')).toHaveValue('');
+      expect(within(command).getByRole('button', { name: 'Применить' })).toBeDisabled();
+    }
+    const remote = screen.getByRole('region', { name: 'Параметр пульта' });
+    expect(remote.closest('details')).toBe(summary.closest('details'));
+    expect(within(remote).getByText(/Связанные устройства добавляются в Smart Life/)).toBeInTheDocument();
+    expect(within(remote).queryByRole('combobox')).toBeNull();
+    expect(writes).toHaveLength(0);
+    await user.click(within(remote).getByRole('button', { name: 'Выключить' }));
+    await screen.findByText(/Команда принята.*Статус запрошен заново/);
+    expect(writes).toEqual([{ commands: [{ code: 'remote_switch', value: false }] }]);
+    expect(within(remote).getByText('Да')).toBeInTheDocument(); // Cloud echo remains separate from ACK.
+  });
   it('shows a gateway PIR sensor with no writable functions and refreshes its motion without sending commands', async () => {
     const device = { id: 'cloud-motion-sensor', name: 'Датчик ванной', category: 'pir', sub: true, online: true, has_local_key: true };
     const ranges = [{ code: 'pir', type: 'Enum', values: '{"range":["pir","none"]}' },
@@ -156,6 +220,46 @@ describe('cloud device control', () => {
     expect(close).not.toHaveBeenCalled();
     await act(async () => { server.resolve(); });
     expect(screen.getByRole('button', { name: 'Закрыть' })).toBeEnabled();
+  });
+});
+
+describe('manual device maps', () => {
+  it('shows unknown Smart Life bindings, saves explicit device/code/DP references, and makes no control request', async () => {
+    const target={...cloudDevice,id:'target-switch',name:'Выключатель кухни'};
+    const sourceSpec={code:'switch_led',type:'Boolean',values:'{}',dp_id:20,dp_ids:[20]};
+    const targetSpec={code:'switch_2',type:'Boolean',values:'{}',dp_id:2,dp_ids:[2]};
+    const calls:{path:string;method:string;body?:unknown}[]=[];
+    vi.mocked(fetch).mockImplementation(async(input,init) => {
+      const url=new URL(String(input)),method=init?.method || 'GET',body=init?.body?JSON.parse(String(init.body)):undefined;
+      calls.push({path:url.pathname,method,body});
+      expect(url.searchParams.get('provider')).toBe('sharing');
+      if(method==='POST') return json({id:1,source_device_id:url.pathname.split('/')[5],...body,origin:'manual',applied_to_tuya:false},201);
+      if(method==='DELETE') return new Response(null,{status:204});
+      if(url.pathname.endsWith('/functions')) return json({device_id:target.id,functions:[targetSpec]});
+      return json({device_id:cloudDevice.id,provider:'sharing',tuya_bindings_available:false,mappings:[]});
+    });
+    render(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
+    expect(fetch).not.toHaveBeenCalled();
+    const user=userEvent.setup(); await user.click(screen.getByText('Связанные устройства и сопоставления'));
+    await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
+    await user.selectOptions(screen.getByLabelText('Устройство назначения'),target.id);
+    await screen.findByRole('option',{name:'Канал 2 · switch_2 · DP 2'});
+    expect(screen.getByLabelText('DP источника')).toHaveValue(20);
+    expect(screen.getByLabelText('DP назначения')).toHaveValue(2);
+    await user.selectOptions(screen.getByLabelText('Тип связи'),'multi_control');
+    await user.click(screen.getByRole('button',{name:'Сохранить сопоставление'}));
+    await screen.findByText('Ручное сопоставление · не применено в Tuya');
+    expect(calls.filter(c=>c.method==='POST')).toEqual([{path:'/api/v1/cloud/devices/cloud-lamp/mappings',method:'POST',body:{kind:'multi_control',source_code:'switch_led',source_dp_id:20,target_device_id:'target-switch',target_code:'switch_2',target_dp_id:2}}]);
+    await user.click(screen.getByRole('button',{name:'Удалить сопоставление'}));
+    await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
+    expect(calls.some(c=>c.path.includes('/commands'))).toBe(false);
+    await user.selectOptions(screen.getByLabelText('Направление'),'incoming');
+    await screen.findByRole('option',{name:'Канал 2 · switch_2 · DP 2'});
+    expect(screen.getByLabelText('DP источника')).toHaveValue(2);
+    expect(screen.getByLabelText('DP назначения')).toHaveValue(20);
+    await user.click(screen.getByRole('button',{name:'Сохранить сопоставление'}));
+    await screen.findByText('Ручное сопоставление · не применено в Tuya');
+    expect(calls.filter(c=>c.method==='POST')[1]).toEqual({path:'/api/v1/cloud/devices/target-switch/mappings',method:'POST',body:{kind:'multi_control',source_code:'switch_2',source_dp_id:2,target_device_id:'cloud-lamp',target_code:'switch_led',target_dp_id:20}});
   });
 });
 

@@ -195,7 +195,7 @@ export function App() {
       </> : <><div className="page-heading"><p className="eyebrow">Ваш дом</p><h1>Управление устройствами</h1><p className="muted">Выберите комнату, откройте устройство или группу и настройте доступные функции.</p></div><ControlCenter api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} onLock={setLocalOpen} /></>}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />Подождите…</> : notice.text}</div>
       <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
-      {selectedCloud && <CloudControl key={provider + selectedCloud.id} api={api} device={selectedCloud} provider={provider} onClose={() => setSelectedCloud(null)} onAuthError={invalidateConnection} />}
+      {selectedCloud && <CloudControl key={provider + selectedCloud.id} api={api} device={selectedCloud} devices={devices} provider={provider} onClose={() => setSelectedCloud(null)} onAuthError={invalidateConnection} />}
     </main>
     <footer><span>Smart Home · Tuya</span></footer>
   </div>;

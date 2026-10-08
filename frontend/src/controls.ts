@@ -1,12 +1,15 @@
 import type { CloudFunction, CloudFunctions, CloudSnapshot, JsonValue } from './api';
 import type { Capability, Reading } from './home-api';
+import { editableSchema, rawBytes, validateObject } from './lighting';
+import type { JsonSchema } from './lighting';
 
 export type HSV = { h: number; s: number; v: number };
 export type ControlSpec = {
-  key: string; label: string; kind: 'boolean' | 'number' | 'enum' | 'color' | 'text' | 'json' | 'unsupported';
+  key: string; label: string; kind: 'boolean' | 'number' | 'enum' | 'color' | 'text' | 'json' | 'raw' | 'unsupported';
   readable: boolean; writable: boolean; minimum?: number; maximum?: number; step?: number;
   integer?: boolean; choices?: JsonValue[]; unit?: string;
-  factor?: number; colorScale?: { s: number; v: number }; reason?: string; help?: string; indicator?: 'motion';
+  factor?: number; colorScale?: { s: number; v: number }; reason?: string; help?: string; indicator?: 'motion'; advanced?: boolean;
+  schema?: JsonSchema; maximumBytes?: number;
 };
 
 const MOTION_KEYS = new Set(['motion', 'pir', 'pir_state']);
@@ -21,6 +24,14 @@ const LABELS: Record<string, string> = {
   mode: 'Режим', work_mode: 'Режим', speed: 'Скорость', fan_speed_enum: 'Скорость', position: 'Положение',
   percent_control: 'Положение', control: 'Действие', oscillation: 'Поворот', power: 'Мощность', cur_power: 'Мощность',
   voltage: 'Напряжение', current: 'Ток', child_lock: 'Блокировка', command: 'Команда', press: 'Нажатие',
+  music_data: 'Светомузыка', control_data: 'Переход света', scene_data: 'Световой эффект', scene_data_v2: 'Световой эффект',
+  countdown: 'Таймер', countdown_1: 'Таймер', rhythm_mode: 'Суточный ритм света', sleep_mode: 'Свет перед сном',
+  wakeup_mode: 'Свет для пробуждения', power_memory: 'Поведение после включения питания',
+  do_not_disturb: 'Не беспокоить', remote_switch: 'Параметр пульта', random_timing: 'Случайное расписание',
+};
+const LIGHT_COMMAND_HELP: Record<string, string> = {
+  music_data: 'Команды изменения света в такт музыке. Для синхронизации нужен источник аудио, который отправляет такие команды.',
+  control_data: 'Команда быстрого или плавного изменения света. Текущее состояние смотрите в полях цвета и яркости.',
 };
 const OPTIONS: Record<string, string> = { white: 'Белый свет', colour: 'Цветной свет', scene: 'Сцена', music: 'Музыка',
   auto: 'Авто', manual: 'Вручную', open: 'Открыть', close: 'Закрыть', stop: 'Стоп', low: 'Низкая', medium: 'Средняя', high: 'Высокая', dock: 'На базу' };
@@ -64,11 +75,15 @@ function cloudColorScale(fn: CloudFunction, limits: Record<string, unknown>): { 
 }
 
 export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
-  const base = { key: fn.code, label: labelFor(fn.code), readable: true, writable,
+  // These two documented lighting DPs are send-only, even when the cloud
+  // includes an empty/echoed value in its cached status range.
+  const commandHelp = ['String', 'Json'].includes(fn.type) ? LIGHT_COMMAND_HELP[fn.code] : undefined;
+  const base = { key: fn.code, label: labelFor(fn.code), readable: !commandHelp, writable,
+    advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp,
     indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
   const unit = typeof limits.unit === 'string' ? limits.unit : undefined;
-  if (fn.type === 'Boolean') return { ...base, kind: 'boolean' };
+  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? 'Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.' : undefined };
   if (fn.type === 'Integer') {
     const scale = limits.scale ?? 0;
     const validScale = Number.isInteger(scale) && (scale as number) >= 0 && (scale as number) <= 9;
@@ -94,7 +109,13 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
   if (fn.type === 'String') return { ...base, kind: 'text' };
   if (fn.type === 'Json') {
     const colorScale = cloudColorScale(fn, limits);
-    return { ...base, kind: colorScale ? 'color' : 'json', colorScale };
+    return { ...base, kind: colorScale ? 'color' : 'json', colorScale, advanced: !colorScale, schema: colorScale ? undefined : editableSchema(limits) };
+  }
+  if (fn.type === 'Raw') {
+    const maximum = limits.maxlen === undefined ? 16384 : Number(limits.maxlen);
+    const valid = Number.isInteger(maximum) && maximum >= 0;
+    return { ...base, kind: 'raw', writable: writable && valid, maximumBytes: valid ? Math.min(maximum,16384) : undefined,
+      reason: valid ? undefined : 'Не указан корректный размер данных производителя.' };
   }
   return { ...base, kind: 'unsupported', writable: false, reason: 'Этот формат доступен только для просмотра.' };
 }
@@ -109,6 +130,7 @@ export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot)
 }
 
 export function cloudReading(spec: ControlSpec, raw: JsonValue | undefined): Reading {
+  if (!spec.readable) return { value: null, known: false, stale: true };
   let value: JsonValue = raw ?? null;
   let known = raw !== undefined && raw !== null;
   if (spec.kind === 'number') {
@@ -120,6 +142,14 @@ export function cloudReading(spec: ControlSpec, raw: JsonValue | undefined): Rea
     const color = limitsOf(raw), scale = spec.colorScale!;
     known = finite(color.h) && finite(color.s) && finite(color.v) && color.h >= 0 && color.h <= 360 && color.s >= 0 && color.s <= scale.s && color.v >= 0 && color.v <= scale.v;
     value = known ? { h: Math.round(color.h as number), s: Math.round((color.s as number) * 1000 / scale.s), v: Math.round((color.v as number) * 1000 / scale.v) } : null;
+  } else if (spec.kind === 'json' && typeof raw === 'string') {
+    try { value = JSON.parse(raw); known = Boolean(value) && typeof value === 'object' && !Array.isArray(value); }
+    catch { known = false; }
+    if (!known) value = null;
+  } else if (spec.kind === 'raw') {
+    try { known = typeof raw === 'string'; if (known) rawBytes(raw as string, spec.maximumBytes); }
+    catch { known = false; }
+    if (!known) value = null;
   }
   if (spec.indicator === 'motion') {
     const validMotion = spec.kind === 'enum' ? (raw === 'pir' || raw === 'none') && (!spec.choices?.length || spec.choices.includes(raw)) : typeof raw === 'boolean' || raw === 'pir' || raw === 'none';
@@ -175,6 +205,10 @@ export function validateControlValue(spec: ControlSpec, value: JsonValue): void 
     if (typeof value !== 'string') throw new Error('Введите текст.');
   } else if (spec.kind === 'json') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Введите JSON-объект.');
+    if (spec.schema) validateObject(value,spec.schema);
+  } else if (spec.kind === 'raw') {
+    if (typeof value !== 'string') throw new Error('Нужны данные производителя (base64).');
+    rawBytes(value,spec.maximumBytes);
   } else throw new Error('Формат управления пока не поддержан.');
 }
 
@@ -188,7 +222,7 @@ export function cloudCommands(spec: ControlSpec, value: JsonValue, definitions: 
   }
   const commands = [{ code: spec.key, value: raw }];
   const mode = definitions.functions.find(fn => fn.code === 'work_mode' && fn.type === 'Enum');
-  const wanted = spec.kind === 'color' ? 'colour' : ['bright_value', 'bright_value_v2', 'temp_value', 'temp_value_v2'].includes(spec.key) ? 'white' : undefined;
+  const wanted = spec.kind === 'color' ? 'colour' : spec.key === 'music_data' ? 'music' : spec.key === 'scene_data_v2' ? 'scene' : ['bright_value', 'bright_value_v2', 'temp_value', 'temp_value_v2'].includes(spec.key) ? 'white' : undefined;
   const modes = mode ? limitsOf(mode.values).range : undefined;
   if (wanted && Array.isArray(modes) && modes.includes(wanted)) commands.unshift({ code: 'work_mode', value: wanted });
   return commands;

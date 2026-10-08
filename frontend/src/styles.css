@@ -28,6 +28,17 @@
 .control-toolbar { margin:18px 0 12px; }
 .control-toolbar .help { margin:0; }
 .capability-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:20px 0; }
+.structured-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.structured-fields fieldset { grid-column:1/-1; min-width:0; border:1px solid #344254; border-radius:10px; padding:12px; margin:5px 0; }
+.structured-fields legend { font-size:13px; font-weight:600; padding:0 5px; }
+.structured-fields .mask-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.mask-choices label { display:flex; flex-direction:row; align-items:center; gap:4px; margin:0; }
+.mask-choices input { width:auto; }
+.device-mappings form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.device-mappings code, .cloud-properties code { overflow-wrap:anywhere; }
+.mapping-list { padding:0; list-style:none; }
+.mapping-list li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #344254; }
+.mapping-list p { margin:5px 0; }
 .capability { padding:18px; border:1px solid #344558; border-radius:12px; background:#121e2b; min-width:0; }
 .capability-heading { display:flex; align-items:center; gap:10px; justify-content:space-between; }
 .capability-heading h3 { font-size:15px; overflow-wrap:anywhere; }
@@ -65,7 +76,7 @@ textarea { width:100%; margin-top:7px; resize:vertical; min-height:90px; backgro
 .group-members h3 { font-size:15px; overflow-wrap:anywhere; }
 .group-members .help { margin:5px 0 0; }
 @media(max-width:860px) { .device-grid.local-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .control-filters { grid-template-columns:1fr 1fr; } .control-filters>label:last-child { grid-column:1/-1; } }
-@media(max-width:520px) { .control-center,.control-dialog { padding:18px; } .device-grid.local-grid,.capability-grid,.control-filters,.color-editor { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .control-header { top:-18px; } .group-members li { flex-direction:column; align-items:stretch; } }
+@media(max-width:520px) { .control-center,.control-dialog { padding:18px; } .device-grid.local-grid,.capability-grid,.control-filters,.color-editor,.device-mappings form { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .control-header { top:-18px; } .group-members li { flex-direction:column; align-items:stretch; } }
 
 * {
   box-sizing:border-box;
