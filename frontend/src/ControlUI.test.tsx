@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -139,7 +139,9 @@ describe('cloud device control', () => {
       const channel=await screen.findByRole('region',{name:'Канал 2'});
       expect(within(channel).getByText('Выключено')).toBeInTheDocument();
       const input=screen.getByRole('spinbutton',{name:'Яркость (%)'});
-      fireEvent.change(input,{target:{value:'70'}});
+      await waitFor(()=>expect(input).toBeEnabled());
+      await act(async()=>{fireEvent.change(input,{target:{value:'70'}});});
+      expect(input).toHaveValue(70);
       report=true;
       await act(async () => { vi.advanceTimersByTime(3000); });
       expect(within(channel).getByText('Включено')).toBeInTheDocument();
