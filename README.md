@@ -186,6 +186,40 @@ curl -sS -X DELETE -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/aliases/e
 
 Ошибки: 401 — токен, 404 — объект отсутствует, 409 — конфликт/нет нужной конфигурации, 422 — неверные поля/связи/значения capability, 502 — ошибка Tuya/непригодный ответ, 503 — занят gateway или БД, 504 — нет ответа/тайм-аут. Ошибки валидации возвращают путь поля и тип ошибки без исходного значения.
 
+## Опрос устройства перед регистрацией
+
+В React есть **«Добавить в дом»** (облачная карточка) и **«Добавить устройство»** (ручной ввод). До сохранения открывается страница настройки и наблюдения: пользователь сам переключает устройство, сервис только читает значения. [Подробности и ограничения](frontend/README.md#опрос-перед-добавлением).
+
+API под тем же `X-API-Key`:
+
+- `POST /api/v1/commissioning` — `{draft: DeviceCreate, mode: "local"|"cloud", provider: "sharing"|"developer"|null}`. Если указан provider, метаданные и отсутствующий local_key берутся на сервере из выбранного аккаунта. Никакой Device пока не создаётся. Переданные capabilities должны быть пустыми.
+- `POST /api/v1/commissioning/{session_id}/samples` — `{action: "observe"|"power"|"brightness"|"temperature"|"color"|"sensor"|"button"}`. Только status; выбор действия не отправляет команду. Возвращает `readings`, `changes`, `sample_count`, срок и интервал. Поле `can_write` означает проверенный номер/формат, не разрешение управления по умолчанию.
+- `POST /api/v1/commissioning/{session_id}/register` — название, aliases, building_id/room_id, `reviewed: true`, необязательный список ключей параметров `writable`. Требует хотя бы одной успешной выборки с показаниями; неизвестные или неоднозначные DP нельзя включить для записи. После сохранения сессия закрывается.
+- `DELETE /api/v1/commissioning/{session_id}` — отменить без сохранения.
+
+Сессии в памяти ограничены 15 минутами, 16 одновременными, 64 параметрами и 100 изменениями; используйте один worker. Частые выборки получают 429, истёкшие сессии — 404. Смена выбранного аккаунта блокирует чтение и регистрацию старой сессии. Для Zigbee локальный опрос и регистрация требуют существующего direct Wi-Fi gateway + cid; root IP/key/version берутся из шлюза. Local_key не возвращается. Локальные показатели сохраняются с фактическим временем чтения; облачные значения не заполняют локальный кеш/capabilities. История изменений остаётся временной. Этот этап обязателен для нового UI-пути, существующие REST CRUD/import сохраняют совместимость.
+
+Пример для подключённого аккаунта и Wi-Fi лампы (идентификаторы/адрес замените своими; ключ из аккаунта остаётся на сервере):
+
+```sh
+export BASE=http://127.0.0.1:8000/api/v1
+export TOKEN='replace-with-a-long-random-token'
+curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"draft":{"name":"Новая лампа","device_id":"your-device-id","ip":"192.168.1.40","version":"3.5"},"mode":"local","provider":"sharing"}' \
+  "$BASE/commissioning"
+# Возьмите session_id из ответа. Первый status — исходная выборка.
+export OBSERVATION='session-id-from-response'
+curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"action":"observe"}' "$BASE/commissioning/$OBSERVATION/samples"
+# Переключите лампу вручную; между запросами ждите минимум 3 секунды.
+curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"action":"power"}' "$BASE/commissioning/$OBSERVATION/samples"
+# После просмотра результатов сохраните. Без writable всё будет только для чтения.
+curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"Новая лампа","aliases":["new_lamp"],"reviewed":true,"writable":[]}' \
+  "$BASE/commissioning/$OBSERVATION/register"
+```
+
 ## Пример: здание, комната, Wi-Fi и Zigbee
 
 Ниже пример для **пустой базы**; числовые `id` берите из реальных ответов. IP, device_id, ключи и cid в примере вымышленные. Эти ключи нужны только для демонстрации структуры.
