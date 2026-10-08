@@ -50,10 +50,14 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
     {session.data && !specs.length && <p className="empty-state">Устройство не предоставило показаний или возможностей управления.</p>}
     {session.data && <details className="cloud-properties"><summary>Свойства устройства</summary><dl>
       <div><dt>ID устройства</dt><dd><code>{device.id}</code></dd></div>
-      <div><dt>Тип</dt><dd>{device.category === 'pir' ? 'Датчик движения' : device.category || 'Не указан'}</dd></div>
+      <div><dt>Тип</dt><dd>{device.category === 'pir' ? 'Датчик движения' : device.category === 'dj' ? 'Лампа' : device.category || 'Не указан'}</dd></div>
       <div><dt>Подключение</dt><dd>{device.sub ? 'Через шлюз' : 'Прямое'}</dd></div>
-      <div><dt>Доступ</dt><dd>{session.data.definitions.functions.length ? 'Чтение и команды' : 'Только чтение'}</dd></div>
-    </dl><ul>{[...session.data.definitions.functions,...(session.data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => <li key={spec.code}><code>{spec.code}</code> · {spec.type} · {spec.dp_ids?.length ? 'DP '+spec.dp_ids.join(', ') : spec.dp_id ? 'DP '+spec.dp_id : 'Номер DP не указан'}</li>)}</ul></details>}
+      <div><dt>Управление</dt><dd>{session.data.definitions.functions.length ? 'Через Tuya' : 'Только просмотр показаний'}</dd></div>
+    </dl></details>}
+    {session.data && <details className="cloud-properties"><summary>Технические данные для настройки связей</summary>
+      <p className="help">Коды параметров и известные номера DP для сопоставления устройств. Номер DP не нужен для облачной команды; его отсутствие не означает ошибку. Эти сведения не подтверждают физическое выполнение команды.</p>
+      <ul>{[...session.data.definitions.functions,...(session.data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => <li key={spec.code}><strong>{specs.find(control => control.key === spec.code)?.label || spec.code}</strong> · <code>{spec.code}</code> · {spec.type}{spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : spec.dp_id ? ' · DP '+spec.dp_id : ''}</li>)}</ul>
+    </details>}
     {session.data && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={session.data.definitions} disabled={session.busy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;

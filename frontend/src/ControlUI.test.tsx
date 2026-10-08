@@ -72,6 +72,25 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
+  it('keeps raw codes in collapsed mapping diagnostics instead of ordinary device properties', async () => {
+    cloudServer();
+    render(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,category:'dj',sub:true}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    await screen.findByRole('region',{name:'Яркость'});
+    const user=userEvent.setup();
+    const properties=screen.getByText('Свойства устройства').closest('details')!;
+    const diagnostics=screen.getByText('Технические данные для настройки связей').closest('details')!;
+    expect(diagnostics).not.toHaveAttribute('open');
+    await user.click(screen.getByText('Свойства устройства'));
+    expect(within(properties).getByText('Лампа')).toBeInTheDocument();
+    expect(within(properties).getByText('Через Tuya')).toBeInTheDocument();
+    expect(within(properties).getByText('Через шлюз')).toBeInTheDocument();
+    expect(within(properties).queryByText('bright_value_v2')).toBeNull();
+    expect(screen.queryByText('Номер DP не указан')).toBeNull();
+    await user.click(screen.getByText('Технические данные для настройки связей'));
+    expect(diagnostics).toHaveAttribute('open');
+    expect(within(diagnostics).getByText('bright_value_v2')).toBeInTheDocument();
+  });
+
   it.each([['Яркость', 'bright_value_v2', '65', 650], ['Цветовая температура', 'temp_value_v2', '40', 400]] as const)('applies %s with missing DP metadata and an on/off-only status without fabricating a reading', async (label,code,value,raw) => {
     const functions=[
       {code:'switch_led',type:'Boolean',values:'{}',dp_id:1},
