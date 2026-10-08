@@ -72,6 +72,34 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
+  it.each([['Яркость', 'bright_value_v2', '65', 650], ['Цветовая температура', 'temp_value_v2', '40', 400]] as const)('applies %s with missing DP metadata and an on/off-only status without fabricating a reading', async (label,code,value,raw) => {
+    const functions=[
+      {code:'switch_led',type:'Boolean',values:'{}',dp_id:1},
+      {code:'work_mode',type:'Enum',values:{range:['white','colour','scene','music']}},
+      {code:'bright_value_v2',type:'Integer',values:{min:10,max:1000,scale:0,step:1}},
+      {code:'temp_value_v2',type:'Integer',values:{min:0,max:1000,scale:0,step:1}},
+    ];
+    const writes:unknown[]=[];
+    vi.mocked(fetch).mockImplementation(async (input,init) => {
+      const path=new URL(String(input)).pathname;
+      if(init?.method==='POST') {writes.push(JSON.parse(String(init.body)));return json({acknowledged:true});}
+      if(path.endsWith('/functions')) return json({device_id:'cloud-lamp',functions,status_range:[functions[0]]});
+      return json({device_id:'cloud-lamp',online:true,status:{switch_led:true},status_range:[functions[0]]});
+    });
+    render(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,sub:true,category:'dj'}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const field=await screen.findByRole('region',{name:label});
+    expect(within(field).getByText('Нет данных')).toBeInTheDocument();
+    const user=userEvent.setup();
+    fireEvent.change(within(field).getByRole('slider'),{target:{value}});
+    await user.click(within(field).getByRole('button',{name:'Применить'}));
+    await screen.findByText(/Команда принята.*Статус запрошен заново/);
+    expect(writes).toEqual([{commands:[{code:'work_mode',value:'white'},{code,value:raw}]}]);
+    expect(within(field).getByText('Нет данных')).toBeInTheDocument();
+    expect(within(field).getByRole('spinbutton')).toHaveValue(Number(value));
+    expect(within(field).getByRole('slider')).toHaveValue(value);
+    expect(within(field).getByRole('button',{name:'Применить'})).toBeDisabled();
+  });
+
   it('polls only the local report cache, updates channel 2 and preserves an edited brightness draft', async () => {
     vi.useFakeTimers({toFake:['setInterval','clearInterval']});
     const reads:string[]=[];

@@ -129,6 +129,9 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
   const fingerprint = JSON.stringify([reading?.value, reading?.known, reading?.stale, reading?.observed_at]);
   useEffect(() => {
     if (dirty) return; // A new report must not erase an unapplied user draft.
+    // Keep the selected target after applying a command if Tuya supplies no
+    // reading. The separate observed-state line must still show "Нет данных".
+    if (!fresh && draft !== '') return;
     const value = fresh ? reading!.value : null;
     setDraft(value === null ? '' : spec.kind === 'enum' ? String(spec.choices?.findIndex(option => sameValue(option, value)) ?? -1) : spec.kind === 'json' ? JSON.stringify(value, null, 2) : String(value));
     if (spec.kind === 'color' && value && typeof value === 'object' && !Array.isArray(value)) setColor(value as HSV);
