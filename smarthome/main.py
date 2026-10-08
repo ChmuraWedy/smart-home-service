@@ -586,6 +586,9 @@ def create_app(settings: Settings | None = None, controller=None):
         engine = make_engine(settings.database_path)
         init_db(engine)
         app.state.engine = engine
+        from .commissioning import Observations
+
+        app.state.observations = Observations()
         from .cloud import CloudBridge
 
         app.state.cloud = CloudBridge(settings)
@@ -600,6 +603,7 @@ def create_app(settings: Settings | None = None, controller=None):
             yield
         finally:
             app.state.poller.stop()
+            app.state.observations.clear()
             app.state.cloud.close()
             engine.dispose()
 
@@ -626,6 +630,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .cloud_mappings import router as cloud_router
 
     app.include_router(cloud_router)
+    from .commissioning import router as commissioning_router
+
+    app.include_router(commissioning_router)
 
     @app.get("/cloud", include_in_schema=False)
     def cloud_setup_page():

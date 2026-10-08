@@ -5385,6 +5385,202 @@
         }
       }
     },
+    "/api/v1/commissioning": {
+      "post": {
+        "tags": [
+          "Commissioning"
+        ],
+        "summary": "Start",
+        "operationId": "start_api_v1_commissioning_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartObservation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/commissioning/{token}/samples": {
+      "post": {
+        "tags": [
+          "Commissioning"
+        ],
+        "summary": "Sample",
+        "operationId": "sample_api_v1_commissioning__token__samples_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SampleObservation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commissioning/{token}": {
+      "delete": {
+        "tags": [
+          "Commissioning"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel_api_v1_commissioning__token__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commissioning/{token}/register": {
+      "post": {
+        "tags": [
+          "Commissioning"
+        ],
+        "summary": "Register",
+        "operationId": "register_api_v1_commissioning__token__register_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterObservation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -7450,6 +7646,72 @@
         "type": "object",
         "title": "QRLogin"
       },
+      "RegisterObservation": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "aliases": {
+            "items": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1,
+              "pattern": ".*\\S.*"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Aliases"
+          },
+          "building_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Id"
+          },
+          "room_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Id"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Reviewed"
+          },
+          "writable": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "title": "Writable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "reviewed"
+        ],
+        "title": "RegisterObservation"
+      },
       "RoomCreate": {
         "properties": {
           "aliases": {
@@ -7661,6 +7923,27 @@
         ],
         "title": "RoomTree"
       },
+      "SampleObservation": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "observe",
+              "power",
+              "brightness",
+              "temperature",
+              "color",
+              "sensor",
+              "button"
+            ],
+            "title": "Action",
+            "default": "observe"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SampleObservation"
+      },
       "SavedUserCode": {
         "properties": {
           "user_code": {
@@ -7678,6 +7961,43 @@
           "user_code"
         ],
         "title": "SavedUserCode"
+      },
+      "StartObservation": {
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/DeviceCreate"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sharing",
+                  "developer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "local",
+              "cloud"
+            ],
+            "title": "Mode",
+            "default": "local"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "draft"
+        ],
+        "title": "StartObservation"
       },
       "SwitchCommand": {
         "properties": {
