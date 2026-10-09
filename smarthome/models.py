@@ -12,6 +12,14 @@ class Base(DeclarativeBase):
     pass
 
 
+class CloudChannelLabel(Base):
+    __tablename__ = "cloud_channel_labels"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    code: Mapped[str] = mapped_column(String(128), primary_key=True)
+    label: Mapped[str] = mapped_column(String(120))
+
+
 class CloudDeviceMapping(Base):
     """User-maintained map; never presented as an applied Tuya association."""
 

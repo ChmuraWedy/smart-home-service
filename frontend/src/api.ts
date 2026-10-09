@@ -32,7 +32,7 @@ export type DeveloperCredentials = {
 };
 export type QRLogin = { session_id: string; qr_url: string; expires_in: number };
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null; dp_id?: number; dp_ids?: number[] };
+export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null; dp_id?: number; dp_ids?: number[]; user_label?: string };
 export type MappingInput = { kind: 'remote' | 'zigbee_group' | 'multi_control'; source_code: string; source_dp_id: number | null; target_device_id: string; target_code: string; target_dp_id: number | null };
 export type DeviceMapping = MappingInput & { id: number; source_device_id: string; origin: 'manual'; applied_to_tuya: false };
 export type MappingList = { device_id: string; provider: Provider; tuya_bindings_available: false; mappings: DeviceMapping[] };
@@ -131,6 +131,9 @@ export class CloudApi {
   devices(provider: Provider, signal?: AbortSignal) { return this.json<CloudDevice[]>('/devices?refresh=true&provider=' + provider, 'GET', undefined, signal); }
   deviceFunctions(id: string, provider: Provider, signal?: AbortSignal) {
     return this.json<CloudFunctions>('/devices/' + encodeURIComponent(id) + '/functions?provider=' + provider, 'GET', undefined, signal);
+  }
+  saveChannelLabels(id: string, provider: Provider, labels: Record<string, string | null>, signal?: AbortSignal) {
+    return this.json<{ device_id: string; labels: Record<string, string> }>('/devices/' + encodeURIComponent(id) + '/channel-labels?provider=' + provider, 'PUT', { labels }, signal);
   }
   deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true) {
     return this.json<CloudSnapshot>('/devices/' + encodeURIComponent(id) + '/status?refresh=' + refresh + '&provider=' + provider, 'GET', undefined, signal);

@@ -72,6 +72,39 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
+  it('saves channel names separately from commands, restores them on reopen and keeps DP routing', async () => {
+    let labels: Record<string, string> = {};
+    const writes: { method: string; body: unknown }[] = [];
+    const functions = [
+      { code: 'switch_1', type: 'Boolean', values: '{}' },
+      { code: 'countdown_1', type: 'Integer', values: '{"min":0,"max":86400,"step":1,"unit":"s"}' },
+    ];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)); writes.push({ method: 'PUT', body });
+        labels = Object.fromEntries(Object.entries(body.labels).filter(([, value]) => value !== null)) as Record<string, string>;
+        return json({ device_id: cloudDevice.id, labels });
+      }
+      if (init?.method === 'POST') { writes.push({ method: 'POST', body: JSON.parse(String(init.body)) }); return json({ acknowledged: true }); }
+      if (path.endsWith('/functions')) return json({ device_id: cloudDevice.id, functions: functions.map(fn => ({ ...fn, user_label: labels[fn.code] })) });
+      return json({ device_id: cloudDevice.id, source: 'cloud', online: true, status: { switch_1: false, countdown_1: 0 } });
+    });
+    const api = new CloudApi(connection), user = userEvent.setup();
+    const props = { api, device: cloudDevice, provider: 'sharing' as const, onClose: vi.fn(), onAuthError: vi.fn() };
+    const view = render(<CloudControl {...props} />);
+    await screen.findByRole('region', { name: 'Канал 1' });
+    await user.click(screen.getByText('Названия каналов', { exact: true }));
+    await user.type(screen.getByLabelText('Название канала 1'), 'Настольный свет');
+    await user.click(screen.getByRole('button', { name: 'Сохранить названия' }));
+    await screen.findByRole('region', { name: 'Настольный свет' });
+    expect(screen.getByRole('region', { name: 'Таймер: Настольный свет' })).toBeInTheDocument();
+    expect(writes).toEqual([{ method: 'PUT', body: { labels: { switch_1: 'Настольный свет' } } }]);
+    view.unmount(); render(<CloudControl {...props} />);
+    const channel = await screen.findByRole('region', { name: 'Настольный свет' });
+    await user.click(within(channel).getByRole('button', { name: 'Включить' }));
+    await waitFor(() => expect(writes[1]).toEqual({ method: 'POST', body: { commands: [{ code: 'switch_1', value: true }] } }));
+  });
   it('keeps raw codes in collapsed mapping diagnostics instead of ordinary device properties', async () => {
     cloudServer();
     render(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,category:'dj',sub:true}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);

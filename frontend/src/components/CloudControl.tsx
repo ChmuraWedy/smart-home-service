@@ -1,15 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
 import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, CloudSnapshot, Provider } from '../api';
-import { cloudCommands, cloudReading, cloudSpecs } from '../controls';
+import { cloudCommands, cloudReading, cloudSpecs, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceMappings } from './DeviceMappings';
+import { ChannelNames } from './ChannelNames';
 
 export function CloudControl({ api, device, provider, devices, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; onClose: () => void; onAuthError: () => void;
 }) {
   const [mappingBusy,setMappingBusy] = useState(false);
+  const [labelBusy, setLabelBusy] = useState(false), [labels, setLabels] = useState<Record<string, string> | null>(null);
+  const editingBusy = mappingBusy || labelBusy;
   const metadata = useMemo(() => ({value:null as CloudFunctions|null}),[api,device.id,provider]);
   const checked = (snapshot:CloudSnapshot) => {
     if (snapshot.device_id !== device.id || !snapshot.status || typeof snapshot.status !== 'object' || Array.isArray(snapshot.status)) throw new Error('Сервис вернул неожиданные данные устройства.');
@@ -27,17 +30,18 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
     const snapshot = checked(await api.deviceSnapshot(device.id,provider,signal,false));
     return {...current,snapshot,fetchedAt:snapshot.snapshot_received_at ? receiptTime(snapshot) : current.fetchedAt};
   },[api,device.id,provider]);
-  const session = useControlSession<Data>(load, onAuthError, provider === 'sharing' && !mappingBusy ? poll : undefined);
+  const session = useControlSession<Data>(load, onAuthError, provider === 'sharing' && !editingBusy ? poll : undefined);
   const now = useClock();
-  const specs = session.data ? cloudSpecs(session.data.definitions, session.data.snapshot) : [];
+  const definitions = session.data ? labels ? withChannelLabels(session.data.definitions, labels) : session.data.definitions : null;
+  const specs = session.data && definitions ? cloudSpecs(definitions, session.data.snapshot) : [];
   const basic = specs.filter(spec => !spec.advanced), advanced = specs.filter(spec => spec.advanced);
-  const field = (spec: ControlSpec) => <CapabilityField key={spec.key} spec={spec} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} disabled={mappingBusy || session.busy || !session.readOK || !session.data!.snapshot.online} onSend={value => session.execute(async () => {
+  const field = (spec: ControlSpec) => <CapabilityField key={spec.key} spec={spec} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} disabled={editingBusy || session.busy || !session.readOK || !session.data!.snapshot.online} onSend={value => session.execute(async () => {
     const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, session.data!.definitions));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
     return { text: 'Команда принята.' };
   })} />;
-  return <ControlDialog title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || mappingBusy} onClose={onClose}>
-    <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><button className="secondary compact" disabled={session.busy || mappingBusy} onClick={() => void session.refresh()}>Обновить статус</button></div>
+  return <ControlDialog title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || editingBusy} onClose={onClose}>
+    <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><button className="secondary compact" disabled={session.busy || editingBusy} onClick={() => void session.refresh()}>Обновить статус</button></div>
     <p className="help">{specs.some(spec => spec.writable) ? 'Облачный снимок состояния. Принятие команды не подтверждает изменение устройства; облако может вернуть прежнее показание.' : 'Последнее известное состояние в облаке. Обновите статус для получения нового снимка.'}</p>
     {session.data && <p className="help">Снимок получен: {new Date(session.data.fetchedAt).toLocaleString('ru-RU')}</p>}
     {provider === 'sharing' && session.data && <p className="help">{session.data.snapshot.event_stream_connected ? 'Приём отчётов устройства подключён. Новые состояния появляются автоматически.' : 'Свежих отчётов пока нет или соединение ещё устанавливается. Сохранённый снимок Tuya может запаздывать.'}</p>}
@@ -58,7 +62,8 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
       <p className="help">Коды параметров и известные номера DP для сопоставления устройств. Номер DP не нужен для облачной команды; его отсутствие не означает ошибку. Эти сведения не подтверждают физическое выполнение команды.</p>
       <ul>{[...session.data.definitions.functions,...(session.data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => <li key={spec.code}><strong>{specs.find(control => control.key === spec.code)?.label || spec.code}</strong> · <code>{spec.code}</code> · {spec.type}{spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : spec.dp_id ? ' · DP '+spec.dp_id : ''}</li>)}</ul>
     </details>}
-    {session.data && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={session.data.definitions} disabled={session.busy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
+    {definitions && <ChannelNames api={api} deviceId={device.id} provider={provider} definitions={definitions} disabled={session.busy || mappingBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} />}
+    {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;
 }

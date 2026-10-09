@@ -131,6 +131,37 @@ def login(client):
     return id
 
 
+def test_channel_names_persist_without_commands_and_are_scoped(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    device = bridge.device("gateway")
+    device.function["switch_1"] = SimpleNamespace(code="switch_1", type="Boolean", values="{}")
+    path = API + "/devices/gateway/channel-labels"
+    result = cloud_client.put(path, json={"labels": {"switch_1": "  Свет над столом  "}})
+    assert result.status_code == 200
+    assert result.json()["labels"] == {"switch_1": "Свет над столом"}
+    assert bridge.manager.customer_api.calls == []
+    # A fresh database session (another request) reads the stored label.
+    spec = cloud_client.get(API + "/devices/gateway/functions").json()["functions"][-1]
+    assert spec["user_label"] == "Свет над столом" and spec["code"] == "switch_1"
+    bridge.device("child").function["switch_1"] = SimpleNamespace(code="switch_1", type="Boolean", values="{}")
+    assert cloud_client.get(API + "/devices/child/functions").json()["functions"][0].get("user_label") is None
+    bridge.auth["token_info"]["uid"] = "another-account"
+    assert "user_label" not in cloud_client.get(API + "/devices/gateway/functions").json()["functions"][-1]
+    bridge.auth["token_info"]["uid"] = "user"
+    assert cloud_client.put(path, json={"labels": {"switch_1": None}}).json()["labels"] == {}
+    assert "user_label" not in cloud_client.get(API + "/devices/gateway/functions").json()["functions"][-1]
+
+
+def test_channel_names_require_auth_and_reject_invalid_or_unknown_channels(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/channel-labels"
+    for labels in [{}, {"switch_99": "Unknown"}, {"switch": "Not a channel"}, {"switch_1": " "}, {"switch_1": "x" * 121}, {"switch_1": "a\nb"}]:
+        assert cloud_client.put(path, json={"labels": labels}).status_code == 422
+    cloud_client.headers.clear()
+    assert cloud_client.put(path, json={"labels": {"switch_1": "Название"}}).status_code == 401
+
+
 def test_verified_dp_mapping_metadata_is_private_and_handles_ambiguity(cloud_client):
     login(cloud_client)
     device = cloud_client.app.state.cloud.device("gateway")

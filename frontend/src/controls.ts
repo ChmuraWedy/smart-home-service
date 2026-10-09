@@ -47,6 +47,11 @@ function controlHelp(key: string): string | undefined {
   if (key === 'switch_inching') return 'После включения выключатель автоматически отключается через заданное время. Например, через минуту. Настройка передаётся строкой; её формат не описан в API этого устройства.';
 }
 export const sameValue = (left: JsonValue, right: JsonValue) => JSON.stringify(left) === JSON.stringify(right);
+export const cloudLabel = (fn: CloudFunction) => fn.user_label || labelFor(fn.code);
+export function withChannelLabels(definitions: CloudFunctions, labels: Record<string, string>): CloudFunctions {
+  const apply = (fn: CloudFunction) => ({ ...fn, user_label: labels[fn.code] });
+  return { ...definitions, functions: definitions.functions.map(apply), status_range: definitions.status_range?.map(apply) };
+}
 
 export function limitsOf(value: unknown): Record<string, unknown> {
   try {
@@ -87,7 +92,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
   // These two documented lighting DPs are send-only, even when the cloud
   // includes an empty/echoed value in its cached status range.
   const commandHelp = ['String', 'Json'].includes(fn.type) ? LIGHT_COMMAND_HELP[fn.code] : undefined;
-  const base = { key: fn.code, label: labelFor(fn.code), readable: !commandHelp, writable,
+  const base = { key: fn.code, label: cloudLabel(fn), readable: !commandHelp, writable,
     advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp || controlHelp(fn.code),
     indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
@@ -135,6 +140,15 @@ export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot)
   for (const fn of definitions.functions) result.set(fn.code, cloudSpec(fn, true));
   for (const key of Object.keys(snapshot.status)) if (!result.has(key)) result.set(key, { key, label: labelFor(key), kind: 'unsupported', readable: true, writable: false,
     indicator: MOTION_KEYS.has(key) ? 'motion' : undefined });
+  for (const fn of [...(definitions.status_range || []), ...definitions.functions]) {
+    const spec = result.get(fn.code);
+    if (spec && fn.user_label) spec.label = fn.user_label;
+  }
+  for (const spec of result.values()) {
+    if (!/^countdown_[1-9][0-9]*$/.test(spec.key)) continue;
+    const channelKey = 'switch_' + spec.key.slice(10), channel = result.get(channelKey);
+    if (channel && channel.label !== labelFor(channelKey)) spec.label = 'Таймер: ' + channel.label;
+  }
   return [...result.values()];
 }
 

@@ -6,10 +6,12 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field, JsonValue, SecretStr, field_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .importer import import_tinytuya
+from .models import CloudChannelLabel
 from .schemas import Identifier, ImportRequest, PositiveID, Schema
 
 router = APIRouter(prefix="/api/v1/cloud", tags=["Cloud"], dependencies=[Depends(authenticate)])
@@ -67,6 +69,37 @@ class CloudCommand(Schema):
 
 class CloudCommands(Schema):
     commands: list[CloudCommand] = Field(min_length=1, max_length=16)
+
+
+class ChannelLabels(Schema):
+    labels: dict[
+        Annotated[str, Field(pattern=r"^switch_[1-9][0-9]*$", max_length=128)],
+        Annotated[str, Field(min_length=1, max_length=120)] | None,
+    ] = Field(min_length=1, max_length=32)
+
+    @field_validator("labels")
+    @classmethod
+    def clean_labels(cls, labels):
+        for code, label in labels.items():
+            if label is not None:
+                label = label.strip()
+                if not label or any(not c.isprintable() for c in label):
+                    raise ValueError("Channel names must be nonempty printable text")
+                labels[code] = label
+        return labels
+
+
+def channel_labels(session, bridge, provider, device_id):
+    from .cloud_mappings import scope_for
+
+    scope = scope_for(bridge, provider)
+    return {
+        row.code: row.label for row in session.scalars(
+            select(CloudChannelLabel).where(
+                CloudChannelLabel.scope == scope, CloudChannelLabel.device_id == device_id
+            )
+        )
+    }
 
 
 def safe_spec(device, spec):
@@ -276,16 +309,54 @@ def cloud_device_status(
 
 @router.get("/devices/{device_id}/functions")
 def cloud_device_functions(
-    device_id: Identifier, request: Request, response: Response, provider: Provider = "sharing"
+    device_id: Identifier, request: Request, response: Response, provider: Provider = "sharing",
+    session: Session = Depends(get_session),
 ):
     bridge = cloud_bridge(request, provider)
-    device = bridge.writable_device(device_id)
+    with bridge.lock:
+        device = bridge.writable_device(device_id)
+        labels = channel_labels(session, bridge, provider, device_id)
+        functions = safe_device(device)["functions"]
+        ranges = safe_status_ranges(device)
+        for spec in functions + ranges:
+            if spec["code"] in labels:
+                spec["user_label"] = labels[spec["code"]]
     response.headers["Cache-Control"] = "no-store"
     return {
         "device_id": device.id,
-        "functions": safe_device(device)["functions"],
-        "status_range": safe_status_ranges(device),
+        "functions": functions,
+        "status_range": ranges,
     }
+
+
+@router.put("/devices/{device_id}/channel-labels")
+def save_channel_labels(
+    device_id: Identifier, body: ChannelLabels, request: Request, response: Response,
+    provider: Provider = "sharing", session: Session = Depends(get_session),
+):
+    from .cloud_mappings import scope_for
+    from .service import commit
+
+    bridge = cloud_bridge(request, provider)
+    with bridge.lock:
+        scope = scope_for(bridge, provider)
+        device = bridge.writable_device(device_id)
+        available = set(device.function) | set(getattr(device, "status_range", {}))
+        if not set(body.labels).issubset(available):
+            raise HTTPException(422, "Channel is not available on the selected device")
+        for code, label in body.labels.items():
+            row = session.get(CloudChannelLabel, (scope, device_id, code))
+            if label is None:
+                if row is not None:
+                    session.delete(row)
+            elif row is not None:
+                row.label = label
+            else:
+                session.add(CloudChannelLabel(scope=scope, device_id=device_id, code=code, label=label))
+        commit(session)
+        labels = channel_labels(session, bridge, provider, device_id)
+    response.headers["Cache-Control"] = "no-store"
+    return {"device_id": device_id, "labels": labels}
 
 
 @router.post("/devices/{device_id}/commands")

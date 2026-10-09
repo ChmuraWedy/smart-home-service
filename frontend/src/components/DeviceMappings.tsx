@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudApi, CloudDevice, CloudFunction, CloudFunctions, DeviceMapping, MappingInput, Provider } from '../api';
-import { labelFor } from '../controls';
+import { cloudLabel, labelFor } from '../controls';
 
 const kinds = { remote:'Пульт / выключатель', zigbee_group:'Группа Zigbee', multi_control:'Multi-control' };
 const preferred = (specs:CloudFunction[]) => specs.find(s => /^(switch(?:_led|_[1-9][0-9]*)?|press|button_[1-9][0-9]*)$/.test(s.code))?.code || specs[0]?.code || '';
-const title = (spec:CloudFunction) => `${labelFor(spec.code)} · ${spec.code}${spec.dp_id ? ' · DP '+spec.dp_id : spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : ' · DP не указан'}`;
+const title = (spec:CloudFunction) => `${cloudLabel(spec)} · ${spec.code}${spec.dp_id ? ' · DP '+spec.dp_id : spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : ' · DP не указан'}`;
 
 export function DeviceMappings({ api, device, provider, definitions, devices, disabled, onBusy, onAuthError }: {
   api:CloudApi; device:CloudDevice; provider:Provider; definitions:CloudFunctions; devices?:CloudDevice[]; disabled:boolean; onBusy:(value:boolean)=>void; onAuthError:()=>void;
