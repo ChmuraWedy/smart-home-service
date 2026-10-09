@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { displayReading, isStale, localSpec } from '../controls';
+import { displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
-import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceNetwork } from './DeviceNetwork';
+import { useControlDrafts } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 
 export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: {
@@ -17,11 +18,19 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
   }, [api, device.id]);
   const session = useControlSession(load, onAuthError), now = useClock();
   const item = session.data?.metadata || device;
+  const drafts = useControlDrafts();
   return <ControlDialog className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
-    <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><button className="secondary compact" disabled={session.busy} onClick={() => void session.refresh()}>Обновить статус</button></div>
+    <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><div className="control-actions"><button className="secondary compact" disabled={session.busy || aliasBusy} onClick={() => void session.refresh()}>Обновить статус</button>
+      {Object.values(item.capabilities).some(cap => cap.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || aliasBusy || !session.readOK || !session.data?.state.enabled} onApply={() => void drafts.apply(changes => session.execute(async () => {
+        for (const change of changes) validateControlValue(change.spec, change.value!);
+        const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
+        if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
+        return {text:'Команда принята.'};
+      }))} />}
+    </div></div>
     <p className="help">Первое открытие читает кеш. «Обновить статус» опрашивает устройство. Команды и ключи Tuya обрабатывает сервер.</p>
     {session.data && !session.data.state.enabled && <p className="saved-summary">Устройство или его шлюз отключены в настройках сервиса.</p>}
-    <div className="capability-grid">{session.data && Object.entries(item.capabilities).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
+    <div className="capability-grid">{session.data && Object.entries(item.capabilities).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={drafts.stage} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
       const result = await api.setCapability(item.id, key, value);
       if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
       return { text: 'Команда принята.' };

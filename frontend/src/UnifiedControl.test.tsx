@@ -77,6 +77,7 @@ describe('unified device identity and management', () => {
     const cloud = await screen.findByRole('dialog', { name: local.name });
     expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
     await user.click(await within(cloud).findByRole('button', { name: 'Включить' }));
+    await user.click(within(cloud).getByRole('button', { name: 'Применить' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('результат команды неизвестен');
     expect(calls.filter(call => call.method === 'POST')).toEqual([{ path: '/api/v1/cloud/devices/physical-lamp/commands?provider=developer', method: 'POST', body: { commands: [{ code: 'switch_led', value: true }] } }]);
     await user.click(within(cloud).getByRole('button', { name: 'Закрыть' }));
@@ -86,6 +87,7 @@ describe('unified device identity and management', () => {
     await user.click(within(reloaded).getByRole('button', { name: 'Управлять' }));
     const home = await screen.findByRole('dialog', { name: local.name });
     await user.click(await within(home).findByRole('button', { name: 'Включить' }));
+    await user.click(within(home).getByRole('button', { name: 'Применить' }));
     expect(calls.filter(call => call.method === 'POST')[1]).toEqual({ path: '/api/v1/devices/7/commands/capabilities', method: 'POST', body: { values: { switch: true } } });
     expect(calls.some(call => call.path.includes('/cloud/devices/7/'))).toBe(false);
   });

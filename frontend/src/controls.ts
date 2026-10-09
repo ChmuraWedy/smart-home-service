@@ -247,6 +247,23 @@ export function cloudCommands(spec: ControlSpec, value: JsonValue, definitions: 
   return commands;
 }
 
+export function cloudBatchCommands(changes: { spec: ControlSpec; value: JsonValue }[], definitions: CloudFunctions, status: Record<string, JsonValue>) {
+  const commands = new Map<string, JsonValue>();
+  let inferredMode: JsonValue | undefined;
+  const explicitMode = changes.find(change => change.spec.key === 'work_mode');
+  for (const { spec, value } of changes) {
+    for (const command of cloudCommands(spec, value, definitions)) {
+      if (command.code === 'work_mode') inferredMode = command.value;
+      else commands.set(command.code, command.value);
+    }
+  }
+  const mode = explicitMode?.value ?? inferredMode;
+  const result = [...commands].map(([code, value]) => ({ code, value }));
+  if (mode !== undefined && (explicitMode || !sameValue(mode, status.work_mode ?? null))) result.unshift({ code: 'work_mode', value: mode });
+  if (result.length > 16) throw new Error('За один раз можно применить до 16 параметров.');
+  return result;
+}
+
 export function hsvToHex(hsv: HSV): string {
   const h = (hsv.h % 360) / 60, s = hsv.s / 1000, v = hsv.v / 1000;
   const c = v * s, x = c * (1 - Math.abs(h % 2 - 1)), m = v - c;

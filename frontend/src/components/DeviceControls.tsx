@@ -5,6 +5,7 @@ import type { JsonValue } from '../api';
 import { displayReading, hexToHsv, hsvToHex, isStale, motionState, optionLabel, sameValue, validateControlValue } from '../controls';
 import type { ControlSpec, HSV } from '../controls';
 import type { Reading } from '../home-api';
+import type { DraftStage } from '../control-drafts';
 import { defaultObject } from '../lighting';
 import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFields';
 
@@ -120,12 +121,14 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, stage }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; stage?: DraftStage;
 }) {
   const fresh = reading?.known && !isStale(reading, now, local);
   const motion = motionState(spec, reading);
   const [draft, setDraft] = useState('');
+  const initial = useRef<JsonValue | undefined>(undefined);
+  const [preciseColor, setPreciseColor] = useState(false);
   const [color, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
   const pendingTarget = useRef<{ value: JsonValue; baseline: JsonValue | undefined; sentAt: number } | null>(null);
   const [awaiting, setAwaiting] = useState(false);
@@ -150,8 +153,39 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     setDirty(false); setError('');
   }, [fingerprint, spec.key, dirty, now, awaiting]);
 
-  const change = (value: string) => { setDraft(value); setDirty(true); setError(''); };
-  const changeColor = (value: HSV) => { setColor(value); setDirty(true); setError(''); };
+  function beginEdit() {
+    if (!dirty) initial.current = pendingTarget.current?.value ?? (reading?.known ? reading.value : undefined);
+  }
+  const change = (value: string) => { beginEdit(); setDraft(value); setDirty(true); setError(''); };
+  const changeColor = (value: HSV) => { beginEdit(); setColor(value); setDirty(true); setError(''); };
+  function parsedDraft(): JsonValue {
+    let value: JsonValue;
+    if (spec.kind === 'number') { if (!draft.trim()) throw new Error('Введите значение.'); value = Number(draft); }
+    else if (spec.kind === 'enum') { if (!draft) throw new Error('Выберите значение.'); value = spec.choices?.[Number(draft)] ?? null; }
+    else if (spec.kind === 'boolean') value = draft === 'true';
+    else if (spec.kind === 'color') value = color;
+    else if (spec.kind === 'json') { try { value = JSON.parse(draft); } catch { throw new Error('Введите корректный JSON-объект.'); } }
+    else value = draft;
+    validateControlValue(spec, value);
+    return value;
+  }
+  let draftError = '';
+  try { if (stage && dirty) parsedDraft(); } catch (failure) { draftError = errorText(failure); }
+  useEffect(() => {
+    if (!stage) return;
+    if (!dirty) { stage(spec.key, null); return; }
+    let value: JsonValue | undefined, invalid = error;
+    try { value = parsedDraft(); } catch (failure) { invalid = errorText(failure); }
+    if (!invalid && value !== undefined && initial.current !== undefined && sameValue(value, initial.current)) {
+      stage(spec.key, null); setDirty(false); return;
+    }
+    stage(spec.key, { spec, value, error: invalid, accept: sentAt => {
+      pendingTarget.current = { value: value!, baseline: initial.current, sentAt };
+      setAwaiting(true); setDirty(false);
+    } });
+  }, [stage, spec.key, draft, color, dirty, error]);
+  useEffect(() => () => { stage?.(spec.key, null); }, [stage, spec.key]);
+  const selectedPower = stage && (dirty || awaiting) ? draft === 'true' : Boolean(fresh && reading?.value === true);
   async function send(value?: JsonValue) {
     try {
       let parsed = value;
@@ -173,20 +207,21 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
   return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
     <div className="capability-row"><div className="capability-heading"><h3>{spec.label}</h3>
       {spec.kind === 'color' && spec.writable && <input aria-label="Выбор цвета" title="Выбор цвета" className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
+      {spec.kind === 'color' && spec.writable && <button type="button" className="secondary color-details-toggle" aria-label="Точная настройка цвета" title="Тон, насыщенность и яркость" aria-expanded={preciseColor} onClick={() => setPreciseColor(value => !value)}>···</button>}
     </div>
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
       {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
-      <button disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === true)} onClick={() => void send(true)}>Включить</button>
-      <button className="secondary" disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === false)} onClick={() => void send(false)}>Выключить</button>
-    </div> : <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
+      <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>Включить</button>
+      <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>Выключить</button>
+    </div> : <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!stage && !disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
       {spec.kind === 'number' && <div className="range-input-row">
         <label className="range-value"><span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span><input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Значение" />{spec.unit && <span>{spec.unit}</span>}</label>
         {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + ' — ползунок'} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
       </div>}
       {spec.kind === 'enum' && <label className="enum-value"><span className="sr-only">{spec.label}</span><select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}><option value="">Выберите значение</option>{spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}</select></label>}
       {spec.kind === 'color' && <div className="color-editor">
-        <div className="color-sliders">{(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<input aria-label={axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}</div>
+        {preciseColor && <div className="color-sliders">{(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<input aria-label={axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}</div>}
       </div>}
       {spec.kind === 'text' && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
       {spec.kind === 'json' && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
@@ -196,7 +231,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
         <label>Данные производителя (base64)<textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} /></label>
         <p className="help">Размер после декодирования: до {spec.maximumBytes} байт. Изменение отправляется только кнопкой «Применить».</p>
       </>}
-      <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">Применить</button>
+      {!stage && <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">Применить</button>}
     </form>)}
     <div className="reading-meta">
       {spec.readable && !reading?.known && <span>Нет показания</span>}
@@ -208,6 +243,13 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     {awaiting && <p className="help pending-reading">Ожидаем новое показание</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}
     {spec.help && <p className="help">{spec.help}</p>}
-    {error && <p className="field-error" role="alert">{error}</p>}
+    {(error || draftError) && <p className="field-error" role="alert">{error || draftError}</p>}
   </section>;
+}
+
+export function ControlApply({ count, invalid, disabled, onApply }: { count: number; invalid: boolean; disabled: boolean; onApply: () => void }) {
+  return <div className="control-apply">
+    {count > 0 && <span role="status">Изменено: {count}</span>}
+    <button className="compact" disabled={disabled || !count || invalid} onClick={onApply}>Применить</button>
+  </div>;
 }

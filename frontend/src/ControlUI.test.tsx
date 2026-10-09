@@ -107,6 +107,7 @@ describe('cloud device control', () => {
     expect(within(channel).getByRole('heading', { name: 'Канал 1' })).toBeInTheDocument();
     expect(within(channel).getByRole('group', { name: 'Алиасы' })).toHaveTextContent('Алиасы:Настольный свет');
     await user.click(within(channel).getByRole('button', { name: 'Включить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await waitFor(() => expect(writes[1]).toEqual({ method: 'POST', body: { commands: [{ code: 'switch_1', value: true }] } }));
   });
   it('keeps raw codes in collapsed mapping diagnostics instead of ordinary device properties', async () => {
@@ -147,13 +148,13 @@ describe('cloud device control', () => {
     expect(within(field).getByText('Нет показания')).toBeInTheDocument();
     const user=userEvent.setup();
     fireEvent.change(within(field).getByRole('slider'),{target:{value}});
-    await user.click(within(field).getByRole('button',{name:'Применить'}));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(writes).toEqual([{commands:[{code:'work_mode',value:'white'},{code,value:raw}]}]);
     expect(within(field).getByText('Нет показания')).toBeInTheDocument();
     expect(within(field).getByRole('spinbutton')).toHaveValue(Number(value));
     expect(within(field).getByRole('slider')).toHaveValue(value);
-    expect(within(field).getByRole('button',{name:'Применить'})).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Применить' })).toBeDisabled();
   });
 
   it('polls only the local report cache, updates channel 2 and preserves an edited brightness draft', async () => {
@@ -238,7 +239,7 @@ describe('cloud device control', () => {
     fireEvent.change(within(music).getByLabelText('Выбор цвета'),{target:{value:'#00ff00'}});
     expect(within(music).getByLabelText('music_data.s')).toHaveValue(255);
     expect(writes).toHaveLength(0);
-    await user.click(within(music).getByRole('button',{name:'Применить'}));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(writes).toEqual([{commands:[{code:'work_mode',value:'music'},{code:'music_data',value:{change_mode:'gradient',bright:0,temperature:0,h:120,s:255,v:255}}]}]);
     expect(music.querySelector('.reading')).toBeNull();
@@ -271,7 +272,7 @@ describe('cloud device control', () => {
       expect(command.querySelector('.reading')).toBeNull();
       expect(within(command).getByText('Команда')).toBeInTheDocument();
       expect(within(command).getByRole('textbox')).toHaveValue('');
-      expect(within(command).getByRole('button', { name: 'Применить' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Применить' })).toBeDisabled();
     }
     const remote = screen.getByRole('region', { name: 'Параметр пульта' });
     expect(remote.closest('details')).toBe(summary.closest('details'));
@@ -279,6 +280,7 @@ describe('cloud device control', () => {
     expect(within(remote).queryByRole('combobox')).toBeNull();
     expect(writes).toHaveLength(0);
     await user.click(within(remote).getByRole('button', { name: 'Выключить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(writes).toEqual([{ commands: [{ code: 'remote_switch', value: false }] }]);
     expect(within(remote).getByText('Да')).toBeInTheDocument(); // Cloud echo remains separate from ACK.
@@ -319,11 +321,12 @@ describe('cloud device control', () => {
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const power = await screen.findByRole('region', { name: 'Питание' });
     await user.click(within(power).getByRole('button', { name: 'Включить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(server.writes).toEqual([{ commands: [{ code: 'switch_led', value: true }] }]);
     expect(server.providers.every(value => value === provider)).toBe(true);
     expect(within(power).getByText('Выключено')).toBeInTheDocument();
-    expect(within(power).getByRole('button', { name: 'Включить' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(power).getByRole('button', { name: 'Включить' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('21.5 °C')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Температура' })).getByRole('button', {name:'Обновить показание Температура'})).toBeEnabled();
   });
@@ -333,12 +336,12 @@ describe('cloud device control', () => {
     const brightness = await screen.findByRole('region', { name: 'Яркость' });
     fireEvent.change(within(brightness).getByRole('slider'), { target: { value: '65' } });
     expect(server.writes).toHaveLength(0);
-    await user.click(within(brightness).getByRole('button', { name: 'Применить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
-    expect(server.writes[0]).toEqual({ commands: [{ code: 'work_mode', value: 'white' }, { code: 'bright_value_v2', value: 650 }] });
+    expect(server.writes[0]).toEqual({ commands: [{ code: 'bright_value_v2', value: 650 }] });
     const color = screen.getByRole('region', { name: 'Цвет' });
     fireEvent.change(within(color).getByLabelText('Выбор цвета'), { target: { value: '#00ff00' } });
-    await user.click(within(color).getByRole('button', { name: 'Применить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(server.writes[1]).toEqual({ commands: [{ code: 'work_mode', value: 'colour' }, { code: 'colour_data_v2', value: { h: 120, s: 1000, v: 1000 } }] });
   });
@@ -349,12 +352,14 @@ describe('cloud device control', () => {
     expect(button).toBeEnabled();
     expect(server.writes).toHaveLength(0);
     await userEvent.setup().click(button);
+    await userEvent.setup().click(screen.getByRole('button', {name:'Применить'}));
     await waitFor(() => expect(server.writes).toEqual([{commands:[{code:'switch_led',value:true}]}]));
   });
   it('distinguishes accepted command from a failed follow-up status and never retries the command', async () => {
     const server = cloudServer({ postReadError: true }); const user = userEvent.setup();
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Включить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Команда принята. Обновить статус не удалось');
     expect(server.writes).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Включить' })).toBeDisabled();
@@ -363,7 +368,10 @@ describe('cloud device control', () => {
     const server = cloudServer({ pending: true }); const close = vi.fn();
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={close} onAuthError={vi.fn()} />);
     const button = await screen.findByRole('button', { name: 'Включить' });
-    fireEvent.click(button); fireEvent.click(button);
+    fireEvent.click(button);
+    const apply = screen.getByRole('button', {name:'Применить'});
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply); fireEvent.click(apply);
     expect(server.writes).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Закрыть' })).toBeDisabled();
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }));
@@ -418,6 +426,7 @@ describe('local device and group controls', () => {
     const server = localServer(); const user = userEvent.setup();
     render(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Включить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(server.writes).toEqual([{ path: `/api/v1/devices/${device.id}/commands/capabilities`, body: { values: { switch: true } } }]);
     expect(server.reads).toContain(`/api/v1/devices/${device.id}/state?refresh=true&max_age=60`);
@@ -428,12 +437,12 @@ describe('local device and group controls', () => {
     render(<LocalControl api={new HomeApi(connection)} device={thermostat} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const target = await screen.findByRole('region', { name: 'Заданная температура' });
     fireEvent.change(within(target).getByRole('spinbutton'), { target: { value: '23' } });
-    await user.click(within(target).getByRole('button', { name: 'Применить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(server.writes[0].body).toEqual({ values: { target_temperature: 23 } });
     const mode = screen.getByRole('region', { name: 'Режим' });
     await user.selectOptions(within(mode).getByRole('combobox'), '1');
-    await user.click(within(mode).getByRole('button', { name: 'Применить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(server.writes[1].body).toEqual({ values: { mode: 1 } });
     expect(within(screen.getByRole('region', { name: 'Температура' })).queryByRole('spinbutton')).toBeNull();
@@ -498,6 +507,9 @@ describe('local device and group controls', () => {
     const server = localServer({ postError: true });
     render(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Включить' }));
+    const apply = screen.getByRole('button', {name:'Применить'});
+    await waitFor(() => expect(apply).toBeEnabled());
+    fireEvent.click(apply);
     expect(await screen.findByRole('alert')).toHaveTextContent('результат команды неизвестен');
     expect(server.writes).toHaveLength(1);
   });

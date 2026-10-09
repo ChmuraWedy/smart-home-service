@@ -66,7 +66,10 @@ export class HomeApi extends CloudApi {
     return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60`, 'GET', undefined, signal);
   }
   setCapability(id: number, name: string, value: JsonValue) {
-    return this.request<{ acknowledged: boolean }>(`/devices/${id}/commands/capabilities`, 'POST', { values: { [name]: value } });
+    return this.setCapabilities(id, { [name]: value });
+  }
+  setCapabilities(id: number, values: Record<string, JsonValue>) {
+    return this.request<{ acknowledged: boolean }>(`/devices/${id}/commands/capabilities`, 'POST', { values });
   }
   groupState(id: number, signal?: AbortSignal) { return this.request<GroupState>(`/groups/${id}/state`, 'GET', undefined, signal); }
   groupCommand(id: number, command: 'on' | 'off') { return this.request<GroupResult>(`/groups/${id}/commands/${command}`, 'POST'); }

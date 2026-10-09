@@ -761,8 +761,8 @@ footer {
 .capability > .help,.capability > .field-error { margin:4px 0 0 167px; font-size:11px; }
 .capability-alias-editor { margin-left:167px; }
 .capability-alias-editor .alias-row { margin:5px 0 0; }
-.capability-color .capability-heading:has(.color-picker) { grid-column:1/3; }
-.capability-color .capability-form { grid-column:1/-1; grid-row:2; }
+.capability-color .capability-heading:has(.color-picker) { grid-column:1; gap:8px; }
+.capability-color .capability-form { grid-column:2; grid-row:1; }
 .capability-color .color-editor { flex:1; min-width:0; }
 .color-sliders label { margin:0; font-size:11px; font-weight:400; text-align:center; }
 .color-sliders input { margin:0; }
@@ -787,3 +787,10 @@ footer {
   .color-sliders { gap:8px; }
   .alias-inline-form input { max-width:22ch; }
 }
+
+.control-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+.control-apply { display:flex; align-items:center; gap:10px; }
+.control-apply > span { color:#a1b1c5; font-size:11px; }
+.capability-heading .color-details-toggle { padding:0; width:24px; height:24px; border:0; background:transparent; color:#a1b1c5; }
+.bulb-controls .control-apply button { background:#87bfff; color:#102239; }
+@media(max-width:600px) { .control-actions { gap:6px; } .control-apply { gap:6px; } }
