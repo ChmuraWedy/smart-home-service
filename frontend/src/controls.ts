@@ -20,6 +20,9 @@ const LABELS: Record<string, string> = {
   temp_value: 'Цветовая температура', temp_value_v2: 'Цветовая температура', target_temperature: 'Заданная температура',
   temp_set: 'Заданная температура', temp_set_f: 'Заданная температура', temperature: 'Температура', temp_current: 'Температура',
   humidity: 'Влажность', humidity_value: 'Влажность', target_humidity: 'Заданная влажность', motion: 'Движение',
+  va_temperature: 'Температура', va_humidity: 'Влажность', va_battery: 'Батарея', battery_value: 'Батарея', battery_state: 'Батарея', battery_level: 'Батарея',
+  temp_unit_convert: 'Единица температуры', temp_unit: 'Единица температуры', temp_sensitivity: 'Чувствительность температуры', humidity_sensitivity: 'Чувствительность влажности',
+  temp_calibration: 'Поправка температуры', humidity_calibration: 'Поправка влажности', max_temp: 'Верхний порог температуры', min_temp: 'Нижний порог температуры', max_humidity: 'Верхний порог влажности', min_humidity: 'Нижний порог влажности',
   pir: 'Движение', pir_state: 'Движение', presence_state: 'Присутствие', battery: 'Батарея', battery_percentage: 'Батарея',
   mode: 'Режим', work_mode: 'Режим', speed: 'Скорость', fan_speed_enum: 'Скорость', position: 'Положение',
   percent_control: 'Положение', control: 'Действие', oscillation: 'Поворот', power: 'Мощность', cur_power: 'Мощность',
@@ -39,7 +42,7 @@ const OPTIONS: Record<string, string> = { white: 'Белый свет', colour: 
 export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? 'Канал ' + key.slice(7) : /^countdown_[1-9][0-9]*$/.test(key) ? 'Таймер канала ' + key.slice(10) : /^relay_status_[1-9][0-9]*$/.test(key) ? 'Состояние канала ' + key.slice(13) + ' после подачи питания' : key.replaceAll('_', ' '));
 const RELAY_OPTIONS: Record<string, string> = { power_off: 'Выключено', off: 'Выключено', power_on: 'Включено', on: 'Включено', last: 'Восстановить предыдущее состояние', memory: 'Восстановить предыдущее состояние' };
 export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : JSON.stringify(value);
-const unitLabel = (unit: string | undefined) => unit === 's' ? 'с' : unit;
+const unitLabel = (unit: string | undefined) => unit === 's' ? 'с' : unit === '℃' ? '°C' : unit === '℉' ? '°F' : unit;
 function controlHelp(key: string): string | undefined {
   if (key === 'relay_status' || /^relay_status_[1-9][0-9]*$/.test(key)) return 'Какое состояние восстановить после отключения и повторной подачи электропитания. Это настройка, а не текущий статус реле.';
   if (key === 'switch_backlight') return 'Включение и выключение подсветки клавиш выключателя.';

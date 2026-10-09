@@ -40,7 +40,7 @@ describe('one Apply for a device card', () => {
     await screen.findByRole('region', { name: 'Яркость' });
     expect(screen.getAllByRole('button', { name: 'Применить' })).toHaveLength(1);
     edit('Яркость', '65'); edit('Цветовая температура', '40');
-    await user.click(screen.getByRole('button', { name: 'Включить' }));
+    await user.click(screen.getByRole('switch'));
     expect(writes).toEqual([]);
     expect(await screen.findByText('Изменено: 3')).toBeInTheDocument();
     await user.click(apply());
@@ -50,7 +50,7 @@ describe('one Apply for a device card', () => {
     ] }]);
     expect(within(field('Яркость')).getByRole('spinbutton')).toHaveValue(65);
     expect(within(field('Цветовая температура')).getByRole('spinbutton')).toHaveValue(40);
-    expect(screen.getByRole('button', { name: 'Включить' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
     expect(apply()).toBeDisabled();
   });
 
@@ -58,8 +58,8 @@ describe('one Apply for a device card', () => {
     const { writes } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
     edit('Яркость', '65'); edit('Яркость', '50');
-    await user.click(screen.getByRole('button', { name: 'Включить' }));
-    await user.click(screen.getByRole('button', { name: 'Выключить' }));
+    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('switch'));
     await waitFor(() => expect(apply()).toBeDisabled());
     expect(screen.queryByText(/Изменено:/)).toBeNull();
     expect(writes).toEqual([]);
@@ -150,7 +150,7 @@ describe('one Apply for a device card', () => {
     render(<LocalControl api={new HomeApi(connection)} device={local} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
-    await user.click(screen.getByRole('button', { name: 'Выключить' })); edit('Яркость', '65');
+    await user.click(screen.getByRole('switch')); edit('Яркость', '65');
     expect(writes).toEqual([]);
     await user.click(apply());
     await waitFor(() => expect(writes).toEqual([{ path: '/api/v1/devices/1/commands/capabilities', body: { values: { switch: false, brightness: 65 } } }]));

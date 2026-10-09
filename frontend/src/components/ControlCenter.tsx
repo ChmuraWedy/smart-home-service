@@ -10,6 +10,7 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
+import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
@@ -25,14 +26,15 @@ function DeviceCard({ device, state, room, now, onOpen, onAdd }: {
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const local = device.local;
+  const battery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   return <li className="device-card" aria-label={device.name}>
     <div className="device-heading"><span className="device-symbol" aria-hidden="true">◇</span>
-      <span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span>
+      <div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div>
     </div>
     <h3>{device.name}</h3>
     {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства"><span className="alias-row-label">Алиасы:</span>{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div>}
     <p className="help">{room} · {local ? (local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi') : cloud?.sub ? 'Через шлюз' : 'Прямое подключение'}</p>
-    {local && <div className="card-readings"><p className="help">Последние показания в домашней сети</p>{Object.entries(local.capabilities).filter(([, cap]) => cap.readable).slice(0, 4).map(([key, cap]) => {
+    {local && <div className="card-readings"><p className="help">Последние показания в домашней сети</p>{Object.entries(local.capabilities).filter(([key, cap]) => cap.readable && !isBattery(key)).slice(0, 4).map(([key, cap]) => {
       const reading = state?.values[key];
       return <p key={key}><span>{localSpec(key, cap).label}</span><strong className={isStale(reading, now, true) || !state?.enabled ? 'unknown' : ''}>{displayReading(localSpec(key, cap), reading)}{reading?.known && (isStale(reading, now, true) || !state?.enabled) && ' · неактуально'}</strong></p>;
     })}</div>}

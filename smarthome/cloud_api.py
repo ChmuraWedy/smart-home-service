@@ -35,7 +35,44 @@ class DeveloperCredentials(Schema):
 
 
 def cloud_bridge(request, provider):
-    return request.app.state.developer_cloud if provider == "developer" else request.app.state.cloud
+    bridge = request.app.state.developer_cloud if provider == "developer" else request.app.state.cloud
+    if provider == "sharing" and hasattr(bridge, "state"):
+        bridge.state.history_engine = request.app.state.engine
+    return bridge
+
+
+def audit_cloud(request, bridge, provider, device, *, commands=None, outcome=None):
+    import logging
+
+    from .activity import record_command, record_values
+    from .cloud_mappings import scope_for
+    try:
+        with Session(request.app.state.engine) as session:
+            scope = scope_for(bridge, provider)
+            if commands is not None:
+                record_command(session, scope, device.id, {row["code"]: row["value"] for row in commands}, outcome, getattr(device, "local_key", None))
+            else:
+                record_values(session, scope, device.id, {**device.status, "online": bool(device.online)}, secret=getattr(device, "local_key", None))
+            session.commit()
+    except Exception:
+        logging.getLogger(__name__).warning("Device activity persistence unavailable")
+
+
+def battery_reading(device):
+    for code in ("battery_percentage", "battery_value", "va_battery", "battery", "battery_state", "battery_level"):
+        value = device.status.get(code)
+        if value is None or value == getattr(device, "local_key", None):
+            continue
+        spec = getattr(device, "status_range", {}).get(code)
+        try:
+            limits = spec.values if isinstance(spec.values, dict) else json.loads(spec.values)
+        except (AttributeError, ValueError, TypeError):
+            limits = {}
+        scale = limits.get("scale", 0)
+        if type(value) in (int, float) and type(scale) is int and 0 <= scale <= 9:
+            value = value * 10 ** -scale
+        return {"code": code, "value": value, "unit": limits.get("unit") or ("%" if code == "battery_percentage" else None)}
+    return None
 
 
 class QRLogin(Schema):
@@ -124,6 +161,7 @@ def safe_device(device):
     fields = ("id", "name", "category", "product_id", "online", "sub", "node_id", "support_local")
     result = {name: getattr(device, name, None) for name in fields}
     result["has_local_key"] = bool(getattr(device, "local_key", None))
+    result["battery"] = battery_reading(device)
     result["functions"] = [
         safe_spec(device, f)
         for f in getattr(device, "function", {}).values()
@@ -230,7 +268,11 @@ def devices(
     response.headers["Cache-Control"] = "no-store"
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
-        rows = [safe_device(device) for device in bridge.devices(refresh)]
+        account_devices = bridge.devices(refresh)
+        snapshots = [bridge.state.snapshot(device) if provider == "sharing" else device for device in account_devices]
+        rows = [safe_device(device) for device in snapshots]
+        for device in snapshots:
+            audit_cloud(request, bridge, provider, device)
         if rows:
             aliases = aliases_for_devices(session, scope_for(bridge, provider), [row["id"] for row in rows])
             for row in rows:
@@ -292,7 +334,9 @@ def cloud_device_status(
     provider: Provider = "sharing",
 ):
     bridge = cloud_bridge(request, provider)
-    device = bridge.device_status(device_id, refresh)
+    with bridge.lock:
+        device = bridge.device_status(device_id, refresh)
+        audit_cloud(request, bridge, provider, device)
     response.headers["Cache-Control"] = "no-store"
     return {
         "device_id": device.id,
@@ -378,7 +422,15 @@ def cloud_commands(
     with bridge.lock:
         device = bridge.writable_device(device_id)
         validate_cloud_commands(device, body.commands)
-        return bridge.send_commands(device_id, [command.model_dump() for command in body.commands])
+        commands = [command.model_dump() for command in body.commands]
+        audit_cloud(request, bridge, provider, device, commands=commands, outcome="sent")
+        try:
+            result = bridge.send_commands(device_id, commands)
+        except HTTPException as error:
+            audit_cloud(request, bridge, provider, device, commands=commands, outcome="rejected" if error.status_code in {400, 403, 404, 409, 422} else "unknown")
+            raise
+        audit_cloud(request, bridge, provider, device, commands=commands, outcome="accepted" if result.get("acknowledged") else "unknown")
+        return result
 
 
 def validate_cloud_commands(device, commands):

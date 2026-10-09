@@ -8,6 +8,8 @@ import type { Reading } from '../home-api';
 import type { DraftStage } from '../control-drafts';
 import { defaultObject } from '../lighting';
 import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFields';
+import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWizard';
+import { ParameterIcon } from './DevicePresentation';
 
 export type ControlNotice = { text: string; error?: boolean };
 export type Receipt = ControlNotice;
@@ -99,8 +101,8 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   return { data, busy, readOK, notice, refresh, execute };
 }
 
-export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, className = '' }: {
-  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; className?: string;
+export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, statusContent, className = '' }: {
+  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; statusContent?: ReactNode; className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -110,7 +112,7 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     return () => { element.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }}>
-    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><button className="secondary compact" disabled={busy} onClick={onClose}>{closeLabel}</button></header>
+    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><button className="secondary compact" disabled={busy} onClick={onClose}>{closeLabel}</button>{statusContent}</div></header>
     {children}
   </dialog>;
 }
@@ -129,6 +131,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
   const [draft, setDraft] = useState('');
   const initial = useRef<JsonValue | undefined>(undefined);
   const [preciseColor, setPreciseColor] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const [color, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
   const pendingTarget = useRef<{ value: JsonValue; baseline: JsonValue | undefined; sentAt: number } | null>(null);
   const [awaiting, setAwaiting] = useState(false);
@@ -185,7 +188,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     } });
   }, [stage, spec.key, draft, color, dirty, error]);
   useEffect(() => () => { stage?.(spec.key, null); }, [stage, spec.key]);
-  const selectedPower = stage && (dirty || awaiting) ? draft === 'true' : Boolean(fresh && reading?.value === true);
+  const selectedPower = stage && (dirty || awaiting) ? draft === 'true' : Boolean(reading?.known && reading.value === true);
   async function send(value?: JsonValue) {
     try {
       let parsed = value;
@@ -205,15 +208,19 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     } catch (failure) { setError(errorText(failure)); }
   }
   return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-row"><div className="capability-heading"><h3>{spec.label}</h3>
+    <div className="capability-row"><div className="capability-heading"><h3>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.label}</h3>
+    </div>
+    {spec.kind === 'color' && <div className="color-tools">
       {spec.kind === 'color' && spec.writable && <input aria-label="Выбор цвета" title="Выбор цвета" className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
       {spec.kind === 'color' && spec.writable && <button type="button" className="secondary color-details-toggle" aria-label="Точная настройка цвета" title="Тон, насыщенность и яркость" aria-expanded={preciseColor} onClick={() => setPreciseColor(value => !value)}>···</button>}
-    </div>
+    </div>}
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
+      {stage ? <><button type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => change(String(!selectedPower))}><span /></button><span className="power-selection">{dirty || awaiting || reading?.known ? selectedPower ? 'Включено' : 'Выключено' : 'Нет данных'}</span>{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
       {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
       <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>Выключить</button>
+      </>}
     </div> : <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!stage && !disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
       {spec.kind === 'number' && <div className="range-input-row">
         <label className="range-value"><span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span><input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Значение" />{spec.unit && <span>{spec.unit}</span>}</label>
@@ -225,7 +232,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
       </div>}
       {spec.kind === 'text' && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
       {spec.kind === 'json' && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
-      {spec.kind === 'raw' && <>
+      {hasScheduleWizard(spec) ? <div className="schedule-launch"><span className="help">{scheduleSummary(spec.key,draft)}</span><button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>Настроить</button></div> : spec.kind === 'raw' && <>
         {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
         <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
         <label>Данные производителя (base64)<textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} /></label>
@@ -244,6 +251,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     {spec.reason && <p className="help">{spec.reason}</p>}
     {spec.help && <p className="help">{spec.help}</p>}
     {(error || draftError) && <p className="field-error" role="alert">{error || draftError}</p>}
+    {scheduleOpen && <ScheduleWizard spec={spec} value={draft} onClose={() => setScheduleOpen(false)} onDone={value => { change(value); setScheduleOpen(false); }} />}
   </section>;
 }
 

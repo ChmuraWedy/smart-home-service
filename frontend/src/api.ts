@@ -24,6 +24,7 @@ export type CloudDevice = {
   has_local_key: boolean;
   node_id?: string | null;
   aliases?: string[];
+  battery?: { code: string; value: JsonValue; unit?: string | null } | null;
 };
 export type DeveloperCredentials = {
   access_id: string;
@@ -45,6 +46,7 @@ export type CloudSnapshot = {
   status_observations?: Record<string, {observed_at: string | null; received_at: string}>;
 };
 export type CloudCommandResult = { acknowledged: boolean; state_confirmed: boolean };
+export type DeviceEvent = { id: number; at: string; observed_at: string | null; kind: string; code: string; value: JsonValue; outcome: string | null };
 export type NetworkWatch = {
   watch_id: string; device_id: string; target_id: string; route: 'direct' | 'gateway';
   configured_ip: string | null; observed_ip: string | null; version: string | null;
@@ -130,6 +132,9 @@ export class CloudApi {
   }
 
   status(signal?: AbortSignal) { return this.json<CloudStatus>('/status', 'GET', undefined, signal); }
+  deviceActivity(id: string, provider: Provider | 'local', before?: number, signal?: AbortSignal) {
+    return this.request<{ device_id: string; events: DeviceEvent[]; next_before: number | null }>('/activity/devices/' + encodeURIComponent(id) + '?provider=' + provider + (before ? '&before=' + before : ''), 'GET', undefined, signal);
+  }
   startNetworkWatch(id: string, provider: Provider | 'local', signal?: AbortSignal) {
     return this.request<NetworkWatch>('/network/devices/' + encodeURIComponent(id) + '/watch?provider=' + provider, 'POST', {}, signal);
   }

@@ -13,11 +13,13 @@ export function JsonFields({ schema, value, disabled, onChange, prefix = '', nod
   const set = (key: string, v: JsonValue) => onChange({ ...value, [key]: v });
   const hsv = ['h','s','v'].every(k => typeof value[k] === 'number' && typeof schema[k]?.max === 'number');
   return <div className="structured-fields">
+    {schema.hour && schema.minute && <label>Время<input type="time" disabled={disabled} value={`${String(value.hour).padStart(2,'0')}:${String(value.minute).padStart(2,'0')}`} onChange={event => { const [hour,minute] = event.target.value.split(':').map(Number); onChange({...value,hour:Number.isFinite(hour) ? hour : null,minute:Number.isFinite(minute) ? minute : null}); }} /></label>}
     {hsv && <label>Выбор цвета<input type="color" disabled={disabled} value={hsvToHex({ h:Number(value.h), s:Number(value.s)*1000/Number(schema.s.max), v:Number(value.v)*1000/Number(schema.v.max) })} onChange={e => {
       const color = hexToHsv(e.target.value);
       onChange({ ...value, h:color.h, s:Math.round(color.s*Number(schema.s.max)/1000), v:Math.round(color.v*Number(schema.v.max)/1000) });
     }} /></label>}
     {Object.entries(schema).map(([key, rule]) => {
+      if ((key === 'hour' || key === 'minute') && schema.hour && schema.minute) return null;
       const label = labels[key] || key.replaceAll('_',' '), id = prefix + key;
       if (key === 'days' || key === 'channels') {
         const names = key === 'days' ? ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'] : ['1','2','3','4','5','6','7'];

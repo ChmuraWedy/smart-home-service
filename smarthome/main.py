@@ -648,6 +648,9 @@ def create_app(settings: Settings | None = None, controller=None):
 
     app.include_router(device_aliases_router)
 
+    from .activity import router as activity_router
+    app.include_router(activity_router)
+
     @app.get("/cloud", include_in_schema=False)
     def cloud_setup_page():
         if not settings.frontend_url:

@@ -6,6 +6,8 @@ import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock
 import { DeviceNetwork } from './DeviceNetwork';
 import { useControlDrafts } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
+import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
+import { DeviceActivity } from './DeviceActivity';
 
 export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: {
   api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string;
@@ -19,7 +21,9 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
   const session = useControlSession(load, onAuthError), now = useClock();
   const item = session.data?.metadata || device;
   const drafts = useControlDrafts();
-  return <ControlDialog className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
+  const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
+  const primaryActivity = specs.some(spec => spec.indicator === 'motion');
+  return <ControlDialog statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(session.data.state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
     <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><div className="control-actions"><button className="secondary compact" disabled={session.busy || aliasBusy} onClick={() => void session.refresh()}>Обновить статус</button>
       {Object.values(item.capabilities).some(cap => cap.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || aliasBusy || !session.readOK || !session.data?.state.enabled} onApply={() => void drafts.apply(changes => session.execute(async () => {
         for (const change of changes) validateControlValue(change.spec, change.value!);
@@ -30,12 +34,14 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
     </div></div>
     <p className="help">Первое открытие читает кеш. «Обновить статус» опрашивает устройство. Команды и ключи Tuya обрабатывает сервер.</p>
     {session.data && !session.data.state.enabled && <p className="saved-summary">Устройство или его шлюз отключены в настройках сервиса.</p>}
-    <div className="capability-grid">{session.data && Object.entries(item.capabilities).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={drafts.stage} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
+    {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
+    <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>{session.data && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={drafts.stage} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
       const result = await api.setCapability(item.id, key, value);
       if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
       return { text: 'Команда принята.' };
     })} />)}</div>
     {session.data && !Object.keys(item.capabilities).length && <p className="saved-summary">Возможности ещё не настроены. Задайте проверенные capabilities устройству или его типу через REST API.</p>}
+    {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
     <DeviceNetwork api={api} deviceId={item.device_id} provider="local" onAuthError={onAuthError} />
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;

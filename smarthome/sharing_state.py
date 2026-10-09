@@ -49,6 +49,21 @@ class SharingState:
         self.received = {}
         self.mq = None
         self.store = SharingReports(bridge)
+        self.history_engine = None
+
+    def history(self, device_id, reports):
+        if self.history_engine is None:
+            return
+        try:
+            from sqlalchemy.orm import Session
+
+            from .activity import record_values
+            with Session(self.history_engine) as session:
+                record_values(session, self.store.scope, device_id,
+                    {code: row["value"] for code, row in reports.items()}, source="report", observations=reports)
+                session.commit()
+        except Exception:
+            logging.getLogger(__name__).warning("Device activity persistence unavailable")
 
     def stored(self, action, *args):
         try:
@@ -115,6 +130,8 @@ class SharingState:
         self.reports = {id: report for id, report in self.reports.items() if id in devices}
         self.online = {id: value for id, value in self.online.items() if id in devices}
         self.received = dict.fromkeys(devices, received)
+        for device in devices.values():
+            self.watch(manager, device)
 
     def definitions(self, manager, device):
         if device.id in self.metadata or not hasattr(manager, "device_repository"):
@@ -159,6 +176,7 @@ class SharingState:
                     received = now_iso()
                     if properties is None:
                         state.online[reported.id] = bool(reported.online)
+                        state.history(reported.id, {"online": {"value": bool(reported.online), "observed_at": None, "received_at": received}})
                         return
                     reports = dict(state.reports.get(reported.id, {}))
                     for code in properties:
@@ -181,7 +199,7 @@ class SharingState:
                             except (ValueError, OverflowError, OSError):
                                 pass
                         previous = reports.get(code, {}).get("observed_at")
-                        if observed and previous and previous > observed:
+                        if observed and previous and previous >= observed:
                             continue  # Delayed delivery must not reverse a newer report.
                         reports[code] = {
                             "value": copy.deepcopy(reported.status[code]),
@@ -190,6 +208,7 @@ class SharingState:
                         }
                     state.reports[reported.id] = reports
                     state.stored("save", reported.id, reports)
+                    state.history(reported.id, reports)
 
                 def add_device(self, reported):
                     pass
@@ -209,7 +228,21 @@ class SharingState:
             mq.daemon = True
             self.mq = mq
             manager.mq = mq
-            mq.add_message_listener(manager.on_message)
+            def on_message(message):
+                if state.bridge.manager is not manager or state.mq is None:
+                    return
+                # Load DP conversion only when a device actually reports, without
+                # the former four metadata requests for every inventory entry.
+                device_id = message.get("data", {}).get("devId")
+                reported = manager.device_map.get(device_id)
+                if message.get("protocol") == 4 and reported is not None:
+                    try:
+                        state.definitions(manager, reported)
+                    except Exception:
+                        logging.getLogger(__name__).warning("Tuya report definitions unavailable")
+                        return
+                manager.on_message(message)
+            mq.add_message_listener(on_message)
             mq.start()
         else:
             if self.connected:

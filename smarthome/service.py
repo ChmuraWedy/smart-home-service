@@ -208,6 +208,19 @@ def capability_values_dps(session, item, values):
 
 
 def record_observations(session, item, observed, observed_at):
+    from .activity import record_values
+    from .capabilities import decode
+
+    values = {}
+    for name, definition in effective_capabilities(session, item).items():
+        spec = Capability.model_validate(definition)
+        dp = spec.read_dp or spec.dp
+        if spec.readable and dp in observed:
+            try:
+                values[name] = decode(spec, observed[dp])
+            except (ValueError, TypeError, OverflowError):
+                pass
+    record_values(session, "local", item.device_id, values, source="local", secret=item.local_key)
     if observed:
         item.last_dps = {**(item.last_dps or {}), **observed}
     for dp, value in observed.items():

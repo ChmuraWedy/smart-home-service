@@ -267,3 +267,25 @@ class DisplayWidget(Base):
         ForeignKey("device_groups.id", ondelete="RESTRICT"), index=True
     )
     capabilities: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class DeviceActivity(Base):
+    __tablename__ = "device_activity"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scope: Mapped[str] = mapped_column(String(64), index=True)
+    device_id: Mapped[str] = mapped_column(String(128), index=True)
+    at: Mapped[str] = mapped_column(String(40))
+    observed_at: Mapped[str | None] = mapped_column(String(40))
+    kind: Mapped[str] = mapped_column(String(20))
+    code: Mapped[str] = mapped_column(String(128))
+    value: Mapped[object] = mapped_column(JSON)
+    outcome: Mapped[str | None] = mapped_column(String(20))
+
+
+class ActivityValue(Base):
+    __tablename__ = "device_activity_values"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    code: Mapped[str] = mapped_column(String(128), primary_key=True)
+    value: Mapped[object] = mapped_column(JSON)
+    report_stamp: Mapped[str | None] = mapped_column(String(40))
