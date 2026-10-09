@@ -44,6 +44,12 @@ export type CloudSnapshot = {
   status_observations?: Record<string, {observed_at: string | null; received_at: string}>;
 };
 export type CloudCommandResult = { acknowledged: boolean; state_confirmed: boolean };
+export type NetworkWatch = {
+  watch_id: string; device_id: string; target_id: string; route: 'direct' | 'gateway';
+  configured_ip: string | null; observed_ip: string | null; version: string | null;
+  last_seen: string | null; packets: number; listening: boolean; ports: number[]; failed_ports: number[];
+  remaining_seconds: number; changes: { at: string; previous_ip: string | null; ip: string }[];
+};
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -123,6 +129,11 @@ export class CloudApi {
   }
 
   status(signal?: AbortSignal) { return this.json<CloudStatus>('/status', 'GET', undefined, signal); }
+  startNetworkWatch(id: string, provider: Provider | 'local', signal?: AbortSignal) {
+    return this.request<NetworkWatch>('/network/devices/' + encodeURIComponent(id) + '/watch?provider=' + provider, 'POST', {}, signal);
+  }
+  networkWatch(id: string, signal?: AbortSignal) { return this.request<NetworkWatch>('/network/watches/' + encodeURIComponent(id), 'GET', undefined, signal); }
+  stopNetworkWatch(id: string) { return this.deleteResource('/network/watches/' + encodeURIComponent(id)); }
   saveCode(user_code: string) { return this.json<CodeStatus>('/user-code', 'PUT', { user_code }); }
   saveDeveloper(body: DeveloperCredentials) { return this.json<DeveloperStatus>('/developer/credentials', 'PUT', body); }
   connectDeveloper() { return this.json<DeveloperStatus>('/developer/connect', 'POST'); }

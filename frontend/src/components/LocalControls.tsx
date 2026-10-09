@@ -3,6 +3,7 @@ import { displayReading, isStale, localSpec } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { DeviceNetwork } from './DeviceNetwork';
 
 export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: {
   api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string;
@@ -24,6 +25,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
       return { text: 'Команда принята.' };
     })} />)}</div>
     {session.data && !Object.keys(item.capabilities).length && <p className="saved-summary">Возможности ещё не настроены. Задайте проверенные capabilities устройству или его типу через REST API.</p>}
+    <DeviceNetwork api={api} deviceId={item.device_id} provider="local" onAuthError={onAuthError} />
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;
 }

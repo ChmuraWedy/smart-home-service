@@ -6,6 +6,7 @@ import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceMappings } from './DeviceMappings';
 import { ChannelAliases } from './ChannelAliases';
+import { DeviceNetwork } from './DeviceNetwork';
 
 export function CloudControl({ api, device, provider, devices, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; onClose: () => void; onAuthError: () => void;
@@ -52,6 +53,7 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
       <div className="capability-grid">{advanced.map(field)}</div>
     </details>}
     {session.data && !specs.length && <p className="empty-state">Устройство не предоставило показаний или возможностей управления.</p>}
+    <DeviceNetwork api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />
     {session.data && <details className="cloud-properties"><summary>Свойства устройства</summary><dl>
       <div><dt>ID устройства</dt><dd><code>{device.id}</code></dd></div>
       <div><dt>Тип</dt><dd>{device.category === 'pir' ? 'Датчик движения' : device.category === 'dj' ? 'Лампа' : device.category || 'Не указан'}</dd></div>
