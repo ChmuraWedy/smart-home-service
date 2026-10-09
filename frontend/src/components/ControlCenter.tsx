@@ -30,7 +30,7 @@ function DeviceCard({ device, state, room, now, onOpen, onAdd }: {
       <span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span>
     </div>
     <h3>{device.name}</h3>
-    {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства">{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}><span>Алиас:</span> {alias}</span>)}</div>}
+    {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства"><span className="alias-row-label">Алиасы:</span>{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div>}
     <p className="help">{room} · {local ? (local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi') : cloud?.sub ? 'Через шлюз' : 'Прямое подключение'}</p>
     {local && <div className="card-readings"><p className="help">Последние показания в домашней сети</p>{Object.entries(local.capabilities).filter(([, cap]) => cap.readable).slice(0, 4).map(([key, cap]) => {
       const reading = state?.values[key];

@@ -91,10 +91,10 @@ def test_conflicting_alias_is_atomic(client, resource):
     [
         ["123"],
         ["bad/alias"],
-        ["alias with spaces"],
+        ["bad\nvalue"],
         ["x" * 65],
         ["same", " SAME "],
-        ["кириллица"],
+        ["bad:alias"],
         None,
     ],
 )
@@ -300,3 +300,15 @@ def test_upgrade_existing_database_preserves_inventory_and_keys(tmp_path):
             assert {"building_aliases", "room_aliases", "device_aliases"}.issubset(
                 inspect(client.app.state.engine).get_table_names()
             )
+
+
+@pytest.mark.parametrize("resource", ["buildings", "rooms", "devices"])
+def test_unicode_aliases_round_trip_and_normalize(client, resource):
+    aliases = ["Свет кухни", "Святло пакоя", "Światło pokoju", "Cafe\u0301"]
+    item = create_owner(client, resource, aliases=aliases)
+    path = API + "/" + resource
+    for alias in ["СВЕТ КУХНИ", "СВЯТЛО ПАКОЯ", "ŚWIATŁO POKOJU", "CAFÉ"]:
+        assert client.get(path + "/" + alias).json()["id"] == item["id"]
+    assert "café" in item["aliases"]
+    duplicate = client.patch(path + f"/{item['id']}", json={"aliases": ["Café", "Cafe\u0301"]})
+    assert duplicate.status_code == 422

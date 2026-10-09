@@ -51,7 +51,7 @@ def replace_aliases(session: Session, item, aliases: list[str]):
     except ValidationError:
         raise HTTPException(
             422,
-            "Custom aliases require 1..64 ASCII letters/digits/._- and must start with a letter; the current name is automatic",
+            "Custom aliases require 1..64 Unicode letters/marks/digits/spaces/._- and must start with a letter; the current name is automatic",
         ) from None
     if len(aliases) > 32 or len(aliases) != len(set(aliases)):
         raise HTTPException(422, "At most 32 unique custom aliases are allowed")

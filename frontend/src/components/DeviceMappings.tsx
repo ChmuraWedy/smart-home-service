@@ -61,7 +61,7 @@ export function DeviceMappings({ api, device, provider, definitions, devices, di
     finally { lock.current = false; if (alive.current) { setBusy(false); onBusy(false); } }
   }
   const toDP = (known:CloudFunction|undefined, text:string) => known?.dp_id ?? (text ? Number(text) : null);
-  return <details className="cloud-properties device-mappings" onToggle={e => setOpened(e.currentTarget.open)}><summary>Связанные устройства и сопоставления</summary>
+  return <details className="cloud-properties device-mappings" onToggle={e => setOpened(e.currentTarget.open)}><summary>Ручные сопоставления в нашей базе</summary>
     <p className="help">Привязки из Smart Life недоступны через это подключение. Здесь можно сохранить свою карту: ID устройства и кнопка/DP. Запись хранится в сервисе; она не меняет настройки Tuya и не запускает автоматизацию.</p>
     <p className="help">Текущее устройство: <code>{device.id}</code></p>
     {busy && <p role="status">Загружаем…</p>}

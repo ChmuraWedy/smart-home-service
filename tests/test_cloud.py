@@ -687,7 +687,7 @@ def test_device_aliases_persist_in_cards_without_creating_inventory_or_renaming_
     assert cloud_client.get(path).json()["aliases"] == []
     bridge.auth["token_info"]["uid"] = "user"
     assert cloud_client.put(path, json={"aliases": []}).json()["aliases"] == []
-    for aliases in [["Bad Alias"], ["кириллица"], ["a", " A "], ["x" * 65], [f"alias{i}" for i in range(33)]]:
+    for aliases in [["Bad/Alias"], ["bad\nvalue"], ["a", " A "], ["x" * 65], [f"alias{i}" for i in range(33)]]:
         assert cloud_client.put(path, json={"aliases": aliases}).status_code == 422
     assert cloud_client.get(API + "/devices/missing/aliases").status_code == 404
     cloud_client.headers.clear()
@@ -715,3 +715,31 @@ def test_cloud_card_reuses_inventory_aliases_and_preserves_other_device_settings
     assert cloud_client.get("/api/v1/devices/new_tag").json()["id"] == local["id"]
     assert cloud_client.put(path, json={"aliases": ["new_tag"]}).status_code == 200
     assert cloud_client.get(f"/api/v1/devices/{local['id']}").json()["aliases"] == ["Мой шлюз", "new_tag"]
+
+
+def test_unicode_cloud_aliases_persist_and_conflict_after_normalization(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/aliases"
+    result = cloud_client.put(path, json={"aliases": ["Свет кухни", "Святло пакоя", "Światło pokoju", "Cafe\u0301"]})
+    assert result.status_code == 200, result.text
+    assert result.json()["aliases"] == sorted(["свет кухни", "святло пакоя", "światło pokoju", "café"])
+    assert cloud_client.get(path).json() == result.json()
+    assert cloud_client.put(API + "/devices/child/aliases", json={"aliases": ["CAFÉ"]}).status_code == 409
+
+
+@pytest.mark.parametrize("code,status,detail", [("2001", 409, "не в сети"), ("2003", 502, "code 2003"), (SECRET, 502, "physical outcome may be unknown")])
+def test_upstream_command_rejection_is_safe_and_not_retried(cloud_client, monkeypatch, code, status, detail):
+    login(cloud_client)
+    cloud_client.get(API + "/devices")
+    calls = []
+    def reject(*args):
+        calls.append(args)
+        error = RuntimeError(SECRET)
+        error.error_code = code
+        raise error
+    monkeypatch.setattr(cloud_client.app.state.cloud.manager.customer_api, "post", reject)
+    response = cloud_client.post(API + "/devices/gateway/commands", json={"commands": [{"code": "switch", "value": True}]})
+    assert response.status_code == status
+    assert detail in response.json()["detail"]
+    assert SECRET not in response.text
+    assert len(calls) == 1

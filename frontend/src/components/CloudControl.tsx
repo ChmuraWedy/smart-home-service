@@ -37,20 +37,21 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
   const now = useClock();
   const definitions = session.data ? labels ? withChannelLabels(session.data.definitions, labels) : session.data.definitions : null;
   const specs = session.data && definitions ? cloudSpecs(definitions, session.data.snapshot) : [];
-  const basic = specs.filter(spec => !spec.advanced), advanced = specs.filter(spec => spec.advanced);
-  const field = (spec: ControlSpec) => <CapabilityField key={spec.key} spec={spec} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} disabled={editingBusy || session.busy || !session.readOK || !session.data!.snapshot.online} onSend={value => session.execute(async () => {
+  const settings = specs.filter(spec => /^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key));
+  const basic = specs.filter(spec => !spec.advanced && !settings.includes(spec)), advanced = specs.filter(spec => spec.advanced && !settings.includes(spec));
+  const field = (spec: ControlSpec) => <CapabilityField key={spec.key} spec={spec} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={editingBusy || session.busy || !session.readOK} onSend={value => session.execute(async () => {
     const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, session.data!.definitions));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
     return { text: 'Команда принята.' };
   })} />;
-  return <ControlDialog title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || editingBusy} onClose={onClose}>
-    <DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />
+  return <ControlDialog title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><button className="secondary compact" disabled={session.busy || editingBusy} onClick={() => void session.refresh()}>Обновить статус</button></div>
     <p className="help">{specs.some(spec => spec.writable) ? 'Облачный снимок состояния. Принятие команды не подтверждает изменение устройства; облако может вернуть прежнее показание.' : 'Последнее известное состояние в облаке. Обновите статус для получения нового снимка.'}</p>
     {session.data && <p className="help">Снимок получен: {new Date(session.data.fetchedAt).toLocaleString('ru-RU')}</p>}
     {provider === 'sharing' && session.data && <p className="help">{session.data.snapshot.event_stream_connected ? 'Приём отчётов устройства подключён. Новые состояния появляются автоматически.' : 'Свежих отчётов пока нет или соединение ещё устанавливается. Сохранённый снимок Tuya может запаздывать.'}</p>}
-    {session.data && !session.data.snapshot.online && <p className="saved-summary">Устройство не в сети. Обновите статус после восстановления связи.</p>}
+    {session.data && !session.data.snapshot.online && <p className="saved-summary">Tuya сообщает, что устройство не в сети. Можно обновить статус или отправить команду; результат покажет сервис.</p>}
     {basic.length > 0 && <div className="capability-grid">{basic.map(field)}</div>}
+    {settings.length > 0 && <details className="cloud-properties additional-settings"><summary>Дополнительные настройки</summary><div className="capability-grid">{settings.map(field)}</div></details>}
     {advanced.length > 0 && <details className="cloud-properties advanced-controls"><summary>Эффекты и дополнительные параметры</summary>
       <p className="help">Составные команды и параметры производителя. Здесь нужны значения в формате устройства; основные настройки света доступны выше.</p>
       <div className="capability-grid">{advanced.map(field)}</div>
@@ -66,9 +67,8 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
     {session.data && <details className="cloud-properties"><summary>Технические данные для настройки связей</summary>
       <p className="help">Коды параметров и известные номера DP для сопоставления устройств. Номер DP не нужен для облачной команды; его отсутствие не означает ошибку. Эти сведения не подтверждают физическое выполнение команды.</p>
       <ul>{[...session.data.definitions.functions,...(session.data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => <li key={spec.code}><strong>{specs.find(control => control.key === spec.code)?.label || spec.code}</strong> · <code>{spec.code}</code> · {spec.type}{spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : spec.dp_id ? ' · DP '+spec.dp_id : ''}</li>)}</ul>
+    {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy || aliasBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
     </details>}
-    {definitions && <ChannelAliases api={api} deviceId={device.id} provider={provider} definitions={definitions} disabled={session.busy || mappingBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} />}
-    {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;
 }

@@ -1,8 +1,10 @@
+import unicodedata
 from datetime import datetime
 from ipaddress import IPv4Address
 from typing import Annotated, ClassVar, Literal
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -22,7 +24,7 @@ PositiveID = Annotated[int, Field(gt=0)]
 
 
 def normalize_alias(value):
-    return value.strip().lower() if isinstance(value, str) else value
+    return unicodedata.normalize("NFC", value).strip().casefold() if isinstance(value, str) else value
 
 
 def normalize_reference(value):
@@ -38,19 +40,30 @@ def normalize_reference(value):
     return value
 
 
-Alias = Annotated[
-    str,
-    BeforeValidator(normalize_alias),
-    Field(pattern=r"^[a-z][a-z0-9._-]{0,63}$"),
-]
+def validate_alias(value):
+    if not 1 <= len(value) <= 64 or not value[0].isalpha() or any(
+        not (c.isalnum() or unicodedata.category(c).startswith("M") or c in " ._-") for c in value
+    ):
+        raise ValueError("Alias requires 1..64 letters, marks, digits, spaces or ._-; start with a letter")
+    return value
+
+
+def validate_reference(value):
+    if value.startswith("name:"):
+        return value
+    if value.isascii() and value.isdecimal():
+        if value.startswith("0"):
+            raise ValueError("Positive numeric ID required")
+        return value
+    return validate_alias(value)
+
+
+Alias = Annotated[str, BeforeValidator(normalize_alias), AfterValidator(validate_alias)]
 EntityRef = Annotated[
     str,
     BeforeValidator(normalize_reference),
-    Field(
-        pattern=r"^(?:[1-9][0-9]{0,18}|[a-z][a-z0-9._-]{0,63}|name:.+)$",
-        max_length=125,
-        description="Numeric ID, alias, or explicit exact name reference: name:Розетка",
-    ),
+    Field(max_length=125, description="Numeric ID, Unicode alias, or exact name reference: name:Розетка"),
+    AfterValidator(validate_reference),
 ]
 NameQuery = Annotated[
     str,

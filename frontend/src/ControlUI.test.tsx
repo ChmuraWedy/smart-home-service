@@ -94,10 +94,10 @@ describe('cloud device control', () => {
     const props = { api, device: cloudDevice, provider: 'sharing' as const, onClose: vi.fn(), onAuthError: vi.fn() };
     const view = render(<CloudControl {...props} />);
     await screen.findByRole('region', { name: 'Канал 1' });
-    await user.click(screen.getByText('Алиасы каналов', { exact: true }));
-    await user.type(screen.getByLabelText('Алиас канала 1'), 'Настольный свет');
-    await user.click(screen.getByRole('button', { name: 'Сохранить алиасы' }));
-    const aliases = await within(screen.getByRole('region', { name: 'Канал 1' })).findByRole('list', { name: 'Локальные алиасы' });
+    await user.click(within(screen.getByRole('region', { name: 'Канал 1' })).getByRole('button', { name: 'Добавить алиас' }));
+    await user.type(screen.getByLabelText('Новый алиас'), 'Настольный свет');
+    await user.click(screen.getByRole('button', { name: 'Сохранить' }));
+    const aliases = await within(screen.getByRole('region', { name: 'Канал 1' })).findByRole('group', { name: 'Алиасы' });
     expect(within(aliases).getByText('Настольный свет', { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Настольный свет' })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('cloud device control', () => {
     view.unmount(); render(<CloudControl {...props} />);
     const channel = await screen.findByRole('region', { name: 'Канал 1' });
     expect(within(channel).getByRole('heading', { name: 'Канал 1' })).toBeInTheDocument();
-    expect(within(channel).getByRole('list', { name: 'Локальные алиасы' })).toHaveTextContent('Алиас: Настольный свет');
+    expect(within(channel).getByRole('group', { name: 'Алиасы' })).toHaveTextContent('Алиасы:Настольный свет');
     await user.click(within(channel).getByRole('button', { name: 'Включить' }));
     await waitFor(() => expect(writes[1]).toEqual({ method: 'POST', body: { commands: [{ code: 'switch_1', value: true }] } }));
   });
@@ -144,13 +144,13 @@ describe('cloud device control', () => {
     });
     render(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,sub:true,category:'dj'}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const field=await screen.findByRole('region',{name:label});
-    expect(within(field).getByText('Нет данных')).toBeInTheDocument();
+    expect(within(field).getByText('Нет показания')).toBeInTheDocument();
     const user=userEvent.setup();
     fireEvent.change(within(field).getByRole('slider'),{target:{value}});
     await user.click(within(field).getByRole('button',{name:'Применить'}));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(writes).toEqual([{commands:[{code:'work_mode',value:'white'},{code,value:raw}]}]);
-    expect(within(field).getByText('Нет данных')).toBeInTheDocument();
+    expect(within(field).getByText('Нет показания')).toBeInTheDocument();
     expect(within(field).getByRole('spinbutton')).toHaveValue(Number(value));
     expect(within(field).getByRole('slider')).toHaveValue(value);
     expect(within(field).getByRole('button',{name:'Применить'})).toBeDisabled();
@@ -182,7 +182,8 @@ describe('cloud device control', () => {
       report=true;
       await act(async () => { vi.advanceTimersByTime(3000); });
       expect(within(channel).getByText('Включено')).toBeInTheDocument();
-      expect(within(channel).getByText('Отчёт устройства')).toBeInTheDocument();
+      expect(within(channel).queryByText('Отчёт устройства')).not.toBeInTheDocument();
+      expect(within(channel).getByRole('button', {name:'Обновить показание Канал 2'})).toBeEnabled();
       expect(input).toHaveValue(70);
       expect(reads.filter(path=>path.includes('/functions'))).toHaveLength(1);
       expect(reads.filter(path=>path.includes('/status?refresh=true'))).toHaveLength(1);
@@ -324,7 +325,7 @@ describe('cloud device control', () => {
     expect(within(power).getByText('Выключено')).toBeInTheDocument();
     expect(within(power).getByRole('button', { name: 'Включить' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('21.5 °C')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Температура' })).queryByRole('button')).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Температура' })).getByRole('button', {name:'Обновить показание Температура'})).toBeEnabled();
   });
   it('stages brightness/color without writes, then applies them with their matching mode', async () => {
     const server = cloudServer(); const user = userEvent.setup();
@@ -341,12 +342,14 @@ describe('cloud device control', () => {
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(server.writes[1]).toEqual({ commands: [{ code: 'work_mode', value: 'colour' }, { code: 'colour_data_v2', value: { h: 120, s: 1000, v: 1000 } }] });
   });
-  it('disables writes for an offline device while preserving read-only status', async () => {
+  it('allows an explicit command despite an advisory offline flag from Tuya', async () => {
     const server = cloudServer({ offline: true });
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
-    await screen.findByText('Устройство не в сети. Обновите статус после восстановления связи.');
-    expect(screen.getByRole('button', { name: 'Включить' })).toBeDisabled();
+    const button = await screen.findByRole('button', { name: 'Включить' });
+    expect(button).toBeEnabled();
     expect(server.writes).toHaveLength(0);
+    await userEvent.setup().click(button);
+    await waitFor(() => expect(server.writes).toEqual([{commands:[{code:'switch_led',value:true}]}]));
   });
   it('distinguishes accepted command from a failed follow-up status and never retries the command', async () => {
     const server = cloudServer({ postReadError: true }); const user = userEvent.setup();
@@ -387,7 +390,7 @@ describe('manual device maps', () => {
     });
     render(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
     expect(fetch).not.toHaveBeenCalled();
-    const user=userEvent.setup(); await user.click(screen.getByText('Связанные устройства и сопоставления'));
+    const user=userEvent.setup(); await user.click(screen.getByText('Ручные сопоставления в нашей базе'));
     await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
     await user.selectOptions(screen.getByLabelText('Устройство назначения'),target.id);
     await screen.findByRole('option',{name:'Канал 2 · switch_2 · DP 2'});

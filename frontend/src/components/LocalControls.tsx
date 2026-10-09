@@ -17,12 +17,11 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
   }, [api, device.id]);
   const session = useControlSession(load, onAuthError), now = useClock();
   const item = session.data?.metadata || device;
-  return <ControlDialog title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel}>
-    <DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />
+  return <ControlDialog title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
     <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><button className="secondary compact" disabled={session.busy} onClick={() => void session.refresh()}>Обновить статус</button></div>
     <p className="help">Первое открытие читает кеш. «Обновить статус» опрашивает устройство. Команды и ключи Tuya обрабатывает сервер.</p>
     {session.data && !session.data.state.enabled && <p className="saved-summary">Устройство или его шлюз отключены в настройках сервиса.</p>}
-    <div className="capability-grid">{session.data && Object.entries(item.capabilities).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} reading={session.data!.state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
+    <div className="capability-grid">{session.data && Object.entries(item.capabilities).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
       const result = await api.setCapability(item.id, key, value);
       if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
       return { text: 'Команда принята.' };

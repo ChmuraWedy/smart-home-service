@@ -14,7 +14,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : '
 
 export function useClock() {
   const [now, setNow] = useState(Date.now);
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   return now;
 }
 
@@ -74,7 +74,7 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
     finally { if (alive.current) { lock.current = false; setBusy(false); } }
   }
   async function execute(send: () => Promise<Receipt>) {
-    if (lock.current || !readOK) return;
+    if (lock.current || !readOK) return false;
     cancelPoll();
     lock.current = true; setBusy(true); setNotice({ text: '' });
     try {
@@ -91,13 +91,15 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
         setNotice({ text: (rejected ? 'Команда отклонена. ' : 'Подтверждение не получено; результат команды неизвестен. ') + errorText(error), error: true });
         unauthorized(error);
       }
+      return false;
     } finally { if (alive.current) { lock.current = false; setBusy(false); } }
+    return true;
   }
   return { data, busy, readOK, notice, refresh, execute };
 }
 
-export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть' }: {
-  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string;
+export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, className = '' }: {
+  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -106,8 +108,8 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     element.showModal();
     return () => { element.close(); previous?.focus(); };
   }, []);
-  return <dialog ref={dialog} className="control-dialog" aria-label={title} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
-    <header className="control-header"><div><p className="eyebrow">{subtitle}</p><h2>{title}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>{closeLabel}</button></header>
+  return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }}>
+    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><button className="secondary compact" disabled={busy} onClick={onClose}>{closeLabel}</button></header>
     {children}
   </dialog>;
 }
@@ -118,25 +120,35 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<void>;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode;
 }) {
   const fresh = reading?.known && !isStale(reading, now, local);
   const motion = motionState(spec, reading);
   const [draft, setDraft] = useState('');
   const [color, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
+  const pendingTarget = useRef<{ value: JsonValue; baseline: JsonValue | undefined; sentAt: number } | null>(null);
+  const [awaiting, setAwaiting] = useState(false);
   const [dirty, setDirty] = useState(false), [error, setError] = useState('');
   const fingerprint = JSON.stringify([reading?.value, reading?.known, reading?.stale, reading?.observed_at]);
   useEffect(() => {
     if (dirty) return; // A new report must not erase an unapplied user draft.
-    // Keep the selected target after applying a command if Tuya supplies no
-    // reading. The separate observed-state line must still show "Нет данных".
+    const target = pendingTarget.current;
+    if (target) {
+      const received = Date.parse(reading?.received_at || reading?.observed_at || '');
+      const confirmed = reading?.known && sameValue(reading.value, target.value);
+      const newerReport = reading?.known && Number.isFinite(received) && received >= target.sentAt;
+      const changedLater = now - target.sentAt >= 15000 && reading?.known && !sameValue(reading.value, target.baseline ?? null);
+      if (!confirmed && !newerReport && !changedLater) return;
+      pendingTarget.current = null; setAwaiting(false);
+    }
+    // Keep a selected target when Tuya has no fresh reading.
     if (!fresh && draft !== '') return;
     const value = fresh ? reading!.value : null;
     setDraft(value === null ? '' : spec.kind === 'enum' ? String(spec.choices?.findIndex(option => sameValue(option, value)) ?? -1) : spec.kind === 'json' ? JSON.stringify(value, null, 2) : String(value));
     if (spec.kind === 'color' && value && typeof value === 'object' && !Array.isArray(value)) setColor(value as HSV);
     setDirty(false); setError('');
-  }, [fingerprint, spec.key, dirty]);
+  }, [fingerprint, spec.key, dirty, now, awaiting]);
 
   const change = (value: string) => { setDraft(value); setDirty(true); setError(''); };
   const changeColor = (value: HSV) => { setColor(value); setDirty(true); setError(''); };
@@ -151,30 +163,37 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
         else parsed = draft;
       }
       validateControlValue(spec, parsed!);
-      await onSend(parsed!); setDirty(false);
+      const sentAt = Date.now();
+      const accepted = await onSend(parsed!);
+      if (accepted === false) return;
+      pendingTarget.current = { value: parsed!, baseline: reading?.value, sentAt };
+      setAwaiting(true); setDirty(false);
     } catch (failure) { setError(errorText(failure)); }
   }
   return <section className={'capability' + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-heading"><h3>{spec.label}</h3>{!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}</div>
-    {!!spec.aliases?.length && <ul className="capability-aliases" aria-label="Локальные алиасы">{spec.aliases.map(alias => <li className="alias-tag" key={alias}><span>Алиас:</span> {alias}</li>)}</ul>}
-    {spec.readable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
-    {reading?.observed_at && <p className="help">Показание: {new Date(reading.observed_at).toLocaleString('ru-RU')}</p>}
-    {!local && reading?.known && spec.readable && <p className="help">{reading.source === 'tuya_event' ? 'Отчёт устройства' : 'Сохранённый снимок Tuya'}{reading.source === 'tuya_event' && !reading.observed_at && reading.received_at ? ' · получен '+new Date(reading.received_at).toLocaleString('ru-RU') : ''}</p>}
+    <div className="capability-heading"><h3>{spec.label}</h3><div className="reading-meta">
+      {spec.readable && !reading?.known && <span>Нет показания</span>}
+      {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString('ru-RU')}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))} с назад</span>}
+      {!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}
+      {onRefresh && <button type="button" className="reading-refresh" aria-label={'Обновить показание ' + spec.label} title="Обновить показание" disabled={disabled} onClick={() => void onRefresh()}>↻</button>}
+    </div></div>
+    {aliasEditor}
+    {spec.readable && (!spec.writable || !['number', 'enum', 'color'].includes(spec.kind)) && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
+    {awaiting && <p className="help pending-reading">Ожидаем новое показание</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}
     {spec.help && <p className="help">{spec.help}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
       <button disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === true)} onClick={() => void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === false)} onClick={() => void send(false)}>Выключить</button>
     </div> : <form onSubmit={event => { event.preventDefault(); if (!disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
-      {spec.kind === 'number' && <>
+      {spec.kind === 'number' && <div className="range-input-row">
         {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + ' — ползунок'} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
-        <label>{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}<input type="number" value={draft} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Выберите значение" /></label>
-        <p className="help">{spec.minimum !== undefined && spec.maximum !== undefined ? `${spec.minimum}–${spec.maximum}${spec.unit ? ' ' + spec.unit : ''}` : 'Числовое значение'}{spec.step ? ` · шаг ${spec.step}` : ''}</p>
-      </>}
+        <label className="range-value"><span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span><input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Значение" />{spec.unit && <span>{spec.unit}</span>}</label>
+      </div>}
       {spec.kind === 'enum' && <label>{spec.label}<select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}><option value="">Выберите значение</option>{spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}</select></label>}
       {spec.kind === 'color' && <div className="color-editor">
-        <label>Выбор цвета<input type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} /></label>
-        {(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<span className="color-value">{axis === 'h' ? color.h + '°' : color[axis] / 10 + '%'}</span><input type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}
+        <label className="color-picker">Выбор цвета<input type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} /></label>
+        <div className="color-sliders">{(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<input aria-label={axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}</div>
       </div>}
       {spec.kind === 'text' && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
       {spec.kind === 'json' && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
