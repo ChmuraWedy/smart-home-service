@@ -9,7 +9,7 @@ export type ControlSpec = {
   readable: boolean; writable: boolean; minimum?: number; maximum?: number; step?: number;
   integer?: boolean; choices?: JsonValue[]; unit?: string;
   factor?: number; colorScale?: { s: number; v: number }; reason?: string; help?: string; indicator?: 'motion'; advanced?: boolean;
-  schema?: JsonSchema; maximumBytes?: number;
+  schema?: JsonSchema; maximumBytes?: number; aliases?: string[];
 };
 
 const MOTION_KEYS = new Set(['motion', 'pir', 'pir_state']);
@@ -47,7 +47,7 @@ function controlHelp(key: string): string | undefined {
   if (key === 'switch_inching') return 'После включения выключатель автоматически отключается через заданное время. Например, через минуту. Настройка передаётся строкой; её формат не описан в API этого устройства.';
 }
 export const sameValue = (left: JsonValue, right: JsonValue) => JSON.stringify(left) === JSON.stringify(right);
-export const cloudLabel = (fn: CloudFunction) => fn.user_label || labelFor(fn.code);
+export const cloudLabel = (fn: CloudFunction) => labelFor(fn.code);
 export function withChannelLabels(definitions: CloudFunctions, labels: Record<string, string>): CloudFunctions {
   const apply = (fn: CloudFunction) => ({ ...fn, user_label: labels[fn.code] });
   return { ...definitions, functions: definitions.functions.map(apply), status_range: definitions.status_range?.map(apply) };
@@ -93,6 +93,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
   // includes an empty/echoed value in its cached status range.
   const commandHelp = ['String', 'Json'].includes(fn.type) ? LIGHT_COMMAND_HELP[fn.code] : undefined;
   const base = { key: fn.code, label: cloudLabel(fn), readable: !commandHelp, writable,
+    aliases: /^switch_[1-9][0-9]*$/.test(fn.code) && fn.user_label ? [fn.user_label] : undefined,
     advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp || controlHelp(fn.code),
     indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
@@ -142,12 +143,7 @@ export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot)
     indicator: MOTION_KEYS.has(key) ? 'motion' : undefined });
   for (const fn of [...(definitions.status_range || []), ...definitions.functions]) {
     const spec = result.get(fn.code);
-    if (spec && fn.user_label) spec.label = fn.user_label;
-  }
-  for (const spec of result.values()) {
-    if (!/^countdown_[1-9][0-9]*$/.test(spec.key)) continue;
-    const channelKey = 'switch_' + spec.key.slice(10), channel = result.get(channelKey);
-    if (channel && channel.label !== labelFor(channelKey)) spec.label = 'Таймер: ' + channel.label;
+    if (spec && /^switch_[1-9][0-9]*$/.test(fn.code) && fn.user_label) spec.aliases = [fn.user_label];
   }
   return [...result.values()];
 }

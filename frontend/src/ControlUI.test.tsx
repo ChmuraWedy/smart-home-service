@@ -72,7 +72,7 @@ function cloudServer(options: { offline?: boolean; postReadError?: boolean; post
 }
 
 describe('cloud device control', () => {
-  it('saves channel names separately from commands, restores them on reopen and keeps DP routing', async () => {
+  it('shows saved aliases as tags without replacing channel or timer names, restores them on reopen and keeps DP routing', async () => {
     let labels: Record<string, string> = {};
     const writes: { method: string; body: unknown }[] = [];
     const functions = [
@@ -94,14 +94,18 @@ describe('cloud device control', () => {
     const props = { api, device: cloudDevice, provider: 'sharing' as const, onClose: vi.fn(), onAuthError: vi.fn() };
     const view = render(<CloudControl {...props} />);
     await screen.findByRole('region', { name: 'Канал 1' });
-    await user.click(screen.getByText('Названия каналов', { exact: true }));
-    await user.type(screen.getByLabelText('Название канала 1'), 'Настольный свет');
-    await user.click(screen.getByRole('button', { name: 'Сохранить названия' }));
-    await screen.findByRole('region', { name: 'Настольный свет' });
-    expect(screen.getByRole('region', { name: 'Таймер: Настольный свет' })).toBeInTheDocument();
+    await user.click(screen.getByText('Алиасы каналов', { exact: true }));
+    await user.type(screen.getByLabelText('Алиас канала 1'), 'Настольный свет');
+    await user.click(screen.getByRole('button', { name: 'Сохранить алиасы' }));
+    const aliases = await within(screen.getByRole('region', { name: 'Канал 1' })).findByRole('list', { name: 'Локальные алиасы' });
+    expect(within(aliases).getByText('Настольный свет', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Настольный свет' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
     expect(writes).toEqual([{ method: 'PUT', body: { labels: { switch_1: 'Настольный свет' } } }]);
     view.unmount(); render(<CloudControl {...props} />);
-    const channel = await screen.findByRole('region', { name: 'Настольный свет' });
+    const channel = await screen.findByRole('region', { name: 'Канал 1' });
+    expect(within(channel).getByRole('heading', { name: 'Канал 1' })).toBeInTheDocument();
+    expect(within(channel).getByRole('list', { name: 'Локальные алиасы' })).toHaveTextContent('Алиас: Настольный свет');
     await user.click(within(channel).getByRole('button', { name: 'Включить' }));
     await waitFor(() => expect(writes[1]).toEqual({ method: 'POST', body: { commands: [{ code: 'switch_1', value: true }] } }));
   });

@@ -156,6 +156,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend }:
   }
   return <section className={'capability' + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
     <div className="capability-heading"><h3>{spec.label}</h3>{!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}</div>
+    {!!spec.aliases?.length && <ul className="capability-aliases" aria-label="Локальные алиасы">{spec.aliases.map(alias => <li className="alias-tag" key={alias}><span>Алиас:</span> {alias}</li>)}</ul>}
     {spec.readable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {reading?.observed_at && <p className="help">Показание: {new Date(reading.observed_at).toLocaleString('ru-RU')}</p>}
     {!local && reading?.known && spec.readable && <p className="help">{reading.source === 'tuya_event' ? 'Отчёт устройства' : 'Сохранённый снимок Tuya'}{reading.source === 'tuya_event' && !reading.observed_at && reading.received_at ? ' · получен '+new Date(reading.received_at).toLocaleString('ru-RU') : ''}</p>}

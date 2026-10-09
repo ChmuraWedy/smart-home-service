@@ -3,7 +3,7 @@ import { ApiError } from '../api';
 import type { CloudApi, CloudFunctions, Provider } from '../api';
 import { labelFor } from '../controls';
 
-export function ChannelNames({ api, deviceId, provider, definitions, disabled, onBusy, onSaved, onAuthError }: {
+export function ChannelAliases({ api, deviceId, provider, definitions, disabled, onBusy, onSaved, onAuthError }: {
   api: CloudApi; deviceId: string; provider: Provider; definitions: CloudFunctions; disabled: boolean;
   onBusy: (busy: boolean) => void; onSaved: (labels: Record<string, string>) => void; onAuthError: () => void;
 }) {
@@ -22,22 +22,22 @@ export function ChannelNames({ api, deviceId, provider, definitions, disabled, o
     try {
       const result = await api.saveChannelLabels(deviceId, provider, Object.fromEntries(Object.entries(draft).map(([code, label]) => [code, label.trim() || null])), controller.signal);
       if (controller.signal.aborted) return;
-      if (result.device_id !== deviceId) throw new Error('Сервис вернул названия другого устройства.');
-      onSaved(result.labels); setNotice('Названия сохранены в нашей базе.');
+      if (result.device_id !== deviceId) throw new Error('Сервис вернул алиасы другого устройства.');
+      onSaved(result.labels); setNotice('Алиасы сохранены в нашей базе.');
     } catch (failure) {
       if (!controller.signal.aborted) {
-        setError(failure instanceof Error ? failure.message : 'Не удалось сохранить названия.');
+        setError(failure instanceof Error ? failure.message : 'Не удалось сохранить алиасы.');
         if (failure instanceof ApiError && failure.status === 401) onAuthError();
       }
     } finally {
       if (!controller.signal.aborted) { pending.current = null; setBusy(false); onBusy(false); }
     }
   }
-  return <details className="cloud-properties"><summary>Названия каналов</summary>
-    <p className="help">Smart Life не передаёт названия каналов через это подключение. Укажите такие же названия здесь: они сохранятся в нашей базе. Пустое поле возвращает стандартное название.</p>
-    <form aria-label="Названия каналов" onSubmit={event => { event.preventDefault(); void save(); }}>
-      {channels.map(fn => <label key={fn.code}>Название канала {fn.code.slice(7)}<input maxLength={120} value={draft[fn.code] || ''} placeholder={labelFor(fn.code)} disabled={disabled || busy} onChange={event => { setDraft({ ...draft, [fn.code]: event.target.value }); setNotice(''); setError(''); }} /></label>)}
-      <button type="submit" disabled={disabled || busy || JSON.stringify(draft) === saved}>Сохранить названия</button>
+  return <details className="cloud-properties"><summary>Алиасы каналов</summary>
+    <p className="help">Дополнительные подписи сохраняются в нашей базе и показываются тегами под каналами. Они не заменяют названия каналов и не синхронизируются со Smart Life. Пустое поле удаляет алиас.</p>
+    <form aria-label="Алиасы каналов" onSubmit={event => { event.preventDefault(); void save(); }}>
+      {channels.map(fn => <label key={fn.code}>Алиас канала {fn.code.slice(7)}<input maxLength={120} value={draft[fn.code] || ''} placeholder={labelFor(fn.code)} disabled={disabled || busy} onChange={event => { setDraft({ ...draft, [fn.code]: event.target.value }); setNotice(''); setError(''); }} /></label>)}
+      <button type="submit" disabled={disabled || busy || JSON.stringify(draft) === saved}>Сохранить алиасы</button>
     </form>
     {notice && <p role="status">{notice}</p>}{error && <p role="alert">{error}</p>}
   </details>;

@@ -5,7 +5,7 @@ import { cloudCommands, cloudReading, cloudSpecs, withChannelLabels } from '../c
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceMappings } from './DeviceMappings';
-import { ChannelNames } from './ChannelNames';
+import { ChannelAliases } from './ChannelAliases';
 
 export function CloudControl({ api, device, provider, devices, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; onClose: () => void; onAuthError: () => void;
@@ -62,7 +62,7 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
       <p className="help">Коды параметров и известные номера DP для сопоставления устройств. Номер DP не нужен для облачной команды; его отсутствие не означает ошибку. Эти сведения не подтверждают физическое выполнение команды.</p>
       <ul>{[...session.data.definitions.functions,...(session.data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => <li key={spec.code}><strong>{specs.find(control => control.key === spec.code)?.label || spec.code}</strong> · <code>{spec.code}</code> · {spec.type}{spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : spec.dp_id ? ' · DP '+spec.dp_id : ''}</li>)}</ul>
     </details>}
-    {definitions && <ChannelNames api={api} deviceId={device.id} provider={provider} definitions={definitions} disabled={session.busy || mappingBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} />}
+    {definitions && <ChannelAliases api={api} deviceId={device.id} provider={provider} definitions={definitions} disabled={session.busy || mappingBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} />}
     {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;
