@@ -44,11 +44,13 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
     return { text: 'Команда принята.' };
   })} />;
-  return <ControlDialog title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
+  return <ControlDialog className={device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><button className="secondary compact" disabled={session.busy || editingBusy} onClick={() => void session.refresh()}>Обновить статус</button></div>
+    <details className="status-details"><summary>О показаниях</summary>
     <p className="help">{specs.some(spec => spec.writable) ? 'Облачный снимок состояния. Принятие команды не подтверждает изменение устройства; облако может вернуть прежнее показание.' : 'Последнее известное состояние в облаке. Обновите статус для получения нового снимка.'}</p>
     {session.data && <p className="help">Снимок получен: {new Date(session.data.fetchedAt).toLocaleString('ru-RU')}</p>}
     {provider === 'sharing' && session.data && <p className="help">{session.data.snapshot.event_stream_connected ? 'Приём отчётов устройства подключён. Новые состояния появляются автоматически.' : 'Свежих отчётов пока нет или соединение ещё устанавливается. Сохранённый снимок Tuya может запаздывать.'}</p>}
+    </details>
     {session.data && !session.data.snapshot.online && <p className="saved-summary">Tuya сообщает, что устройство не в сети. Можно обновить статус или отправить команду; результат покажет сервис.</p>}
     {basic.length > 0 && <div className="capability-grid">{basic.map(field)}</div>}
     {settings.length > 0 && <details className="cloud-properties additional-settings"><summary>Дополнительные настройки</summary><div className="capability-grid">{settings.map(field)}</div></details>}

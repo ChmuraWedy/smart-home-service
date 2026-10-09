@@ -170,29 +170,22 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
       setAwaiting(true); setDirty(false);
     } catch (failure) { setError(errorText(failure)); }
   }
-  return <section className={'capability' + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-heading"><h3>{spec.label}</h3><div className="reading-meta">
-      {spec.readable && !reading?.known && <span>Нет показания</span>}
-      {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString('ru-RU')}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))} с назад</span>}
-      {!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}
-      {onRefresh && <button type="button" className="reading-refresh" aria-label={'Обновить показание ' + spec.label} title="Обновить показание" disabled={disabled} onClick={() => void onRefresh()}>↻</button>}
-    </div></div>
-    {aliasEditor}
-    {spec.readable && (!spec.writable || !['number', 'enum', 'color'].includes(spec.kind)) && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
-    {awaiting && <p className="help pending-reading">Ожидаем новое показание</p>}
-    {spec.reason && <p className="help">{spec.reason}</p>}
-    {spec.help && <p className="help">{spec.help}</p>}
+  return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
+    <div className="capability-row"><div className="capability-heading"><h3>{spec.label}</h3>
+      {spec.kind === 'color' && spec.writable && <input aria-label="Выбор цвета" title="Выбор цвета" className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
+    </div>
+    {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
+      {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
       <button disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === true)} onClick={() => void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={Boolean(fresh && reading?.value === false)} onClick={() => void send(false)}>Выключить</button>
-    </div> : <form onSubmit={event => { event.preventDefault(); if (!disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
+    </div> : <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
       {spec.kind === 'number' && <div className="range-input-row">
+        <label className="range-value"><span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span><input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Значение" />{spec.unit && <span>{spec.unit}</span>}</label>
         {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + ' — ползунок'} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
-        <label className="range-value"><span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span><input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder="Значение" />{spec.unit && <span>{spec.unit}</span>}</label>
       </div>}
-      {spec.kind === 'enum' && <label>{spec.label}<select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}><option value="">Выберите значение</option>{spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}</select></label>}
+      {spec.kind === 'enum' && <label className="enum-value"><span className="sr-only">{spec.label}</span><select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}><option value="">Выберите значение</option>{spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}</select></label>}
       {spec.kind === 'color' && <div className="color-editor">
-        <label className="color-picker">Выбор цвета<input type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} /></label>
         <div className="color-sliders">{(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<input aria-label={axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}</div>
       </div>}
       {spec.kind === 'text' && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
@@ -205,6 +198,16 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
       </>}
       <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">Применить</button>
     </form>)}
+    <div className="reading-meta">
+      {spec.readable && !reading?.known && <span>Нет показания</span>}
+      {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString('ru-RU')}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))} с назад</span>}
+      {!spec.writable ? <span className="read-only">Только чтение</span> : !spec.readable && <span className="read-only">Команда</span>}
+      {onRefresh && <button type="button" className="reading-refresh" aria-label={'Обновить показание ' + spec.label} title="Обновить показание" disabled={disabled} onClick={() => void onRefresh()}>↻</button>}
+    </div></div>
+    {aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}
+    {awaiting && <p className="help pending-reading">Ожидаем новое показание</p>}
+    {spec.reason && <p className="help">{spec.reason}</p>}
+    {spec.help && <p className="help">{spec.help}</p>}
     {error && <p className="field-error" role="alert">{error}</p>}
   </section>;
 }
