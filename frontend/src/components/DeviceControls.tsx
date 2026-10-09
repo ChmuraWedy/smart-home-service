@@ -112,7 +112,7 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     return () => { element.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }}>
-    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><button className="secondary compact" disabled={busy} onClick={onClose}>{closeLabel}</button>{statusContent}</div></header>
+    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button>{statusContent}</div></header>
     {children}
   </dialog>;
 }

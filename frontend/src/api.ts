@@ -25,6 +25,7 @@ export type CloudDevice = {
   node_id?: string | null;
   aliases?: string[];
   battery?: { code: string; value: JsonValue; unit?: string | null } | null;
+  controls?: { ready: boolean; definitions: CloudFunctions; snapshot: CloudSnapshot };
 };
 export type DeveloperCredentials = {
   access_id: string;

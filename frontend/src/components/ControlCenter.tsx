@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
-import { displayReading, isStale, localSpec } from '../controls';
+import { localSpec } from '../controls';
 import { deviceAliases, deviceRoutes, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
@@ -10,19 +10,22 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
-import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
+import { BatteryBadge, batteryFromSpecs } from './DevicePresentation';
 import { useTopology } from '../use-topology';
+import { CardControls } from './CardControls';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
 const PAGE_SIZE = 24;
 const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
 
-function DeviceCard({ device, state, room, now, onOpen, onAdd }: {
-  device: UnifiedDevice; state?: DeviceState; room: string; now: number; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
+function DeviceCard({ api, device, state, room, now, paused, onAuthError, onCommandBusy, onOpen, onAdd }: {
+  api: HomeApi; device: UnifiedDevice; state?: DeviceState; room: string; now: number; paused: boolean; onAuthError: () => void; onCommandBusy: (id:string,busy:boolean) => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
 }) {
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
+  const [quickBusy,setQuickBusy] = useState(false);
+  const notifyBusy = useCallback((busy:boolean) => { setQuickBusy(busy); onCommandBusy(device.id,busy); },[device.id,onCommandBusy]);
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const local = device.local;
@@ -34,13 +37,10 @@ function DeviceCard({ device, state, room, now, onOpen, onAdd }: {
     <h3>{device.name}</h3>
     {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства"><span className="alias-row-label">Алиасы:</span>{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div>}
     <p className="help">{room} · {local ? (local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi') : cloud?.sub ? 'Через шлюз' : 'Прямое подключение'}</p>
-    {local && <div className="card-readings"><p className="help">Последние показания в домашней сети</p>{Object.entries(local.capabilities).filter(([key, cap]) => cap.readable && !isBattery(key)).slice(0, 4).map(([key, cap]) => {
-      const reading = state?.values[key];
-      return <p key={key}><span>{localSpec(key, cap).label}</span><strong className={isStale(reading, now, true) || !state?.enabled ? 'unknown' : ''}>{displayReading(localSpec(key, cap), reading)}{reading?.known && (isStale(reading, now, true) || !state?.enabled) && ' · неактуально'}</strong></p>;
-    })}</div>}
-    {routes.length > 1 ? <label className="device-route">Способ управления<select aria-label={'Способ управления: ' + device.name} value={route} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select></label> : <p className="help">{routeLabel[route]}</p>}
-    <button className="secondary compact full-width" onClick={() => onOpen(route)}>Управлять</button>
-    {!local && <button className="secondary compact full-width" disabled={!onAdd} onClick={() => route !== 'local' && onAdd?.(route)}>Добавить в дом</button>}
+    {routes.length > 1 ? <label className="device-route">Способ управления<select aria-label={'Способ управления: ' + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select></label> : <p className="help">{routeLabel[route]}</p>}
+    <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />
+    <button className="secondary compact full-width" disabled={quickBusy} onClick={() => onOpen(route)}>Подробнее</button>
+    {!local && <button className="secondary compact full-width" disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}>Добавить в дом</button>}
   </li>;
 }
 
@@ -64,8 +64,13 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
   const [states, setStates] = useState<Record<number, DeviceState>>({});
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
+  const [commandCards,setCommandCards] = useState(new Set<string>());
+  const onCommandBusy = useCallback((id:string,busy:boolean) => setCommandCards(previous => {
+    if (previous.has(id) === busy) return previous;
+    const next = new Set(previous); if (busy) next.add(id); else next.delete(id); return next;
+  }),[]);
   const now = useClock();
-  useEffect(() => { onLock(Boolean(selected)); return () => onLock(false); }, [selected, onLock]);
+  useEffect(() => { onLock(Boolean(selected) || commandCards.size > 0); return () => onLock(false); }, [selected, commandCards, onLock]);
   useEffect(() => { setSelection(null); }, [api, ready, mask]);
   useEffect(() => {
     if (!ready) return;
@@ -124,7 +129,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading"><div><p className="eyebrow">Ваш дом</p><h2 id="control-center-heading">Устройства и группы{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div><div className="survey-toolbar"><button className="secondary compact" disabled={!inventory || busy} onClick={() => choose({ kind: 'survey' })}>Добавить устройство</button><button className="secondary compact" disabled={!ready || busy} onClick={() => setRevision(value => value + 1)}>Обновить список</button></div></div>
     {!ready ? <p className="saved-summary">Сначала сохраните доступ к сервису в настройках подключения.</p> : <>
-      <p className="help">Одна карточка для каждого устройства. Способ управления показывает, нужна ли связь с интернетом.</p>
+      <p className="help">Основные параметры доступны прямо здесь. Расписания, журнал и дополнительные настройки — в подробной карточке.</p>
       {sharingReady && <div className="topology-summary">
         <div><h3>Комнаты из Smart Life</h3><p className="help">{topology.busy ? `Получаем структуру дома… ${topology.data?.job.processed || 0} / ${topology.data?.job.total || '…'}` : topology.data?.synced_at ? 'Синхронизировано: ' + new Date(topology.data.synced_at).toLocaleString('ru-RU') : 'Подставим здание и комнату в карточки и мастер добавления.'}</p></div>
         <button className="secondary compact" disabled={topology.busy} onClick={() => void topology.sync()}>Синхронизировать Smart Life</button>
@@ -138,7 +143,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? 'Ничего не найдено' : 'Устройств пока нет'}</h3><p>{devices.length || inventory?.groups.length ? 'Измените фильтры или поисковый запрос.' : sharingReady || developerReady ? 'Добавьте устройства в Smart Life и обновите список.' : 'Подключите аккаунт Tuya, чтобы увидеть свои устройства.'}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>Настроить подключение</button>}</div>}
       <ul className="device-grid local-grid">{visible.map(entry => entry.kind === 'group' ? <li className="device-card group-card" key={'group-' + entry.group.id}>
         <p className="eyebrow">Группа · {entry.group.device_ids.length} устройств</p><h3>{entry.group.name}</h3><p className="reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : 'Состояние неизвестно'}</p><p className="help">В домашней сети</p><button className="secondary compact full-width" onClick={() => choose(entry)}>Открыть группу</button>
-      </li> : <DeviceCard key={'device-' + entry.device.id} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={inventory?.rooms.find(item => item.id === location(entry.device)?.room_id)?.name || 'Без комнаты'} now={now} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
+      </li> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={inventory?.rooms.find(item => item.id === location(entry.device)?.room_id)?.name || 'Без комнаты'} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>Назад</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>Далее</button></div>}
     </>}
     {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} closeLabel={selected.parent ? 'Назад к группе' : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}

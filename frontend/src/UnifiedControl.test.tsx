@@ -73,7 +73,7 @@ describe('unified device identity and management', () => {
     await screen.findByRole('listitem', { name: local.name });
     const card = screen.getByRole('listitem', { name: local.name });
     await user.selectOptions(within(card).getByRole('combobox'), 'developer');
-    await user.click(within(card).getByRole('button', { name: 'Управлять' }));
+    await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const cloud = await screen.findByRole('dialog', { name: local.name });
     expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
     await user.click(await within(cloud).findByRole('switch'));
@@ -84,7 +84,7 @@ describe('unified device identity and management', () => {
     const reloaded = await screen.findByRole('listitem', { name: local.name });
     expect(within(reloaded).getByRole('combobox')).toHaveValue('developer');
     await user.selectOptions(within(reloaded).getByRole('combobox'), 'local');
-    await user.click(within(reloaded).getByRole('button', { name: 'Управлять' }));
+    await user.click(within(reloaded).getByRole('button', { name: 'Подробнее' }));
     const home = await screen.findByRole('dialog', { name: local.name });
     await user.click(await within(home).findByRole('switch'));
     await user.click(within(home).getByRole('button', { name: 'Применить' }));

@@ -164,7 +164,7 @@ describe('cloud UI journeys', () => {
     await screen.findByText('API подключён'); const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Подключения' }));
     expect(screen.getByRole('heading', { name: 'Подключить Tuya' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Управлять' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Подробнее' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Получить QR-код' }));
     await screen.findByAltText('QR-код для входа в Tuya');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]) === BASE + '/api/v1/cloud/login/qr-session/qr.svg')).toBe(true);

@@ -178,6 +178,31 @@ def safe_status_ranges(device):
     ]
 
 
+def safe_snapshot(device, provider):
+    return {
+        "device_id": device.id,
+        "online": bool(device.online),
+        "source": "tuya_developer_cloud_snapshot"
+        if provider == "developer"
+        else "tuya_cloud_snapshot",
+        "status": {
+            code: value
+            for code, value in device.status.items()
+            if code not in {"local_key", "key", "access_token", "refresh_token"}
+            and value != getattr(device, "local_key", None)
+        },
+        "device_update_time": getattr(device, "update_time", None),
+        "snapshot_received_at": getattr(device, "snapshot_received_at", None),
+        "event_stream_connected": getattr(device, "event_stream_connected", False),
+        "status_observations": {
+            code: observation
+            for code, observation in getattr(device, "status_observations", {}).items()
+            if code not in {"local_key", "key", "access_token", "refresh_token"}
+        },
+        "status_range": safe_status_ranges(device),
+    }
+
+
 @router.get("/status")
 def cloud_status(request: Request, response: Response):
     bridge = request.app.state.cloud
@@ -275,8 +300,20 @@ def devices(
             audit_cloud(request, bridge, provider, device)
         if rows:
             aliases = aliases_for_devices(session, scope_for(bridge, provider), [row["id"] for row in rows])
-            for row in rows:
+            labels = {(label.device_id, label.code): label.label for label in session.scalars(
+                select(CloudChannelLabel).where(CloudChannelLabel.scope == scope_for(bridge, provider), CloudChannelLabel.device_id.in_([row["id"] for row in rows]))
+            )}
+            for row, device in zip(rows, snapshots, strict=True):
                 row["aliases"] = aliases[row["id"]]
+                functions, ranges = row["functions"], safe_status_ranges(device)
+                for spec in functions + ranges:
+                    if (device.id, spec["code"]) in labels:
+                        spec["user_label"] = labels[(device.id, spec["code"])]
+                row["controls"] = {
+                    "ready": device.id in bridge.state.metadata if provider == "sharing" else bool(functions or ranges),
+                    "definitions": {"device_id": device.id, "functions": functions, "status_range": ranges},
+                    "snapshot": safe_snapshot(device, provider),
+                }
     return rows
 
 
@@ -338,28 +375,7 @@ def cloud_device_status(
         device = bridge.device_status(device_id, refresh)
         audit_cloud(request, bridge, provider, device)
     response.headers["Cache-Control"] = "no-store"
-    return {
-        "device_id": device.id,
-        "online": bool(device.online),
-        "source": "tuya_developer_cloud_snapshot"
-        if provider == "developer"
-        else "tuya_cloud_snapshot",
-        "status": {
-            code: value
-            for code, value in device.status.items()
-            if code not in {"local_key", "key", "access_token", "refresh_token"}
-            and value != getattr(device, "local_key", None)
-        },
-        "device_update_time": getattr(device, "update_time", None),
-        "snapshot_received_at": getattr(device, "snapshot_received_at", None),
-        "event_stream_connected": getattr(device, "event_stream_connected", False),
-        "status_observations": {
-            code: observation
-            for code, observation in getattr(device, "status_observations", {}).items()
-            if code not in {"local_key", "key", "access_token", "refresh_token"}
-        },
-        "status_range": safe_status_ranges(device),
-    }
+    return safe_snapshot(device, provider)
 
 
 @router.get("/devices/{device_id}/functions")

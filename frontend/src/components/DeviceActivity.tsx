@@ -19,6 +19,9 @@ export function DeviceActivity({ api, deviceId, provider, specs, primary = false
   const [error, setError] = useState(''), [busy, setBusy] = useState(false), [filter, setFilter] = useState('all');
   const cursorLoaded = useRef(false);
   const pagingAbort = useRef<AbortController | null>(null);
+  const hasMotion = primary || specs.some(spec => spec.indicator === 'motion');
+  const hasCommands = specs.some(spec => spec.writable) || events.some(event => event.kind === 'command');
+  const effectiveFilter = filter === 'motion' && !hasMotion || filter === 'commands' && !hasCommands ? 'all' : filter;
   useEffect(() => {
     if (!open) return;
     setBusy(false);
@@ -44,10 +47,10 @@ export function DeviceActivity({ api, deviceId, provider, specs, primary = false
     catch (failure) { if (!controller.signal.aborted) { setError((failure as Error).message); if (failure instanceof ApiError && failure.status === 401) onAuthError(); } }
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
-  const visible = events.filter(event => filter === 'all' || (filter === 'commands' ? event.kind === 'command' : /motion|pir|presence/.test(event.code)));
+  const visible = events.filter(event => effectiveFilter === 'all' || (effectiveFilter === 'commands' ? event.kind === 'command' : specs.some(spec => spec.key === event.code && spec.indicator === 'motion')));
   return <details className={'device-activity' + (primary ? ' primary-activity' : '')} open={open} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>{primary ? 'Журнал активности' : 'Журнал устройства'}</summary>
-    <div className="activity-toolbar"><label>Показать<select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Все события</option><option value="motion">Движение</option><option value="commands">Команды</option></select></label><span className="help">Последние 2000 событий · новые отчёты появляются автоматически</span></div>
+    <div className="activity-toolbar">{(hasMotion || hasCommands) && <label>Показать<select value={effectiveFilter} onChange={event => setFilter(event.target.value)}><option value="all">Все события</option>{hasMotion && <option value="motion">Движение</option>}{hasCommands && <option value="commands">Команды</option>}</select></label>}<span className="help">Последние 2000 событий · новые отчёты появляются автоматически</span></div>
     {error && <p className="field-error" role="alert">{error}</p>}
     {!visible.length && <p className="help">Событий пока нет. История накапливается с момента подключения журнала.</p>}
     <ol className="activity-events">{visible.map(event => <li key={event.id}><ParameterIcon code={event.code} /><div><strong>{eventText(event,specs)}</strong><span>{event.kind === 'snapshot' ? 'Сохранённый снимок · записан ' : event.kind === 'report' ? 'Отчёт устройства · ' : event.kind === 'local' ? 'Локальное показание · ' : ''}<time dateTime={event.observed_at || event.at}>{new Date(event.observed_at || event.at).toLocaleString('ru-RU')}</time>{event.observed_at && <span title={new Date(event.at).toLocaleString('ru-RU')}> · получено {new Date(event.at).toLocaleTimeString('ru-RU')}</span>}</span></div></li>)}</ol>

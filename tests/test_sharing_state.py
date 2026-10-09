@@ -247,3 +247,36 @@ def test_online_and_delete_events_use_the_registered_mq_without_revoking_account
     assert lazy_client.get(path).status_code == 404
     assert "switch-0" not in bridge.state.reports
     assert not any(method == "POST" for method, _, _ in bridge.manager.customer_api.calls)
+
+
+def test_inventory_card_controls_reuse_known_definitions_without_eager_queries(lazy_client):
+    client = lazy_client
+    bridge = client.app.state.cloud
+    first = client.get(API + '/devices').json()[0]
+    assert first['controls']['ready'] is False
+    assert first['controls']['snapshot']['status'] == {'switch_1': False, 'switch_2': False}
+    assert len(bridge.manager.customer_api.calls) == 2
+    client.get(API + '/devices/switch-0/functions')
+    client.put(API + '/devices/switch-0/channel-labels', json={'labels': {'switch_1': 'Światło'}})
+    bridge.manager.customer_api.calls.clear()
+    row = client.get(API + '/devices?refresh=true').json()[0]
+    assert len(bridge.manager.customer_api.calls) == 2  # Home inventory only.
+    assert row['controls']['ready'] is True
+    definitions = row['controls']['definitions']
+    assert definitions['device_id'] == row['id']
+    assert definitions['functions'][0]['code'] == 'switch_1'
+    assert definitions['functions'][0]['user_label'] == 'Światło'
+
+
+def test_inventory_card_snapshot_does_not_expose_private_status_and_uses_actual_reports(lazy_client):
+    client = lazy_client
+    client.get(API + '/devices')
+    bridge = client.app.state.cloud
+    item = bridge.manager.device_map['switch-0']
+    item.status.update(local_key=KEY, access_token='private-token', unknown_value=KEY)
+    bridge.state.mq.emit(timestamp=1791400000000)
+    row = client.get(API + '/devices').json()[0]
+    snapshot = row['controls']['snapshot']
+    assert KEY not in str(snapshot) and 'private-token' not in str(snapshot)
+    assert snapshot['status']['switch_2'] is True
+    assert snapshot['status_observations']['switch_2']['observed_at']

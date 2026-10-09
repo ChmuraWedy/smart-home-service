@@ -85,7 +85,7 @@ describe('Smart Life topology', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Синхронизировать Smart Life' })); });
     expect(screen.getByRole('button', { name: 'Синхронизировать Smart Life' })).toBeDisabled();
     expect(screen.getByText(/Получаем структуру дома… 0 \/ 1/)).toBeInTheDocument();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Управлять' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Подробнее' })); });
     expect(screen.getByRole('dialog', { name: 'Лампа' })).toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(1000));
     expect(screen.getByRole('dialog', { name: 'Лампа' })).toBeInTheDocument();

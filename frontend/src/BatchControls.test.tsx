@@ -38,6 +38,7 @@ describe('one Apply for a device card', () => {
   it('stages power and numeric edits, sends only changed values in one request, and retains targets over an old cloud snapshot', async () => {
     const { writes } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     expect(screen.getAllByRole('button', { name: 'Применить' })).toHaveLength(1);
     edit('Яркость', '65'); edit('Цветовая температура', '40');
     await user.click(screen.getByRole('switch'));
@@ -57,6 +58,7 @@ describe('one Apply for a device card', () => {
   it('excludes edits returned to the initial value, including a false power value', async () => {
     const { writes } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     edit('Яркость', '65'); edit('Яркость', '50');
     await user.click(screen.getByRole('switch'));
     await user.click(screen.getByRole('switch'));
@@ -68,6 +70,7 @@ describe('one Apply for a device card', () => {
   it('validates every changed field before sending any command and includes a zero value', async () => {
     const { writes } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     edit('Яркость', '65'); edit('Цветовая температура', '200');
     expect(apply()).toBeDisabled();
     expect(within(field('Цветовая температура')).getByRole('alert')).toBeInTheDocument();
@@ -81,6 +84,7 @@ describe('one Apply for a device card', () => {
   it('keeps all edits after rejection and never retries automatically', async () => {
     const { writes } = cloud(true), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     edit('Яркость', '65'); edit('Цветовая температура', '40');
     await user.click(apply());
     await screen.findByText(/Устройство недоступно/);
@@ -110,6 +114,7 @@ describe('one Apply for a device card', () => {
   it('compares against the original value even when a refresh updates the live reading during editing', async () => {
     const { writes, status } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     edit('Яркость', '65'); status.bright_value_v2 = 700;
     await user.click(screen.getByRole('button', { name: 'Обновить статус' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Обновить статус' })).toBeEnabled());
@@ -150,6 +155,7 @@ describe('one Apply for a device card', () => {
     render(<LocalControl api={new HomeApi(connection)} device={local} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     await user.click(screen.getByRole('switch')); edit('Яркость', '65');
     expect(writes).toEqual([]);
     await user.click(apply());

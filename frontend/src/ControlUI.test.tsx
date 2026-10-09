@@ -498,7 +498,7 @@ describe('local device and group controls', () => {
     });
     view.rerender(<ControlCenter api={new HomeApi({ baseUrl:'http://other-api.test',token:'new-service-key' })} ready onAuthError={onAuthError} onLock={onLock} />);
     expect(screen.queryByText('Лампа кухни')).toBeNull();
-    expect(screen.queryByRole('button', { name:'Управлять' })).toBeNull();
+    expect(screen.queryByRole('button', { name:'Подробнее' })).toBeNull();
     expect(screen.getByText('Загружаем список…')).toBeInTheDocument();
   });
   it('disables a locally disabled device and reports a command timeout without retry', async () => {
@@ -508,7 +508,9 @@ describe('local device and group controls', () => {
     expect(screen.getByRole('switch')).toBeDisabled(); first.unmount();
     const server = localServer({ postError: true });
     render(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
-    fireEvent.click(await screen.findByRole('switch'));
+    const power = await screen.findByRole('switch');
+    await waitFor(() => expect(power).toBeEnabled());
+    fireEvent.click(power);
     const apply = screen.getByRole('button', {name:'Применить'});
     await waitFor(() => expect(apply).toBeEnabled());
     fireEvent.click(apply);

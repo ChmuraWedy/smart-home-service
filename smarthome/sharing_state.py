@@ -98,8 +98,8 @@ class SharingState:
             manager.update_device_cache()
             return
         # SDK update_device_cache performs four extra HTTP calls per device.
-        # Load only the inventory here; metadata is needed only for an opened
-        # device, command validation or a mapping.
+        # Load only the inventory here; metadata is needed only for visible
+        # controls, an actual report, command validation or a mapping.
         homes = manager.home_repository.query_homes()
         devices = {}
         received = now_iso()
