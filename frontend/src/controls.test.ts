@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloudCommands, cloudReading, cloudSpec, cloudSpecs, displayReading, hexToHsv, hsvToHex, isStale, localSpec, motionState, validateControlValue } from './controls';
+import { cloudCommands, cloudReading, cloudSpec, cloudSpecs, displayReading, hexToHsv, hsvToHex, isStale, localSpec, motionState, optionLabel, validateControlValue } from './controls';
 import type { CloudFunction, CloudFunctions } from './api';
 
 const fn = (code: string, type: string, values: unknown = {}): CloudFunction => ({ code, type, values: JSON.stringify(values) });
@@ -7,6 +7,19 @@ const definitions = (functions: CloudFunction[]): CloudFunctions => ({ device_id
 const mode = fn('work_mode', 'Enum', { range: ['white', 'colour'] });
 
 describe('metadata-driven controls', () => {
+  it('localizes relay settings without translating command values or unrelated enums', () => {
+    const relay = fn('relay_status', 'Enum', { range: ['power_off', 'power_on', 'last'] });
+    const spec = cloudSpec(relay, true);
+    expect(displayReading(spec, cloudReading(spec, 'last'))).toBe('Восстановить предыдущее состояние');
+    expect(optionLabel('power_on', spec.key)).toBe('Включено');
+    expect(optionLabel('last', 'custom_mode')).toBe('last');
+    expect(cloudCommands(spec, 'power_off', definitions([relay]))).toEqual([{ code: 'relay_status', value: 'power_off' }]);
+    const timer = fn('countdown_2', 'Integer', { min: 0, max: 86400, step: 1, scale: 0, unit: 's' });
+    const timerSpec = cloudSpec(timer, true);
+    expect(timerSpec.label).toBe('Таймер канала 2');
+    expect(displayReading(timerSpec, cloudReading(timerSpec, 60))).toBe('60 с');
+    expect(cloudCommands(timerSpec, 60, definitions([timer]))).toEqual([{ code: 'countdown_2', value: 60 }]);
+  });
   it.each(['music_data', 'control_data'])('does not turn %s command echoes into observed state', code => {
     for (const type of ['Json', 'String']) {
       const spec = cloudSpec(fn(code, type), true);

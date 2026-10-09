@@ -25,7 +25,8 @@ const LABELS: Record<string, string> = {
   percent_control: 'Положение', control: 'Действие', oscillation: 'Поворот', power: 'Мощность', cur_power: 'Мощность',
   voltage: 'Напряжение', current: 'Ток', child_lock: 'Блокировка', command: 'Команда', press: 'Нажатие',
   music_data: 'Светомузыка', control_data: 'Переход света', scene_data: 'Световой эффект', scene_data_v2: 'Световой эффект',
-  countdown: 'Таймер', countdown_1: 'Таймер', rhythm_mode: 'Суточный ритм света', sleep_mode: 'Свет перед сном',
+  countdown: 'Таймер', relay_status: 'Состояние после подачи питания', switch_backlight: 'Подсветка выключателя',
+  switch_inching: 'Автовыключение (импульсный режим)', rhythm_mode: 'Суточный ритм света', sleep_mode: 'Свет перед сном',
   wakeup_mode: 'Свет для пробуждения', power_memory: 'Поведение после включения питания',
   do_not_disturb: 'Не беспокоить', remote_switch: 'Параметр пульта', random_timing: 'Случайное расписание',
 };
@@ -35,8 +36,16 @@ const LIGHT_COMMAND_HELP: Record<string, string> = {
 };
 const OPTIONS: Record<string, string> = { white: 'Белый свет', colour: 'Цветной свет', scene: 'Сцена', music: 'Музыка',
   auto: 'Авто', manual: 'Вручную', open: 'Открыть', close: 'Закрыть', stop: 'Стоп', low: 'Низкая', medium: 'Средняя', high: 'Высокая', dock: 'На базу' };
-export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? 'Канал ' + key.slice(7) : key.replaceAll('_', ' '));
-export const optionLabel = (value: JsonValue) => typeof value === 'string' ? OPTIONS[value] || value : typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : JSON.stringify(value);
+export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? 'Канал ' + key.slice(7) : /^countdown_[1-9][0-9]*$/.test(key) ? 'Таймер канала ' + key.slice(10) : /^relay_status_[1-9][0-9]*$/.test(key) ? 'Состояние канала ' + key.slice(13) + ' после подачи питания' : key.replaceAll('_', ' '));
+const RELAY_OPTIONS: Record<string, string> = { power_off: 'Выключено', off: 'Выключено', power_on: 'Включено', on: 'Включено', last: 'Восстановить предыдущее состояние', memory: 'Восстановить предыдущее состояние' };
+export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : JSON.stringify(value);
+const unitLabel = (unit: string | undefined) => unit === 's' ? 'с' : unit;
+function controlHelp(key: string): string | undefined {
+  if (key === 'relay_status' || /^relay_status_[1-9][0-9]*$/.test(key)) return 'Какое состояние восстановить после отключения и повторной подачи электропитания. Это настройка, а не текущий статус реле.';
+  if (key === 'switch_backlight') return 'Включение и выключение подсветки клавиш выключателя.';
+  if (/^countdown(?:_[1-9][0-9]*)?$/.test(key)) return 'Обратный отсчёт до переключения. Время задаётся в секундах.';
+  if (key === 'switch_inching') return 'После включения выключатель автоматически отключается через заданное время. Например, через минуту. Настройка передаётся строкой; её формат не описан в API этого устройства.';
+}
 export const sameValue = (left: JsonValue, right: JsonValue) => JSON.stringify(left) === JSON.stringify(right);
 
 export function limitsOf(value: unknown): Record<string, unknown> {
@@ -49,7 +58,7 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 const rounded = (value: number) => Number(value.toPrecision(12));
 
 export function localSpec(key: string, cap: Capability): ControlSpec {
-  const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: cap.unit || undefined,
+  const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: unitLabel(cap.unit || undefined), help: controlHelp(key),
     indicator: !cap.writable && MOTION_KEYS.has(key) && cap.type === 'boolean' ? 'motion' as const : undefined };
   if (cap.enum?.length) return { ...base, kind: 'enum', choices: cap.enum };
   switch (cap.type) {
@@ -79,11 +88,11 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
   // includes an empty/echoed value in its cached status range.
   const commandHelp = ['String', 'Json'].includes(fn.type) ? LIGHT_COMMAND_HELP[fn.code] : undefined;
   const base = { key: fn.code, label: labelFor(fn.code), readable: !commandHelp, writable,
-    advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp,
+    advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp || controlHelp(fn.code),
     indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
-  const unit = typeof limits.unit === 'string' ? limits.unit : undefined;
-  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? 'Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.' : undefined };
+  const unit = typeof limits.unit === 'string' ? unitLabel(limits.unit) : undefined;
+  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? 'Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.' : base.help };
   if (fn.type === 'Integer') {
     const scale = limits.scale ?? 0;
     const validScale = Number.isInteger(scale) && (scale as number) >= 0 && (scale as number) <= 9;
@@ -99,7 +108,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
       minimum: finite(limits.min) ? limits.min * factor : undefined,
       maximum: finite(limits.max) ? limits.max * factor : undefined,
       step: (finite(limits.step) ? limits.step : 1) * factor, unit: displayUnit,
-      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? 'Единица измерения не указана устройством.' : undefined,
+      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? 'Единица измерения не указана устройством.' : base.help,
       reason: !writable || validBounds ? undefined : 'Нет корректного диапазона; управление недоступно.' };
   }
   if (fn.type === 'Enum') {
@@ -181,7 +190,7 @@ export function displayReading(spec: ControlSpec, reading: Reading | undefined):
   const value = reading.value;
   if (typeof value === 'boolean') return ['switch', 'switch_led'].includes(spec.key) || spec.key.startsWith('switch_') ? (value ? 'Включено' : 'Выключено') : (value ? 'Да' : 'Нет');
   if (spec.kind === 'color' && typeof value === 'object' && !Array.isArray(value)) return `Тон ${value.h}°, насыщенность ${rounded(Number(value.s) / 10)}%, яркость ${rounded(Number(value.v) / 10)}%`;
-  return (typeof value === 'number' ? String(rounded(value)) : optionLabel(value)) + (spec.unit ? ' ' + spec.unit : '');
+  return (typeof value === 'number' ? String(rounded(value)) : optionLabel(value, spec.key)) + (spec.unit ? ' ' + spec.unit : '');
 }
 
 export function validateControlValue(spec: ControlSpec, value: JsonValue): void {
