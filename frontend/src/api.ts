@@ -23,6 +23,7 @@ export type CloudDevice = {
   sub?: boolean;
   has_local_key: boolean;
   node_id?: string | null;
+  aliases?: string[];
 };
 export type DeveloperCredentials = {
   access_id: string;
@@ -145,6 +146,15 @@ export class CloudApi {
   }
   saveChannelLabels(id: string, provider: Provider, labels: Record<string, string | null>, signal?: AbortSignal) {
     return this.json<{ device_id: string; labels: Record<string, string> }>('/devices/' + encodeURIComponent(id) + '/channel-labels?provider=' + provider, 'PUT', { labels }, signal);
+  }
+  deviceAliases(id: string, provider: Provider, signal?: AbortSignal) {
+    return this.json<{ device_id: string; aliases: string[] }>('/devices/' + encodeURIComponent(id) + '/aliases?provider=' + provider, 'GET', undefined, signal);
+  }
+  saveDeviceAliases(id: string, provider: Provider, aliases: string[], signal?: AbortSignal) {
+    return this.json<{ device_id: string; aliases: string[] }>('/devices/' + encodeURIComponent(id) + '/aliases?provider=' + provider, 'PUT', { aliases }, signal);
+  }
+  saveLocalDeviceAliases(id: number, aliases: string[], signal?: AbortSignal) {
+    return this.request<{ device_id: string; aliases: string[] }>('/devices/' + id, 'PATCH', { aliases }, signal);
   }
   deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true) {
     return this.json<CloudSnapshot>('/devices/' + encodeURIComponent(id) + '/status?refresh=' + refresh + '&provider=' + provider, 'GET', undefined, signal);

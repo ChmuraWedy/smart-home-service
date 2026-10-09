@@ -1,13 +1,15 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { displayReading, isStale, localSpec } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceNetwork } from './DeviceNetwork';
+import { DeviceAliases } from './DeviceAliases';
 
 export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: {
   api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string;
 }) {
+  const [aliasBusy, setAliasBusy] = useState(false);
   const load = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
     const [metadata, state] = await Promise.all([api.device(device.id, signal), api.state(device.id, refresh, signal)]);
     if (metadata.id !== device.id || state.device_id !== device.id) throw new Error('Сервис вернул другое устройство.');
@@ -15,7 +17,8 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
   }, [api, device.id]);
   const session = useControlSession(load, onAuthError), now = useClock();
   const item = session.data?.metadata || device;
-  return <ControlDialog title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy} onClose={onClose} closeLabel={closeLabel}>
+  return <ControlDialog title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel}>
+    <DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />
     <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><button className="secondary compact" disabled={session.busy} onClick={() => void session.refresh()}>Обновить статус</button></div>
     <p className="help">Первое открытие читает кеш. «Обновить статус» опрашивает устройство. Команды и ключи Tuya обрабатывает сервер.</p>
     {session.data && !session.data.state.enabled && <p className="saved-summary">Устройство или его шлюз отключены в настройках сервиса.</p>}

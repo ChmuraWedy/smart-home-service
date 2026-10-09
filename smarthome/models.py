@@ -20,6 +20,13 @@ class CloudChannelLabel(Base):
     label: Mapped[str] = mapped_column(String(120))
 
 
+class CloudDeviceAlias(Base):
+    __tablename__ = "cloud_device_aliases"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    alias: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), index=True)
+
+
 class CloudDeviceMapping(Base):
     """User-maintained map; never presented as an applied Tuya association."""
 

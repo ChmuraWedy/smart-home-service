@@ -221,10 +221,21 @@ def logout(request: Request):
 
 @router.get("/devices")
 def devices(
-    request: Request, response: Response, refresh: bool = False, provider: Provider = "sharing"
+    request: Request, response: Response, refresh: bool = False, provider: Provider = "sharing",
+    session: Session = Depends(get_session),
 ):
+    from .cloud_mappings import scope_for
+    from .device_aliases import aliases_for_devices
+
     response.headers["Cache-Control"] = "no-store"
-    return [safe_device(device) for device in cloud_bridge(request, provider).devices(refresh)]
+    bridge = cloud_bridge(request, provider)
+    with bridge.lock:
+        rows = [safe_device(device) for device in bridge.devices(refresh)]
+        if rows:
+            aliases = aliases_for_devices(session, scope_for(bridge, provider), [row["id"] for row in rows])
+            for row in rows:
+                row["aliases"] = aliases[row["id"]]
+    return rows
 
 
 @router.post("/imports/local-inventory")

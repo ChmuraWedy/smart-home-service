@@ -47,6 +47,9 @@
 .capability-aliases { display:flex; flex-wrap:wrap; gap:6px; list-style:none; padding:0; margin:8px 0; }
 .alias-tag { border:1px solid #344558; border-radius:999px; background:#1b2b3b; padding:3px 9px; font-size:12px; overflow-wrap:anywhere; }
 .alias-tag span { color:#a1b1c5; }
+.device-alias-editor > .cloud-properties { margin:10px 0 18px; border-top:0; padding-top:0; }
+.device-alias-list { list-style:none; padding:0; }
+.device-alias-list li { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0; overflow-wrap:anywhere; }
 .read-only { color:#a1b1c5; font-size:10px; white-space:nowrap; }
 .reading { font-size:18px; margin:10px 0; overflow-wrap:anywhere; }
 .reading.unknown { font-size:15px; }

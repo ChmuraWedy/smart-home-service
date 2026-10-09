@@ -32,6 +32,12 @@ export function deviceRoutes(device: UnifiedDevice): DeviceRoute[] {
 }
 
 export function matchesDevice(device: UnifiedDevice, search: string): boolean {
-  return [device.id, device.name, ...(device.local?.aliases || []), ...Object.values(device.cloud).map(item => item?.name || '')]
+  return [device.id, device.name, ...deviceAliases(device), ...Object.values(device.cloud).map(item => item?.name || '')]
     .join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
+}
+
+export function deviceAliases(device: UnifiedDevice): string[] {
+  const names = new Set([device.name, ...Object.values(device.cloud).map(item => item?.name || '')].map(name => name.toLocaleLowerCase()));
+  return [...new Set([...(device.local?.aliases || []), ...Object.values(device.cloud).flatMap(item => item?.aliases || [])])]
+    .filter(alias => !names.has(alias.toLocaleLowerCase()));
 }

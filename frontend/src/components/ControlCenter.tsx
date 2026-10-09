@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { displayReading, isStale, localSpec } from '../controls';
-import { deviceRoutes, matchesDevice, mergeDevices, routeLabel } from '../devices';
+import { deviceAliases, deviceRoutes, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, Inventory } from '../home-api';
@@ -29,7 +29,9 @@ function DeviceCard({ device, state, room, now, onOpen, onAdd }: {
     <div className="device-heading"><span className="device-symbol" aria-hidden="true">◇</span>
       <span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span>
     </div>
-    <h3>{device.name}</h3><p className="help">{room} · {local ? (local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi') : cloud?.sub ? 'Через шлюз' : 'Прямое подключение'}</p>
+    <h3>{device.name}</h3>
+    {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства">{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}><span>Алиас:</span> {alias}</span>)}</div>}
+    <p className="help">{room} · {local ? (local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi') : cloud?.sub ? 'Через шлюз' : 'Прямое подключение'}</p>
     {local && <div className="card-readings"><p className="help">Последние показания в домашней сети</p>{Object.entries(local.capabilities).filter(([, cap]) => cap.readable).slice(0, 4).map(([key, cap]) => {
       const reading = state?.values[key];
       return <p key={key}><span>{localSpec(key, cap).label}</span><strong className={isStale(reading, now, true) || !state?.enabled ? 'unknown' : ''}>{displayReading(localSpec(key, cap), reading)}{reading?.known && (isStale(reading, now, true) || !state?.enabled) && ' · неактуально'}</strong></p>;

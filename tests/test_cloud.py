@@ -665,3 +665,53 @@ def test_local_key_metadata_cloud_does_not_override_custom_aliases(cloud_client)
     device = cloud_client.get("/api/v1/devices/stable").json()
     assert device["version"] == "3.5" and device["ip"] == "192.168.1.20"
     assert device["aliases"] == ["Gateway", "stable"]
+
+
+def test_device_aliases_persist_in_cards_without_creating_inventory_or_renaming_cloud(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    path = API + "/devices/gateway/aliases"
+    assert cloud_client.get(path).json()["aliases"] == []
+    result = cloud_client.put(path, json={"aliases": ["  Desk_Light  ", "work-lamp"]})
+    assert result.status_code == 200, result.text
+    assert result.json()["aliases"] == ["desk_light", "work-lamp"]
+    assert cloud_client.get(path).json()["aliases"] == ["desk_light", "work-lamp"]
+    rows = cloud_client.get(API + "/devices").json()
+    row = next(row for row in rows if row["id"] == "gateway")
+    assert row["aliases"] == ["desk_light", "work-lamp"] and row["name"] == "Gateway"
+    assert cloud_client.get("/api/v1/devices").json() == []
+    assert bridge.manager.customer_api.calls == []
+    conflict = cloud_client.put(API + "/devices/child/aliases", json={"aliases": ["DESK_LIGHT"]})
+    assert conflict.status_code == 409
+    bridge.auth["token_info"]["uid"] = "other"
+    assert cloud_client.get(path).json()["aliases"] == []
+    bridge.auth["token_info"]["uid"] = "user"
+    assert cloud_client.put(path, json={"aliases": []}).json()["aliases"] == []
+    for aliases in [["Bad Alias"], ["кириллица"], ["a", " A "], ["x" * 65], [f"alias{i}" for i in range(33)]]:
+        assert cloud_client.put(path, json={"aliases": aliases}).status_code == 422
+    assert cloud_client.get(API + "/devices/missing/aliases").status_code == 404
+    cloud_client.headers.clear()
+    assert cloud_client.get(path).status_code == 401
+    assert cloud_client.put(path, json={"aliases": []}).status_code == 401
+
+
+def test_cloud_card_reuses_inventory_aliases_and_preserves_other_device_settings(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/aliases"
+    assert cloud_client.put(path, json={"aliases": ["cloud_tag"]}).status_code == 200
+    response = cloud_client.post("/api/v1/devices", json={
+        "device_id": "gateway", "name": "Мой шлюз", "aliases": ["existing_tag"],
+        "ip": "192.168.1.40", "version": "3.5", "local_key": KEY,
+    })
+    assert response.status_code == 201, response.text
+    local = response.json()
+    assert cloud_client.get(path).json()["aliases"] == ["cloud_tag", "existing_tag"]
+    result = cloud_client.put(path, json={"aliases": ["cloud_tag", "existing_tag", "new_tag"]})
+    assert result.status_code == 200, result.text
+    stored = cloud_client.get(f"/api/v1/devices/{local['id']}").json()
+    assert stored["aliases"] == ["Мой шлюз", "cloud_tag", "existing_tag", "new_tag"]
+    assert stored["ip"] == local["ip"] and stored["has_local_key"]
+    assert stored["name"] == local["name"]
+    assert cloud_client.get("/api/v1/devices/new_tag").json()["id"] == local["id"]
+    assert cloud_client.put(path, json={"aliases": ["new_tag"]}).status_code == 200
+    assert cloud_client.get(f"/api/v1/devices/{local['id']}").json()["aliases"] == ["Мой шлюз", "new_tag"]

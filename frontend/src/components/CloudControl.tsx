@@ -7,13 +7,15 @@ import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSe
 import { DeviceMappings } from './DeviceMappings';
 import { ChannelAliases } from './ChannelAliases';
 import { DeviceNetwork } from './DeviceNetwork';
+import { DeviceAliases } from './DeviceAliases';
 
 export function CloudControl({ api, device, provider, devices, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; onClose: () => void; onAuthError: () => void;
 }) {
   const [mappingBusy,setMappingBusy] = useState(false);
+  const [aliasBusy, setAliasBusy] = useState(false);
   const [labelBusy, setLabelBusy] = useState(false), [labels, setLabels] = useState<Record<string, string> | null>(null);
-  const editingBusy = mappingBusy || labelBusy;
+  const editingBusy = mappingBusy || labelBusy || aliasBusy;
   const metadata = useMemo(() => ({value:null as CloudFunctions|null}),[api,device.id,provider]);
   const checked = (snapshot:CloudSnapshot) => {
     if (snapshot.device_id !== device.id || !snapshot.status || typeof snapshot.status !== 'object' || Array.isArray(snapshot.status)) throw new Error('Сервис вернул неожиданные данные устройства.');
@@ -42,6 +44,7 @@ export function CloudControl({ api, device, provider, devices, onClose, onAuthEr
     return { text: 'Команда принята.' };
   })} />;
   return <ControlDialog title={device.name || 'Устройство Tuya'} subtitle={provider === 'sharing' ? 'Smart Life · через интернет' : 'Tuya Developer · через интернет'} busy={session.busy || editingBusy} onClose={onClose}>
+    <DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><button className="secondary compact" disabled={session.busy || editingBusy} onClick={() => void session.refresh()}>Обновить статус</button></div>
     <p className="help">{specs.some(spec => spec.writable) ? 'Облачный снимок состояния. Принятие команды не подтверждает изменение устройства; облако может вернуть прежнее показание.' : 'Последнее известное состояние в облаке. Обновите статус для получения нового снимка.'}</p>
     {session.data && <p className="help">Снимок получен: {new Date(session.data.fetchedAt).toLocaleString('ru-RU')}</p>}

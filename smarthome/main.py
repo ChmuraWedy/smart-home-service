@@ -644,6 +644,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .network import router as network_router
 
     app.include_router(network_router)
+    from .device_aliases import router as device_aliases_router
+
+    app.include_router(device_aliases_router)
 
     @app.get("/cloud", include_in_schema=False)
     def cloud_setup_page():
