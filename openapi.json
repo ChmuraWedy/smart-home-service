@@ -5385,6 +5385,54 @@
         }
       }
     },
+    "/api/v1/cloud/topology": {
+      "get": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Get Topology",
+        "operationId": "get_topology_api_v1_cloud_topology_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cloud/topology/sync": {
+      "post": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Sync Topology",
+        "operationId": "sync_topology_api_v1_cloud_topology_sync_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
     "/api/v1/commissioning": {
       "post": {
         "tags": [

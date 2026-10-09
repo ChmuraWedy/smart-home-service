@@ -589,6 +589,9 @@ def create_app(settings: Settings | None = None, controller=None):
         from .commissioning import Observations
 
         app.state.observations = Observations()
+        from .topology import TopologySync
+
+        app.state.topology = TopologySync()
         from .cloud import CloudBridge
 
         app.state.cloud = CloudBridge(settings)
@@ -603,6 +606,7 @@ def create_app(settings: Settings | None = None, controller=None):
             yield
         finally:
             app.state.poller.stop()
+            app.state.topology.stop()
             app.state.observations.clear()
             app.state.cloud.close()
             engine.dispose()
@@ -627,7 +631,7 @@ def create_app(settings: Settings | None = None, controller=None):
     from .display_api import router as display_router
 
     app.include_router(display_router)
-    from .cloud_mappings import router as cloud_router
+    from .topology import router as cloud_router
 
     app.include_router(cloud_router)
     from .commissioning import router as commissioning_router

@@ -46,6 +46,44 @@ class AliasOwner:
         ]
 
 
+class CloudHome(Base):
+    __tablename__ = "cloud_homes"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    home_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    building_id: Mapped[int | None] = mapped_column(ForeignKey("buildings.id", ondelete="SET NULL"))
+    name: Mapped[str] = mapped_column(String(120))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class CloudRoom(Base):
+    __tablename__ = "cloud_rooms"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    home_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    room_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    local_room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
+    name: Mapped[str] = mapped_column(String(120))
+    imported_name: Mapped[str] = mapped_column(String(120))
+
+
+class CloudPlacement(Base):
+    __tablename__ = "cloud_placements"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    home_id: Mapped[str] = mapped_column(String(128))
+    room_id: Mapped[str | None] = mapped_column(String(128))
+    managed: Mapped[bool] = mapped_column(Boolean, default=False)
+    overridden: Mapped[bool] = mapped_column(Boolean, default=False)
+    applied_building_id: Mapped[int | None]
+    applied_room_id: Mapped[int | None]
+
+
+class CloudTopology(Base):
+    __tablename__ = "cloud_topology"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    warnings: Mapped[int] = mapped_column(default=0)
+
+
 class Building(AliasOwner, Base):
     __tablename__ = "buildings"
     id: Mapped[int] = mapped_column(primary_key=True)
