@@ -692,6 +692,10 @@ footer {
   }
 }
 /* Device observation before inventory registration. */
+.topology-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; border: 1px solid var(--border, #34454e); border-radius: 14px; padding: 16px; margin-block: 20px; }
+.topology-summary > p { flex-basis: 100%; margin: 0; }
+.topology-summary h3 { margin-top: 0; }
+.topology-summary button { white-space: normal; }
 .device-survey { max-width: 1000px; margin-inline: auto; padding: 24px; }
 .survey-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
 .survey-form-grid label, .survey-prompt label { display: flex; flex-direction: column; gap: 8px; }

@@ -10,6 +10,7 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
+import { useTopology } from '../use-topology';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -51,6 +52,9 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   const cloud = current?.cloud || NO_CLOUD;
   const [building, setBuilding] = useState(''), [room, setRoom] = useState(''), [search, setSearch] = useState('');
   const [page, setPage] = useState(0), [revision, setRevision] = useState(0);
+  const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
+  const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
+  function location(device: UnifiedDevice) { return device.local || placements.get(device.id); }
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState<{ api: HomeApi; mask: string; value: Selection } | null>(null);
   const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
@@ -58,8 +62,8 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
   const now = useClock();
   useEffect(() => { onLock(Boolean(selected)); return () => onLock(false); }, [selected, onLock]);
+  useEffect(() => { setSelection(null); }, [api, ready, mask]);
   useEffect(() => {
-    setSelection(null);
     if (!ready) return;
     const controller = new AbortController(); setBusy(true); setPage(0);
     setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, errors: [] } : { api, mask, inventory: null, cloud: {}, errors: [] });
@@ -88,10 +92,10 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   const entries = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
-    const filtered = devices.filter(device => (!building || String(device.local?.building_id) === building) && inRoom(device.local?.room_id ?? null) && matchesDevice(device, needle));
+    const filtered = devices.filter(device => (!building || String(location(device)?.building_id) === building) && inRoom(location(device)?.room_id ?? null) && matchesDevice(device, needle));
     const groups = inventory?.groups.filter(group => inRoom(group.room_id) && (!building || String(inventory.rooms.find(item => item.id === group.room_id)?.building_id) === building) && group.name.toLocaleLowerCase().includes(needle)) || [];
     return [...groups.map(group => ({ kind: 'group' as const, group })), ...filtered.map(device => ({ kind: 'device' as const, device }))];
-  }, [devices, inventory, building, room, search]);
+  }, [devices, inventory, building, room, search, placements]);
   const visible = useMemo(() => entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [entries, page]);
   useEffect(() => {
     const controller = new AbortController();
@@ -112,17 +116,25 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   }, [api, visible]);
   function choose(value: Selection) { setSelection({ api, mask, value }); }
   function close() { setSelection(null); setRevision(value => value + 1); }
-  if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} provider={selected.provider} onClose={close} onAuthError={onAuthError} />;
+  if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} provider={selected.provider} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={close} onAuthError={onAuthError} />;
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading"><div><p className="eyebrow">Ваш дом</p><h2 id="control-center-heading">Устройства и группы{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div><div className="survey-toolbar"><button className="secondary compact" disabled={!inventory || busy} onClick={() => choose({ kind: 'survey' })}>Добавить устройство</button><button className="secondary compact" disabled={!ready || busy} onClick={() => setRevision(value => value + 1)}>Обновить список</button></div></div>
     {!ready ? <p className="saved-summary">Сначала сохраните доступ к сервису в настройках подключения.</p> : <>
       <p className="help">Одна карточка для каждого устройства. Способ управления показывает, нужна ли связь с интернетом.</p>
+      {sharingReady && <div className="topology-summary">
+        <div><h3>Комнаты из Smart Life</h3><p className="help">{topology.busy ? `Получаем структуру дома… ${topology.data?.job.processed || 0} / ${topology.data?.job.total || '…'}` : topology.data?.synced_at ? 'Синхронизировано: ' + new Date(topology.data.synced_at).toLocaleString('ru-RU') : 'Подставим здание и комнату в карточки и мастер добавления.'}</p></div>
+        <button className="secondary compact" disabled={topology.busy} onClick={() => void topology.sync()}>Синхронизировать Smart Life</button>
+        {topology.busy && <p role="status" className="help">Синхронизация выполняется в фоне. Можно продолжать пользоваться устройствами.</p>}
+        {(topology.error || topology.data?.job.message) && <p role="alert" className="field-error">{topology.error || topology.data?.job.message}</p>}
+        {Boolean(topology.data?.warnings) && <p className="help">Сохранены ручные настройки или обнаружены ограничения размещения: {topology.data?.warnings}. Проверьте комнаты нужных устройств.</p>}
+        <p className="help">Пустые комнаты Smart Life при этой синхронизации не передаются.</p>
+      </div>}
       <div className="control-filters"><label>Здание<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); setPage(0); }}><option value="">Все здания</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Комната<select value={room} onChange={event => { setRoom(event.target.value); setPage(0); }}><option value="">Все комнаты</option><option value="none">Без комнаты</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Поиск по названию, алиасу или ID<input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Найти устройство или группу" /></label></div>
       {busy && <p role="status" className="help">Загружаем список…</p>}{current?.errors.map(error => <p key={error} role="alert" className="field-error">{error}</p>)}
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? 'Ничего не найдено' : 'Устройств пока нет'}</h3><p>{devices.length || inventory?.groups.length ? 'Измените фильтры или поисковый запрос.' : sharingReady || developerReady ? 'Добавьте устройства в Smart Life и обновите список.' : 'Подключите аккаунт Tuya, чтобы увидеть свои устройства.'}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>Настроить подключение</button>}</div>}
       <ul className="device-grid local-grid">{visible.map(entry => entry.kind === 'group' ? <li className="device-card group-card" key={'group-' + entry.group.id}>
         <p className="eyebrow">Группа · {entry.group.device_ids.length} устройств</p><h3>{entry.group.name}</h3><p className="reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : 'Состояние неизвестно'}</p><p className="help">В домашней сети</p><button className="secondary compact full-width" onClick={() => choose(entry)}>Открыть группу</button>
-      </li> : <DeviceCard key={'device-' + entry.device.id} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={inventory?.rooms.find(item => item.id === entry.device.local?.room_id)?.name || 'Без комнаты'} now={now} onOpen={route => choose({ ...entry, route })} onAdd={inventory ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
+      </li> : <DeviceCard key={'device-' + entry.device.id} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={inventory?.rooms.find(item => item.id === location(entry.device)?.room_id)?.name || 'Без комнаты'} now={now} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>Назад</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>Далее</button></div>}
     </>}
     {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} closeLabel={selected.parent ? 'Назад к группе' : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}

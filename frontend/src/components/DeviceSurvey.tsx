@@ -3,7 +3,7 @@ import { ApiError } from '../api';
 import type { CloudDevice, JsonValue, Provider } from '../api';
 import { labelFor } from '../controls';
 import { HomeApi } from '../home-api';
-import type { DeviceDraft, Inventory, ObservationAction, ObservationReading, ObservationSession } from '../home-api';
+import type { DeviceDraft, Inventory, ObservationAction, ObservationReading, ObservationSession, Placement } from '../home-api';
 
 const actions: Record<ObservationAction, { label: string; prompt: string }> = {
   observe: { label: 'Наблюдение', prompt: 'Получим исходное состояние. Затем выберите действие, которое хотите проверить.' },
@@ -18,8 +18,9 @@ const textValue = (value: JsonValue) => value === true ? 'Вкл / да' : value
 const title = (row: ObservationReading) => row.code ? labelFor(row.code) : 'Параметр ' + (row.dp ? 'DP ' + row.dp : row.key);
 const timeLabel = (stamp: string | null) => stamp ? new Date(stamp).toLocaleString('ru-RU') : 'Время отчёта не указано';
 
-export function DeviceSurvey({ api, inventory, device, provider, onClose, onAuthError }: {
+export function DeviceSurvey({ api, inventory, device, provider, placement, onClose, onAuthError }: {
   api: HomeApi; inventory: Inventory; device?: CloudDevice; provider?: Provider;
+  placement?: Placement;
   onClose: () => void; onAuthError: () => void;
 }) {
   const [step, setStep] = useState<'configure' | 'observe' | 'review'>('configure');
@@ -27,7 +28,7 @@ export function DeviceSurvey({ api, inventory, device, provider, onClose, onAuth
   const [kind, setKind] = useState(device?.sub ? 'zigbee' : 'wifi');
   const [ip, setIp] = useState(''), [version, setVersion] = useState('3.5'), [key, setKey] = useState('');
   const [parent, setParent] = useState(''), [cid, setCid] = useState(device?.node_id || '');
-  const [room, setRoom] = useState(''), [building, setBuilding] = useState(''), [aliases, setAliases] = useState('');
+  const [room, setRoom] = useState(placement?.room_id ? String(placement.room_id) : ''), [building, setBuilding] = useState(placement?.building_id ? String(placement.building_id) : ''), [aliases, setAliases] = useState('');
   const [mode, setMode] = useState<'local' | 'cloud'>('local');
   const [observation, setObservation] = useState<ObservationSession | null>(null);
   const [action, setAction] = useState<ObservationAction>('observe'), actionRef = useRef(action);
@@ -123,7 +124,7 @@ export function DeviceSurvey({ api, inventory, device, provider, onClose, onAuth
     } catch (failure) { report(failure); if (mounted.current) setBusy(false); }
   }
 
-  const placement = <div className="survey-form-grid">
+  const placementFields = <div className="survey-form-grid">
     <label>Название<input value={name} maxLength={120} onChange={event => setName(event.target.value)} required /></label>
     <label>Алиасы через запятую<input aria-label="Алиасы через запятую" value={aliases} onChange={event => setAliases(event.target.value)} placeholder="kitchen_light, main_light" /><span className="help">Латинские буквы, цифры, . _ -; начинайте с буквы. Название тоже станет алиасом.</span></label>
     <label>Здание<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); }}><option value="">Не выбрано</option>{inventory.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
@@ -134,7 +135,8 @@ export function DeviceSurvey({ api, inventory, device, provider, onClose, onAuth
     <div className="card-heading"><div><p className="eyebrow">Добавление в дом · {step === 'configure' ? '1 / 3' : step === 'observe' ? '2 / 3' : '3 / 3'}</p><h2 id="survey-heading">{step === 'configure' ? 'Опрос перед добавлением' : step === 'observe' ? 'Проверьте устройство' : 'Проверьте результаты'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
     {step === 'configure' ? <form onSubmit={event => { event.preventDefault(); void begin(); }}>
       <p className="help">Сначала прочитаем состояние, затем попросим вас пощёлкать устройством. В базу оно попадёт только после вашего сохранения.</p>
-      {placement}
+      {placement && <p className="help">Здание и комната подставлены из Smart Life. При необходимости измените их перед сохранением.</p>}
+      {placementFields}
       <div className="survey-form-grid">
         <label>Tuya device ID<input value={id} readOnly={Boolean(device)} required maxLength={128} onChange={event => setId(event.target.value)} /></label>
         <label>Подключение устройства<select value={kind} onChange={event => setKind(event.target.value)}><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></select></label>
@@ -151,7 +153,7 @@ export function DeviceSurvey({ api, inventory, device, provider, onClose, onAuth
         <div className="survey-toolbar"><span role="status">{expired ? 'Опрос остановлен. Начните заново.' : hidden ? 'Опрос приостановлен, пока вкладка скрыта.' : paused ? 'Опрос на паузе.' : polling ? 'Читаем состояние…' : 'Ожидаем следующую выборку…'}</span><button className="secondary compact" disabled={expired} onClick={() => setPaused(value => !value)}>{paused ? 'Продолжить' : 'Пауза'}</button></div>
         <p className="help">Сервис читает только выбранное устройство каждые {observation?.interval_seconds} сек. Короткие события между чтениями могут быть пропущены. Опрос действует 15 минут.</p>
       </>}
-      {step === 'review' && <>{placement}<p className="saved-summary">Изменение значения не доказывает его назначение. Неизвестные DP будут доступны только для чтения. Управление можно включить для параметров, чей номер DP и формат подтверждены Tuya и локальным ответом.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}
+      {step === 'review' && <>{placementFields}<p className="saved-summary">Изменение значения не доказывает его назначение. Неизвестные DP будут доступны только для чтения. Управление можно включить для параметров, чей номер DP и формат подтверждены Tuya и локальным ответом.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}
       <div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output>{step === 'review' && row.can_write && <label className="survey-checkbox"><input type="checkbox" checked={writable.includes(row.key)} onChange={event => setWritable(current => event.target.checked ? [...current, row.key] : current.filter(value => value !== row.key))} />Разрешить управление: {title(row)}</label>}</li>)}</ul>}</div>
       <div className="survey-history"><h3>Замеченные изменения <span className="count">{observation?.changes.length || 0}</span></h3>{!observation?.changes.length ? <p className="help">Изменений пока нет. Исходное состояние не считается изменением.</p> : <ol>{[...observation.changes].reverse().map((row, index) => <li key={index}><span className="help">{timeLabel(row.detected_at)} · {actions[row.action as ObservationAction]?.label || 'Наблюдение'}</span><strong>{title(row)}</strong><span>{textValue(row.previous)} → {textValue(row.value)}</span></li>)}</ol>}</div>
       <div className="survey-footer">{step === 'observe' ? <><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>Изменить подключение</button><button disabled={expired || polling || !observation?.readings.length} onClick={() => { setStep('review'); setReviewed(false); }}>Перейти к сохранению</button></> : <><label className="survey-checkbox"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />Я проверил показания и выбранные параметры</label><button className="secondary" disabled={busy} onClick={() => setStep('observe')}>Продолжить опрос</button><button disabled={!reviewed || busy || expired || !name.trim()} onClick={() => void save()}>Сохранить устройство</button></>}</div>

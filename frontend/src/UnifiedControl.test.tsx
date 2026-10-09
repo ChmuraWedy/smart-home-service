@@ -19,6 +19,7 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
   vi.mocked(fetch).mockImplementation(async (input, init) => {
     const url = new URL(String(input)), path = url.pathname, method = init?.method || 'GET';
     calls.push({ path: path + url.search, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (path === '/api/v1/cloud/topology') return json({ synced_at: null, warnings: 0, placements: [], job: { status: 'idle', processed: 0, total: 0, message: null } });
     if (method === 'POST') return options.commandFailure && path.includes('/cloud/') ? json({ detail: 'Cloud timeout' }, 504) : json({ acknowledged: true, state_confirmed: false });
     if (path.endsWith('/cloud/devices')) return options.cloudFailure && url.searchParams.get('provider') === 'sharing' ? json({ detail: 'Cloud unavailable' }, 502) : json(url.searchParams.get('provider') === 'sharing' ? [shared, cloudOnly] : [developer]);
     if (path === '/api/v1/buildings') return options.localFailure ? json({ detail: 'Inventory unavailable' }, 503) : json([{ id: 1, name: 'Дом', aliases: ['home'] }]);

@@ -21,6 +21,7 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
     const token = (options?.headers as Record<string, string> | undefined)?.['X-API-Key'];
     calls.push({ path, method: options?.method || 'GET', body, token });
     if (token !== TOKEN) return json({ detail: 'Unauthorized' }, 401);
+    if (path === '/api/v1/cloud/topology') return json({ synced_at: null, warnings: 0, placements: [], job: { status: 'idle', processed: 0, total: 0, message: null } });
     if (path.endsWith('/status')) return json(status);
     if (path.endsWith('/user-code')) {
       status.has_saved_user_code = true; status.saved_user_code_requires_login = true;

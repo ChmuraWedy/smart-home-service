@@ -25,6 +25,7 @@ function server(options: { failedSecond?: boolean; cloud?: boolean; registerFail
     const path = new URL(String(input)).pathname, method = init?.method || 'GET';
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ path, method, ...(body ? { body } : {}) });
+    if (path === '/api/v1/cloud/topology') return json({ synced_at: null, warnings: 0, placements: [], job: { status: 'idle', processed: 0, total: 0, message: null } });
     if (path === '/api/v1/buildings') return json(inventory.buildings);
     if (path === '/api/v1/rooms') return json(inventory.rooms);
     if (path === '/api/v1/groups' || path === '/api/v1/devices') return json([]);

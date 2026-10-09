@@ -20,6 +20,9 @@ export type Group = { id: number; name: string; room_id: number; device_ids: num
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
 export type GroupResult = { all_acknowledged: boolean; results: { device_id: number; acknowledged: boolean }[] };
 export type Inventory = { buildings: Building[]; rooms: Room[]; devices: LocalDevice[]; groups: Group[] };
+export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
+export type TopologyJob = { status: 'idle' | 'running' | 'done' | 'failed'; processed: number; total: number; message: string | null };
+export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: false; placements: Placement[]; job: TopologyJob };
 export type DeviceDraft = {
   name: string; device_id: string; transport: 'wifi' | 'zigbee'; is_gateway: boolean;
   ip: string | null; version: string | null; parent_id: number | null; cid: string | null;
@@ -38,6 +41,8 @@ export type ObservationSession = {
 export type ObservationAction = 'observe' | 'power' | 'brightness' | 'temperature' | 'color' | 'sensor' | 'button';
 
 export class HomeApi extends CloudApi {
+  topology(signal?: AbortSignal) { return this.request<Topology>('/cloud/topology', 'GET', undefined, signal); }
+  syncTopology(signal?: AbortSignal) { return this.request<TopologyJob>('/cloud/topology/sync', 'POST', undefined, signal); }
   private async list<T>(path: string, signal?: AbortSignal): Promise<T[]> {
     const result: T[] = [];
     // Page metadata only; loading the inventory never contacts physical devices.
