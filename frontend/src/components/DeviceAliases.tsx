@@ -27,5 +27,5 @@ export function DeviceAliases({ api, deviceId, name, initialAliases = [], provid
       throw failure;
     } finally { if (!controller.signal.aborted) { pending.current = null; onBusy(false); } }
   }
-  return <div className="device-alias-heading"><h2>{name}</h2><AliasRow aliases={aliases} disabled={disabled} onSave={save} validate={value => /^[\p{L}][\p{L}\p{M}\p{N} ._-]*$/u.test(value)} /></div>;
+  return <div className="device-alias-heading"><h2>{name}</h2><AliasRow label="Алиасы:" aliases={aliases} disabled={disabled} onSave={save} validate={value => /^[\p{L}][\p{L}\p{M}\p{N} ._-]*$/u.test(value)} /></div>;
 }

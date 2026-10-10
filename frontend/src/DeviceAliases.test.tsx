@@ -24,7 +24,7 @@ it('adds, edits and removes inline tags, keeping the real device name and comman
   expect(save).toHaveBeenCalledWith('lamp', 'sharing', ['Свет кухни'], expect.any(AbortSignal));
   expect(screen.getByRole('heading', { name: 'Original lamp' })).toBeInTheDocument();
   expect(screen.getByRole('group', { name: 'Алиасы' })).toHaveTextContent('Свет кухни');
-  expect(screen.queryByText('Алиасы:')).toBeNull();
+  expect(screen.getByText('Алиасы:')).toBeVisible();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Изменить алиас Свет кухни' }));
   await user.clear(screen.getByLabelText('Изменить алиас'));

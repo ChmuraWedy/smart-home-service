@@ -6,9 +6,9 @@ export function Pencil() {
 function AliasActionIcon({ action }: { action: 'save' | 'delete' | 'cancel' }) {
   return <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{action === 'save' ? <path d="m5 12 4 4L19 6" /> : action === 'cancel' ? <path d="m6 6 12 12M18 6 6 18" /> : <><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 10v7M14 10v7" /></>}</svg>;
 }
-export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength = 64, validate }: {
+export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength = 64, validate, label }: {
   aliases: string[]; disabled: boolean; onSave: (values: string[]) => Promise<void>;
-  maxAliases?: number; maxLength?: number; validate?: (value: string) => boolean;
+  maxAliases?: number; maxLength?: number; validate?: (value: string) => boolean; label?: string;
 }) {
   const [editing, setEditing] = useState<number | null>(null), [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false), [error, setError] = useState('');
@@ -32,6 +32,7 @@ export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength
       <button type="button" className="alias-icon" aria-label="Отмена" title="Отмена" disabled={saving} onClick={() => { setEditing(null); setError(''); }}><AliasActionIcon action="cancel" /></button>
     </form>;
   return <div className="alias-row" role="group" aria-label="Алиасы">
+    {label && <span className="alias-label">{label}</span>}
     {aliases.map((alias, index) => editing === index ? editor : <span className="alias-tag" key={alias}>{alias}<button type="button" className="alias-icon" aria-label={'Изменить алиас ' + alias} title="Изменить алиас" disabled={disabled || saving} onClick={() => { setEditing(index); setDraft(alias); setError(''); }}><Pencil /></button></span>)}
     {editing === null && aliases.length < maxAliases && <button type="button" className="secondary alias-add" aria-label="Добавить алиас" title="Добавить алиас" disabled={disabled || saving} onClick={() => { setEditing(aliases.length); setDraft(''); setError(''); }}>+</button>}
     {editing === aliases.length && editor}
