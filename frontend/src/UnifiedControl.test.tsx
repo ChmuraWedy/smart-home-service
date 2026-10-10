@@ -101,7 +101,7 @@ describe('unified device identity and management', () => {
     await user.selectOptions(within(card).getByRole('combobox'), 'developer');
     await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const cloud = await screen.findByRole('dialog', { name: local.name });
-    expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
+    expect(within(cloud).queryByText('Tuya Developer · через интернет')).toBeNull();
     const connectionSummary=within(cloud).getByRole('region',{name:'Подключение устройства'});
     expect(connectionSummary).toBeVisible();
     for (const text of ['Комната','Кухня','Подключение','Через шлюз','Управление','Через интернет · Tuya Developer','Состояние связи']) {

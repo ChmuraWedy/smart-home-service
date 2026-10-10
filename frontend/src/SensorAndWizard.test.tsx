@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CloudApi, type DeviceEvent } from './api';
 import { cloudSpec } from './controls';
 import { defaultSchedule, encodeRawSchedule } from './raw-lighting';
+import { LightEffectWizard } from './components/LightEffectWizard';
 import { ScheduleWizard } from './components/ScheduleWizard';
 import { DeviceActivity } from './components/DeviceActivity';
 import { CloudControl } from './components/CloudControl';
@@ -59,7 +60,8 @@ describe('popup schedule wizards', () => {
       expect(within(schedules).getByRole('region',{name})).toBeVisible();
     }
     expect(within(schedules).getAllByRole('button',{name:'Настроить'})).toHaveLength(4);
-    expect(screen.getByText('Эффекты и дополнительные параметры').closest('details')).not.toHaveAttribute('open');
+    expect(within(screen.getByRole('region',{name:'Световые эффекты'})).getByRole('button',{name:'Настроить'})).toBeVisible();
+    expect(screen.queryByText('Эффекты и дополнительные параметры')).toBeNull();
     expect(vi.mocked(fetch).mock.calls.every(([,init]) => init?.method !== 'POST')).toBe(true);
   });
 
@@ -88,6 +90,37 @@ describe('popup schedule wizards', () => {
     expect(writes).toHaveLength(1);
     expect((writes[0] as {commands:{code:string;value:string}[]}).commands[0].code).toBe('rhythm_mode');
     expect((writes[0] as {commands:{value:string}[]}).commands[0].value).not.toBe(original);
+  });
+});
+
+describe('light effect wizards', () => {
+  it.each(['scene_data_v2','music_data','control_data'])('keeps %s changes local and discards cancellation', async code => {
+    const spec=cloudSpec({code,type:'Json',values:{h:{min:0,max:360},s:{min:0,max:255},v:{min:0,max:255}}},true);
+    const original=JSON.stringify({h:60,s:100,v:255}), done=vi.fn(), close=vi.fn(), user=userEvent.setup();
+    const view=render(<LightEffectWizard spec={spec} value={original} onDone={done} onClose={close} />);
+    fireEvent.change(screen.getByLabelText(code+'.h'),{target:{value:'120'}});
+    await user.click(screen.getByRole('button',{name:'Отмена'}));
+    expect(close).toHaveBeenCalledTimes(1); expect(done).not.toHaveBeenCalled();
+    view.unmount(); render(<LightEffectWizard spec={spec} value={original} onDone={done} onClose={close} />);
+    expect(screen.getByLabelText(code+'.h')).toHaveValue(60);
+    fireEvent.change(screen.getByLabelText(code+'.h'),{target:{value:'400'}});
+    await user.click(screen.getByRole('button',{name:'Далее'}));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(code+'.h'),{target:{value:'120'}});
+    await user.click(screen.getByRole('button',{name:'Далее'}));
+    expect(done).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button',{name:'Готово'}));
+    expect(JSON.parse(done.mock.calls[0][0])).toEqual({h:120,s:100,v:255});
+  });
+  it('keeps schedule navigation in the footer and closes via the top cross', async () => {
+    const close=vi.fn(), done=vi.fn(), user=userEvent.setup();
+    render(<ScheduleWizard spec={rawSpec('random_timing')} value={encodeRawSchedule('random_timing',defaultSchedule('random_timing'))} onDone={done} onClose={close} />);
+    expect(screen.getByRole('button',{name:'Отмена'}).closest('footer')).not.toBeNull();
+    expect(screen.getByRole('button',{name:'Далее'}).closest('footer')).not.toBeNull();
+    const cross=screen.getByRole('button',{name:'Закрыть мастер'});
+    expect(cross.closest('header')).not.toBeNull();
+    await user.click(cross);
+    expect(close).toHaveBeenCalledTimes(1); expect(done).not.toHaveBeenCalled();
   });
 });
 

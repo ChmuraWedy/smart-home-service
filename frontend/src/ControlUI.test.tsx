@@ -239,7 +239,7 @@ describe('cloud device control', () => {
     const modes=await screen.findByRole('combobox',{name:'Режим'});
     expect(within(modes).getAllByRole('option').map(option => option.textContent)).toEqual(['Выберите значение','Белый свет','Цветной свет','Музыка']);
     expect(screen.queryByRole('region',{name:'Расписания света'})).toBeNull();
-    expect(screen.queryByRole('button',{name:'Настроить'})).toBeNull();
+    expect(within(screen.getByRole('region',{name:'Световые эффекты'})).getByRole('button',{name:'Настроить'})).toBeVisible();
     expect(screen.getByRole('button',{name:'Обновить статус'}).closest('header')).not.toBeNull();
   });
 
@@ -254,12 +254,16 @@ describe('cloud device control', () => {
     });
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const user=userEvent.setup();
-    await user.click(await screen.findByText('Эффекты и дополнительные параметры'));
-    const music=screen.getByRole('region',{name:'Светомузыка'});
+    const music=await screen.findByRole('region',{name:'Светомузыка'});
+    await user.click(within(music).getByRole('button',{name:'Настроить'}));
+    const wizard=screen.getByRole('dialog',{name:'Настройка: Светомузыка'});
     expect(within(music).queryByRole('textbox')).toBeNull();
-    await user.selectOptions(within(music).getByLabelText('music_data.change_mode'),'gradient');
-    fireEvent.change(within(music).getByLabelText('Выбор цвета'),{target:{value:'#00ff00'}});
-    expect(within(music).getByLabelText('music_data.s')).toHaveValue(255);
+    await user.selectOptions(within(wizard).getByLabelText('music_data.change_mode'),'gradient');
+    fireEvent.change(within(wizard).getByLabelText('Выбор цвета'),{target:{value:'#00ff00'}});
+    expect(within(wizard).getByLabelText('music_data.s')).toHaveValue(255);
+    expect(writes).toHaveLength(0);
+    await user.click(within(wizard).getByRole('button',{name:'Далее'}));
+    await user.click(within(wizard).getByRole('button',{name:'Готово'}));
     expect(writes).toHaveLength(0);
     await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
@@ -293,7 +297,8 @@ describe('cloud device control', () => {
       const command = screen.getByRole('region', { name });
       expect(command.querySelector('.reading')).toBeNull();
       expect(within(command).getByText('Команда')).toBeInTheDocument();
-      expect(within(command).getByRole('textbox')).toHaveValue('');
+      expect(within(command).queryByRole('textbox')).toBeNull();
+      expect(within(command).getByRole('button',{name:'Настроить'})).toBeVisible();
       expect(screen.getByRole('button', { name: 'Применить' })).toBeDisabled();
     }
     const remote = screen.getByRole('region', { name: 'Параметр пульта' });

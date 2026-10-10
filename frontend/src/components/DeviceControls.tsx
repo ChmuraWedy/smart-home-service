@@ -9,6 +9,7 @@ import type { DraftStage } from '../control-drafts';
 import { defaultObject } from '../lighting';
 import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFields';
 import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWizard';
+import { hasLightEffectWizard, LightEffectWizard } from './LightEffectWizard';
 import { ParameterIcon } from './DevicePresentation';
 
 export type ControlNotice = { text: string; error?: boolean };
@@ -101,8 +102,8 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   return { data, busy, readOK, notice, refresh, execute };
 }
 
-export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, statusContent, information, onRefresh, className = '' }: {
-  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; onRefresh?: () => Promise<void>; className?: string;
+export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, connectionContent, statusContent, information, onRefresh, className = '' }: {
+  title: string; subtitle?: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; connectionContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; onRefresh?: () => Promise<void>; className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [infoOpen,setInfoOpen] = useState(false);
@@ -123,7 +124,7 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     return () => { element.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (infoOpen) setInfoOpen(false); else if (!busy) onClose(); }}>
-    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><div className="control-header-buttons">{onRefresh && <button type="button" className="secondary control-refresh" aria-label="Обновить статус" title="Обновить статус" disabled={busy} onClick={() => void onRefresh()}>↻</button>}{information && <button type="button" ref={infoButton} className="secondary control-information" aria-label="О подключении устройства" title="О подключении устройства" aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}{information && infoOpen && <section ref={infoPanel} id={infoId} className="connection-information connection-balloon" aria-label="О подключении устройства"><button type="button" className="secondary balloon-close" aria-label="Закрыть справку" onClick={() => { setInfoOpen(false); infoButton.current?.focus(); }}>×</button>{information}</section>}</div></header>
+    <header className={"control-header" + (connectionContent ? " device-control-header" : "")}><div className="control-header-title">{subtitle && <p className="eyebrow">{subtitle}</p>}{titleContent || <h2>{title}</h2>}</div>{connectionContent}<div className="control-header-actions"><div className="control-header-buttons">{onRefresh && <button type="button" className="secondary control-refresh" aria-label="Обновить статус" title="Обновить статус" disabled={busy} onClick={() => void onRefresh()}>↻</button>}{information && <button type="button" ref={infoButton} className="secondary control-information" aria-label="О подключении устройства" title="О подключении устройства" aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}{information && infoOpen && <section ref={infoPanel} id={infoId} className="connection-information connection-balloon" aria-label="О подключении устройства"><button type="button" className="secondary balloon-close" aria-label="Закрыть справку" onClick={() => { setInfoOpen(false); infoButton.current?.focus(); }}>×</button>{information}</section>}</div></header>
     {children}
   </dialog>;
 }
@@ -143,7 +144,8 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
   const [draft, setDraft] = useState('');
   const initial = useRef<JsonValue | undefined>(undefined);
   const [preciseColor, setPreciseColor] = useState(false);
-  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false), [effectOpen, setEffectOpen] = useState(false);
+  const effectWizard = hasLightEffectWizard(spec);
   const [color, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
   const pendingTarget = useRef<{ value: JsonValue; baseline: JsonValue | undefined; sentAt: number } | null>(null);
   const [awaiting, setAwaiting] = useState(false);
@@ -243,9 +245,9 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
       {spec.kind === 'color' && <div className="color-editor">
         {preciseColor && <div className="color-sliders">{(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'}<input aria-label={axis === 'h' ? 'Тон' : axis === 's' ? 'Насыщенность' : 'Яркость цвета'} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}</div>}
       </div>}
-      {spec.kind === 'text' && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
-      {spec.kind === 'json' && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
-      {hasScheduleWizard(spec) ? <div className="schedule-launch"><span className="help">{scheduleSummary(spec.key,draft)}</span><button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>Настроить</button></div> : spec.kind === 'raw' && <>
+      {spec.kind === 'text' && !effectWizard && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
+      {spec.kind === 'json' && !effectWizard && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
+      {effectWizard ? <div className="schedule-launch"><button type="button" className="secondary compact" disabled={disabled} onClick={() => setEffectOpen(true)}>Настроить</button></div> : hasScheduleWizard(spec) ? <div className="schedule-launch"><span className="help">{scheduleSummary(spec.key,draft)}</span><button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>Настроить</button></div> : spec.kind === 'raw' && <>
         {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
         <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
         <label>Данные производителя (base64)<textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} /></label>
@@ -263,6 +265,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     {spec.reason && <p className="help">{spec.reason}</p>}
     {spec.help && <p className="help">{spec.help}</p>}
     {(error || draftError) && <p className="field-error" role="alert">{error || draftError}</p>}
+    {effectOpen && <LightEffectWizard spec={spec} value={draft} onClose={() => setEffectOpen(false)} onDone={value => { change(value); setEffectOpen(false); }} />}
     {scheduleOpen && <ScheduleWizard spec={spec} value={draft} onClose={() => setScheduleOpen(false)} onDone={value => { change(value); setScheduleOpen(false); }} />}
   </section>;
 }
