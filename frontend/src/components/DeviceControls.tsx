@@ -123,8 +123,8 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, stage }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; stage?: DraftStage;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, stage, immediatePower = false }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; stage?: DraftStage; immediatePower?: boolean;
 }) {
   const fresh = reading?.known && !isStale(reading, now, local);
   const motion = motionState(spec, reading);
@@ -188,7 +188,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     } });
   }, [stage, spec.key, draft, color, dirty, error]);
   useEffect(() => () => { stage?.(spec.key, null); }, [stage, spec.key]);
-  const selectedPower = stage && (dirty || awaiting) ? draft === 'true' : Boolean(reading?.known && reading.value === true);
+  const selectedPower = (stage || immediatePower) && (dirty || awaiting) ? draft === 'true' : Boolean(reading?.known && reading.value === true);
   async function send(value?: JsonValue) {
     try {
       let parsed = value;
@@ -204,6 +204,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
       const accepted = await onSend(parsed!);
       if (accepted === false) return;
       pendingTarget.current = { value: parsed!, baseline: reading?.value, sentAt };
+      if (immediatePower) setDraft(String(parsed));
       setAwaiting(true); setDirty(false);
     } catch (failure) { setError(errorText(failure)); }
   }
@@ -216,7 +217,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     </div>}
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
-      {stage ? <><button type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => change(String(!selectedPower))}><span /></button><span className="power-selection">{dirty || awaiting || reading?.known ? selectedPower ? 'Включено' : 'Выключено' : 'Нет данных'}</span>{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
+      {stage || immediatePower ? <><button type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}><span /></button><span className="power-selection">{dirty || awaiting || reading?.known ? selectedPower ? 'Включено' : 'Выключено' : 'Нет данных'}</span>{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
       {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
       <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>Выключить</button>

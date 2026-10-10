@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CloudDevice, CloudFunctions, CloudSnapshot, JsonValue, Provider } from '../api';
-import { cloudBatchCommands, cloudReading, cloudSpecs, localSpec, validateControlValue } from '../controls';
+import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import type { ControlSpec } from '../controls';
-import { useControlDrafts } from '../control-drafts';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
-import { CapabilityField, ControlApply, ControlFeedback, useControlSession } from './DeviceControls';
-import { isBattery } from './DevicePresentation';
+import { CapabilityField, ControlFeedback, useControlSession } from './DeviceControls';
+import { isBattery, ParameterIcon } from './DevicePresentation';
 
-function mainControl(spec: ControlSpec) {
-  return !isBattery(spec.key) && !spec.advanced && !/^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key) &&
-    (spec.writable ? ['boolean','number','enum','color'].includes(spec.kind) : spec.readable && !['json','raw','color','unsupported'].includes(spec.kind));
+function powerControl(spec: ControlSpec) {
+  return spec.writable && spec.kind === 'boolean' && /^(switch|switch_led|switch_[1-9][0-9]*)$/.test(spec.key);
+}
+function sensorReading(spec: ControlSpec) {
+  return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key) && ['number','boolean','enum','text'].includes(spec.kind);
 }
 
 type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; state?: DeviceState; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void };
 
 // Only cards entering the viewport request missing metadata. Keep an activated
-// card mounted when it scrolls away so an unapplied draft is not discarded.
+// card mounted when it scrolls away so an accepted target is not discarded.
 export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
@@ -34,7 +35,7 @@ export function CardControls(props: CardProps) {
   const cached = props.route === 'local' || cloud?.controls?.ready;
   const active = activated || cached;
   return <div className="card-quick-controls" ref={container} role="group" aria-label={'Основные параметры: ' + props.device.name}>
-    {active ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={visible && !props.paused} /> : <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>Показать параметры</button>}
+    {active ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={visible && !props.paused} /> : <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>Показать состояние</button>}
   </div>;
 }
 
@@ -43,24 +44,29 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
   refresh: () => Promise<void>; execute: (send: () => Promise<{text:string}>) => Promise<boolean | undefined>;
   send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean};
 }) {
-  const drafts = useControlDrafts(), [sending,setSending] = useState(false);
+  const [sending,setSending] = useState(false);
   useEffect(() => { onBusy(sending); return () => onBusy(false); },[sending,onBusy]);
-  async function apply() {
-    if (sending) return;
+  async function toggle(spec:ControlSpec,value:JsonValue) {
+    if (sending) return false;
     setSending(true);
-    try { await drafts.apply(changes => execute(async () => {
-      const values = changes.map(change => ({spec:change.spec,value:change.value!}));
-      for (const change of values) validateControlValue(change.spec,change.value);
-      await send(values);
+    try { return await execute(async () => {
+      validateControlValue(spec,value);
+      await send([{spec,value}]);
       return {text:'Команда принята.'};
-    })); } finally { setSending(false); }
+    }) === true; } finally { setSending(false); }
   }
-  const basic = specs.filter(mainControl);
+  const powers = specs.filter(powerControl), sensors = specs.filter(sensorReading);
+  if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
   return <>
-    <div className="card-control-toolbar"><button className="secondary card-refresh" aria-label="Обновить параметры" title="Обновить параметры" disabled={busy} onClick={() => void refresh()}>↻</button>{basic.some(spec => spec.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={busy || !readOK || sending} onApply={() => void apply()} />}</div>
-    <div className="capability-grid">{basic.map(spec => <CapabilityField key={spec.key} spec={spec} reading={reading(spec)} stage={drafts.stage} now={now} local={local} disabled={busy || !readOK || sending} onSend={async () => false} aliasEditor={spec.aliases?.length ? <div className="capability-aliases"><span className="alias-row-label">Алиасы:</span>{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />)}</div>
-    {!busy && readOK && !basic.length && <p className="help">Основных параметров нет. Подробности — в карточке устройства.</p>}
-    {(busy || notice.text) && <ControlFeedback busy={busy} notice={notice} />}
+    <div className="card-primary-controls">{powers.map(spec => <CapabilityField key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases"><span className="alias-row-label">Алиасы:</span>{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />)}
+      {!!sensors.length && <div className="card-sensor-values">{sensors.map(spec => {
+        const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
+        const label = spec.label + ': ' + displayReading(spec,value) + (stale ? ' · Устарело' : '');
+        return <span key={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} aria-label={label} title={label}><ParameterIcon code={spec.key} /><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">Устарело</span>}</span>;
+      })}</div>}
+      <button className="secondary card-refresh" aria-label="Обновить параметры" title="Обновить параметры" disabled={busy || sending} onClick={() => void refresh()}>↻</button>
+    </div>
+    {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
   </>;
 }
 

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
@@ -25,7 +25,7 @@ function mount(cloud=lamp, route:'sharing'|'developer'='sharing') {
 }
 
 describe('main controls on device cards', () => {
-  it('uses cached inventory, stages edits, sends one validated batch, and retains targets against an old snapshot', async () => {
+  it('sends power immediately without secondary editors or Apply, and retains its target against an old snapshot', async () => {
     const writes:unknown[]=[];
     vi.mocked(fetch).mockImplementation(async (input,init) => {
       if (init?.method === 'POST') { writes.push(JSON.parse(String(init.body))); return json({acknowledged:true}); }
@@ -37,15 +37,33 @@ describe('main controls on device cards', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('region',{name:'Состояние после подачи питания'})).toBeNull();
     expect(screen.queryByRole('button',{name:'Настроить'})).toBeNull();
+    await waitFor(() => expect(power).toBeEnabled());
     await user.click(power);
-    const bright=screen.getByRole('spinbutton',{name:'Яркость (%)'});
-    await user.clear(bright); await user.type(bright,'35');
-    expect(writes).toHaveLength(0);
-    await user.click(screen.getByRole('button',{name:'Применить'}));
-    await screen.findByText(/Команда принята.*Статус запрошен заново/);
-    expect(writes).toEqual([{commands:[{code:'switch_led',value:true},{code:'bright_value_v2',value:350}]}]);
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(screen.queryByRole('spinbutton')).toBeNull();
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
+    expect(writes).toEqual([{commands:[{code:'switch_led',value:true}]}]);
     expect(power).toHaveAttribute('aria-checked','true');
-    expect(bright).toHaveValue(35);
+    expect(screen.getByText('Ожидаем новое показание')).toBeInTheDocument();
+  });
+
+  it('sends once while awaiting an acknowledgement and clears waiting after a matching report', async () => {
+    let accept!:() => void;
+    const ack=new Promise<Response>(resolve => {accept=() => resolve(json({acknowledged:true}));});
+    let writes=0;
+    vi.mocked(fetch).mockImplementation(async (_input,init) => {
+      if (init?.method==='POST') { writes++; return ack; }
+      return json({...snapshot,status:{...snapshot.status,switch_led:true}});
+    });
+    mount(); const user=userEvent.setup(),power=await screen.findByRole('switch',{name:'Питание'});
+    await waitFor(() => expect(power).toBeEnabled());
+    await user.dblClick(power);
+    expect(writes).toBe(1); expect(power).toBeDisabled();
+    await act(async () => accept());
+    await waitFor(() => expect(power).toBeEnabled());
+    await waitFor(() => expect(screen.queryByText('Ожидаем новое показание')).toBeNull());
+    expect(power).toHaveAttribute('aria-checked','true');
+    expect(writes).toBe(1);
   });
 
   it('loads missing definitions only after the card becomes visible and uses the inventory snapshot', async () => {
@@ -63,15 +81,14 @@ describe('main controls on device cards', () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
-  it('keeps drafts but stops cached polling when the card scrolls out of view', async () => {
+  it('stops cached polling when the card scrolls out of view', async () => {
     vi.useFakeTimers({toFake:['setInterval','clearInterval']});
     const observers:IntersectionObserverCallback[]=[];
     vi.stubGlobal('IntersectionObserver',class { constructor(callback:IntersectionObserverCallback){observers.push(callback);} observe(){} disconnect(){} });
     vi.mocked(fetch).mockImplementation(async () => json(snapshot));
     const view=mount();
     try {
-      const user=userEvent.setup();
-      await user.click(await screen.findByRole('switch',{name:'Питание'}));
+      await screen.findByRole('switch',{name:'Питание'});
       await act(async () => observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
       await act(async () => { vi.advanceTimersByTime(3000); });
       expect(fetch).toHaveBeenCalledTimes(1);
@@ -79,8 +96,7 @@ describe('main controls on device cards', () => {
       await act(async () => observers[0]([{isIntersecting:false} as IntersectionObserverEntry],{} as IntersectionObserver));
       await act(async () => { vi.advanceTimersByTime(6000); });
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(screen.getByRole('switch',{name:'Питание'})).toHaveAttribute('aria-checked','true');
-      expect(screen.getByRole('button',{name:'Применить'})).toBeEnabled();
+      expect(screen.getByRole('switch',{name:'Питание'})).toHaveAttribute('aria-checked','false');
     } finally { view.unmount(); vi.useRealTimers(); vi.unstubAllGlobals(); }
   });
 
@@ -91,11 +107,13 @@ describe('main controls on device cards', () => {
       return json(snapshot);
     });
     mount(lamp,route); const user=userEvent.setup();
-    await user.click(await screen.findByRole('switch',{name:'Питание'}));
-    await user.click(screen.getByRole('button',{name:'Применить'}));
+    const power=await screen.findByRole('switch',{name:'Питание'});
+    await waitFor(() => expect(power).toBeEnabled());
+    await user.click(power);
     expect(await screen.findByRole('alert')).toHaveTextContent('Команда отклонена');
     expect(writes).toHaveLength(1); expect(writes[0]).toContain('provider='+route);
-    expect(screen.getByRole('button',{name:'Применить'})).toBeEnabled();
+    expect(screen.getByRole('switch',{name:'Питание'})).toBeEnabled();
+    expect(screen.getByRole('switch',{name:'Питание'})).toHaveAttribute('aria-checked','false');
   });
 
   it('uses the numeric local record for local card commands', async () => {
@@ -107,16 +125,27 @@ describe('main controls on device cards', () => {
     });
     const props={api:new HomeApi(connection),device:{id:'physical',name:local.name,local,cloud:{}},route:'local' as const,now:Date.now(),paused:false,onAuthError:vi.fn(),onBusy:vi.fn()};
     render(<CardControls {...props} />);
-    const user=userEvent.setup(); await user.click(await screen.findByRole('switch',{name:'Питание'}));
-    await user.click(screen.getByRole('button',{name:'Применить'}));
-    await screen.findByText(/Команда принята.*Статус запрошен заново/);
+    const user=userEvent.setup(),power=await screen.findByRole('switch',{name:'Питание'});
+    await waitFor(() => expect(power).toBeEnabled());
+    await user.click(power);
+    await waitFor(() => expect(power).toBeEnabled());
     expect(calls).toEqual([{path:'http://api.test/api/v1/devices/7/commands/capabilities',body:{values:{switch:true}}}]);
   });
+  it('shows sensor values with accessible labels and no settings editors', async () => {
+    const sensorDefinitions:CloudFunctions={device_id:'lamp',functions:[{code:'temp_unit_convert',type:'Enum',values:{range:['c','f']}}],status_range:[{code:'va_temperature',type:'Integer',values:{unit:'℃',scale:1}},{code:'va_humidity',type:'Integer',values:{unit:'%',scale:0}}]};
+    mount({...lamp,controls:{ready:true,definitions:sensorDefinitions,snapshot:{...snapshot,status:{va_temperature:225,va_humidity:48}}}});
+    expect(await screen.findByLabelText('Температура: 22.5 °C')).toHaveTextContent('22.5 °C');
+    expect(screen.getByLabelText('Влажность: 48 %')).toHaveTextContent('48 %');
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('blocks inline writes when the local device or its gateway is disabled', async () => {
     const local={id:7,device_id:'physical',name:'Локальный свет',transport:'wifi' as const,parent_id:null,cid:null,aliases:[],building_id:null,room_id:null,enabled:false,capabilities:{switch:{type:'boolean' as const,readable:true,writable:true}}};
     render(<CardControls api={new HomeApi(connection)} device={{id:'physical',name:local.name,local,cloud:{}}} route="local" state={{device_id:7,name:local.name,enabled:false,available:false,values:{switch:{value:false,known:true,stale:false}}}} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
     expect(await screen.findByRole('switch',{name:'Питание'})).toBeDisabled();
-    expect(screen.getByRole('button',{name:'Применить'})).toBeDisabled();
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
   });
 

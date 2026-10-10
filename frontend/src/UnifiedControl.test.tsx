@@ -55,6 +55,10 @@ describe('unified device identity and management', () => {
     const card = screen.getByRole('listitem', { name: local.name });
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     expect(within(card).getByRole('combobox')).toHaveValue('sharing');
+    const header=card.querySelector('header')!;
+    expect(header).toHaveTextContent(local.name);
+    expect(header).toHaveTextContent('Кухня · Через шлюз');
+    expect(header.querySelector('[data-device-type=\"switch\"]')).not.toBeNull();
     expect(within(card).getAllByRole('option')).toHaveLength(3);
     expect(calls.some(call => /\/functions|\/status|refresh=true&max_age/.test(call.path))).toBe(false);
     expect(calls.every(call => call.method === 'GET')).toBe(true);
@@ -65,6 +69,26 @@ describe('unified device identity and management', () => {
     await user.clear(screen.getByRole('searchbox')); await user.selectOptions(screen.getByLabelText('Комната'), 'none');
     expect(screen.queryByRole('listitem', { name: local.name })).toBeNull();
     expect(screen.getByRole('listitem', { name: 'Только в аккаунте' })).toBeInTheDocument();
+  });
+
+  it('keeps deferred devices visible without activating their controls', async () => {
+    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input,init) => {
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json(['TRACER FOCUS 3','WorkGtZb'].map((name,index) => ({...shared,id:'deferred-'+index,name})));
+      return original(input,init);
+    });
+    const observers:IntersectionObserverCallback[]=[];
+    vi.stubGlobal('IntersectionObserver',class { constructor(callback:IntersectionObserverCallback){observers.push(callback);} observe(){} disconnect(){} });
+    try {
+      render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+      for (const name of ['TRACER FOCUS 3','WorkGtZb']) {
+        const card=await screen.findByRole('listitem',{name});
+        expect(within(card).getByText('Настройка отложена')).toBeInTheDocument();
+        expect(within(card).queryByRole('group',{name:'Основные параметры: '+name})).toBeNull();
+      }
+      expect(observers).toHaveLength(0);
+      expect(calls.some(call => /\/functions|\/status/.test(call.path))).toBe(false);
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it('routes commands by the chosen provider or local numeric record, without an automatic fallback', async () => {

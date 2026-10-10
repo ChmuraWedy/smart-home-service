@@ -10,7 +10,7 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
-import { BatteryBadge, batteryFromSpecs } from './DevicePresentation';
+import { BatteryBadge, batteryFromSpecs, DeviceIcon } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import { CardControls } from './CardControls';
 
@@ -30,17 +30,25 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const local = device.local;
   const battery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
+  // These two devices were explicitly deferred; browsing must not activate them.
+  const postponed = ['tracer focus 3','workgtzb'].includes(device.name.trim().toLocaleLowerCase());
+  const definitions = cloud?.controls?.definitions;
+  const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
+  const localTransport = local ? local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi' : 'Подключение не указано';
+  const transport = route === 'local' ? localTransport : cloud?.sub === true ? 'Через шлюз' : cloud?.sub === false ? 'Прямое подключение' : localTransport;
   return <li className="device-card" aria-label={device.name}>
-    <div className="device-heading"><span className="device-symbol" aria-hidden="true">◇</span>
+    <header className="device-heading"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
+      <div className="device-card-title"><h3>{device.name}</h3><p className="device-location">{room} · {transport}</p>
+        {routes.length > 1 ? <select className="device-route-select" aria-label={'Способ управления: ' + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select> : <p className="device-route-label">{routeLabel[route]}</p>}
+      </div>
       <div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div>
-    </div>
-    <h3>{device.name}</h3>
+    </header>
     {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства"><span className="alias-row-label">Алиасы:</span>{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div>}
-    <p className="help">{room} · {local ? (local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi') : cloud?.sub ? 'Через шлюз' : 'Прямое подключение'}</p>
-    {routes.length > 1 ? <label className="device-route">Способ управления<select aria-label={'Способ управления: ' + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select></label> : <p className="help">{routeLabel[route]}</p>}
-    <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />
-    <button className="secondary compact full-width" disabled={quickBusy} onClick={() => onOpen(route)}>Подробнее</button>
-    {!local && <button className="secondary compact full-width" disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}>Добавить в дом</button>}
+    {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />}
+    <div className="device-card-footer"><button className="secondary compact" disabled={quickBusy} onClick={() => onOpen(route)}>Подробнее</button>
+      {!local && !postponed && <button className="secondary compact" disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}>Добавить в дом</button>}
+      {postponed && <span className="help">Настройка отложена</span>}
+    </div>
   </li>;
 }
 

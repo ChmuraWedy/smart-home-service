@@ -845,38 +845,43 @@ footer {
 
 .control-header-actions .control-dismiss { width:44px; height:44px; flex:none; padding:10px; display:grid; place-items:center; border-radius:50%; }
 .device-grid.local-grid { align-items:start; }
-.card-quick-controls { margin:12px 0; padding-top:6px; border-top:1px solid #344254; }
-.card-control-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-.card-control-toolbar .card-refresh { width:40px; height:40px; padding:7px; font-size:20px; }
-.card-control-toolbar .control-apply { flex-wrap:wrap; justify-content:flex-end; gap:5px; }
-.card-control-toolbar .control-apply button { padding:8px 12px; min-height:40px; font-size:12px; }
-.card-quick-controls .capability-grid { gap:0; margin:4px 0; }
-.card-quick-controls .capability-row { grid-template-columns:minmax(80px,.9fr) minmax(0,1.1fr); gap:6px 8px; }
-.card-quick-controls .capability-row > .capability-form,.card-quick-controls .capability-row > .power-actions { grid-column:2; grid-row:1; }
-.card-quick-controls .capability-row > .reading { grid-column:2; grid-row:1; text-align:right; font-size:16px; }
-.card-quick-controls .capability-row > .reading-meta { grid-column:1/-1; grid-row:2; white-space:normal; }
-.card-quick-controls .read-only { display:none; }
-.card-quick-controls .capability-heading h3 { font-size:12px; }
+/* List tiles show primary actions; the full editor stays in the dialog. */
+.device-card { padding:12px; }
+.device-heading { align-items:flex-start; margin-bottom:8px; gap:9px; }
+.device-symbol { flex:none; display:grid; place-items:center; padding:6px; border-radius:8px; }
+.device-type-icon { width:24px; height:24px; }
+.device-card-title { flex:1; min-width:0; }
+.device-card-title h3 { margin:0 0 3px; font-size:14px; line-height:1.3; }
+.device-location,.device-route-label { color:#9aacc0; font-size:10px; line-height:1.5; margin:0; overflow-wrap:anywhere; }
+.device-card-title .device-route-select { font-size:10px; color:#b3c3d6; padding:2px 4px; margin:2px 0 0; width:100%; max-width:220px; }
+.device-card-status { flex:none; max-width:110px; }
+.device-card-status .presence { white-space:normal; }
+.device-card-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.device-card-footer button { font-size:11px; min-height:36px; padding:6px 9px; }
+.device-card-footer .help { margin:0; font-size:11px; }
+.card-quick-controls { margin:6px 0; }
+.card-quick-controls:empty { display:none; }
+.card-primary-controls { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; }
+.card-primary-controls > .capability { flex:1 1 150px; padding:0; }
+.card-quick-controls .capability-row { grid-template-columns:auto minmax(0,1fr); gap:4px 8px; }
+.card-quick-controls .capability-row > .power-actions { grid-column:2; grid-row:1; justify-content:flex-end; }
+.card-quick-controls .capability-heading h3 { font-size:12px; margin:0; }
 .card-quick-controls .power-actions { gap:6px; }
+.card-quick-controls .power-actions > .help,.card-quick-controls .reading-meta { display:none; }
 .card-quick-controls .power-selection { font-size:11px; }
-.card-quick-controls .capability > .help,.card-quick-controls .capability > .field-error,.card-quick-controls .capability-alias-editor { margin-left:0; }
-.card-quick-controls .capability-color .capability-form:has(.color-sliders) { grid-column:1/-1; grid-row:2; margin:0; }
-.card-quick-controls .color-sliders { gap:6px; }
-.card-quick-controls .control-feedback { font-size:11px; margin-top:8px; min-height:0; }
-.card-quick-controls .capability-heading .parameter-icon { width:16px; height:16px; }
-.card-quick-controls .capability-form select { max-width:100%; }
-.card-quick-controls .capability-row .power-actions .power-toggle { min-width:44px; height:32px; padding:6px 3px; }
+.card-quick-controls .capability-alias-editor { margin:0; }
+.card-quick-controls .pending-reading { font-size:10px; margin:3px 0; }
+.card-quick-controls .control-feedback { font-size:11px; margin:6px 0; min-height:0; }
+.card-refresh { flex:none; margin-left:auto; width:36px; height:36px; padding:5px; font-size:20px; }
+.card-sensor-values { display:flex; align-items:center; flex:1; flex-wrap:wrap; gap:8px 14px; }
+.card-sensor-value { display:inline-flex; align-items:center; gap:4px; font-size:16px; font-variant-numeric:tabular-nums; }
+.card-sensor-value .parameter-icon { width:18px; height:18px; color:#9fc4c4; }
+.card-sensor-value.unknown { color:#8fa1b7; }
+@media(pointer:coarse) { .device-card-footer button,.card-refresh { min-height:44px; } .card-refresh { width:44px; } }
 @media(pointer:coarse) {
   .capability-row .power-actions .power-toggle,.card-quick-controls .capability-row .power-actions .power-toggle { position:relative; height:44px; background:transparent; }
   .power-actions .power-toggle::before { content:""; position:absolute; inset:auto 0; height:25px; border-radius:20px; background:#465264; }
   .power-actions .power-toggle[aria-checked=true]::before { background:#77b4ef; }
   .power-toggle > span { position:relative; z-index:1; }
 }
-.card-quick-controls .capability { padding:6px 0; }
-.card-quick-controls .capability-heading h3 { margin:0; }
-.card-quick-controls .reading-meta:empty,.card-quick-controls .reading-meta:has(> .read-only:only-child) { display:none; }
-.card-quick-controls .capability > .help:not(.pending-reading) { display:none; }
-@media(pointer:coarse) { .card-control-toolbar .card-refresh,.card-control-toolbar .control-apply button { min-height:44px; } }
 .capability-color .capability-heading { grid-column:1; grid-row:1; }
-.card-quick-controls .color-tools { grid-column:2; grid-row:1; }
-.card-quick-controls .capability-color .capability-form:not(:has(.color-sliders)) { display:none; }
