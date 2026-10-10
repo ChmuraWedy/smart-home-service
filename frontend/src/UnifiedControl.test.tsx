@@ -102,7 +102,12 @@ describe('unified device identity and management', () => {
     await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const cloud = await screen.findByRole('dialog', { name: local.name });
     expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
-    expect(cloud.querySelector('header')).toHaveTextContent('Кухня · Через шлюз');
+    const connectionSummary=within(cloud).getByRole('region',{name:'Подключение устройства'});
+    expect(connectionSummary).toBeVisible();
+    for (const text of ['Комната','Кухня','Подключение','Через шлюз','Управление','Через интернет · Tuya Developer','Состояние связи']) {
+      expect(within(connectionSummary).getByText(text,{exact:true})).toBeVisible();
+    }
+    expect(await within(connectionSummary).findByText('В сети',{exact:true})).toBeVisible();
     const info=within(cloud).getByRole('button',{name:'О подключении устройства'});
     expect(info).toHaveAttribute('aria-expanded','false');
     await user.click(info);
@@ -126,6 +131,11 @@ describe('unified device identity and management', () => {
     await user.selectOptions(within(reloaded).getByRole('combobox'), 'local');
     await user.click(within(reloaded).getByRole('button', { name: 'Подробнее' }));
     const home = await screen.findByRole('dialog', { name: local.name });
+    const localSummary=within(home).getByRole('region',{name:'Подключение устройства'});
+    for (const text of ['Кухня','Через шлюз','В домашней сети','Состояние связи']) {
+      expect(within(localSummary).getByText(text,{exact:true})).toBeVisible();
+    }
+    expect(await within(localSummary).findByText('Доступно дома',{exact:true})).toBeVisible();
     await user.click(within(home).getByRole('button',{name:'О подключении устройства'}));
     expect(within(home).getByRole('region',{name:'О подключении устройства'})).toHaveTextContent('настроенному шлюзу в домашней сети');
     await user.click(await within(home).findByRole('switch'));

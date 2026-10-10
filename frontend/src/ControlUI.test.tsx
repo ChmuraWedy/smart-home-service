@@ -150,7 +150,9 @@ describe('cloud device control', () => {
     const field=await screen.findByRole('region',{name:label});
     expect(within(field).getByText('Нет показания')).toBeInTheDocument();
     const user=userEvent.setup();
+    await waitFor(() => expect(within(field).getByRole('slider')).toBeEnabled());
     fireEvent.change(within(field).getByRole('slider'),{target:{value}});
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Применить' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: 'Применить' }));
     await screen.findByText(/Команда принята.*Статус запрошен заново/);
     expect(writes).toEqual([{commands:[{code:'work_mode',value:'white'},{code,value:raw}]}]);
@@ -324,7 +326,7 @@ describe('cloud device control', () => {
     expect(screen.getByLabelText('Батарея: 90')).toHaveAttribute('title', 'Последнее известное показание батареи');
     expect(screen.getByText(/Снимок получен:/)).not.toHaveTextContent('1970');
     expect(screen.getByText('Датчик движения')).toBeInTheDocument();
-    expect(screen.getByText('Через шлюз')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Подключение устройства' })).getByText('Через шлюз')).toBeVisible();
     expect(screen.queryByRole('switch')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Применить' })).toBeNull();
     const user = userEvent.setup(); motion = 'none';

@@ -8,6 +8,15 @@ export function connectionLabel({ route, throughGateway, localTransport }: Conne
   return route === 'local' ? local : throughGateway === true ? 'Через шлюз' : throughGateway === false ? 'Прямое подключение' : local;
 }
 
+export function DeviceConnectionSummary(props: ConnectionDetails & { status: string; online?: boolean }) {
+  return <section className="device-connection-summary" aria-label="Подключение устройства"><dl>
+    <div><dt>Комната</dt><dd>{props.room || 'Без комнаты'}</dd></div>
+    <div><dt>Подключение</dt><dd>{connectionLabel(props)}</dd></div>
+    <div><dt>Управление</dt><dd>{routeLabel[props.route]}</dd></div>
+    <div><dt>Состояние связи</dt><dd className={'presence' + (props.online ? ' online' : '')}>{props.status}</dd></div>
+  </dl></section>;
+}
+
 export function DeviceConnectionDescription(props: ConnectionDetails) {
   const { route, room, throughGateway, localTransport } = props;
   const gateway = route === 'local' || throughGateway === undefined ? localTransport === 'zigbee' : throughGateway;
