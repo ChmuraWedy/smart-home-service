@@ -176,14 +176,14 @@ describe('cloud device control', () => {
     const view=render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     try {
       const channel=await screen.findByRole('region',{name:'Канал 2'});
-      expect(within(channel).getByText('Выключено')).toBeInTheDocument();
+      expect(within(channel).getByRole('switch')).toHaveAttribute('aria-checked','false');
       const input=screen.getByRole('spinbutton',{name:'Яркость (%)'});
       await waitFor(()=>expect(input).toBeEnabled());
       await act(async()=>{fireEvent.change(input,{target:{value:'70'}});});
       expect(input).toHaveValue(70);
       report=true;
       await act(async () => { vi.advanceTimersByTime(3000); });
-      expect(within(channel).getByText('Включено')).toBeInTheDocument();
+      expect(within(channel).getByRole('switch')).toHaveAttribute('aria-checked','true');
       expect(within(channel).queryByText('Отчёт устройства')).not.toBeInTheDocument();
       expect(within(channel).getByRole('button', {name:'Обновить показание Канал 2'})).toBeEnabled();
       expect(input).toHaveValue(70);
@@ -216,10 +216,27 @@ describe('cloud device control', () => {
       await act(async()=>{vi.advanceTimersByTime(3000);});
       fireEvent.click(screen.getByRole('button',{name:'Обновить статус'}));
       await act(async()=>{});
-      expect(within(channel).getByText('Включено')).toBeInTheDocument();
+      expect(within(channel).getByRole('switch')).toHaveAttribute('aria-checked','true');
       await act(async()=>{resolvePoll(json(snapshot(false)));});
-      expect(within(channel).getByText('Включено')).toBeInTheDocument();
+      expect(within(channel).getByRole('switch')).toHaveAttribute('aria-checked','true');
     } finally {view.unmount();vi.useRealTimers();}
+  });
+
+  it('shows only the lighting modes and schedules declared by the device', async () => {
+    const functions = [
+      {code:'switch_led',type:'Boolean',values:{}},
+      {code:'work_mode',type:'Enum',values:{range:['white','colour','music']}},
+      {code:'music_data',type:'Json',values:{}},
+    ];
+    vi.mocked(fetch).mockImplementation(async input => json(String(input).includes('/functions')
+      ? {device_id:cloudDevice.id,functions}
+      : {device_id:cloudDevice.id,online:true,status:{switch_led:false,work_mode:'white'}}));
+    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const modes=await screen.findByRole('combobox',{name:'Режим'});
+    expect(within(modes).getAllByRole('option').map(option => option.textContent)).toEqual(['Выберите значение','Белый свет','Цветной свет','Музыка']);
+    expect(screen.queryByRole('region',{name:'Расписания света'})).toBeNull();
+    expect(screen.queryByRole('button',{name:'Настроить'})).toBeNull();
+    expect(screen.getByRole('button',{name:'Обновить статус'}).closest('header')).not.toBeNull();
   });
 
   it('stages a typed music command using the actual 255 range and sends only after Apply', async () => {

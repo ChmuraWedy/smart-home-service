@@ -101,8 +101,8 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   return { data, busy, readOK, notice, refresh, execute };
 }
 
-export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, statusContent, information, className = '' }: {
-  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; className?: string;
+export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, statusContent, information, onRefresh, className = '' }: {
+  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; onRefresh?: () => Promise<void>; className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [infoOpen,setInfoOpen] = useState(false);
@@ -114,7 +114,7 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     return () => { element.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }}>
-    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><div className="control-header-buttons">{information && <button type="button" className="secondary control-information" aria-label="О подключении устройства" title="О подключении устройства" aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}</div></header>
+    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><div className="control-header-buttons">{onRefresh && <button type="button" className="secondary control-refresh" aria-label="Обновить статус" title="Обновить статус" disabled={busy} onClick={() => void onRefresh()}>↻</button>}{information && <button type="button" className="secondary control-information" aria-label="О подключении устройства" title="О подключении устройства" aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}</div></header>
     {information && infoOpen && <section id={infoId} className="connection-information" aria-label="О подключении устройства">{information}</section>}
     {children}
   </dialog>;
@@ -129,6 +129,7 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
 export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, stage, immediatePower = false }: {
   spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; stage?: DraftStage; immediatePower?: boolean;
 }) {
+  const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
   const motion = motionState(spec, reading);
   const [draft, setDraft] = useState('');
@@ -212,7 +213,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     } catch (failure) { setError(errorText(failure)); }
   }
   return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-row"><div className="capability-heading"><h3>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.label}</h3>
+    <div className="capability-row"><div className="capability-heading"><h3>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.writable && spec.kind === 'boolean' && (stage || immediatePower) ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}</h3>
     </div>
     {spec.kind === 'color' && <div className="color-tools">
       {spec.kind === 'color' && spec.writable && <input aria-label="Выбор цвета" title="Выбор цвета" className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
@@ -220,7 +221,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     </div>}
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
-      {stage || immediatePower ? <><button type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}><span /></button><span className="power-selection">{dirty || awaiting || reading?.known ? selectedPower ? 'Включено' : 'Выключено' : 'Нет данных'}</span>{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
+      {stage || immediatePower ? <><button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}><span /></button>{!dirty && !awaiting && !reading?.known && <span className="power-selection">Нет данных</span>}{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
       {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
       <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>Выключить</button>

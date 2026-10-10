@@ -48,6 +48,21 @@ describe('popup schedule wizards', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('region',{name:'Настройки точки'})).toBeInTheDocument();
   });
+  it('keeps all declared schedule wizards visible apart from collapsed effects', async () => {
+    const functions = ['rhythm_mode','random_timing','wakeup_mode','sleep_mode'].map(code => ({code,type:'Raw',values:{}}));
+    vi.mocked(fetch).mockImplementation(async input => json(String(input).includes('/functions')
+      ? {device_id:'lamp',functions:[...functions,{code:'music_data',type:'Json',values:{}}]}
+      : {device_id:'lamp',online:true,status:{}}));
+    render(<CloudControl api={new CloudApi(connection)} device={{id:'lamp',name:'Лампа',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const schedules = await screen.findByRole('region',{name:'Расписания света'});
+    for (const name of ['Суточный ритм света','Случайное расписание','Свет для пробуждения','Свет перед сном']) {
+      expect(within(schedules).getByRole('region',{name})).toBeVisible();
+    }
+    expect(within(schedules).getAllByRole('button',{name:'Настроить'})).toHaveLength(4);
+    expect(screen.getByText('Эффекты и дополнительные параметры').closest('details')).not.toHaveAttribute('open');
+    expect(vi.mocked(fetch).mock.calls.every(([,init]) => init?.method !== 'POST')).toBe(true);
+  });
+
   it('keeps wizard edits local until Done, then sends them only through the card Apply button', async () => {
     const original=encodeRawSchedule('rhythm_mode',defaultSchedule('rhythm_mode')), writes:unknown[]=[];
     vi.mocked(fetch).mockImplementation(async (input,init) => {
@@ -56,7 +71,8 @@ describe('popup schedule wizards', () => {
     });
     render(<CloudControl api={new CloudApi(connection)} device={{id:'lamp',name:'Лампа',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const user=userEvent.setup(); await screen.findByRole('region',{name:'Суточный ритм света'});
-    await user.click(screen.getByText('Эффекты и дополнительные параметры'));
+    expect(screen.getByRole('region',{name:'Расписания света'})).toBeVisible();
+    expect(screen.queryByText('Эффекты и дополнительные параметры')).toBeNull();
     await user.click(screen.getByRole('button',{name:'Настроить'}));
     expect(screen.getByRole('button',{name:'Применить'})).toBeDisabled();
     await user.click(screen.getByRole('button',{name:'Далее'}));
