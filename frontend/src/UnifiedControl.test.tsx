@@ -57,7 +57,9 @@ describe('unified device identity and management', () => {
     expect(within(card).getByRole('combobox')).toHaveValue('sharing');
     const header=card.querySelector('header')!;
     expect(header).toHaveTextContent(local.name);
-    expect(header).toHaveTextContent('Кухня · Через шлюз');
+    expect(header).toHaveTextContent('Кухня');
+    expect(header).not.toHaveTextContent('Через шлюз');
+    expect(within(screen.getByRole('listitem',{name:'Только в аккаунте'})).queryByText('Через интернет · Smart Life')).toBeNull();
     expect(header.querySelector('[data-device-type=\"switch\"]')).not.toBeNull();
     expect(within(card).getAllByRole('option')).toHaveLength(3);
     expect(calls.some(call => /\/functions|\/status|refresh=true&max_age/.test(call.path))).toBe(false);
@@ -100,6 +102,7 @@ describe('unified device identity and management', () => {
     await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const cloud = await screen.findByRole('dialog', { name: local.name });
     expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
+    expect(cloud.querySelector('header')).toHaveTextContent('Кухня · Через шлюз');
     const info=within(cloud).getByRole('button',{name:'О подключении устройства'});
     expect(info).toHaveAttribute('aria-expanded','false');
     await user.click(info);
@@ -107,7 +110,11 @@ describe('unified device identity and management', () => {
     expect(description).toHaveTextContent('Кухня');
     expect(description).toHaveTextContent('Устройство подключено через шлюз');
     expect(description).toHaveTextContent('через подключённый аккаунт Tuya Developer');
+    await user.keyboard('{Escape}');
+    expect(within(cloud).queryByRole('region',{name:'О подключении устройства'})).toBeNull();
+    expect(cloud).toBeInTheDocument();
     await user.click(info);
+    await user.click(within(cloud).getByRole('heading',{name:local.name}));
     expect(within(cloud).queryByRole('region',{name:'О подключении устройства'})).toBeNull();
     await user.click(await within(cloud).findByRole('switch'));
     await user.click(within(cloud).getByRole('button', { name: 'Применить' }));

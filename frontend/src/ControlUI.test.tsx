@@ -101,6 +101,8 @@ describe('cloud device control', () => {
     const aliases = await within(screen.getByRole('region', { name: 'Канал 1' })).findByRole('group', { name: 'Алиасы' });
     expect(within(aliases).getByText('Настольный свет', { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Настольный свет' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Таймер канала 1' })).toBeNull();
+    await user.click(screen.getByRole('button',{name:'Таймер канала 1'}));
     expect(screen.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
     expect(writes).toEqual([{ method: 'PUT', body: { labels: { switch_1: 'Настольный свет' } } }]);
     view.unmount(); render(<CloudControl {...props} />);

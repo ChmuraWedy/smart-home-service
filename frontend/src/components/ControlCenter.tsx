@@ -13,7 +13,6 @@ import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import { CardControls } from './CardControls';
-import { connectionLabel } from './DeviceConnection';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -35,11 +34,10 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const postponed = ['tracer focus 3','workgtzb'].includes(device.name.trim().toLocaleLowerCase());
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
-  const transport = connectionLabel({route,throughGateway:cloud?.sub,localTransport:local?.transport});
   return <li className="device-card" aria-label={device.name}>
     <header className="device-heading"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
-      <div className="device-card-title"><h3>{device.name}</h3><p className="device-location">{room} · {transport}</p>
-        {routes.length > 1 ? <select className="device-route-select" aria-label={'Способ управления: ' + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select> : <p className="device-route-label">{routeLabel[route]}</p>}
+      <div className="device-card-title"><h3>{device.name}</h3><p className="device-location">{room}</p>
+        {routes.length > 1 ? <select className="device-route-select" aria-label={'Способ управления: ' + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select> : null}
       </div>
       <div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div>
     </header>

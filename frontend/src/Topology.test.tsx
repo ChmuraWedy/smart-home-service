@@ -46,7 +46,7 @@ describe('Smart Life topology', () => {
   it.each(['sharing', 'developer'])('uses cached placement for room filtering and survey via %s without registration or sync', async provider => {
     const calls = server(), user = userEvent.setup(); setup(true);
     const card = await screen.findByRole('listitem', { name: 'Лампа' });
-    expect(await within(card).findByText('Кухня · Подключение не указано')).toBeInTheDocument();
+    expect(await within(card).findByText('Кухня')).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Комната'), '2');
     expect(card).toBeInTheDocument();
     await user.selectOptions(within(card).getByRole('combobox'), provider);
@@ -73,10 +73,10 @@ describe('Smart Life topology', () => {
   it('preserves a local manually cleared room instead of overriding it with cloud placement', async () => {
     server({ local: { id: 5, device_id: 'lamp', name: 'Лампа', aliases: [], building_id: null, room_id: null, transport: 'wifi', parent_id: null, cid: null, enabled: true, capabilities: {} } }); setup();
     const card = await screen.findByRole('listitem', { name: 'Лампа' });
-    expect(within(card).getByText('Без комнаты · Wi-Fi')).toBeInTheDocument();
+    expect(within(card).getByText('Без комнаты')).toBeInTheDocument();
     const user = userEvent.setup();
     await user.selectOptions(within(card).getByRole('combobox'), 'local');
-    expect(within(card).getByText('Без комнаты · Wi-Fi')).toBeInTheDocument();
+    expect(within(card).getByText('Без комнаты')).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Комната'), '2');
     expect(screen.queryByRole('listitem', { name: 'Лампа' })).toBeNull();
   });
@@ -95,7 +95,7 @@ describe('Smart Life topology', () => {
     expect(calls.filter(call => call.method === 'POST')).toEqual([{ path: '/api/v1/cloud/topology/sync', method: 'POST' }]);
     expect(calls.filter(call => call.path.endsWith('/rooms')).length).toBeGreaterThan(1);
     await act(async () => { fireEvent.click(within(screen.getByRole('dialog', { name: 'Лампа' })).getByRole('button', { name: 'Закрыть' })); });
-    expect(screen.getByText('Кухня · Подключение не указано')).toBeInTheDocument();
+    expect(within(screen.getByRole('listitem',{name:'Лампа'})).getByText('Кухня')).toBeInTheDocument();
   });
 
   it('shows a failed job and enables retry without registering or commanding devices', async () => {
