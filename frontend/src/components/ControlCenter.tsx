@@ -13,6 +13,7 @@ import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import { CardControls } from './CardControls';
+import { connectionLabel } from './DeviceConnection';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -34,8 +35,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const postponed = ['tracer focus 3','workgtzb'].includes(device.name.trim().toLocaleLowerCase());
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
-  const localTransport = local ? local.transport === 'zigbee' ? 'Через шлюз' : 'Wi-Fi' : 'Подключение не указано';
-  const transport = route === 'local' ? localTransport : cloud?.sub === true ? 'Через шлюз' : cloud?.sub === false ? 'Прямое подключение' : localTransport;
+  const transport = connectionLabel({route,throughGateway:cloud?.sub,localTransport:local?.transport});
   return <li className="device-card" aria-label={device.name}>
     <header className="device-heading"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
       <div className="device-card-title"><h3>{device.name}</h3><p className="device-location">{room} · {transport}</p>
@@ -43,7 +43,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
       </div>
       <div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div>
     </header>
-    {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства"><span className="alias-row-label">Алиасы:</span>{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div>}
+    {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства">{deviceAliases(device).map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div>}
     {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />}
     <div className="device-card-footer"><button className="secondary compact" disabled={quickBusy} onClick={() => onOpen(route)}>Подробнее</button>
       {!local && !postponed && <button className="secondary compact" disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}>Добавить в дом</button>}
@@ -67,6 +67,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
   function location(device: UnifiedDevice) { return device.local || placements.get(device.id); }
+  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === location(device)?.room_id)?.name || 'Без комнаты'; }
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState<{ api: HomeApi; mask: string; value: Selection } | null>(null);
   const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
@@ -151,11 +152,11 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? 'Ничего не найдено' : 'Устройств пока нет'}</h3><p>{devices.length || inventory?.groups.length ? 'Измените фильтры или поисковый запрос.' : sharingReady || developerReady ? 'Добавьте устройства в Smart Life и обновите список.' : 'Подключите аккаунт Tuya, чтобы увидеть свои устройства.'}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>Настроить подключение</button>}</div>}
       <ul className="device-grid local-grid">{visible.map(entry => entry.kind === 'group' ? <li className="device-card group-card" key={'group-' + entry.group.id}>
         <p className="eyebrow">Группа · {entry.group.device_ids.length} устройств</p><h3>{entry.group.name}</h3><p className="reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : 'Состояние неизвестно'}</p><p className="help">В домашней сети</p><button className="secondary compact full-width" onClick={() => choose(entry)}>Открыть группу</button>
-      </li> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={inventory?.rooms.find(item => item.id === location(entry.device)?.room_id)?.name || 'Без комнаты'} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
+      </li> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>Назад</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>Далее</button></div>}
     </>}
-    {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} closeLabel={selected.parent ? 'Назад к группе' : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
-    {selected?.kind === 'device' && selected.route !== 'local' && selected.device.cloud[selected.route] && <CloudControl key={selected.route + selected.device.id} api={api} device={{ ...selected.device.cloud[selected.route]!, name: selected.device.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
+    {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl room={roomName(selected.device)} key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} closeLabel={selected.parent ? 'Назад к группе' : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
+    {selected?.kind === 'device' && selected.route !== 'local' && selected.device.cloud[selected.route] && <CloudControl room={roomName(selected.device)} localTransport={selected.device.local?.transport} key={selected.route + selected.device.id} api={api} device={{ ...selected.device.cloud[selected.route]!, name: selected.device.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
     {selected?.kind === 'group' && <GroupControl key={selected.group.id} api={api} group={selected.group} onAuthError={onAuthError} onClose={close} onDevice={device => choose({ kind: 'device', device: mergeDevices([device], cloud)[0], route: 'local', parent: selected.group })} />}
   </section>;
 }

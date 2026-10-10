@@ -8,9 +8,10 @@ import { useControlDrafts } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
+import { DeviceConnectionDescription } from './DeviceConnection';
 
-export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: {
-  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string;
+export function LocalControl({ api, device, onClose, onAuthError, closeLabel, room }: {
+  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string;
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
   const load = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
@@ -23,7 +24,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
   const drafts = useControlDrafts();
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
-  return <ControlDialog statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(session.data.state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
+  return <ControlDialog information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(session.data.state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}>
     <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><div className="control-actions"><button className="secondary compact" disabled={session.busy || aliasBusy} onClick={() => void session.refresh()}>Обновить статус</button>
       {Object.values(item.capabilities).some(cap => cap.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || aliasBusy || !session.readOK || !session.data?.state.enabled} onApply={() => void drafts.apply(changes => session.execute(async () => {
         for (const change of changes) validateControlValue(change.spec, change.value!);

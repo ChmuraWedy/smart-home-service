@@ -58,7 +58,7 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
   const powers = specs.filter(powerControl), sensors = specs.filter(sensorReading);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
   return <>
-    <div className="card-primary-controls">{powers.map(spec => <CapabilityField key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases"><span className="alias-row-label">Алиасы:</span>{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />)}
+    <div className="card-primary-controls">{powers.map(spec => <CapabilityField key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />)}
       {!!sensors.length && <div className="card-sensor-values">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? ' · Устарело' : '');

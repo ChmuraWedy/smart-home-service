@@ -106,7 +106,7 @@ describe('cloud device control', () => {
     view.unmount(); render(<CloudControl {...props} />);
     const channel = await screen.findByRole('region', { name: 'Канал 1' });
     expect(within(channel).getByRole('heading', { name: 'Канал 1' })).toBeInTheDocument();
-    expect(within(channel).getByRole('group', { name: 'Алиасы' })).toHaveTextContent('Алиасы:Настольный свет');
+    expect(within(channel).getByRole('group', { name: 'Алиасы' })).toHaveTextContent('Настольный свет');
     await user.click(within(channel).getByRole('switch'));
     await user.click(screen.getByRole('button', { name: 'Применить' }));
     await waitFor(() => expect(writes[1]).toEqual({ method: 'POST', body: { commands: [{ code: 'switch_1', value: true }] } }));
@@ -370,6 +370,7 @@ describe('cloud device control', () => {
     const server = cloudServer({ pending: true }); const close = vi.fn();
     render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={close} onAuthError={vi.fn()} />);
     const button = await screen.findByRole('switch');
+    await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
     const apply = screen.getByRole('button', {name:'Применить'});
     await waitFor(() => expect(apply).toBeEnabled());

@@ -32,7 +32,6 @@ export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength
       <button type="button" className="alias-icon" aria-label="Отмена" title="Отмена" disabled={saving} onClick={() => { setEditing(null); setError(''); }}><AliasActionIcon action="cancel" /></button>
     </form>;
   return <div className="alias-row" role="group" aria-label="Алиасы">
-    <span className="alias-row-label">Алиасы:</span>
     {aliases.map((alias, index) => editing === index ? editor : <span className="alias-tag" key={alias}>{alias}<button type="button" className="alias-icon" aria-label={'Изменить алиас ' + alias} title="Изменить алиас" disabled={disabled || saving} onClick={() => { setEditing(index); setDraft(alias); setError(''); }}><Pencil /></button></span>)}
     {editing === null && aliases.length < maxAliases && <button type="button" className="secondary alias-add" aria-label="Добавить алиас" title="Добавить алиас" disabled={disabled || saving} onClick={() => { setEditing(aliases.length); setDraft(''); setError(''); }}>+</button>}
     {editing === aliases.length && editor}

@@ -100,6 +100,15 @@ describe('unified device identity and management', () => {
     await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const cloud = await screen.findByRole('dialog', { name: local.name });
     expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
+    const info=within(cloud).getByRole('button',{name:'О подключении устройства'});
+    expect(info).toHaveAttribute('aria-expanded','false');
+    await user.click(info);
+    const description=within(cloud).getByRole('region',{name:'О подключении устройства'});
+    expect(description).toHaveTextContent('Кухня');
+    expect(description).toHaveTextContent('Устройство подключено через шлюз');
+    expect(description).toHaveTextContent('через подключённый аккаунт Tuya Developer');
+    await user.click(info);
+    expect(within(cloud).queryByRole('region',{name:'О подключении устройства'})).toBeNull();
     await user.click(await within(cloud).findByRole('switch'));
     await user.click(within(cloud).getByRole('button', { name: 'Применить' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('результат команды неизвестен');
@@ -110,6 +119,8 @@ describe('unified device identity and management', () => {
     await user.selectOptions(within(reloaded).getByRole('combobox'), 'local');
     await user.click(within(reloaded).getByRole('button', { name: 'Подробнее' }));
     const home = await screen.findByRole('dialog', { name: local.name });
+    await user.click(within(home).getByRole('button',{name:'О подключении устройства'}));
+    expect(within(home).getByRole('region',{name:'О подключении устройства'})).toHaveTextContent('настроенному шлюзу в домашней сети');
     await user.click(await within(home).findByRole('switch'));
     await user.click(within(home).getByRole('button', { name: 'Применить' }));
     expect(calls.filter(call => call.method === 'POST')[1]).toEqual({ path: '/api/v1/devices/7/commands/capabilities', method: 'POST', body: { values: { switch: true } } });

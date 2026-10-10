@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiError } from '../api';
 import type { JsonValue } from '../api';
@@ -101,10 +101,12 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   return { data, busy, readOK, notice, refresh, execute };
 }
 
-export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, statusContent, className = '' }: {
-  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; statusContent?: ReactNode; className?: string;
+export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = 'Закрыть', titleContent, statusContent, information, className = '' }: {
+  title: string; subtitle: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const [infoOpen,setInfoOpen] = useState(false);
+  const infoId = useId();
   useEffect(() => {
     const element = dialog.current!;
     const previous = document.activeElement as HTMLElement | null;
@@ -112,7 +114,8 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     return () => { element.close(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!busy) onClose(); }}>
-    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button>{statusContent}</div></header>
+    <header className="control-header"><div><p className="eyebrow">{subtitle}</p>{titleContent || <h2>{title}</h2>}</div><div className="control-header-actions"><div className="control-header-buttons">{information && <button type="button" className="secondary control-information" aria-label="О подключении устройства" title="О подключении устройства" aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="secondary control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === 'Закрыть' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}</div></header>
+    {information && infoOpen && <section id={infoId} className="connection-information" aria-label="О подключении устройства">{information}</section>}
     {children}
   </dialog>;
 }
