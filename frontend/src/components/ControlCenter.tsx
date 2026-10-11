@@ -14,6 +14,7 @@ import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePr
 import { useTopology } from '../use-topology';
 import { CardControls } from './CardControls';
 import { CameraLive } from './CameraLive';
+import { cameraPrivacyBlock } from '../camera-controls';
 import type { MouseEvent } from 'react';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
@@ -38,6 +39,9 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const notifyBusy = useCallback((busy:boolean) => { setQuickBusy(busy); onCommandBusy(device.id,busy); },[device.id,onCommandBusy]);
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
+  const [privacyView,setPrivacyView] = useState<{route:DeviceRoute;value:boolean | null | undefined}>();
+  const privacyChanged=useCallback((value:boolean | null | undefined)=>setPrivacyView({route,value}),[route]);
+  const privacyBlock=cameraPrivacyBlock(privacyView?.route===route ? privacyView.value : typeof cloud?.controls?.snapshot.status.basic_private==='boolean' ? cloud.controls.snapshot.status.basic_private : undefined);
   const local = device.local;
   const battery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   // These two devices were explicitly deferred; browsing must not activate them.
@@ -48,7 +52,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
     <header className="device-heading device-tile-layout">
       <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div></div>
-        {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? "Свернуть видео камеры" : "Показать видео камеры"} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? "Свернуть видео камеры" : "Показать видео камеры"} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : "▷ Видео"}</button> : undefined} />}
+        {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onPrivacyStateChange={privacyChanged} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? "Свернуть видео камеры" : "Показать видео камеры"} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? "Свернуть видео камеры" : "Показать видео камеры"} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : "▷ Видео"}</button> : undefined} />}
       </div>
       <div className="device-card-identity"><div className="device-card-title"><h3>{device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства">{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}
@@ -56,7 +60,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
         {!local && !postponed && <button className="secondary tile-icon-action" aria-label="Добавить в дом" title="Добавить в дом" disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}>+</button>}
       </div></div>
     </header>
-    <div id={previewId}>{previewRoute === route && !paused && cloud && isCamera(cloud.category) && route !== 'local' && <CameraLive key={route} api={api} deviceId={device.id} provider={route} onAuthError={onAuthError} compact autoStart />}</div>
+    <div id={previewId}>{previewRoute === route && !paused && cloud && isCamera(cloud.category) && route !== 'local' && <CameraLive key={route} api={api} deviceId={device.id} provider={route} onAuthError={onAuthError} compact autoStart viewingBlocked={privacyBlock} />}</div>
     {(routes.length > 1 || postponed) && <div className="device-card-footer">
       {routes.length > 1 && <select className="device-route-select" aria-label={'Способ управления: ' + device.name} value={route} disabled={quickBusy} onChange={event => { setPreviewRoute(null); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>}
       {postponed && <span className="help">Настройка отложена</span>}

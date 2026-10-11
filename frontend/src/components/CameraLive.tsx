@@ -9,8 +9,8 @@ function resolutionLabel(width:number, height:number) {
   return (Math.min(width,height) >= 720 ? 'HD' : 'SD') + ' · ' + width + '×' + height;
 }
 
-export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false, networkSignal, headingActions, overlay }: {
-  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode;
+export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false, networkSignal, headingActions, overlay, viewingBlocked }: {
+  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode; viewingBlocked?:string;
 }) {
   const video = useRef<HTMLVideoElement>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
@@ -33,7 +33,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   }, []);
   useEffect(() => {
     const element = video.current;
-    if (!source || !element) return;
+    if (viewingBlocked || !source || !element) return;
     let active = true, player: Hls | undefined;
     const fail = () => {
       if (!active) return;
@@ -80,9 +80,9 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       if (hls.current === player) hls.current = null;
       player?.destroy(); element.pause(); element.removeAttribute('src'); element.load();
     };
-  }, [source]);
+  }, [source,viewingBlocked]);
   async function start() {
-    if (pending.current || source) return;
+    if (viewingBlocked || pending.current || source) return;
     const controller = new AbortController(); pending.current = controller;
     setLoading(true); setError(false); setMessage('Подключаем видео…'); resetMetrics();
     try {
@@ -99,11 +99,12 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       if (pending.current === controller) { pending.current = null; setLoading(false); }
     }
   }
+  useEffect(()=>{ if (viewingBlocked) stop(); },[viewingBlocked]);
   // Inline instances mount only after the user expands the camera tile.
   useEffect(() => { if (autoStart) void start(); }, [autoStart]);
   return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label="Видео камеры">
     <div className="camera-live-heading"><h3>Видео камеры</h3>
-      <div className="camera-live-actions">{headingActions}{source || loading ? <button className="secondary compact" onClick={stop}>Остановить</button> : <button className="compact" onClick={() => void start()}>{error ? 'Подключиться заново' : 'Смотреть видео'}</button>}</div>
+      <div className="camera-live-actions">{headingActions}{source || loading ? <button className="secondary compact" onClick={stop}>Остановить</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? 'Подключиться заново' : 'Смотреть видео'}</button>}</div>
     </div>
     {!compact && <div className="camera-stream-info" aria-label="Качество видео и связи">
       <label>HD/SD <select aria-label="Качество видео HD/SD" value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
@@ -118,9 +119,9 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       <p className="help">{!source ? 'Доступные варианты HD/SD появятся после запуска видео.' : levels.length < 2 ? 'Переключение HD/SD недоступно для этого потока.' : 'Качество выбирается из вариантов видеопотока.'}</p>
     </div>}
     {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
-    {(source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
-      {source ? <video ref={video} controls={!overlay} muted autoPlay playsInline preload="none" aria-label="Прямой эфир камеры" /> : <div className="camera-area-placeholder">Для изображения нажмите «Смотреть видео»</div>}{overlay}
+    {(!viewingBlocked && source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
+      {source && !viewingBlocked ? <video ref={video} controls={!overlay} muted autoPlay playsInline preload="none" aria-label="Прямой эфир камеры" /> : <div className="camera-area-placeholder">{viewingBlocked || 'Для изображения нажмите «Смотреть видео»'}</div>}{overlay}
     </div>}
-    <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{message}</p>
+    <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
   </section>;
 }

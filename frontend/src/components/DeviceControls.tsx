@@ -135,8 +135,8 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, headingActions, stage, immediatePower = false, booleanButton = false, buttonText, valueEditor }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; booleanButton?: boolean; buttonText?:string; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, headingActions, stage, immediatePower = false, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
@@ -203,6 +203,11 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
   }, [stage, spec.key, draft, color, dirty, error]);
   useEffect(() => () => { stage?.(spec.key, null); }, [stage, spec.key]);
   const selectedPower = (stage || immediatePower) && (dirty || awaiting) ? draft === 'true' : Boolean(reading?.known && reading.value === true);
+  // A pending off command is not a confirmed off report. Consumers can keep
+  // dependent actions blocked until the device confirms the new state.
+  useEffect(()=>{
+    if (spec.kind==='boolean') onBooleanStateChange?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value==='boolean' ? reading.value : null);
+  },[onBooleanStateChange,spec.kind,awaiting,selectedPower,reading?.known,reading?.value]);
   async function send(value?: JsonValue) {
     try {
       let parsed = value;
@@ -231,7 +236,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     </div>}
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">Устарело</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
-      {stage || immediatePower ? <>{booleanButton ? <button id={powerId} type="button" className="secondary compact mode-button" aria-label={spec.label} aria-pressed={selectedPower} disabled={disabled || (!reading?.known && !awaiting)} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}>{buttonText || (selectedPower ? 'Выключить' : 'Включить')}</button> : <button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}><span /></button>}{!dirty && !awaiting && !reading?.known && <span className="power-selection">Нет данных</span>}{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
+      {stage || immediatePower ? <>{booleanButton ? <button id={powerId} type="button" className="secondary compact mode-button" title={reading?.known || awaiting ? (selectedPower ? 'Выключить: ' : 'Включить: ')+spec.label : undefined} aria-label={spec.label} aria-pressed={selectedPower} disabled={disabled || (!reading?.known && !awaiting)} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}>{typeof buttonText==='function' ? buttonText(reading?.known || awaiting ? selectedPower : null) : buttonText || (selectedPower ? 'Выключить' : 'Включить')}</button> : <button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => immediatePower ? void send(!selectedPower) : change(String(!selectedPower))}><span /></button>}{!dirty && !awaiting && !reading?.known && <span className="power-selection">Нет данных</span>}{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">Устарело</span>}{(dirty || awaiting) && <span className="help">{dirty ? 'Изменено' : 'Ожидаем показание'}{spec.readable && <> · сейчас: <span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
       {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
       <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>Включить</button>
       <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>Выключить</button>

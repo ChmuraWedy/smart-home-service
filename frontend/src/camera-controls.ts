@@ -77,3 +77,7 @@ export function cameraSettingsGroups(specs: ControlSpec[]) {
     additional: specs.filter(spec => !grouped.has(spec.key)),
   };
 }
+
+export function cameraPrivacyBlock(value:boolean | null | undefined) {
+  return value===true ? 'Режим приватности включён. Выключите его для просмотра видео.' : value===null ? 'Проверяем режим приватности. Дождитесь показания камеры.' : undefined;
+}

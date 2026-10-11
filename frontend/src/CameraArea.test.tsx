@@ -70,7 +70,10 @@ describe('camera storage and activity area',()=>{
     const writes=mount(1),user=userEvent.setup({advanceTimers:vi.advanceTimersByTime});
     try {
       const mode=await screen.findByRole('combobox',{name:'Режим записи'});
+      await waitFor(()=>expect(mode).toBeEnabled());
+      await waitFor(()=>expect(mode).toHaveDisplayValue('По событиям'));
       await user.selectOptions(mode,'1');
+      await waitFor(()=>expect(screen.getByRole('button',{name:/Применить/})).toBeEnabled());
       const originalFetch=vi.mocked(fetch).getMockImplementation()!;
       vi.mocked(fetch).mockImplementation(async(input,options)=>{
         if (options?.method!=='POST' && String(input).includes('/status')) return json({device_id:'camera',online:true,source:'cloud',status:{sd_status:5,record_switch:true,record_mode:'1',motion_area:original}});

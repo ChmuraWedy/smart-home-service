@@ -6,17 +6,17 @@ import type { Area } from '../camera-area';
 import { ControlDialog } from './DeviceControls';
 import { CameraLive } from './CameraLive';
 
-export function CameraArea({value,disabled,onChange,api,deviceId,provider,onAuthError}:{value:string;disabled:boolean;onChange:(value:string)=>void;api:CloudApi;deviceId:string;provider:Provider;onAuthError:()=>void}) {
+export function CameraArea({value,disabled,onChange,api,deviceId,provider,onAuthError,viewingBlocked}:{value:string;disabled:boolean;onChange:(value:string)=>void;api:CloudApi;deviceId:string;provider:Provider;onAuthError:()=>void;viewingBlocked?:string}) {
   const [editing,setEditing]=useState<ReturnType<typeof parseArea>>(null);
   const parsed=parseArea(value);
   return <div className="camera-area-launch">
     <button type="button" className="secondary compact" disabled={disabled || !parsed} onClick={()=>setEditing(parsed)}>Изменить область</button>
     {!parsed && value && <p className="help">Формат области этой камеры не поддерживается графическим редактором. Исходные данные сохранены.</p>}
-    {editing && <AreaDialog initial={editing} api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} onClose={()=>setEditing(null)} onSave={area=>{onChange(encodeArea(editing.document,area)); setEditing(null);}} />}
+    {editing && <AreaDialog viewingBlocked={viewingBlocked} initial={editing} api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} onClose={()=>setEditing(null)} onSave={area=>{onChange(encodeArea(editing.document,area)); setEditing(null);}} />}
   </div>;
 }
 
-function AreaDialog({initial,api,deviceId,provider,onAuthError,onClose,onSave}:{initial:NonNullable<ReturnType<typeof parseArea>>;api:CloudApi;deviceId:string;provider:Provider;onAuthError:()=>void;onClose:()=>void;onSave:(area:Area)=>void}) {
+function AreaDialog({initial,api,deviceId,provider,onAuthError,onClose,onSave,viewingBlocked}:{initial:NonNullable<ReturnType<typeof parseArea>>;api:CloudApi;deviceId:string;provider:Provider;onAuthError:()=>void;onClose:()=>void;onSave:(area:Area)=>void;viewingBlocked?:string}) {
   const [area,setArea]=useState(initial.area), surface=useRef<HTMLDivElement>(null);
   const drag=useRef<{x:number;y:number;width:number;height:number;area:Area;resize:boolean}|null>(null);
   function begin(event:PointerEvent<HTMLButtonElement>,resize:boolean) {
@@ -46,7 +46,7 @@ function AreaDialog({initial,api,deviceId,provider,onAuthError,onClose,onSave}:{
   return <ControlDialog title="Область обнаружения" busy={false} onClose={onClose} className="camera-area-dialog">
     <div className="camera-area-body">
     <p className="help">Переместите красную рамку и потяните её угол. Стрелки клавиатуры также перемещают рамку или меняют её размер.</p>
-    <CameraLive api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} compact overlay={overlay} />
+    <CameraLive viewingBlocked={viewingBlocked} api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} compact overlay={overlay} />
     <div className="camera-area-values">{(['x','y','xlen','ylen'] as const).map(key=><label key={key}>{({x:'Слева',y:'Сверху',xlen:'Ширина',ylen:'Высота'})[key]} (%)<input type="number" min={key==='x'||key==='y'?0:1} max={100} step={1} value={area[key]} onChange={event=>setArea({...area,[key]:Number(event.target.value)})} /></label>)}</div>
     {!validArea(area) && <p role="alert" className="error">Область должна целиком находиться внутри изображения и иметь ненулевой размер.</p>}
     <p className="help">«Сохранить» перенесёт область в настройки. Для отправки камере нажмите «Применить» в подробной карточке.</p>

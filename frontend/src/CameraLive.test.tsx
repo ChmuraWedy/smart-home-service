@@ -22,14 +22,17 @@ const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{statu
 function mount(provider:'sharing'|'developer'='sharing',onAuthError=vi.fn()) {
   return render(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider={provider} onAuthError={onAuthError} />);
 }
-function mountTiles() {
+function mountTiles(privacy?:boolean) {
+  const functions=privacy===undefined ? [] : [{code:'basic_private',type:'Boolean',values:'{}'}];
+  const snapshot={device_id:'camera',online:true,source:'cloud',status:privacy===undefined ? {} : {basic_private:privacy}};
+  const definitions={device_id:'camera',functions};
   vi.mocked(fetch).mockImplementation(async (input) => {
     const path=new URL(String(input)).pathname;
     if (path.endsWith('/stream')) return json({device_id:'camera',type:'hls',url});
     if (path.endsWith('/cloud/topology')) return json({synced_at:null,warnings:0,placements:[],job:{status:'idle',processed:0,total:0,message:null}});
-    if (path.endsWith('/cloud/devices')) return json([{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}]);
-    if (path.endsWith('/functions')) return json({device_id:'camera',functions:[]});
-    if (path.endsWith('/status')) return json({device_id:'camera',online:true,source:'cloud',status:{}});
+    if (path.endsWith('/cloud/devices')) return json([{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false,...(privacy===undefined ? {} : {controls:{ready:true,definitions,snapshot}})}]);
+    if (path.endsWith('/functions')) return json(definitions);
+    if (path.endsWith('/status')) return json(snapshot);
     return json([]);
   });
   return render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
@@ -44,6 +47,35 @@ beforeEach(()=>{
 });
 
 describe('camera live viewing',()=>{
+  it('blocks preview allocation during privacy and keeps playback stopped when privacy is turned off',async()=>{
+    const api=new CloudApi(connection),onAuthError=vi.fn(),blocked='Режим приватности включён. Выключите его для просмотра видео.';
+    const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart viewingBlocked={blocked} />);
+    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
+    expect(fetch).not.toHaveBeenCalled();
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart />);
+    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeEnabled();
+    expect(fetch).not.toHaveBeenCalled();
+    await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart viewingBlocked={blocked} />);
+    expect(hls.destroy).toHaveBeenCalledOnce();
+    expect(screen.queryByLabelText('Прямой эфир камеры')).toBeNull();
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart />);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+  it('discards an in-flight stream if privacy becomes enabled',async()=>{
+    let resolve!:(value:Response)=>void;
+    vi.mocked(fetch).mockReturnValue(new Promise(r=>{resolve=r;}));
+    const api=new CloudApi(connection),onAuthError=vi.fn();
+    const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} />);
+    await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} viewingBlocked="Режим приватности включён." />);
+    await act(async()=>resolve(json({device_id:'camera',type:'hls',url})));
+    expect(hls.attach).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Прямой эфир камеры')).toBeNull();
+    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
+  });
+
   it('selects only actual stream variants, reports playback and download speed, and clears measurements on stop',async()=>{
     hls.levels=[{width:640,height:360,bitrate:500000},{width:1920,height:1080,bitrate:2000000}];
     mount(); const user=userEvent.setup();
@@ -80,6 +112,16 @@ describe('camera live viewing',()=>{
     expect(quality).toBeDisabled(); expect(within(quality).getAllByRole('option')).toHaveLength(1);
     expect(screen.getByText('Переключение HD/SD недоступно для этого потока.')).toBeInTheDocument();
     expect(screen.getByText('Wi-Fi: -55 dBm')).toBeInTheDocument();
+  });
+  it('shows the privacy explanation instead of allocating a main tile preview',async()=>{
+    mountTiles(true); const user=userEvent.setup();
+    const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
+    const privacy=await within(card).findByRole('button',{name:'Приватность'});
+    await waitFor(()=>expect(privacy).toHaveAttribute('aria-pressed','true'));
+    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    expect(within(card).getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
+    expect(card).toHaveTextContent('Выключите его для просмотра видео');
+    expect(vi.mocked(fetch).mock.calls.some(([input])=>String(input).includes('/stream'))).toBe(false);
   });
   it('expands a main tile into live video without opening details and destroys the player on collapse',async()=>{
     mountTiles(); const user=userEvent.setup();

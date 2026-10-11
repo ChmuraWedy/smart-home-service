@@ -6,12 +6,12 @@ import { CAMERA_HELP } from './camera-controls';
 import { CloudControl } from './components/CloudControl';
 
 const json=(value:unknown)=>new Response(JSON.stringify(value));
-function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise<Response>,sdStatus=1) {
+function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise<Response>,sdStatus=1,privacyStatus={value:false}) {
   const writes:{path:string;body:unknown}[]=[];
   const functions=[{code:'basic_private',type:'Boolean',values:'{}'}, {code:'humanoid_filter',type:'Boolean',values:'{}'}, {code:'sd_format',type:'Boolean',values:'{}'}, {code:'record_switch',type:'Boolean',values:'{}'}, {code:'basic_nightvision',type:'Enum',values:'{"range":["0","1","2"]}'}];
   vi.mocked(fetch).mockImplementation(async (input,options)=>{
     if (options?.method==='POST') {writes.push({path:String(input),body:JSON.parse(String(options.body))}); return pending || json({acknowledged:true});}
-    return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:false,humanoid_filter:false,sd_format:false,record_switch:false,sd_status:sdStatus,basic_nightvision:'0'}});
+    return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:privacyStatus.value,humanoid_filter:false,sd_format:false,record_switch:false,sd_status:sdStatus,basic_nightvision:'0'}});
   });
   render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
   return writes;
@@ -35,6 +35,23 @@ describe('camera action buttons',()=>{
     await user.click(screen.getByRole('button',{name:/Применить/}));
     await waitFor(()=>expect(writes).toHaveLength(2));
     expect(writes[1].body).toEqual({commands:[{code:'basic_nightvision',value:'1'}]});
+  });
+  it('shows privacy state and waits for the camera to confirm off before enabling video',async()=>{
+    const status={value:true},writes=mountSettings('sharing',undefined,1,status),user=userEvent.setup();
+    const privacy=await screen.findByRole('button',{name:'Режим приватности'});
+    await waitFor(()=>expect(privacy).toBeEnabled());
+    expect(privacy).toHaveTextContent('Включена');
+    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
+    expect(screen.getByRole('region',{name:'Видео камеры'})).toHaveTextContent('Выключите его для просмотра видео');
+    await user.click(privacy);
+    await waitFor(()=>expect(privacy).toBeEnabled());
+    expect(privacy).toHaveTextContent('Выключена');
+    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
+    expect(writes.map(write=>write.body)).toEqual([{commands:[{code:'basic_private',value:false}]}]);
+    status.value=false;
+    await user.click(screen.getByRole('button',{name:'Обновить статус'}));
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeEnabled());
+    expect(writes).toHaveLength(1);
   });
   it('shows the human detection explanation only from its info button and closes it without closing the device',async()=>{
     const writes=mountSettings(),user=userEvent.setup();
