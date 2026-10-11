@@ -58,6 +58,10 @@ describe('unified device identity and management', () => {
     const header=card.querySelector('header')!;
     expect(header).toHaveTextContent(local.name);
     expect(header).toHaveTextContent('Кухня');
+    expect(card.querySelector('.device-card-identity')).toHaveTextContent(local.name);
+    expect(card.querySelector('.device-card-identity')).toHaveTextContent('kitchen_light');
+    expect(card.querySelector('.device-card-context')).toHaveTextContent('Кухня');
+    expect(card.querySelector('.device-card-context')).toHaveTextContent('В сети');
     expect(header).not.toHaveTextContent('Через шлюз');
     expect(within(screen.getByRole('listitem',{name:'Только в аккаунте'})).queryByText('Через интернет · Smart Life')).toBeNull();
     expect(header.querySelector('[data-device-type=\"switch\"]')).not.toBeNull();

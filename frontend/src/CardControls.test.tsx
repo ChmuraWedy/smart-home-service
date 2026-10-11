@@ -39,7 +39,7 @@ describe('main controls on device cards', () => {
     expect(screen.queryByRole('button',{name:'Настроить'})).toBeNull();
     await waitFor(() => expect(power).toBeEnabled());
     expect(screen.queryByText('Выключено')).toBeNull();
-    await user.click(screen.getByText('Питание',{selector:'label'}));
+    await user.click(power);
     await waitFor(() => expect(power).toBeEnabled());
     expect(screen.queryByRole('spinbutton')).toBeNull();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
