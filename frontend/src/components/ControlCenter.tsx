@@ -36,13 +36,13 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   return <li className="device-card" aria-label={device.name}>
     <header className="device-heading device-tile-layout">
-      <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
-        <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div></div>
-        {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />}
-      </div>
       <div className="device-card-identity"><div className="device-card-title"><h3>{device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства">{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}
-      </div><div className="device-card-actions"><button className="secondary tile-icon-action" aria-label="Подробнее" title="Подробнее" disabled={quickBusy} onClick={() => onOpen(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
+      </div></div>
+      <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
+        {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />}
+      </div>
+      <div className="device-card-bottom"><div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div></div><div className="device-card-actions"><button className="secondary tile-icon-action" aria-label="Подробнее" title="Подробнее" disabled={quickBusy} onClick={() => onOpen(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
         {!local && !postponed && <button className="secondary tile-icon-action" aria-label="Добавить в дом" title="Добавить в дом" disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}>+</button>}
       </div></div>
     </header>
