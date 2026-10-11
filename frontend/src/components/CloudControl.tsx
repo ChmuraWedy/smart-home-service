@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { CloudApi } from '../api';
-import type { CloudDevice, CloudFunctions, CloudSnapshot, Provider } from '../api';
+import type { CloudDevice, CloudFunctions, CloudSnapshot, JsonValue, Provider } from '../api';
 import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
@@ -18,6 +18,8 @@ import { ChannelControl, channelTimer } from './ChannelControl';
 import type { ReactNode } from 'react';
 import { CameraLive } from './CameraLive';
 import { CameraSettings } from './CameraSettings';
+import { CameraFormat } from './CameraFormat';
+import { FieldInfo } from './FieldInfo';
 
 export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; onClose: () => void; onAuthError: () => void;
@@ -51,11 +53,18 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   const regularSpecs = camera ? [] : specs;
   const settings = regularSpecs.filter(spec => /^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key));
   const basic = regularSpecs.filter(spec => !spec.advanced && !hasLightEffectWizard(spec) && !settings.includes(spec) && !isBattery(spec.key)), schedules = regularSpecs.filter(hasScheduleWizard), effects = regularSpecs.filter(hasLightEffectWizard), advanced = regularSpecs.filter(spec => spec.advanced && !settings.includes(spec) && !hasScheduleWizard(spec) && !hasLightEffectWizard(spec));
-  const field = (spec: ControlSpec, headingActions?: ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} stage={drafts.stage} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={editingBusy || session.busy || !session.readOK} onSend={value => session.execute(async () => {
+  const sendValue = (spec:ControlSpec,value:JsonValue) => session.execute(async () => {
     const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, session.data!.definitions));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
     return { text: 'Команда принята.' };
-  })} />;
+  });
+  const field = (spec: ControlSpec, headingActions?: ReactNode) => {
+    const disabled = editingBusy || session.busy || !session.readOK;
+    if (camera && spec.key === 'sd_format' && spec.writable && spec.kind === 'boolean') return <CameraFormat key={spec.key} disabled={disabled} onFormat={()=>sendValue(spec,true)} />;
+    const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
+    const info = camera && spec.key === 'humanoid_filter' && spec.help;
+    return <CapabilityField headingActions={info ? <>{headingActions}<FieldInfo label={spec.label} text={info} /></> : headingActions} key={spec.key} spec={info ? {...spec,help:undefined} : spec} stage={privacyButton ? undefined : drafts.stage} immediatePower={privacyButton} booleanButton={privacyButton} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
+  };
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');

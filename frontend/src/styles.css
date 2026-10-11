@@ -1029,8 +1029,21 @@ footer {
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:#080d13; border-radius:10px; color:#9eb5cc; font-size:30px; }
 .camera-setting-group { margin:20px 0; }
 .camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:#9eb5cc; }
-.device-card-top .camera-quick-controls .card-primary-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,125px),1fr)); gap:8px 12px; }
-.device-card-top .camera-quick-controls .capability-heading h3 { white-space:normal; overflow-wrap:anywhere; }
+.device-card-top .camera-quick-controls { grid-column:1 / -1; }
+.device-card-top:has(.camera-quick-controls) .device-symbol { grid-row:1; }
+.device-card-top .camera-quick-controls .card-primary-controls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+.device-card-top .camera-quick-controls .capability-row { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.device-card-top .camera-quick-controls .capability-label-line { min-height:24px; justify-content:center; text-align:center; }
+.device-card-top .camera-quick-controls .capability-heading h3 { font-size:10px; line-height:1.2; white-space:normal; overflow-wrap:anywhere; }
+.device-card-top .camera-quick-controls .power-actions { justify-content:center; }
+.mode-button[aria-pressed=true] { border-color:#77b4ef; color:#a9d1ff; }
+.camera-format-dialog { max-width:480px; }
+.camera-format-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:24px; }
+.field-info { position:relative; display:inline-flex; }
+.field-info-button { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; padding:0; font-size:13px; }
+.field-info-panel { position:absolute; z-index:6; top:30px; left:0; width:280px; padding:14px; border:1px solid #59748c; border-radius:12px; background:#202e3e; color:#e7edf5; font-size:12px; font-weight:400; box-shadow:0 12px 36px #0008; }
+.field-info-panel > button { float:right; width:26px; height:26px; padding:0; margin:-6px -6px 4px 8px; }
+@media(max-width:600px) { .field-info-panel { position:fixed; left:16px; right:16px; bottom:16px; top:auto; width:auto; } }
 .camera-stream-info { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin:8px 0 12px; color:#aebed1; font-size:12px; }
 .camera-stream-info label { display:flex; align-items:center; gap:8px; margin:0; }
 .camera-stream-info select { width:auto; max-width:100%; margin:0; padding:6px 8px; font-size:12px; }

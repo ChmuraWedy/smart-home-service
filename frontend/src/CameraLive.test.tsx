@@ -198,7 +198,7 @@ describe('camera live viewing',()=>{
     });
     render(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const image=await screen.findByRole('region',{name:'Изображение и звук'});
-    expect(within(image).getByRole('switch',{name:'Режим приватности'})).not.toBeChecked();
+    expect(within(image).getByRole('button',{name:'Режим приватности'})).toHaveAttribute('aria-pressed','false');
     await waitFor(()=>expect(within(image).getByRole('combobox',{name:'Ночное видение'})).toHaveDisplayValue('Авто'));
     expect(within(screen.getByRole('region',{name:'Обнаружение и оповещения'})).getByRole('switch',{name:'Обнаружение движения'})).toBeChecked();
     const storage=screen.getByRole('region',{name:'Запись и карта памяти'});
@@ -211,7 +211,7 @@ describe('camera live viewing',()=>{
     const user=userEvent.setup();
     await user.click(screen.getByText('Дополнительные параметры камеры',{exact:true}));
     expect(screen.getByRole('switch',{name:'vendor setting'})).toBeEnabled();
-    expect(screen.getByText('Форматирование удаляет записи с карты памяти.')).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Форматировать…'})).toBeEnabled();
     await user.selectOptions(within(image).getByRole('combobox',{name:'Ночное видение'}),'1');
     await user.selectOptions(within(storage).getByRole('combobox',{name:'Режим записи'}),'1');
     await user.click(screen.getByRole('button',{name:/Применить/}));
