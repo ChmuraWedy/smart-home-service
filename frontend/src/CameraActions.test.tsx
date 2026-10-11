@@ -2,15 +2,16 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
+import { CAMERA_HELP } from './camera-controls';
 import { CloudControl } from './components/CloudControl';
 
 const json=(value:unknown)=>new Response(JSON.stringify(value));
-function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise<Response>) {
+function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise<Response>,sdStatus=1) {
   const writes:{path:string;body:unknown}[]=[];
-  const functions=[{code:'basic_private',type:'Boolean',values:'{}'}, {code:'humanoid_filter',type:'Boolean',values:'{}'}, {code:'sd_format',type:'Boolean',values:'{}'}, {code:'basic_nightvision',type:'Enum',values:'{"range":["0","1","2"]}'}];
+  const functions=[{code:'basic_private',type:'Boolean',values:'{}'}, {code:'humanoid_filter',type:'Boolean',values:'{}'}, {code:'sd_format',type:'Boolean',values:'{}'}, {code:'record_switch',type:'Boolean',values:'{}'}, {code:'basic_nightvision',type:'Enum',values:'{"range":["0","1","2"]}'}];
   vi.mocked(fetch).mockImplementation(async (input,options)=>{
     if (options?.method==='POST') {writes.push({path:String(input),body:JSON.parse(String(options.body))}); return pending || json({acknowledged:true});}
-    return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:false,humanoid_filter:false,sd_format:false,sd_status:1,basic_nightvision:'0'}});
+    return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:false,humanoid_filter:false,sd_format:false,record_switch:false,sd_status:sdStatus,basic_nightvision:'0'}});
   });
   render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
   return writes;
@@ -38,9 +39,9 @@ describe('camera action buttons',()=>{
   it('shows the human detection explanation only from its info button and closes it without closing the device',async()=>{
     const writes=mountSettings(),user=userEvent.setup();
     const info=await screen.findByRole('button',{name:'Подробнее: Обнаружение человека'});
-    expect(screen.queryByText('Камера предоставляет параметр обнаружения человека. API не сообщает, нужна ли подписка и активирована ли функция. Наличие переключателя не подтверждает доступность распознавания; условия проверьте в Smart Life.')).toBeNull();
+    expect(screen.queryByText(CAMERA_HELP.humanoid_filter)).toBeNull();
     await user.click(info);
-    expect(screen.getByRole('note',{name:'Обнаружение человека'})).toHaveTextContent('Камера предоставляет параметр обнаружения человека. API не сообщает, нужна ли подписка и активирована ли функция. Наличие переключателя не подтверждает доступность распознавания; условия проверьте в Smart Life.');
+    expect(screen.getByRole('note',{name:'Обнаружение человека'})).toHaveTextContent('уведомлять при обнаружении человека, исключая другие движения');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('note')).toBeNull();
     expect(screen.getByRole('dialog',{name:'Sleep Cam'})).toBeInTheDocument();
@@ -48,6 +49,23 @@ describe('camera action buttons',()=>{
     expect(screen.queryByRole('note')).toBeNull(); expect(info).toHaveFocus();
     await user.click(info); await user.click(screen.getByRole('heading',{name:'Изображение и звук'}));
     expect(screen.queryByRole('note')).toBeNull(); expect(writes).toEqual([]);
+  });
+  it('opens explanations for video settings, unavailable recording and formatting without sending commands',async()=>{
+    const writes=mountSettings('sharing',undefined,5),user=userEvent.setup();
+    const night=await screen.findByRole('button',{name:'Подробнее: Ночное видение'});
+    await user.click(night);
+    expect(screen.getByRole('note',{name:'Ночное видение'})).toHaveTextContent('Инфракрасная подсветка');
+    await user.click(screen.getByRole('button',{name:'Подробнее: Запись на карту памяти'}));
+    expect(screen.getByRole('note',{name:'Запись на карту памяти'})).toHaveTextContent('Без готовой карты запись недоступна');
+    expect(screen.queryByRole('note',{name:'Ночное видение'})).toBeNull();
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByText('Дополнительные параметры камеры',{exact:true}));
+    await user.click(screen.getByRole('button',{name:'Подробнее: Форматирование карты памяти'}));
+    expect(screen.getByRole('note',{name:'Форматирование карты памяти'})).toHaveTextContent('удаляет все записи');
+    expect(screen.getByRole('button',{name:'Форматировать…'})).toBeDisabled();
+    expect(screen.queryByRole('switch',{name:'Запись на карту памяти'})).toBeNull();
+    expect(writes).toEqual([]);
+    expect(screen.getByRole('button',{name:/Применить/})).toBeDisabled();
   });
   it('formats only after confirmation, never stages an off value, and prevents double submissions',async()=>{
     let resolve!:(response:Response)=>void;

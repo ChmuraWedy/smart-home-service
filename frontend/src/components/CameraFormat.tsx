@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { ControlDialog } from './DeviceControls';
 
-export function CameraFormat({disabled,onFormat}: {disabled:boolean;onFormat:()=>Promise<unknown>}) {
+export function CameraFormat({disabled,onFormat,information}: {disabled:boolean;information?:ReactNode;onFormat:()=>Promise<unknown>}) {
   const [open,setOpen]=useState(false), [pending,setPending]=useState(false), [error,setError]=useState('');
   const lock=useRef(false);
   async function format() {
@@ -11,7 +11,7 @@ export function CameraFormat({disabled,onFormat}: {disabled:boolean;onFormat:()=
     finally {lock.current=false; setPending(false);}
   }
   return <section className="capability camera-format" aria-label="Форматирование карты памяти">
-    <div className="capability-row"><div className="capability-heading"><h3>Форматирование карты памяти</h3></div>
+    <div className="capability-row"><div className="capability-heading"><div className="capability-label-line"><h3>Форматирование карты памяти</h3>{information}</div></div>
       <button type="button" className="secondary compact" disabled={disabled || pending} onClick={()=>{setError(''); setOpen(true);}}>Форматировать…</button>
     </div>
     {open && <ControlDialog title="Форматирование карты памяти" busy={pending} onClose={()=>setOpen(false)} className="camera-format-dialog">
