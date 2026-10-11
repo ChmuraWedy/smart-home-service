@@ -65,7 +65,7 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
       {!!sensors.length && <div className="card-sensor-values">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? ' · Устарело' : '');
-        return <span key={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} aria-label={label} title={label}><ParameterIcon code={spec.key} />{/^(temperature|va_temperature|temp_current|humidity|va_humidity|humidity_value)$/.test(spec.key) && <span className="card-sensor-caption">{spec.label}</span>}<span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">Устарело</span>}</span>;
+        return <span key={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} aria-label={label} title={label}><ParameterIcon code={spec.key} /><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">Устарело</span>}</span>;
       })}</div>}
       <button className="secondary card-refresh" aria-label="Обновить параметры" title="Обновить параметры" disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
