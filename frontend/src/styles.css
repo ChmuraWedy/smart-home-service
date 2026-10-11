@@ -999,16 +999,18 @@ footer {
 .device-card-actions { display:flex; align-items:center; gap:2px; flex:none; }
 .device-card-actions .tile-icon-action { display:grid; place-items:center; width:28px; height:28px; min-height:28px; padding:0; font-size:20px; border:0; background:transparent; color:#9eb5cc; }
 .device-card-context { grid-column:2; grid-row:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px 8px; min-width:0; min-height:26px; }
-.device-card:has(.card-refresh) .device-card-context { padding-right:30px; }
+.device-card:has(.card-refresh) .device-card-identity,
+.device-card:has(.card-refresh) .device-card-footer { padding-right:30px; }
 .device-card-context .device-location { font-size:11px; }
 .device-card .device-card-context .device-card-status { flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:flex-end; padding-top:0; max-width:100%; gap:6px; font-size:11px; }
 .device-card-context .battery-badge { border-left:1px solid #425264; padding-left:6px; font-size:11px; }
-.device-card .card-refresh { top:10px; bottom:auto; right:8px; width:26px; height:26px; padding:0; font-size:18px; }
+.device-card .card-refresh { top:auto; bottom:10px; right:8px; width:26px; height:26px; padding:0; font-size:18px; }
 .device-card-footer .device-route-select { width:100%; font-size:10px; margin:0; padding:4px 6px; }
 @media(pointer:coarse) {
   .device-card-actions .tile-icon-action { width:36px; min-height:44px; height:44px; }
   .device-card-top .channel-timer-toggle { min-width:36px; width:36px; height:44px; }
-  .device-card .card-refresh { width:32px; height:44px; top:4px; }
+  .device-card .card-refresh { width:32px; height:44px; bottom:4px; }
   .device-card-context { min-height:36px; }
-  .device-card:has(.card-refresh) .device-card-context { padding-right:36px; }
+  .device-card:has(.card-refresh) .device-card-identity,
+  .device-card:has(.card-refresh) .device-card-footer { padding-right:36px; }
 }
