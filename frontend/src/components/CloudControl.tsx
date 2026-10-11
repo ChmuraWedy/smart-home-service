@@ -20,6 +20,8 @@ import { CameraLive } from './CameraLive';
 import { CameraSettings } from './CameraSettings';
 import { CameraFormat } from './CameraFormat';
 import { FieldInfo } from './FieldInfo';
+import { cameraStorage, isStorageSetting } from '../camera-controls';
+import { CameraArea } from './CameraArea';
 
 export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; onClose: () => void; onAuthError: () => void;
@@ -50,30 +52,36 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   const definitions = session.data ? labels ? withChannelLabels(session.data.definitions, labels) : session.data.definitions : null;
   const specs = session.data && definitions ? cloudSpecs(definitions, session.data.snapshot) : [];
   const camera = isCamera(device.category);
+  const storage = cameraStorage(session.data?.snapshot.status || {});
+  const privacy = camera ? specs.find(spec=>spec.key==='basic_private' && spec.writable && spec.kind==='boolean') : undefined;
   const regularSpecs = camera ? [] : specs;
   const settings = regularSpecs.filter(spec => /^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key));
   const basic = regularSpecs.filter(spec => !spec.advanced && !hasLightEffectWizard(spec) && !settings.includes(spec) && !isBattery(spec.key)), schedules = regularSpecs.filter(hasScheduleWizard), effects = regularSpecs.filter(hasLightEffectWizard), advanced = regularSpecs.filter(spec => spec.advanced && !settings.includes(spec) && !hasScheduleWizard(spec) && !hasLightEffectWizard(spec));
+  const ensureStorage = (spec:ControlSpec) => {if (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready)) throw new Error(storage.label+'. Команда недоступна.');};
   const sendValue = (spec:ControlSpec,value:JsonValue) => session.execute(async () => {
+    ensureStorage(spec);
     const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, session.data!.definitions));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
     return { text: 'Команда принята.' };
   });
   const field = (spec: ControlSpec, headingActions?: ReactNode) => {
-    const disabled = editingBusy || session.busy || !session.readOK;
+    const disabled = editingBusy || session.busy || !session.readOK || (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready));
+    if (camera && spec.key==='record_switch' && !storage.ready) return <section className="capability camera-record-unavailable" key={spec.key} aria-label={spec.label}><div className="capability-row"><h3>{spec.label}</h3><span>Недоступна</span></div><p className="help">{storage.label}. {session.data?.snapshot.status.record_switch===true ? 'Сохранённая настройка записи включена, но это не означает, что камера записывает видео.' : 'Запись станет доступна после установки исправной карты памяти.'}</p></section>;
     if (camera && spec.key === 'sd_format' && spec.writable && spec.kind === 'boolean') return <CameraFormat key={spec.key} disabled={disabled} onFormat={()=>sendValue(spec,true)} />;
     const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
     const info = camera && spec.key === 'humanoid_filter' && spec.help;
-    return <CapabilityField headingActions={info ? <>{headingActions}<FieldInfo label={spec.label} text={info} /></> : headingActions} key={spec.key} spec={info ? {...spec,help:undefined} : spec} stage={privacyButton ? undefined : drafts.stage} immediatePower={privacyButton} booleanButton={privacyButton} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
+    return <CapabilityField headingActions={info ? <>{headingActions}<FieldInfo label={spec.label} text={info} /></> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={privacyButton ? undefined : drafts.stage} immediatePower={privacyButton} booleanButton={privacyButton} reading={camera && spec.key==='sd_status' ? {...cloudReading(spec,session.data!.snapshot.status[spec.key],session.data!.snapshot.status_observations?.[spec.key]),value:storage.label} : cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
   };
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
   const networkSignal = signal && session.data ? displayReading(signal,cloudReading(signal,session.data.snapshot.status[signal.key])) : undefined;
-  return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,session.data.snapshot.status) : device.battery} />} className={device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || 'Устройство Tuya'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'} online={session.data?.snapshot.online} />}>
-    {camera && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} />}
+  return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,session.data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || 'Устройство Tuya'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'} online={session.data?.snapshot.online} />}>
+    {camera && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined} />}
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><div className="control-actions">
       {specs.some(spec => spec.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || editingBusy || !session.readOK} onApply={() => void drafts.apply(changes => session.execute(async () => {
+        changes.forEach(change=>ensureStorage(change.spec));
         const commands = cloudBatchCommands(changes.map(change => ({spec:change.spec,value:change.value!})), session.data!.definitions, session.data!.snapshot.status);
         const result = await api.sendDeviceCommands(device.id, provider, commands);
         if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
@@ -87,7 +95,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     </details>
     {session.data && !session.data.snapshot.online && <p className="saved-summary">Tuya сообщает, что устройство не в сети. Можно обновить статус или отправить команду; результат покажет сервис.</p>}
     {primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
-    {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key))} renderField={field} />}
+    {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
     {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.filter(spec => !pairedTimers.has(spec.key)).map(basicField)}</div>}
     {settings.length > 0 && <details className="cloud-properties additional-settings"><summary>Дополнительные настройки</summary><div className="capability-grid">{settings.map(spec => field(spec))}</div></details>}
     {schedules.length > 0 && <section className="light-schedules" aria-label="Расписания света"><h3>Расписания света</h3><div className="capability-grid">{schedules.map(spec => field(spec))}</div></section>}

@@ -1,4 +1,5 @@
 import type { ControlSpec } from './controls';
+import type { JsonValue } from './api';
 
 // Tuya's standard camera DP names. Availability and writable ranges still come
 // exclusively from the selected device's API definitions.
@@ -29,12 +30,12 @@ export const CAMERA_OPTIONS: Record<string, Record<string, string>> = {
 export const CAMERA_HELP: Record<string, string> = {
   basic_private: 'Режим приватности камеры. В этом режиме просмотр видео может быть недоступен.',
   basic_anti_flicker: 'Частота электросети помогает уменьшить мерцание от искусственного освещения.',
-  humanoid_filter: 'Распознавание человека средствами самой камеры.',
+  humanoid_filter: 'Камера предоставляет параметр обнаружения человека. API не сообщает, нужна ли подписка и активирована ли функция. Наличие переключателя не подтверждает доступность распознавания; условия проверьте в Smart Life.',
   record_switch: 'Запись выполняется камерой на установленную карту памяти.',
   record_mode: 'Запись по событиям или непрерывная запись на карту памяти.',
   sd_storge: 'Камера сообщает общую, занятую и свободную ёмкость карты в своём формате.',
   sd_format: 'Форматирование удаляет записи с карты памяти.',
-  motion_area: 'Область, сохранённая камерой. Здесь доступен формат устройства; редактор области по изображению пока не реализован.',
+  motion_area: 'Область изображения, в которой камера обнаруживает движение.',
 };
 
 export const CAMERA_QUICK_LABELS: Record<string, string> = {
@@ -43,9 +44,19 @@ export const CAMERA_QUICK_LABELS: Record<string, string> = {
 
 const GROUPS = [
   { title:'Изображение и звук', keys:['basic_private','basic_nightvision','basic_flip','basic_osd','basic_anti_flicker','basic_indicator','basic_wdr','basic_shimmer','basic_device_volume'] },
-  { title:'Обнаружение и оповещения', keys:['motion_switch','motion_sensitivity','humanoid_filter','motion_area_switch','decibel_switch','decibel_sensitivity','siren_switch'] },
+  { title:'Обнаружение и оповещения', keys:['motion_switch','motion_sensitivity','humanoid_filter','motion_area_switch','motion_area','decibel_switch','decibel_sensitivity','siren_switch'] },
   { title:'Запись и карта памяти', keys:['record_switch','record_mode','record_loop','sd_status','sd_storge','sd_format_state'] },
 ];
+
+export function cameraStorage(status:Record<string,JsonValue>) {
+  // sd_status is a categorical code, not a scaled measurement. Interpret only
+  // the documented raw codes; never infer a mounted card from record_switch.
+  const labels:Record<string,string>={'1':'Карта памяти готова','2':'Ошибка карты памяти','3':'Недостаточно места на карте','4':'Карта памяти форматируется','5':'Карта памяти не установлена'};
+  const code=typeof status.sd_status==='number' || typeof status.sd_status==='string' ? String(status.sd_status) : '';
+  return {ready:code==='1',canFormat:['1','2','3'].includes(code),label:labels[code] || 'Состояние карты памяти неизвестно'};
+}
+
+export const isStorageSetting=(key:string)=>['record_switch','record_mode','record_loop','ipc_mute_record','sd_format'].includes(key);
 
 export function cameraSettingsGroups(specs: ControlSpec[]) {
   const grouped = new Set(GROUPS.flatMap(group => group.keys));

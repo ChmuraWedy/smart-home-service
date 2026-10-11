@@ -37,17 +37,18 @@ describe('main controls on device cards', () => {
     mount({...lamp,category:'sp',controls:{ready:true,definitions:cameraDefinitions,snapshot:state}},route);
     const user=userEvent.setup();
     for (const [index,label] of ['Приватность','Движение','Звук','Сирена'].entries()) {
-      const toggle=await screen.findByRole('switch',{name:label});
+      const toggle=await screen.findByRole(label==='Приватность' ? 'button' : 'switch',{name:label});
       await waitFor(()=>expect(toggle).toBeEnabled());
-      expect(toggle).not.toBeChecked();
+      expect(toggle).toHaveAttribute(label==='Приватность' ? 'aria-pressed' : 'aria-checked','false');
       await user.click(toggle);
       await waitFor(()=>expect(toggle).toBeEnabled());
-      expect(toggle).toBeChecked();
+      expect(toggle).toHaveAttribute(label==='Приватность' ? 'aria-pressed' : 'aria-checked','true');
       expect(writes[index].path).toContain('provider='+route);
       expect(writes[index].body).toEqual({commands:[{code:codes[index],value:true}]});
     }
     expect(writes).toHaveLength(4);
-    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.getAllByRole('switch')).toHaveLength(3);
+    expect(screen.queryByRole('switch',{name:'Приватность'})).toBeNull();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     expect(screen.queryByText('5')).toBeNull();
   });

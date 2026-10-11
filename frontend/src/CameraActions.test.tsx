@@ -10,7 +10,7 @@ function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise
   const functions=[{code:'basic_private',type:'Boolean',values:'{}'}, {code:'humanoid_filter',type:'Boolean',values:'{}'}, {code:'sd_format',type:'Boolean',values:'{}'}, {code:'basic_nightvision',type:'Enum',values:'{"range":["0","1","2"]}'}];
   vi.mocked(fetch).mockImplementation(async (input,options)=>{
     if (options?.method==='POST') {writes.push({path:String(input),body:JSON.parse(String(options.body))}); return pending || json({acknowledged:true});}
-    return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:false,humanoid_filter:false,sd_format:false,basic_nightvision:'0'}});
+    return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:false,humanoid_filter:false,sd_format:false,sd_status:1,basic_nightvision:'0'}});
   });
   render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
   return writes;
@@ -22,6 +22,8 @@ describe('camera action buttons',()=>{
     const privacy=await screen.findByRole('button',{name:'Режим приватности'});
     await waitFor(()=>expect(privacy).toBeEnabled());
     expect(screen.queryByRole('switch',{name:'Режим приватности'})).toBeNull();
+    expect(within(screen.getByRole('region',{name:'Видео камеры'})).getByRole('button',{name:'Режим приватности'})).toBe(privacy);
+    expect(within(screen.getByRole('region',{name:'Изображение и звук'})).queryByRole('button',{name:'Режим приватности'})).toBeNull();
     const night=screen.getByRole('combobox',{name:'Ночное видение'});
     await waitFor(()=>expect(night).toHaveDisplayValue('Авто'));
     await user.selectOptions(night,'1');
@@ -36,9 +38,9 @@ describe('camera action buttons',()=>{
   it('shows the human detection explanation only from its info button and closes it without closing the device',async()=>{
     const writes=mountSettings(),user=userEvent.setup();
     const info=await screen.findByRole('button',{name:'Подробнее: Обнаружение человека'});
-    expect(screen.queryByText('Распознавание человека средствами самой камеры.')).toBeNull();
+    expect(screen.queryByText('Камера предоставляет параметр обнаружения человека. API не сообщает, нужна ли подписка и активирована ли функция. Наличие переключателя не подтверждает доступность распознавания; условия проверьте в Smart Life.')).toBeNull();
     await user.click(info);
-    expect(screen.getByRole('note',{name:'Обнаружение человека'})).toHaveTextContent('Распознавание человека средствами самой камеры.');
+    expect(screen.getByRole('note',{name:'Обнаружение человека'})).toHaveTextContent('Камера предоставляет параметр обнаружения человека. API не сообщает, нужна ли подписка и активирована ли функция. Наличие переключателя не подтверждает доступность распознавания; условия проверьте в Smart Life.');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('note')).toBeNull();
     expect(screen.getByRole('dialog',{name:'Sleep Cam'})).toBeInTheDocument();

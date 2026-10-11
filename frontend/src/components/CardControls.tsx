@@ -17,7 +17,7 @@ function sensorReading(spec: ControlSpec) {
   return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key) && ['number','boolean','enum','text'].includes(spec.kind);
 }
 
-type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; state?: DeviceState; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void };
+type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; state?: DeviceState; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; cameraAction?:ReactNode };
 
 // Only cards entering the viewport request missing metadata. Keep an activated
 // card mounted when it scrolls away so an accepted target is not discarded.
@@ -38,14 +38,14 @@ export function CardControls(props: CardProps) {
   const cached = props.route === 'local' || cloud?.controls?.ready;
   const active = activated || cached;
   return <div className={'card-quick-controls' + (isCamera(cloud?.category) ? ' camera-quick-controls' : '')} ref={container} role="group" aria-label={'Основные параметры: ' + props.device.name}>
-    {active ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={visible && !props.paused} /> : <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>Показать состояние</button>}
+    {active ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={visible && !props.paused} /> : <><button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>Показать состояние</button>{props.cameraAction && <div className="camera-card-actions">{props.cameraAction}</div>}</>}
   </div>;
 }
 
-function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execute, send, onBusy, notice, camera = false }: {
+function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execute, send, onBusy, notice, camera = false, cameraAction }: {
   specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; busy: boolean; readOK: boolean;
   refresh: () => Promise<void>; execute: (send: () => Promise<{text:string}>) => Promise<boolean | undefined>;
-  send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean}; camera?: boolean;
+  send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean}; camera?: boolean; cameraAction?:ReactNode;
 }) {
   const [sending,setSending] = useState(false);
   useEffect(() => { onBusy(sending); return () => onBusy(false); },[sending,onBusy]);
@@ -59,10 +59,11 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
     }) === true; } finally { setSending(false); }
   }
   const powers = camera ? Object.entries(CAMERA_QUICK_LABELS).flatMap(([key,label]) => specs.filter(spec => spec.key === key && spec.kind === 'boolean' && spec.writable).map(spec => ({...spec,label,help:undefined}))) : specs.filter(powerControl), sensors = camera ? [] : specs.filter(sensorReading);
-  if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
-  const field = (spec:ControlSpec, headingActions?:ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
+  if (!busy && readOK && !powers.length && !sensors.length && !notice.error && !cameraAction) return null;
+  const privacy=camera ? powers.find(spec=>spec.key==='basic_private') : undefined;
+  const field = (spec:ControlSpec, headingActions?:ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower booleanButton={camera && spec.key==='basic_private'} buttonText={camera && spec.key==='basic_private' ? 'Приватность' : undefined} disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
   return <>
-    <div className={"card-primary-controls" + (powers.length === 1 && /^(switch|switch_led)$/.test(powers[0].key) ? " single-power" : "")}>{powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+    <div className={"card-primary-controls" + (powers.length === 1 && /^(switch|switch_led)$/.test(powers[0].key) ? " single-power" : "")}>{powers.filter(spec=>spec!==privacy).map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       {!!sensors.length && <div className="card-sensor-values">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? ' · Устарело' : '');
@@ -70,11 +71,12 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
       })}</div>}
       <button className="secondary card-refresh" aria-label="Обновить параметры" title="Обновить параметры" disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
+    {camera && <div className="camera-card-actions">{privacy && <div className="camera-card-privacy">{field(privacy)}</div>}{cameraAction}</div>}
     {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
   </>;
 }
 
-function CloudCardControls({api,cloud,provider,now,visible,onAuthError,onBusy}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
+function CloudCardControls({api,cloud,provider,now,visible,onAuthError,onBusy,cameraAction}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
   const metadata = useMemo(() => ({value:cloud.controls?.ready ? cloud.controls.definitions : null as CloudFunctions | null}),[api,cloud.id,provider]);
   const initial = useRef(cloud.controls?.snapshot);
   const checked = (snapshot:CloudSnapshot) => {
@@ -91,7 +93,7 @@ function CloudCardControls({api,cloud,provider,now,visible,onAuthError,onBusy}: 
   const poll = useCallback(async (current:{definitions:CloudFunctions;snapshot:CloudSnapshot},signal:AbortSignal) => ({...current,snapshot:checked(await api.deviceSnapshot(cloud.id,provider,signal,false))}),[api,cloud.id,provider]);
   const session = useControlSession(load,onAuthError,provider === 'sharing' && visible ? poll : undefined);
   const specs = session.data ? cloudSpecs(session.data.definitions,session.data.snapshot) : [];
-  return <QuickFields specs={specs} camera={isCamera(cloud.category)} reading={spec => session.data ? cloudReading(spec,session.data.snapshot.status[spec.key],session.data.snapshot.status_observations?.[spec.key]) : undefined} now={now} local={false} busy={session.busy} readOK={session.readOK} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
+  return <QuickFields specs={specs} camera={isCamera(cloud.category)} cameraAction={cameraAction} reading={spec => session.data ? cloudReading(spec,session.data.snapshot.status[spec.key],session.data.snapshot.status_observations?.[spec.key]) : undefined} now={now} local={false} busy={session.busy} readOK={session.readOK} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
     const data = session.data!;
     const result = await api.sendDeviceCommands(cloud.id,provider,cloudBatchCommands(changes,data.definitions,data.snapshot.status));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');

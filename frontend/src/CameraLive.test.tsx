@@ -196,11 +196,11 @@ describe('camera live viewing',()=>{
     vi.mocked(fetch).mockImplementation(async (input,options)=>{
       if (options?.method==='POST') return json({acknowledged:true,state_confirmed:false});
       if (String(input).includes('/functions')) return json({device_id:'camera',functions,status_range:[{code:'sd_status',type:'Integer',values:'{"min":1,"max":5,"scale":0,"step":1}'}]});
-      return json({device_id:'camera',online:true,source:'cloud',status:{basic_private:false,basic_nightvision:'0',motion_switch:true,record_mode:'1',sd_status:5,sd_format:false,vendor_setting:false}});
+      return json({device_id:'camera',online:true,source:'cloud',status:{basic_private:false,basic_nightvision:'0',motion_switch:true,record_mode:'1',sd_status:1,sd_format:false,vendor_setting:false}});
     });
     render(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const image=await screen.findByRole('region',{name:'Изображение и звук'});
-    expect(within(image).getByRole('button',{name:'Режим приватности'})).toHaveAttribute('aria-pressed','false');
+    expect(within(screen.getByRole('region',{name:'Видео камеры'})).getByRole('button',{name:'Режим приватности'})).toHaveAttribute('aria-pressed','false');
     await waitFor(()=>expect(within(image).getByRole('combobox',{name:'Ночное видение'})).toHaveDisplayValue('Авто'));
     expect(within(screen.getByRole('region',{name:'Обнаружение и оповещения'})).getByRole('switch',{name:'Обнаружение движения'})).toBeChecked();
     const storage=screen.getByRole('region',{name:'Запись и карта памяти'});

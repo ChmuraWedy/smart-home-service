@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
 import type Hls from 'hls.js';
+import type { ReactNode } from 'react';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
 function resolutionLabel(width:number, height:number) {
   return (Math.min(width,height) >= 720 ? 'HD' : 'SD') + ' · ' + width + '×' + height;
 }
 
-export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false, networkSignal }: {
-  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean; networkSignal?: string;
+export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false, networkSignal, headingActions, overlay }: {
+  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode;
 }) {
   const video = useRef<HTMLVideoElement>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
@@ -19,6 +20,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   const [levels,setLevels] = useState<VideoLevel[]>([]), [selectedLevel,setSelectedLevel] = useState(-1);
   const [resolution,setResolution] = useState(''), [speed,setSpeed] = useState<number | null>(null);
   const [playback,setPlayback] = useState('Подключение');
+  const [aspect,setAspect] = useState(16/9);
   function resetMetrics() { setLevels([]); setSelectedLevel(-1); setResolution(''); setSpeed(null); setPlayback('Подключение'); }
   function stop() {
     pending.current?.abort(); pending.current = null;
@@ -38,7 +40,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       setError(true); setMessage('Не удалось воспроизвести видео. Попробуйте подключиться заново.'); setSource(null); resetMetrics();
     };
     const timeout = window.setTimeout(fail, 45_000);
-    const dimensions = () => { if (element.videoWidth > 0 && element.videoHeight > 0) setResolution(resolutionLabel(element.videoWidth,element.videoHeight)); };
+    const dimensions = () => { if (element.videoWidth > 0 && element.videoHeight > 0) {setResolution(resolutionLabel(element.videoWidth,element.videoHeight)); setAspect(element.videoWidth/element.videoHeight);} };
     const playing = () => { window.clearTimeout(timeout); setMessage('Прямой эфир'); setPlayback('Воспроизводится'); dimensions(); };
     const waiting = () => setPlayback('Буферизация'), paused = () => setPlayback('Пауза');
     element.addEventListener('playing', playing);
@@ -101,7 +103,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   useEffect(() => { if (autoStart) void start(); }, [autoStart]);
   return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label="Видео камеры">
     <div className="camera-live-heading"><h3>Видео камеры</h3>
-      {source || loading ? <button className="secondary compact" onClick={stop}>Остановить</button> : <button className="compact" onClick={() => void start()}>{error ? 'Подключиться заново' : 'Смотреть видео'}</button>}
+      <div className="camera-live-actions">{headingActions}{source || loading ? <button className="secondary compact" onClick={stop}>Остановить</button> : <button className="compact" onClick={() => void start()}>{error ? 'Подключиться заново' : 'Смотреть видео'}</button>}</div>
     </div>
     {!compact && <div className="camera-stream-info" aria-label="Качество видео и связи">
       <label>HD/SD <select aria-label="Качество видео HD/SD" value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
@@ -115,8 +117,10 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       <span title={networkSignal ? 'Последнее показание сигнала, сообщённое камерой.' : 'Подключение не предоставило уровень сигнала камеры.'}>Wi-Fi: {networkSignal || 'Нет данных'}</span>
       <p className="help">{!source ? 'Доступные варианты HD/SD появятся после запуска видео.' : levels.length < 2 ? 'Переключение HD/SD недоступно для этого потока.' : 'Качество выбирается из вариантов видеопотока.'}</p>
     </div>}
-    {compact && !source && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
-    {source && <video ref={video} controls muted autoPlay playsInline preload="none" aria-label="Прямой эфир камеры" />}
+    {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
+    {(source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
+      {source ? <video ref={video} controls={!overlay} muted autoPlay playsInline preload="none" aria-label="Прямой эфир камеры" /> : <div className="camera-area-placeholder">Для изображения нажмите «Смотреть видео»</div>}{overlay}
+    </div>}
     <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{message}</p>
   </section>;
 }
