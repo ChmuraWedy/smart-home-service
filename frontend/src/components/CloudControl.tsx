@@ -17,6 +17,7 @@ import { hasScheduleWizard } from './ScheduleWizard';
 import { ChannelControl, channelTimer } from './ChannelControl';
 import type { ReactNode } from 'react';
 import { CameraLive } from './CameraLive';
+import { CameraSettings } from './CameraSettings';
 
 export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; onClose: () => void; onAuthError: () => void;
@@ -46,8 +47,10 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   const now = useClock(), drafts = useControlDrafts();
   const definitions = session.data ? labels ? withChannelLabels(session.data.definitions, labels) : session.data.definitions : null;
   const specs = session.data && definitions ? cloudSpecs(definitions, session.data.snapshot) : [];
-  const settings = specs.filter(spec => /^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key));
-  const basic = specs.filter(spec => !spec.advanced && !hasLightEffectWizard(spec) && !settings.includes(spec) && !isBattery(spec.key)), schedules = specs.filter(hasScheduleWizard), effects = specs.filter(hasLightEffectWizard), advanced = specs.filter(spec => spec.advanced && !settings.includes(spec) && !hasScheduleWizard(spec) && !hasLightEffectWizard(spec));
+  const camera = isCamera(device.category);
+  const regularSpecs = camera ? [] : specs;
+  const settings = regularSpecs.filter(spec => /^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key));
+  const basic = regularSpecs.filter(spec => !spec.advanced && !hasLightEffectWizard(spec) && !settings.includes(spec) && !isBattery(spec.key)), schedules = regularSpecs.filter(hasScheduleWizard), effects = regularSpecs.filter(hasLightEffectWizard), advanced = regularSpecs.filter(spec => spec.advanced && !settings.includes(spec) && !hasScheduleWizard(spec) && !hasLightEffectWizard(spec));
   const field = (spec: ControlSpec, headingActions?: ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} stage={drafts.stage} reading={cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={editingBusy || session.busy || !session.readOK} onSend={value => session.execute(async () => {
     const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, session.data!.definitions));
     if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
@@ -73,6 +76,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     </details>
     {session.data && !session.data.snapshot.online && <p className="saved-summary">Tuya сообщает, что устройство не в сети. Можно обновить статус или отправить команду; результат покажет сервис.</p>}
     {primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
+    {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key))} renderField={field} />}
     {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.filter(spec => !pairedTimers.has(spec.key)).map(basicField)}</div>}
     {settings.length > 0 && <details className="cloud-properties additional-settings"><summary>Дополнительные настройки</summary><div className="capability-grid">{settings.map(spec => field(spec))}</div></details>}
     {schedules.length > 0 && <section className="light-schedules" aria-label="Расписания света"><h3>Расписания света</h3><div className="capability-grid">{schedules.map(spec => field(spec))}</div></section>}

@@ -1027,3 +1027,5 @@ footer {
 .camera-live-compact video { max-height:240px; }
 .camera-live-compact > p { font-size:11px; }
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:#080d13; border-radius:10px; color:#9eb5cc; font-size:30px; }
+.camera-setting-group { margin:20px 0; }
+.camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:#9eb5cc; }

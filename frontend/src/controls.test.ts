@@ -7,6 +7,25 @@ const definitions = (functions: CloudFunction[]): CloudFunctions => ({ device_id
 const mode = fn('work_mode', 'Enum', { range: ['white', 'colour'] });
 
 describe('metadata-driven controls', () => {
+  it('translates documented camera modes only for their exact DP and preserves advertised values', () => {
+    for (const [key,range,labels] of [
+      ['basic_nightvision',['0','1','2'],['Авто','Выключено','Включено']],
+      ['basic_anti_flicker',['0','1','2'],['Выключено','50 Гц','60 Гц']],
+      ['motion_sensitivity',['0','1','2'],['Низкая','Средняя','Высокая']],
+      ['decibel_sensitivity',['0','1'],['Низкая','Высокая']],
+      ['record_mode',['1','2'],['По событиям','Непрерывно']],
+    ] as const) {
+      const definition=fn(key,'Enum',{range});
+      const spec=cloudSpec(definition,true);
+      range.forEach((value,index)=>{
+        expect(optionLabel(value,key)).toBe(labels[index]);
+        expect(cloudCommands(spec,value,definitions([definition]))).toEqual([{code:key,value}]);
+        expect(optionLabel(value,'vendor_mode')).toBe(value);
+      });
+      expect(optionLabel('9',key)).toBe('9');
+      expect(()=>cloudCommands(spec,'9',definitions([definition]))).toThrow();
+    }
+  });
   it('localizes relay settings without translating command values or unrelated enums', () => {
     const relay = fn('relay_status', 'Enum', { range: ['power_off', 'power_on', 'last'] });
     const spec = cloudSpec(relay, true);

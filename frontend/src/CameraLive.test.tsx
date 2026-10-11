@@ -143,4 +143,43 @@ describe('camera live viewing',()=>{
     await screen.findByText('Последнее известное состояние в облаке. Обновите статус для получения нового снимка.');
     expect(vi.mocked(fetch).mock.calls.every(([,options])=>options?.method!=='POST')).toBe(true);
   });
+  it('groups only advertised camera settings and sends edited original mode values together',async()=>{
+    const functions=[
+      {code:'basic_private',type:'Boolean',values:'{}'},
+      {code:'basic_nightvision',type:'Enum',values:'{"range":["0","1","2"]}'},
+      {code:'motion_switch',type:'Boolean',values:'{}'},
+      {code:'record_mode',type:'Enum',values:'{"range":["1","2"]}'},
+      {code:'sd_format',type:'Boolean',values:'{}'},
+      {code:'vendor_setting',type:'Boolean',values:'{}'},
+    ];
+    vi.mocked(fetch).mockImplementation(async (input,options)=>{
+      if (options?.method==='POST') return json({acknowledged:true,state_confirmed:false});
+      if (String(input).includes('/functions')) return json({device_id:'camera',functions,status_range:[{code:'sd_status',type:'Integer',values:'{"min":1,"max":5,"scale":0,"step":1}'}]});
+      return json({device_id:'camera',online:true,source:'cloud',status:{basic_private:false,basic_nightvision:'0',motion_switch:true,record_mode:'1',sd_status:5,sd_format:false,vendor_setting:false}});
+    });
+    render(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const image=await screen.findByRole('region',{name:'Изображение и звук'});
+    expect(within(image).getByRole('switch',{name:'Режим приватности'})).not.toBeChecked();
+    await waitFor(()=>expect(within(image).getByRole('combobox',{name:'Ночное видение'})).toHaveDisplayValue('Авто'));
+    expect(within(screen.getByRole('region',{name:'Обнаружение и оповещения'})).getByRole('switch',{name:'Обнаружение движения'})).toBeChecked();
+    const storage=screen.getByRole('region',{name:'Запись и карта памяти'});
+    expect(within(storage).getByRole('combobox',{name:'Режим записи'})).toHaveDisplayValue('По событиям');
+    expect(screen.getAllByRole('region',{name:'Состояние карты памяти'})).toHaveLength(1);
+    expect(within(storage).queryByRole('switch',{name:'Форматирование карты памяти'})).toBeNull();
+    expect(screen.queryByRole('switch',{name:'Обнаружение человека'})).toBeNull();
+    expect(screen.queryByText('Эффекты и дополнительные параметры')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.every(([,options])=>options?.method!=='POST')).toBe(true);
+    const user=userEvent.setup();
+    await user.click(screen.getByText('Дополнительные параметры камеры',{exact:true}));
+    expect(screen.getByRole('switch',{name:'vendor setting'})).toBeEnabled();
+    expect(screen.getByText('Форматирование удаляет записи с карты памяти.')).toBeInTheDocument();
+    await user.selectOptions(within(image).getByRole('combobox',{name:'Ночное видение'}),'1');
+    await user.selectOptions(within(storage).getByRole('combobox',{name:'Режим записи'}),'1');
+    await user.click(screen.getByRole('button',{name:/Применить/}));
+    await waitFor(()=>expect(vi.mocked(fetch).mock.calls.some(([,options])=>options?.method==='POST')).toBe(true));
+    const [path,options]=vi.mocked(fetch).mock.calls.find(([,options])=>options?.method==='POST')!;
+    expect(String(path)).toContain('provider=sharing');
+    expect(JSON.parse(String(options?.body)).commands).toEqual(expect.arrayContaining([{code:'basic_nightvision',value:'1'},{code:'record_mode',value:'2'}]));
+    expect(JSON.parse(String(options?.body)).commands).toHaveLength(2);
+  });
 });
