@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ControlCenter } from './components/ControlCenter';
@@ -36,6 +36,46 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it.each(['name','surface'])('opens details from the card %s using the selected route',async target=>{
+    const calls=server(),user=userEvent.setup();
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:local.name});
+    await user.selectOptions(within(card).getByRole('combobox'),'developer');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(target==='name' ? within(card).getByRole('heading',{name:local.name}) : card);
+    expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
+    await waitFor(()=>expect(calls.some(call=>call.path.endsWith('/functions?provider=developer'))).toBe(true));
+    expect(calls.filter(call=>call.method==='POST')).toEqual([]);
+  });
+
+  it('keeps quick controls, labels and refresh separate from card navigation and blocks opening during a command',async()=>{
+    const calls=server(),original=vi.mocked(fetch).getMockImplementation()!,user=userEvent.setup();
+    let finish!:(value:Response)=>void;
+    const pending=new Promise<Response>(resolve=>{finish=resolve;});
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      const url=new URL(String(input));
+      if (url.pathname.endsWith('/cloud/devices')) return json([{...shared,controls:{ready:true,definitions:{device_id:shared.id,functions:[{code:'switch_led',type:'Boolean',values:{}}]},snapshot:{device_id:shared.id,online:true,source:'cloud',status:{switch_led:false}}}}]);
+      if (init?.method==='POST') {calls.push({path:url.pathname+url.search,method:'POST',body:JSON.parse(String(init.body))}); return pending;}
+      return original(input,init);
+    });
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:local.name}),power=await within(card).findByRole('switch',{name:'Питание'});
+    await waitFor(()=>expect(power).toBeEnabled());
+    await user.click(within(card).getByRole('button',{name:'Обновить параметры'}));
+    await waitFor(()=>expect(power).toBeEnabled());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(within(card).getByText('Питание',{exact:true}));
+    await waitFor(()=>expect(power).toBeDisabled());
+    await user.click(card);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(calls.filter(call=>call.method==='POST')).toHaveLength(1);
+    await act(async()=>finish(json({acknowledged:true})));
+    await waitFor(()=>expect(power).toBeEnabled());
+    await user.click(within(card).getByRole('heading',{name:local.name}));
+    expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
+    expect(calls.filter(call=>call.method==='POST')).toHaveLength(1);
+  });
+
   it('merges physical IDs across local and both cloud providers, never equal names or numeric record IDs', () => {
     const sameName = { ...shared, id: 'another-physical-lamp', name: local.name };
     const records = mergeDevices([local], { sharing: [shared, sameName], developer: [developer] });

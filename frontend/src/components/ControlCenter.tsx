@@ -14,11 +14,17 @@ import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePr
 import { useTopology } from '../use-topology';
 import { CardControls } from './CardControls';
 import { CameraLive } from './CameraLive';
+import type { MouseEvent } from 'react';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
 const PAGE_SIZE = 24;
 const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
+
+function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
+  if (event.defaultPrevented || !(event.target instanceof Element) || event.target.closest('button,a,input,select,textarea,label,summary,video,audio,[role="button"],[role="switch"],[contenteditable="true"],.camera-live') || window.getSelection()?.toString()) return;
+  open();
+}
 
 function DeviceCard({ api, device, state, room, now, paused, onAuthError, onCommandBusy, onOpen, onAdd }: {
   api: HomeApi; device: UnifiedDevice; state?: DeviceState; room: string; now: number; paused: boolean; onAuthError: () => void; onCommandBusy: (id:string,busy:boolean) => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
@@ -38,7 +44,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const postponed = ['tracer focus 3','workgtzb'].includes(device.name.trim().toLocaleLowerCase());
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
-  return <li className="device-card" aria-label={device.name}>
+  return <li className="device-card" aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
     <header className="device-heading device-tile-layout">
       <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div></div>
@@ -158,7 +164,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
       <div className="control-filters"><label>Здание<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); setPage(0); }}><option value="">Все здания</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Комната<select value={room} onChange={event => { setRoom(event.target.value); setPage(0); }}><option value="">Все комнаты</option><option value="none">Без комнаты</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>Поиск по названию, алиасу или ID<input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder="Найти устройство или группу" /></label></div>
       {busy && <p role="status" className="help">Загружаем список…</p>}{current?.errors.map(error => <p key={error} role="alert" className="field-error">{error}</p>)}
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? 'Ничего не найдено' : 'Устройств пока нет'}</h3><p>{devices.length || inventory?.groups.length ? 'Измените фильтры или поисковый запрос.' : sharingReady || developerReady ? 'Добавьте устройства в Smart Life и обновите список.' : 'Подключите аккаунт Tuya, чтобы увидеть свои устройства.'}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>Настроить подключение</button>}</div>}
-      <ul className="device-grid local-grid">{visible.map(entry => entry.kind === 'group' ? <li className="device-card group-card" key={'group-' + entry.group.id}>
+      <ul className="device-grid local-grid">{visible.map(entry => entry.kind === 'group' ? <li className="device-card group-card" key={'group-' + entry.group.id} onClick={event=>openCard(event,()=>choose(entry))}>
         <p className="eyebrow">Группа · {entry.group.device_ids.length} устройств</p><h3>{entry.group.name}</h3><p className="reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : 'Состояние неизвестно'}</p><p className="help">В домашней сети</p><button className="secondary compact full-width" onClick={() => choose(entry)}>Открыть группу</button>
       </li> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>Назад</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>Далее</button></div>}

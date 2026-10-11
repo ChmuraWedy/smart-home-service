@@ -844,7 +844,7 @@ footer {
 .control-header-actions .control-dismiss,.control-header-actions .control-information { width:44px; height:44px; flex:none; padding:10px; display:grid; place-items:center; border-radius:50%; }
 .device-grid.local-grid { align-items:start; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); }
 /* List tiles show primary actions; the full editor stays in the dialog. */
-.device-card { padding:8px 12px 12px; }
+.device-card { padding:8px 12px 12px; cursor:pointer; }
 .device-heading { align-items:flex-start; margin-bottom:8px; gap:9px; }
 .device-symbol { flex:none; display:grid; place-items:center; padding:6px; border-radius:8px; }
 .device-type-icon { width:24px; height:24px; }
@@ -1029,13 +1029,10 @@ footer {
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:#080d13; border-radius:10px; color:#9eb5cc; font-size:30px; }
 .camera-setting-group { margin:20px 0; }
 .camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:#9eb5cc; }
-.device-card-top .camera-quick-controls { grid-column:1 / -1; }
-.device-card-top:has(.camera-quick-controls) .device-symbol { grid-row:1; }
-.device-card-top .camera-quick-controls .card-primary-controls { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
-.device-card-top .camera-quick-controls .capability-row { display:flex; flex-direction:column; align-items:center; gap:3px; }
-.device-card-top .camera-quick-controls .capability-label-line { min-height:24px; justify-content:center; text-align:center; }
-.device-card-top .camera-quick-controls .capability-heading h3 { font-size:10px; line-height:1.2; white-space:normal; overflow-wrap:anywhere; }
-.device-card-top .camera-quick-controls .power-actions { justify-content:center; }
+.device-card-top .camera-quick-controls .card-primary-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 8px; }
+.device-card-top .camera-quick-controls .capability-row { grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; }
+.device-card-top .camera-quick-controls .capability-label-line { justify-content:flex-end; text-align:right; }
+.device-card-top .camera-quick-controls .capability-heading h3 { font-size:11px; line-height:1.2; white-space:normal; overflow-wrap:anywhere; }
 .mode-button[aria-pressed=true] { border-color:#77b4ef; color:#a9d1ff; }
 .camera-format-dialog { max-width:480px; }
 .camera-format-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:24px; }

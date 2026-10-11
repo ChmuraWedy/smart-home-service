@@ -89,6 +89,8 @@ describe('camera live viewing',()=>{
     await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(card.querySelector('.camera-live-compact')).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Прямой эфир камеры'));
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream')).map(([input])=>String(input))).toEqual(['http://api.test/api/v1/cloud/devices/camera/stream?provider=sharing']);
     await user.click(within(card).getByRole('button',{name:'Свернуть видео камеры'}));
     expect(hls.destroy).toHaveBeenCalledTimes(1);
