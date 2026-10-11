@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
 import { CameraLive } from './components/CameraLive';
 import { CloudControl } from './components/CloudControl';
+import { ControlCenter } from './components/ControlCenter';
+import { HomeApi } from './home-api';
 
 const hls = vi.hoisted(() => ({ destroy:vi.fn(), load:vi.fn(), attach:vi.fn(), handlers:{} as Record<string, (...args:any[])=>void>, supported:true }));
 vi.mock('hls.js', () => ({default:class {
@@ -18,6 +20,18 @@ const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{statu
 function mount(provider:'sharing'|'developer'='sharing',onAuthError=vi.fn()) {
   return render(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider={provider} onAuthError={onAuthError} />);
 }
+function mountTiles() {
+  vi.mocked(fetch).mockImplementation(async (input) => {
+    const path=new URL(String(input)).pathname;
+    if (path.endsWith('/stream')) return json({device_id:'camera',type:'hls',url});
+    if (path.endsWith('/cloud/topology')) return json({synced_at:null,warnings:0,placements:[],job:{status:'idle',processed:0,total:0,message:null}});
+    if (path.endsWith('/cloud/devices')) return json([{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}]);
+    if (path.endsWith('/functions')) return json({device_id:'camera',functions:[]});
+    if (path.endsWith('/status')) return json({device_id:'camera',online:true,source:'cloud',status:{}});
+    return json([]);
+  });
+  return render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+}
 beforeEach(()=>{
   hls.supported=true; hls.handlers={};
   vi.spyOn(HTMLMediaElement.prototype,'canPlayType').mockReturnValue('');
@@ -28,6 +42,40 @@ beforeEach(()=>{
 });
 
 describe('camera live viewing',()=>{
+  it('expands a main tile into live video without opening details and destroys the player on collapse',async()=>{
+    mountTiles(); const user=userEvent.setup();
+    const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
+    expect(hls.attach).not.toHaveBeenCalled();
+    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(card.querySelector('.camera-live-compact')).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream')).map(([input])=>String(input))).toEqual(['http://api.test/api/v1/cloud/devices/camera/stream?provider=sharing']);
+    await user.click(within(card).getByRole('button',{name:'Свернуть видео камеры'}));
+    expect(hls.destroy).toHaveBeenCalledTimes(1);
+    expect(within(card).queryByRole('region',{name:'Видео камеры'})).toBeNull();
+    expect(within(card).getByRole('button',{name:'Показать видео камеры'})).toHaveAttribute('aria-expanded','false');
+  });
+  it('stops and collapses inline viewing on route changes and opening details without restarting on close',async()=>{
+    mountTiles(); const user=userEvent.setup();
+    const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
+    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalledTimes(1));
+    await user.selectOptions(within(card).getByRole('combobox'),'developer');
+    expect(hls.destroy).toHaveBeenCalledTimes(1);
+    expect(within(card).queryByRole('region',{name:'Видео камеры'})).toBeNull();
+    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalledTimes(2));
+    const streams=()=>vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream'));
+    expect(String(streams()[1][0])).toContain('provider=developer');
+    await user.click(within(card).getByRole('button',{name:'Подробнее'}));
+    expect(hls.destroy).toHaveBeenCalledTimes(2);
+    const dialog=screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button',{name:'Смотреть видео'})).toBeEnabled();
+    await user.click(within(dialog).getByRole('button',{name:'Закрыть'}));
+    expect(within(card).queryByRole('region',{name:'Видео камеры'})).toBeNull();
+    expect(streams()).toHaveLength(2);
+  });
   it('does not allocate on opening; starts only the selected route and stops the HLS player',async()=>{
     const view=mount('developer'),user=userEvent.setup();
     expect(fetch).not.toHaveBeenCalled();

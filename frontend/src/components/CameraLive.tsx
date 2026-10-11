@@ -3,8 +3,8 @@ import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
 import type Hls from 'hls.js';
 
-export function CameraLive({ api, deviceId, provider, onAuthError }: {
-  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void;
+export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false }: {
+  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null), pending = useRef<AbortController | null>(null);
   const [source, setSource] = useState<string | null>(null), [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError }: {
   useEffect(() => {
     const hide = () => { if (document.hidden) stop(); };
     document.addEventListener('visibilitychange', hide);
-    return () => { pending.current?.abort(); document.removeEventListener('visibilitychange', hide); };
+    return () => { pending.current?.abort(); pending.current = null; document.removeEventListener('visibilitychange', hide); };
   }, []);
   useEffect(() => {
     const element = video.current;
@@ -68,10 +68,13 @@ export function CameraLive({ api, deviceId, provider, onAuthError }: {
       if (pending.current === controller) { pending.current = null; setLoading(false); }
     }
   }
-  return <section className="camera-live" aria-label="Видео камеры">
+  // Inline instances mount only after the user expands the camera tile.
+  useEffect(() => { if (autoStart) void start(); }, [autoStart]);
+  return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label="Видео камеры">
     <div className="camera-live-heading"><h3>Видео камеры</h3>
       {source || loading ? <button className="secondary compact" onClick={stop}>Остановить</button> : <button className="compact" onClick={() => void start()}>{error ? 'Подключиться заново' : 'Смотреть видео'}</button>}
     </div>
+    {compact && !source && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
     {source && <video ref={video} controls muted autoPlay playsInline preload="none" aria-label="Прямой эфир камеры" />}
     <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{message}</p>
   </section>;
