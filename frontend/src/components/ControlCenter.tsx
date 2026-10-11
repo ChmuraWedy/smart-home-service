@@ -10,7 +10,7 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
-import { BatteryBadge, batteryFromSpecs, DeviceIcon } from './DevicePresentation';
+import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import { CardControls } from './CardControls';
 
@@ -38,7 +38,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
     <header className="device-heading device-tile-layout">
       <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div></div>
-        {!postponed && <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />}
+        {!postponed && (isCamera(cloud?.category) ? <button className="secondary camera-open" onClick={() => onOpen(route)} aria-label="Открыть видео камеры">▷ Видео</button> : <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} />)}
       </div>
       <div className="device-card-identity"><div className="device-card-title"><h3>{device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label="Алиасы устройства">{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}

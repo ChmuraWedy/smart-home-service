@@ -1012,3 +1012,10 @@ footer {
   .device-card:has(.card-refresh) .device-card-identity,
   .device-card:has(.card-refresh) .device-card-footer { padding-right:36px; }
 }
+
+.camera-open { grid-column:2; justify-self:end; padding:6px 10px; font-size:12px; }
+.camera-live { margin:8px 0 20px; }
+.camera-live-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.camera-live-heading h3 { margin:0; font-size:16px; }
+.camera-live video { display:block; width:100%; max-height:65vh; aspect-ratio:16 / 9; background:#080d13; border-radius:10px; object-fit:contain; }
+.camera-live > p { margin:8px 0 0; }

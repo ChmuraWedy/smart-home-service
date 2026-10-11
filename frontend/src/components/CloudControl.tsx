@@ -9,13 +9,14 @@ import { ChannelAliases } from './ChannelAliases';
 import { DeviceNetwork } from './DeviceNetwork';
 import { useControlDrafts } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
-import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
+import { BatteryBadge, batteryFromSpecs, isBattery, isCamera } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
 import { connectionLabel, DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 import { hasLightEffectWizard } from './LightEffectWizard';
 import { hasScheduleWizard } from './ScheduleWizard';
 import { ChannelControl, channelTimer } from './ChannelControl';
 import type { ReactNode } from 'react';
+import { CameraLive } from './CameraLive';
 
 export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; onClose: () => void; onAuthError: () => void;
@@ -56,6 +57,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,session.data.snapshot.status) : device.battery} />} className={device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || 'Устройство Tuya'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'} online={session.data?.snapshot.online} />}>
+    {isCamera(device.category) && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />}
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><div className="control-actions">
       {specs.some(spec => spec.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || editingBusy || !session.readOK} onApply={() => void drafts.apply(changes => session.execute(async () => {
         const commands = cloudBatchCommands(changes.map(change => ({spec:change.spec,value:change.value!})), session.data!.definitions, session.data!.snapshot.status);
@@ -84,7 +86,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     <DeviceNetwork api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />
     {session.data && <details className="cloud-properties"><summary>Свойства устройства</summary><dl>
       <div><dt>ID устройства</dt><dd><code>{device.id}</code></dd></div>
-      <div><dt>Тип</dt><dd>{device.category === 'pir' ? 'Датчик движения' : device.category === 'dj' ? 'Лампа' : device.category || 'Не указан'}</dd></div>
+      <div><dt>Тип</dt><dd>{isCamera(device.category) ? 'Камера' : device.category === 'pir' ? 'Датчик движения' : device.category === 'dj' ? 'Лампа' : device.category || 'Не указан'}</dd></div>
       <div><dt>Подключение</dt><dd>{connectionLabel({route:provider,throughGateway:device.sub,localTransport})}</dd></div>
       <div><dt>Управление</dt><dd>{session.data.definitions.functions.length ? 'Через Tuya' : 'Только просмотр показаний'}</dd></div>
     </dl></details>}

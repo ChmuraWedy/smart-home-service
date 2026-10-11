@@ -638,6 +638,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .topology import router as cloud_router
 
     app.include_router(cloud_router)
+    from .camera_api import router as camera_router
+
+    app.include_router(camera_router)
     from .commissioning import router as commissioning_router
 
     app.include_router(commissioning_router)

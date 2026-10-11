@@ -4,7 +4,9 @@
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "type": "module",
-  "engines": { "node": "^22.22.2 || >=24.15.0" },
+  "engines": {
+    "node": "^22.22.2 || >=24.15.0"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort",
     "build": "tsc --noEmit && vite build",
@@ -12,7 +14,11 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dependencies": { "react": "19.3.0", "react-dom": "19.3.0" },
+  "dependencies": {
+    "hls.js": "^1.7.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
   "devDependencies": {
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
