@@ -844,7 +844,7 @@ footer {
 .control-header-actions .control-dismiss,.control-header-actions .control-information { width:44px; height:44px; flex:none; padding:10px; display:grid; place-items:center; border-radius:50%; }
 .device-grid.local-grid { align-items:start; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); }
 /* List tiles show primary actions; the full editor stays in the dialog. */
-.device-card { padding:12px; }
+.device-card { padding:8px 12px 12px; }
 .device-heading { align-items:flex-start; margin-bottom:8px; gap:9px; }
 .device-symbol { flex:none; display:grid; place-items:center; padding:6px; border-radius:8px; }
 .device-type-icon { width:24px; height:24px; }
@@ -975,7 +975,7 @@ footer {
 
 /* Main tiles: room and connectivity above the primary controls, identity below. */
 .device-tile-layout.device-heading { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin:0; }
-.device-card-top { display:grid; grid-template-columns:36px minmax(0,1fr); align-items:start; gap:6px 8px; min-height:44px; }
+.device-card-top { display:grid; grid-template-columns:36px minmax(0,1fr); align-items:start; gap:4px 8px; min-height:44px; }
 .device-card-top .device-symbol { grid-column:1; grid-row:1 / 3; width:36px; height:36px; padding:6px; }
 .device-card-top .card-quick-controls { grid-column:2; grid-row:2; min-width:0; margin:0; }
 .device-card-top .card-primary-controls { justify-content:flex-end; gap:4px; }
@@ -998,7 +998,7 @@ footer {
 .device-card-identity .alias-tag { font-size:10px; padding:3px 6px; max-width:100%; overflow-wrap:anywhere; }
 .device-card-actions { display:flex; align-items:center; gap:2px; flex:none; }
 .device-card-actions .tile-icon-action { display:grid; place-items:center; width:28px; height:28px; min-height:28px; padding:0; font-size:20px; border:0; background:transparent; color:#9eb5cc; }
-.device-card-context { grid-column:2; grid-row:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px 8px; min-width:0; min-height:26px; }
+.device-card-context { grid-column:2; grid-row:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px 8px; min-width:0; min-height:18px; }
 .device-card:has(.card-refresh) .device-card-identity,
 .device-card:has(.card-refresh) .device-card-footer { padding-right:30px; }
 .device-card-context .device-location { font-size:11px; }
@@ -1010,7 +1010,6 @@ footer {
   .device-card-actions .tile-icon-action { width:36px; min-height:44px; height:44px; }
   .device-card-top .channel-timer-toggle { min-width:36px; width:36px; height:44px; }
   .device-card .card-refresh { width:32px; height:44px; bottom:4px; }
-  .device-card-context { min-height:36px; }
   .device-card:has(.card-refresh) .device-card-identity,
   .device-card:has(.card-refresh) .device-card-footer { padding-right:36px; }
 }
