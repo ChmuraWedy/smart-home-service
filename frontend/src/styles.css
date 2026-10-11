@@ -1029,3 +1029,9 @@ footer {
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:#080d13; border-radius:10px; color:#9eb5cc; font-size:30px; }
 .camera-setting-group { margin:20px 0; }
 .camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:#9eb5cc; }
+.device-card-top .camera-quick-controls .card-primary-controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,125px),1fr)); gap:8px 12px; }
+.device-card-top .camera-quick-controls .capability-heading h3 { white-space:normal; overflow-wrap:anywhere; }
+.camera-stream-info { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin:8px 0 12px; color:#aebed1; font-size:12px; }
+.camera-stream-info label { display:flex; align-items:center; gap:8px; margin:0; }
+.camera-stream-info select { width:auto; max-width:100%; margin:0; padding:6px 8px; font-size:12px; }
+.camera-stream-info > .help { flex-basis:100%; margin:0; font-size:11px; }

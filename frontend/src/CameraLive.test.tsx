@@ -7,10 +7,12 @@ import { CloudControl } from './components/CloudControl';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 
-const hls = vi.hoisted(() => ({ destroy:vi.fn(), load:vi.fn(), attach:vi.fn(), handlers:{} as Record<string, (...args:any[])=>void>, supported:true }));
+const hls = vi.hoisted(() => ({ destroy:vi.fn(), load:vi.fn(), attach:vi.fn(), handlers:{} as Record<string, (...args:any[])=>void>, supported:true, levels:[] as {width:number;height:number;bitrate:number}[], currentLevel:-1 }));
 vi.mock('hls.js', () => ({default:class {
-  static Events = {ERROR:'error',MANIFEST_PARSED:'manifest'};
+  static Events = {ERROR:'error',MANIFEST_PARSED:'manifest',FRAG_LOADED:'fragment'};
   static isSupported() { return hls.supported; }
+  get levels() { return hls.levels; }
+  set currentLevel(value:number) { hls.currentLevel=value; }
   destroy = hls.destroy; loadSource = hls.load; attachMedia = hls.attach;
   on(event:string, handler:(...args:any[])=>void) { hls.handlers[event]=handler; }
 }}));
@@ -33,7 +35,7 @@ function mountTiles() {
   return render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
 }
 beforeEach(()=>{
-  hls.supported=true; hls.handlers={};
+  hls.supported=true; hls.handlers={}; hls.levels=[]; hls.currentLevel=-1;
   vi.spyOn(HTMLMediaElement.prototype,'canPlayType').mockReturnValue('');
   vi.spyOn(HTMLMediaElement.prototype,'play').mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype,'pause').mockImplementation(()=>{});
@@ -42,6 +44,43 @@ beforeEach(()=>{
 });
 
 describe('camera live viewing',()=>{
+  it('selects only actual stream variants, reports playback and download speed, and clears measurements on stop',async()=>{
+    hls.levels=[{width:640,height:360,bitrate:500000},{width:1920,height:1080,bitrate:2000000}];
+    mount(); const user=userEvent.setup();
+    const quality=screen.getByRole('combobox',{name:'Качество видео HD/SD'});
+    expect(quality).toBeDisabled(); expect(screen.getByText('Wi-Fi: Нет данных')).toBeInTheDocument();
+    await user.click(screen.getByRole('button',{name:'Смотреть видео'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
+    await act(async()=>hls.handlers.manifest());
+    expect(quality).toBeEnabled();
+    expect(within(quality).getByRole('option',{name:'SD · 640×360 · 500 кбит/с'})).toBeInTheDocument();
+    await user.selectOptions(quality,'1');
+    expect(hls.currentLevel).toBe(1);
+    await user.selectOptions(quality,'-1'); expect(hls.currentLevel).toBe(-1);
+    const video=screen.getByLabelText('Прямой эфир камеры');
+    Object.defineProperties(video,{videoWidth:{value:1920},videoHeight:{value:1080}});
+    fireEvent.playing(video);
+    expect(screen.getByText('HD · 1920×1080',{exact:true})).toBeInTheDocument();
+    expect(screen.getByText('Видеосвязь: Воспроизводится')).toBeInTheDocument();
+    fireEvent.waiting(video); expect(screen.getByText('Видеосвязь: Буферизация')).toBeInTheDocument();
+    await act(async()=>hls.handlers.fragment('fragment',{frag:{type:'main',stats:{loaded:250000,loading:{start:100,end:1100}}}}));
+    expect(screen.getByText('Загрузка: 250 КБ/с')).toBeInTheDocument();
+    await user.click(screen.getByRole('button',{name:'Остановить'}));
+    expect(quality).toBeDisabled(); expect(screen.getByText('Загрузка: —')).toBeInTheDocument();
+    expect(screen.queryByText('HD · 1920×1080',{exact:true})).toBeNull();
+    expect(screen.getByText('Видеосвязь: Просмотр выключен')).toBeInTheDocument();
+  });
+  it('does not invent an SD variant for a single-quality stream and does not confuse Wi-Fi signal with loading speed',async()=>{
+    hls.levels=[{width:1920,height:1080,bitrate:2000000}];
+    render(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider="sharing" onAuthError={vi.fn()} networkSignal="-55 dBm" />);
+    await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
+    await act(async()=>hls.handlers.manifest());
+    const quality=screen.getByRole('combobox',{name:'Качество видео HD/SD'});
+    expect(quality).toBeDisabled(); expect(within(quality).getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByText('Переключение HD/SD недоступно для этого потока.')).toBeInTheDocument();
+    expect(screen.getByText('Wi-Fi: -55 dBm')).toBeInTheDocument();
+  });
   it('expands a main tile into live video without opening details and destroys the player on collapse',async()=>{
     mountTiles(); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});

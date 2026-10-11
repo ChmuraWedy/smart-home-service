@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, CloudSnapshot, Provider } from '../api';
-import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, withChannelLabels } from '../controls';
+import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceMappings } from './DeviceMappings';
@@ -59,8 +59,10 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
+  const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
+  const networkSignal = signal && session.data ? displayReading(signal,cloudReading(signal,session.data.snapshot.status[signal.key])) : undefined;
   return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,session.data.snapshot.status) : device.battery} />} className={device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || 'Устройство Tuya'} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'} online={session.data?.snapshot.online} />}>
-    {isCamera(device.category) && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />}
+    {camera && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} />}
     <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? 'В сети' : 'Не в сети') : 'Проверяем связь'}</span><div className="control-actions">
       {specs.some(spec => spec.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || editingBusy || !session.readOK} onApply={() => void drafts.apply(changes => session.execute(async () => {
         const commands = cloudBatchCommands(changes.map(change => ({spec:change.spec,value:change.value!})), session.data!.definitions, session.data!.snapshot.status);

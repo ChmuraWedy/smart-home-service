@@ -25,6 +25,39 @@ function mount(cloud=lamp, route:'sharing'|'developer'='sharing') {
 }
 
 describe('main controls on device cards', () => {
+  it.each(['sharing','developer'] as const)('sends the four advertised camera toggles immediately through %s without exposing other settings',async route=>{
+    const codes=['basic_private','motion_switch','decibel_switch','siren_switch'];
+    const cameraDefinitions:CloudFunctions={device_id:'lamp',functions:[...codes.map(code=>({code,type:'Boolean',values:{}})),{code:'sd_format',type:'Boolean',values:{}}],status_range:[{code:'sd_status',type:'Integer',values:{min:1,max:5,scale:0}}]};
+    const state={...snapshot,status:Object.fromEntries([...codes.map(code=>[code,false]),['sd_status',5]])};
+    const writes:{path:string;body:unknown}[]=[];
+    vi.mocked(fetch).mockImplementation(async (input,options)=>{
+      if (options?.method==='POST') {writes.push({path:String(input),body:JSON.parse(String(options.body))}); return json({acknowledged:true});}
+      return json(state);
+    });
+    mount({...lamp,category:'sp',controls:{ready:true,definitions:cameraDefinitions,snapshot:state}},route);
+    const user=userEvent.setup();
+    for (const [index,label] of ['Приватность','Движение','Звук','Сирена'].entries()) {
+      const toggle=await screen.findByRole('switch',{name:label});
+      await waitFor(()=>expect(toggle).toBeEnabled());
+      expect(toggle).not.toBeChecked();
+      await user.click(toggle);
+      await waitFor(()=>expect(toggle).toBeEnabled());
+      expect(toggle).toBeChecked();
+      expect(writes[index].path).toContain('provider='+route);
+      expect(writes[index].body).toEqual({commands:[{code:codes[index],value:true}]});
+    }
+    expect(writes).toHaveLength(4);
+    expect(screen.getAllByRole('switch')).toHaveLength(4);
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
+    expect(screen.queryByText('5')).toBeNull();
+  });
+  it('never turns a camera read-only status or missing function into a main-screen toggle',async()=>{
+    mount({...lamp,category:'sp',controls:{ready:true,definitions:{device_id:'lamp',functions:[{code:'motion_switch',type:'Boolean',values:{}}],status_range:[{code:'siren_switch',type:'Boolean',values:{}}]},snapshot:{...snapshot,status:{motion_switch:false,siren_switch:false}}}});
+    expect(await screen.findByRole('switch',{name:'Движение'})).toBeEnabled();
+    expect(screen.getAllByRole('switch')).toHaveLength(1);
+    expect(screen.queryByRole('switch',{name:'Сирена'})).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('sends power immediately without secondary editors or Apply, and retains its target against an old snapshot', async () => {
     const writes:unknown[]=[];
     vi.mocked(fetch).mockImplementation(async (input,init) => {

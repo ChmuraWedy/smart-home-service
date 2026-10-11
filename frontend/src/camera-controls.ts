@@ -37,6 +37,10 @@ export const CAMERA_HELP: Record<string, string> = {
   motion_area: 'Область, сохранённая камерой. Здесь доступен формат устройства; редактор области по изображению пока не реализован.',
 };
 
+export const CAMERA_QUICK_LABELS: Record<string, string> = {
+  basic_private:'Приватность', motion_switch:'Движение', decibel_switch:'Звук', siren_switch:'Сирена',
+};
+
 const GROUPS = [
   { title:'Изображение и звук', keys:['basic_private','basic_nightvision','basic_flip','basic_osd','basic_anti_flicker','basic_indicator','basic_wdr','basic_shimmer','basic_device_volume'] },
   { title:'Обнаружение и оповещения', keys:['motion_switch','motion_sensitivity','humanoid_filter','motion_area_switch','decibel_switch','decibel_sensitivity','siren_switch'] },
