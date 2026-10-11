@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi, type CloudDevice, type CloudSnapshot, type CloudFunctions } from './api';
@@ -44,14 +44,13 @@ describe('channel timer disclosure',()=>{
     await user.click(screen.getByRole('button',{name:'Применить'}));
     await waitFor(()=>expect(writes).toEqual([{commands:[{code:'countdown_2',value:120}]}]));
   });
-  it('reveals and applies a timer from the main card without switching power',async()=>{
-    const writes=server(),user=userEvent.setup();
+  it('keeps both power channels on the main card and reserves timers for the full editor',async()=>{
+    const writes=server();
     render(<CardControls api={new HomeApi(connection)} device={{id:device.id,name:device.name,cloud:{sharing:device}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
-    await user.click(await screen.findByRole('button',{name:'Таймер канала 1'}));
-    const timer=screen.getByRole('region',{name:'Таймер канала 1'});
-    fireEvent.change(within(timer).getByRole('spinbutton'),{target:{value:'90'}});
+    expect(await screen.findByRole('switch',{name:'Канал 1'})).toHaveAttribute('aria-checked','false');
+    expect(screen.getByRole('switch',{name:'Канал 2'})).toHaveAttribute('aria-checked','true');
+    expect(screen.queryByRole('button',{name:/Таймер канала/})).toBeNull();
+    expect(screen.queryByRole('spinbutton')).toBeNull();
     expect(writes).toEqual([]);
-    await user.click(within(timer).getByRole('button',{name:'Применить'}));
-    await waitFor(()=>expect(writes).toEqual([{commands:[{code:'countdown_1',value:90}]}]));
   });
 });

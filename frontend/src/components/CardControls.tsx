@@ -7,7 +7,7 @@ import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
 import { CapabilityField, ControlFeedback, useControlSession } from './DeviceControls';
 import { isBattery, ParameterIcon } from './DevicePresentation';
-import { ChannelControl, channelTimer } from './ChannelControl';
+import { ChannelControl } from './ChannelControl';
 
 function powerControl(spec: ControlSpec) {
   return spec.writable && spec.kind === 'boolean' && /^(switch|switch_led|switch_[1-9][0-9]*)$/.test(spec.key);
@@ -61,7 +61,7 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
   const field = (spec:ControlSpec, headingActions?:ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower={powerControl(spec)} disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
   return <>
-    <div className={"card-primary-controls" + (powers.length === 1 && /^(switch|switch_led)$/.test(powers[0].key) ? " single-power" : "")}>{powers.map(spec => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,specs)} renderField={field} />)}
+    <div className={"card-primary-controls" + (powers.length === 1 && /^(switch|switch_led)$/.test(powers[0].key) ? " single-power" : "")}>{powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       {!!sensors.length && <div className="card-sensor-values">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? ' · Устарело' : '');
