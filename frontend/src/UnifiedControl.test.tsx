@@ -117,24 +117,22 @@ describe('unified device identity and management', () => {
     expect(screen.getByRole('listitem', { name: 'Только в аккаунте' })).toBeInTheDocument();
   });
 
-  it('keeps deferred devices visible without activating their controls', async () => {
-    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!;
+  it('resumes TRACER FOCUS 3 controls and local setup without sending device commands', async () => {
+    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!, user=userEvent.setup();
     vi.mocked(fetch).mockImplementation(async (input,init) => {
-      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json(['TRACER FOCUS 3'].map((name,index) => ({...shared,id:'deferred-'+index,name})));
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'tracer-real',name:'TRACER FOCUS 3',sub:false}]);
       return original(input,init);
     });
-    const observers:IntersectionObserverCallback[]=[];
-    vi.stubGlobal('IntersectionObserver',class { constructor(callback:IntersectionObserverCallback){observers.push(callback);} observe(){} disconnect(){} });
-    try {
-      render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
-      for (const name of ['TRACER FOCUS 3']) {
-        const card=await screen.findByRole('listitem',{name});
-        expect(within(card).getByText('Настройка отложена')).toBeInTheDocument();
-        expect(within(card).queryByRole('group',{name:'Основные параметры: '+name})).toBeNull();
-      }
-      expect(observers).toHaveLength(0);
-      expect(calls.some(call => /\/functions|\/status/.test(call.path))).toBe(false);
-    } finally { vi.unstubAllGlobals(); }
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:'TRACER FOCUS 3'});
+    expect(within(card).queryByText('Настройка отложена')).toBeNull();
+    expect(within(card).getByRole('group',{name:'Основные параметры: TRACER FOCUS 3'})).toBeInTheDocument();
+    await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
+    expect(screen.getByLabelText('Название')).toHaveValue('TRACER FOCUS 3');
+    expect(screen.getByLabelText('Tuya device ID')).toHaveValue('tracer-real');
+    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('wifi');
+    expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
+    expect(calls.every(call=>call.method==='GET')).toBe(true);
   });
 
   it('resumes WorkGtZb setup from its tile and treats cloud gateways as gateways even with sub=true', async () => {
