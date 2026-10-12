@@ -63,8 +63,8 @@ describe('device survey before registration', () => {
     const calls = server(), user = userEvent.setup();
     render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onLock={vi.fn()} onAuthError={vi.fn()} />);
     const card = await screen.findByRole('listitem', { name: cloudDevice.name });
-    await user.click(within(card).getByRole('button', { name: 'Добавить в дом' }));
-    expect(screen.getByRole('heading', { name: 'Опрос перед добавлением' })).toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
+    expect(screen.getByRole('heading', { name: 'Настроить локальное подключение' })).toBeInTheDocument();
     expect(screen.getByLabelText('Tuya device ID')).toHaveValue(cloudDevice.id);
     expect(screen.getByLabelText('Название')).toHaveValue(cloudDevice.name);
     expect(screen.getByLabelText('Источник показаний')).toHaveValue('local');
@@ -95,11 +95,11 @@ describe('device survey before registration', () => {
     const pollCount = calls.filter(call => call.path.endsWith('/samples')).length;
     await act(() => vi.advanceTimersByTimeAsync(10000));
     expect(calls.filter(call => call.path.endsWith('/samples'))).toHaveLength(pollCount);
-    expect(screen.getByRole('button', { name: 'Сохранить устройство' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить локальное подключение' })).toBeDisabled();
     expect(screen.getByLabelText('Разрешить управление: Питание')).not.toBeChecked();
     await user.click(screen.getByLabelText('Разрешить управление: Питание'));
     await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
-    await user.click(screen.getByRole('button', { name: 'Сохранить устройство' }));
+    await user.click(screen.getByRole('button', { name: 'Сохранить локальное подключение' }));
     expect(calls.find(call => call.path.endsWith('/register'))?.body).toEqual({ name: cloudDevice.name, aliases: ['kitchen_light', 'main_light'], building_id: null, room_id: 2, reviewed: true, writable: ['dp_1'] });
     expect(onClose).toHaveBeenCalledOnce();
     expect(calls.some(call => /commands|set_dps/.test(call.path))).toBe(false);

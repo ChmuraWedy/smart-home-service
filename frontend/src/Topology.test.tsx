@@ -50,7 +50,7 @@ describe('Smart Life topology', () => {
     await user.selectOptions(screen.getByLabelText('Комната'), '2');
     expect(card).toBeInTheDocument();
     await user.selectOptions(within(card).getByRole('combobox'), provider);
-    await user.click(within(card).getByRole('button', { name: 'Добавить в дом' }));
+    await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
     expect(screen.getByLabelText('Здание')).toHaveValue('1');
     expect(screen.getByLabelText('Комната')).toHaveValue('2');
     expect(calls.every(call => call.method === 'GET')).toBe(true);
@@ -64,9 +64,9 @@ describe('Smart Life topology', () => {
       ? new Promise<Response>(resolve => { release = () => resolve(json(topology)); }) : normal(input, init));
     setup(); const user = userEvent.setup();
     const card = await screen.findByRole('listitem', { name: 'Лампа' });
-    expect(within(card).getByRole('button', { name: 'Добавить в дом' })).toBeDisabled();
+    expect(within(card).getByRole('button', { name: 'Настроить локальное подключение' })).toBeDisabled();
     await act(async () => { release(); });
-    await user.click(within(card).getByRole('button', { name: 'Добавить в дом' }));
+    await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
     expect(screen.getByLabelText('Комната')).toHaveValue('2');
   });
 
