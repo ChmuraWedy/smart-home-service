@@ -66,7 +66,7 @@ class TuyaController:
                 lock.release()
 
     def verify_gateway_key(self, device):
-        """Read status without writing DPS or requiring a gateway to expose DPS.
+        """Verify a direct device/gateway key with status only; no DPS writes.
 
         TinyTuya 3.4/3.5 installs a session key only after checking the peer's
         HMAC. For 3.3, accept a decrypted DPS reply or the gateway's decrypted

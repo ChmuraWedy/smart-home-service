@@ -49,9 +49,9 @@ def candidates(devices, gateway_id):
     return result
 
 
-def validate_target(draft):
+def validate_target(draft, *, require_gateway=True):
     if (
-        not draft.is_gateway
+        draft.is_gateway != require_gateway
         or draft.transport != "wifi"
         or draft.parent_id
         or draft.cid
@@ -61,7 +61,7 @@ def validate_target(draft):
     ):
         raise HTTPException(
             422,
-            "Для проверки шлюза нужен его IP в домашней сети (10.x, 172.16–31.x или 192.168.x).",
+            "Для проверки устройства или шлюза нужен его IP в домашней сети (10.x, 172.16–31.x или 192.168.x).",
         )
     if draft.version not in (None, "3.3", "3.4", "3.5"):
         raise HTTPException(
@@ -82,7 +82,7 @@ def discover(controller, draft, pool, clock=time.monotonic):
             if clock() >= deadline:
                 raise HTTPException(
                     504,
-                    "Время проверки истекло. Проверьте IP и доступность шлюза, затем повторите.",
+                    "Время проверки истекло. Проверьте IP и доступность устройства, затем повторите.",
                 )
             verified = DeviceCreate.model_validate(
                 {
@@ -96,5 +96,5 @@ def discover(controller, draft, pool, clock=time.monotonic):
                 return verified, source
     raise HTTPException(
         409,
-        "Ни один ключ не подтверждён. Проверьте IP шлюза и его доступность в домашней сети. Можно ввести ключ вручную.",
+        "Ни один ключ не подтверждён. Проверьте IP устройства и его доступность в домашней сети. Можно ввести ключ вручную.",
     )
