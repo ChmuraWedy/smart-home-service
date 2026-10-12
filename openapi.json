@@ -5647,6 +5647,202 @@
           }
         }
       }
+    },
+    "/api/v1/network/interfaces": {
+      "get": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "List Interfaces",
+        "operationId": "list_interfaces_api_v1_network_interfaces_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/network/scans": {
+      "post": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Start Scan",
+        "operationId": "start_scan_api_v1_network_scans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartNetworkScan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/network/scans/{scan_id}": {
+      "get": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Read Scan",
+        "operationId": "read_scan_api_v1_network_scans__scan_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Stop Scan",
+        "operationId": "stop_scan_api_v1_network_scans__scan_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scan Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/scans/{scan_id}/discover": {
+      "post": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Discover Scan",
+        "operationId": "discover_scan_api_v1_network_scans__scan_id__discover_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8188,6 +8384,21 @@
           "id"
         ],
         "title": "WidgetSelection"
+      },
+      "StartNetworkScan": {
+        "properties": {
+          "interface_address": {
+            "type": "string",
+            "format": "ipvanyaddress",
+            "title": "Interface Address"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "interface_address"
+        ],
+        "title": "StartNetworkScan"
       }
     },
     "securitySchemes": {

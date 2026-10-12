@@ -8,6 +8,8 @@ Web UI вынесен в отдельное **React + TypeScript + Vite** при
 
 Добавлены [прошивка Yellow Display / CYD](firmware/cyd/README.md), [группы и выбор устройств](docs/displays.md), [необязательный User Code + QR вход](docs/qr-login.md), [разбор интеграций Home Assistant](docs/integrations.md) и [возможности редактирования сценариев Tuya](docs/scenes.md). Изменения разделены на локальные Git-коммиты.
 
+Меню **☰ → Сеть и пакеты** открывает [наблюдение за LAN](docs/packet-capture.md#страница-сеть-и-пакеты): IP, Tuya ID, MAC, mDNS/SSDP сервисы, журнал и сохранение JSON-отчёта. Страница не использует Smart Life; Zigbee-радиообмен не просматривается.
+
 ## Быстрый запуск
 
 ```sh

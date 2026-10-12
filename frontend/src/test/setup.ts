@@ -7,6 +7,7 @@ HTMLDialogElement.prototype.close = function () { this.open = false; };
 
 beforeEach(() => {
   localStorage.clear();
+  window.history.replaceState(null, '', '/');
   vi.stubGlobal('fetch', vi.fn());
   URL.createObjectURL = vi.fn(() => 'blob:qr-test');
   URL.revokeObjectURL = vi.fn();

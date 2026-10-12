@@ -1080,3 +1080,49 @@ footer {
 .camera-stream-info label { display:flex; align-items:center; gap:8px; margin:0; }
 .camera-stream-info select { width:auto; max-width:100%; margin:0; padding:6px 8px; font-size:12px; }
 .camera-stream-info > .help { flex-basis:100%; margin:0; font-size:11px; }
+
+.app-menu { position:relative; flex-shrink:0; }
+.app-menu-button { width:44px; height:44px; padding:0; font-size:24px; }
+.app-menu-panel { position:absolute; top:calc(100% + 10px); left:0; z-index:100; display:grid; gap:6px; min-width:220px; padding:10px; background:#1b2633; border:1px solid #435263; border-radius:12px; box-shadow:0 12px 36px #0008; }
+.app-menu-panel button { text-align:left; }
+.app-menu-panel button[aria-current=page] { color:#a4dfcf; border-color:#77b5a7; background:#203b35; }
+.app-header .brand { margin-right:auto; }
+.network-page { margin-top:24px; padding:24px; }
+.network-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.network-heading h1 { margin:0; font-size:26px; }
+.network-heading .eyebrow { margin:0 0 6px; }
+.network-status { font-size:12px; color:#9caebf; white-space:nowrap; }
+.network-status.online { color:#a4dfcf; }
+.network-toolbar { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
+.network-explanation { font-size:13px; color:#adbac8; margin:16px 0; }
+.network-explanation summary,.network-events summary { cursor:pointer; }
+.network-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:24px 0 16px; }
+.network-stats div { display:grid; gap:4px; padding:12px 16px; background:#131d28; border-radius:10px; }
+.network-stats strong { font-size:26px; font-weight:600; }
+.network-stats span { font-size:12px; color:#a6b6c8; }
+.network-filters { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin:20px 0; }
+.network-filters label { display:grid; gap:6px; font-size:13px; }
+.network-page h2 { font-size:18px; margin:20px 0 12px; }
+.network-table-wrap { overflow-x:auto; }
+.network-table { width:100%; border-collapse:collapse; font-size:13px; min-width:650px; }
+.network-table th { text-align:left; color:#a6b6c8; font-weight:500; }
+.network-table th,.network-table td { padding:12px 10px; border-bottom:1px solid #2c3948; vertical-align:top; }
+.network-table td>span,.network-table td>code { display:block; margin-top:4px; }
+.network-table code { font-size:11px; overflow-wrap:anywhere; }
+.network-table .help { font-size:11px; margin:4px 0; }
+.network-events { margin-top:24px; font-size:13px; }
+.network-events ol { list-style:none; padding:0; max-height:350px; overflow:auto; }
+.network-events li { display:flex; flex-wrap:wrap; gap:12px; border-top:1px solid #2c3948; padding:8px 0; font-size:12px; }
+@media(max-width:600px) {
+  .network-page { padding:16px; }
+  .network-heading { flex-direction:column; gap:8px; }
+  .network-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .network-filters { grid-template-columns:1fr; }
+  .network-toolbar button { min-height:44px; flex:1 1 180px; }
+  .app-header { gap:10px; }
+  .app-header .brand-icon { display:none; }
+}
+
+.network-interface { display:flex; align-items:end; gap:12px; margin:16px 0; flex-wrap:wrap; }
+.network-interface label { flex:1 1 280px; display:grid; gap:6px; font-size:13px; }
+.network-interface select { margin:0; }

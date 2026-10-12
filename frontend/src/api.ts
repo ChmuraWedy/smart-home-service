@@ -54,6 +54,20 @@ export type NetworkWatch = {
   last_seen: string | null; packets: number; listening: boolean; ports: number[]; failed_ports: number[];
   remaining_seconds: number; changes: { at: string; previous_ip: string | null; ip: string }[];
 };
+export type NetworkInterface = { name: string; address: string; network: string; broadcast: string };
+export type LanDevice = {
+  ip: string; device_id: string | null; version: string | null; hostname: string | null;
+  mac: string | null; protocols: string[]; services: string[]; packets: number;
+  first_seen: string | null; last_seen: string | null;
+  changes: { at: string; previous_ip: string; ip: string }[];
+};
+export type NetworkScan = {
+  scan_id: string; interface: NetworkInterface | null; devices: LanDevice[];
+  events: { at: string; ip: string; port: number; protocol: string; device_id: string | null }[];
+  packets: number; recognized_packets: number; neighbors_available: boolean | null;
+  discovery_requests: number; truncated: boolean; listening: boolean; ports: number[];
+  failed_ports: number[]; remaining_seconds: number;
+};
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -139,6 +153,11 @@ export class CloudApi {
   startNetworkWatch(id: string, provider: Provider | 'local', signal?: AbortSignal) {
     return this.request<NetworkWatch>('/network/devices/' + encodeURIComponent(id) + '/watch?provider=' + provider, 'POST', {}, signal);
   }
+  networkInterfaces(signal?: AbortSignal) { return this.request<NetworkInterface[]>('/network/interfaces', 'GET', undefined, signal); }
+  startNetworkScan(address: string, signal?: AbortSignal) { return this.request<NetworkScan>('/network/scans', 'POST', { interface_address: address }, signal); }
+  networkScan(id: string, signal?: AbortSignal) { return this.request<NetworkScan>('/network/scans/' + encodeURIComponent(id), 'GET', undefined, signal); }
+  requestNetworkAnnouncements(id: string, signal?: AbortSignal) { return this.request<NetworkScan>('/network/scans/' + encodeURIComponent(id) + '/discover', 'POST', {}, signal); }
+  stopNetworkScan(id: string) { return this.deleteResource('/network/scans/' + encodeURIComponent(id)); }
   networkWatch(id: string, signal?: AbortSignal) { return this.request<NetworkWatch>('/network/watches/' + encodeURIComponent(id), 'GET', undefined, signal); }
   stopNetworkWatch(id: string) { return this.deleteResource('/network/watches/' + encodeURIComponent(id)); }
   saveCode(user_code: string) { return this.json<CodeStatus>('/user-code', 'PUT', { user_code }); }
