@@ -151,7 +151,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   }, [api, visible]);
   function choose(value: Selection) { setSelection({ api, mask, value }); }
   function close() { setSelection(null); setRevision(value => value + 1); }
-  if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} provider={selected.provider} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={close} onAuthError={onAuthError} />;
+  if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} provider={selected.provider} cloudDevices={selected.provider ? cloud[selected.provider] : undefined} gatewayPlacements={Array.from(placements.values())} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={close} onAuthError={onAuthError} />;
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading"><div><p className="eyebrow">Ваш дом</p><h2 id="control-center-heading">Устройства и группы{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div><div className="survey-toolbar"><button className="secondary compact" disabled={!inventory || busy} onClick={() => choose({ kind: 'survey' })}>Настроить локальное устройство</button><button className="secondary compact" disabled={!ready || busy} onClick={() => setRevision(value => value + 1)}>Обновить список</button></div></div>
     {!ready ? <p className="saved-summary">Сначала сохраните доступ к сервису в настройках подключения.</p> : <>

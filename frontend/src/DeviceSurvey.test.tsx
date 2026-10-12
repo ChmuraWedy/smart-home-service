@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { DeviceSurvey } from './components/DeviceSurvey';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
-import type { Inventory, ObservationSession } from './home-api';
+import type { CloudDevice } from './api';
+import type { DeviceDraft, Inventory, ObservationSession } from './home-api';
 
 const connection = { baseUrl: 'http://survey-api.test', token: 'service-key' };
 const cloudDevice = { id: 'lamp-1', name: 'Новая лампа', online: true, has_local_key: true };
@@ -14,9 +15,9 @@ const inventory: Inventory = {
 };
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 
-function server(options: { failedSecond?: boolean; cloud?: boolean; registerFailure?: boolean } = {}) {
+function server(options: { failedSecond?: boolean; cloud?: boolean; registerFailure?: boolean; devices?: CloudDevice[] } = {}) {
   const calls: { path: string; method: string; body?: unknown }[] = [];
-  let samples = 0;
+  let samples = 0, draft: DeviceDraft | undefined;
   const session: ObservationSession = {
     session_id: 'observe-1', device_id: 'lamp-1', mode: options.cloud ? 'cloud' : 'local', expires_in: 900,
     interval_seconds: 3, sample_count: 0, has_local_key: true, readings: [], changes: [],
@@ -29,15 +30,15 @@ function server(options: { failedSecond?: boolean; cloud?: boolean; registerFail
     if (path === '/api/v1/buildings') return json(inventory.buildings);
     if (path === '/api/v1/rooms') return json(inventory.rooms);
     if (path === '/api/v1/groups' || path === '/api/v1/devices') return json([]);
-    if (path === '/api/v1/cloud/devices') return json([cloudDevice]);
-    if (path === '/api/v1/commissioning' && method === 'POST') return json(session, 201);
+    if (path === '/api/v1/cloud/devices') return json(options.devices || [cloudDevice]);
+    if (path === '/api/v1/commissioning' && method === 'POST') { draft = body.draft; session.device_id = body.draft.device_id; return json(session, 201); }
     if (path.endsWith('/samples')) {
       samples++;
       if (options.failedSecond && samples === 2) return json({ detail: 'Устройство не ответило' }, 502);
       const row = { key: 'dp_1', code: 'switch_led', dp: '1', value: samples > 1, received_at: '2026-10-08T10:00:00Z', source: 'local' as const, can_write: !options.cloud };
       return json({ ...session, sample_count: samples, readings: [row], changes: samples > 1 ? [{ ...row, previous: false, action: body.action, detected_at: '2026-10-08T10:00:03Z' }] : [] });
     }
-    if (path.endsWith('/register')) return options.registerFailure ? json({ detail: 'Устройство уже добавлено в дом.' }, 409) : json({ id: 3, device_id: cloudDevice.id }, 201);
+    if (path.endsWith('/register')) return options.registerFailure ? json({ detail: 'Устройство уже добавлено в дом.' }, 409) : json({ ...draft, id: 3, aliases: [], building_id: body.building_id, room_id: body.room_id, enabled: true, capabilities: {}, has_local_key: true }, 201);
     if (method === 'DELETE') return new Response(null, { status: 204 });
     throw new Error('Unexpected survey request');
   });
@@ -59,6 +60,71 @@ function setup(extra?: Partial<React.ComponentProps<typeof DeviceSurvey>>) {
 }
 
 describe('device survey before registration', () => {
+  const gateway = { id: 'gateway-real', name: 'Шлюз из Smart Life', category: 'wg2', sub: true, online: true, has_local_key: true };
+  const sensor = { ...cloudDevice, name: 'Bath2 temperature', sub: true, node_id: 'actual-node' };
+
+  it('lists real gateway candidates from the chosen cloud provider without choosing a parent', async () => {
+    const calls = server({ devices: [sensor, gateway, { ...gateway, id: 'other', name: 'Лампа', category: 'dj' }] }), user = userEvent.setup();
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onLock={vi.fn()} onAuthError={vi.fn()} />);
+    const card = await screen.findByRole('listitem', { name: sensor.name });
+    await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
+    const select = screen.getByLabelText('Шлюз');
+    expect(select).toHaveValue('');
+    expect(within(select).getByRole('option', { name: gateway.name + ' · требуется локальная настройка' })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: /Лампа/ })).toBeNull();
+    await user.selectOptions(select, 'cloud:' + gateway.id);
+    expect(screen.getByRole('button', { name: 'Начать опрос' })).toBeDisabled();
+    expect(screen.getByText(/Smart Life не передал эту связь/)).toBeInTheDocument();
+    expect(calls.every(call => call.method === 'GET')).toBe(true);
+  });
+
+  it('returns from gateway setup with the sensor draft intact and uses the saved numeric parent', async () => {
+    vi.useFakeTimers(); const calls = server(), user = timedUser();
+    const { onClose } = setup({ device: sensor, cloudDevices: [gateway], gatewayPlacements: [{ device_id: gateway.id, building_id: 1, room_id: 2 }] });
+    await user.type(screen.getByLabelText('Название'), 'Датчик ванной');
+    await user.selectOptions(screen.getByLabelText('Комната'), '2');
+    await user.selectOptions(screen.getByLabelText('Шлюз'), 'cloud:' + gateway.id);
+    await user.click(screen.getByRole('button', { name: 'Настроить выбранный шлюз' }));
+    expect(screen.getByLabelText('Название')).toHaveValue(gateway.name);
+    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
+    expect(screen.getByLabelText('Подключение устройства')).toBeDisabled();
+    expect(screen.getByLabelText('Комната')).toHaveValue('2');
+    expect(screen.queryByRole('option', { name: 'Облачные отчёты Tuya' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByLabelText('Название')).toHaveValue('Датчик ванной');
+    expect(screen.getByLabelText('cid / node_id')).toHaveValue('actual-node');
+    expect(screen.getByLabelText('Комната')).toHaveValue('2');
+    expect(calls).toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: 'Настроить выбранный шлюз' }));
+    await user.type(screen.getByLabelText('IP в домашней сети'), '192.168.1.50');
+    await user.click(screen.getByRole('button', { name: 'Начать опрос' }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    await user.click(screen.getByRole('button', { name: 'Перейти к сохранению' }));
+    await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
+    await user.click(screen.getByRole('button', { name: 'Сохранить локальное подключение' }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Название')).toHaveValue('Датчик ванной');
+    expect(screen.getByLabelText('Шлюз')).toHaveValue('3');
+    expect(within(screen.getByLabelText('Шлюз')).getAllByRole('option')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Начать опрос' }));
+    expect(calls.filter(call => call.path === '/api/v1/commissioning').map(call => call.body)).toEqual([
+      { draft: { name: gateway.name, device_id: gateway.id, transport: 'wifi', is_gateway: true, ip: '192.168.1.50', version: '3.5', parent_id: null, cid: null }, mode: 'local', provider: 'sharing' },
+      { draft: { name: 'Датчик ванной', device_id: sensor.id, transport: 'zigbee', is_gateway: false, ip: null, version: null, parent_id: 3, cid: 'actual-node' }, mode: 'local', provider: 'sharing' },
+    ]);
+    expect(calls.some(call => /commands|set_dps/.test(call.path))).toBe(false);
+  });
+
+  it('explains an empty gateway list and opens manual gateway setup without requests', async () => {
+    const calls = server(), user = userEvent.setup();
+    setup({ device: sensor });
+    expect(screen.getByRole('option', { name: 'Нет настроенных шлюзов' })).toBeInTheDocument();
+    expect(screen.getByText(/В этом подключении Smart Life шлюзы не найдены/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Настроить другой шлюз вручную' }));
+    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
+    expect(screen.getByLabelText(/Локальный ключ/)).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
+  });
+
   it('opens the survey from a cloud card before registering anything', async () => {
     const calls = server(), user = userEvent.setup();
     render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onLock={vi.fn()} onAuthError={vi.fn()} />);

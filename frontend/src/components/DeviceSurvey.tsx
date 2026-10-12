@@ -3,7 +3,7 @@ import { ApiError } from '../api';
 import type { CloudDevice, JsonValue, Provider } from '../api';
 import { labelFor } from '../controls';
 import { HomeApi } from '../home-api';
-import type { DeviceDraft, Inventory, ObservationAction, ObservationReading, ObservationSession, Placement } from '../home-api';
+import type { DeviceDraft, Inventory, ObservationAction, ObservationReading, ObservationSession, Placement, LocalDevice } from '../home-api';
 
 const actions: Record<ObservationAction, { label: string; prompt: string }> = {
   observe: { label: 'Наблюдение', prompt: 'Получим исходное состояние. Затем выберите действие, которое хотите проверить.' },
@@ -18,14 +18,15 @@ const textValue = (value: JsonValue) => value === true ? 'Вкл / да' : value
 const title = (row: ObservationReading) => row.code ? labelFor(row.code) : 'Параметр ' + (row.dp ? 'DP ' + row.dp : row.key);
 const timeLabel = (stamp: string | null) => stamp ? new Date(stamp).toLocaleString('ru-RU') : 'Время отчёта не указано';
 
-export function DeviceSurvey({ api, inventory, device, provider, placement, onClose, onAuthError }: {
+export function DeviceSurvey({ api, inventory, device, provider, placement, cloudDevices = [], gatewayPlacements = [], gatewayOnly = false, onSaved, onClose, onAuthError }: {
   api: HomeApi; inventory: Inventory; device?: CloudDevice; provider?: Provider;
-  placement?: Placement;
+  placement?: Placement; cloudDevices?: CloudDevice[]; gatewayPlacements?: Placement[];
+  gatewayOnly?: boolean; onSaved?: (device: LocalDevice) => void;
   onClose: () => void; onAuthError: () => void;
 }) {
   const [step, setStep] = useState<'configure' | 'observe' | 'review'>('configure');
   const [name, setName] = useState(device?.name || ''), [id, setId] = useState(device?.id || '');
-  const [kind, setKind] = useState(device?.sub ? 'zigbee' : 'wifi');
+  const [kind, setKind] = useState(gatewayOnly ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
   const [ip, setIp] = useState(''), [version, setVersion] = useState('3.5'), [key, setKey] = useState('');
   const [parent, setParent] = useState(''), [cid, setCid] = useState(device?.node_id || '');
   const [room, setRoom] = useState(placement?.room_id ? String(placement.room_id) : ''), [building, setBuilding] = useState(placement?.building_id ? String(placement.building_id) : ''), [aliases, setAliases] = useState('');
@@ -38,9 +39,18 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, onCl
   const [reviewed, setReviewed] = useState(false), [writable, setWritable] = useState<string[]>([]);
   const sessionRef = useRef<string | null>(null), mounted = useRef(true), starting = useRef<AbortController | null>(null);
   const [expired, setExpired] = useState(false);
-  const gateways = inventory.devices.filter(item => item.is_gateway && item.transport === 'wifi');
+  const [savedGateways, setSavedGateways] = useState<LocalDevice[]>([]);
+  const [gatewaySetup, setGatewaySetup] = useState<{ device?: CloudDevice } | null>(null);
+  const availableInventory = { ...inventory, devices: [...inventory.devices, ...savedGateways] };
+  const gateways = availableInventory.devices.filter(item => item.is_gateway && item.transport === 'wifi' && item.parent_id === null);
+  // Tuya's gateway category identifies candidates, not a sensor's actual parent.
+  // Sharing can mark gateways themselves as sub=true, so that flag must not
+  // hide gateway candidates. Local connectivity is verified by the setup wizard.
+  // Only devices from the selected provider are supplied by ControlCenter.
+  const cloudGateways = cloudDevices.filter(item => item.category === 'wg2' && !availableInventory.devices.some(local => local.device_id === item.id));
+  const selectedCloudGateway = cloudGateways.find(item => 'cloud:' + item.id === parent);
   const rooms = inventory.rooms.filter(item => !building || String(item.building_id) === building);
-  const childReady = kind !== 'zigbee' || Boolean(parent && cid.trim());
+  const childReady = kind !== 'zigbee' || Boolean(gateways.some(item => String(item.id) === parent && item.enabled) && cid.trim());
   const localReady = kind === 'zigbee' ? childReady : Boolean(ip.trim() && version && (key || device?.has_local_key));
   const sessionId = observation?.session_id;
 
@@ -85,7 +95,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, onCl
   }, [api, sessionId, step, paused, hidden, expired]);
 
   async function begin() {
-    if (busy) return;
+    if (busy || !childReady || (mode === 'local' && !localReady)) return;
     setBusy(true); setError('');
     const controller = new AbortController(); starting.current = controller;
     const draft: DeviceDraft = {
@@ -115,12 +125,12 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, onCl
     if (!observation || !reviewed || busy || expired) return;
     setBusy(true); setError('');
     try {
-      await api.registerObservation(observation.session_id, {
+      const saved = await api.registerObservation(observation.session_id, {
         name: name.trim(), aliases: aliases.split(',').map(value => value.trim()).filter(Boolean),
         room_id: room ? Number(room) : null, building_id: building ? Number(building) : null, reviewed: true,
         writable: writable.filter(value => observation.readings.some(row => row.key === value && row.can_write)),
       });
-      sessionRef.current = null; onClose();
+      sessionRef.current = null; if (onSaved) onSaved(saved); else onClose();
     } catch (failure) { report(failure); if (mounted.current) setBusy(false); }
   }
 
@@ -131,6 +141,13 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, onCl
     <label>Комната<select value={room} onChange={event => setRoom(event.target.value)}><option value="">Не выбрана</option>{rooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
   </div>;
 
+  if (gatewaySetup) return <DeviceSurvey api={api} inventory={availableInventory} device={gatewaySetup.device} provider={gatewaySetup.device ? provider : undefined} gatewayOnly
+    placement={gatewayPlacements.find(item => item.device_id === gatewaySetup.device?.id)}
+    onAuthError={onAuthError} onClose={() => setGatewaySetup(null)} onSaved={saved => {
+      setSavedGateways(current => [...current.filter(item => item.id !== saved.id), saved]);
+      setParent(String(saved.id)); setGatewaySetup(null);
+    }} />;
+
   return <section className="card device-survey" aria-labelledby="survey-heading">
     <div className="card-heading"><div><p className="eyebrow">Локальное подключение · {step === 'configure' ? '1 / 3' : step === 'observe' ? '2 / 3' : '3 / 3'}</p><h2 id="survey-heading">{step === 'configure' ? 'Настроить локальное подключение' : step === 'observe' ? 'Проверьте устройство' : 'Проверьте результаты'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
     {step === 'configure' ? <form onSubmit={event => { event.preventDefault(); void begin(); }}>
@@ -140,11 +157,15 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, onCl
       {placementFields}
       <div className="survey-form-grid">
         <label>Tuya device ID<input value={id} readOnly={Boolean(device)} required maxLength={128} onChange={event => setId(event.target.value)} /></label>
-        <label>Подключение устройства<select value={kind} onChange={event => setKind(event.target.value)}><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></select></label>
-        {kind === 'zigbee' ? <><label>Шлюз<select value={parent} onChange={event => setParent(event.target.value)}><option value="">Выберите шлюз</option>{gateways.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>IP в домашней сети<input value={ip} onChange={event => setIp(event.target.value)} placeholder="192.168.1.40" /></label><label>Версия локального протокола<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">Локальный ключ доступен на сервере.</p> : <label>Локальный ключ<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">16 символов. Ключ не отображается в ответах сервиса.</span></label>}</>}
-        <label>Источник показаний<select value={mode} onChange={event => setMode(event.target.value as 'local' | 'cloud')}><option value="local">Локальный опрос + подписи Tuya</option>{provider && <option value="cloud">Облачные отчёты Tuya</option>}</select></label>
+        <label>Подключение устройства<select value={kind} disabled={gatewayOnly} onChange={event => setKind(event.target.value)}><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></select></label>
+        {kind === 'zigbee' ? <><label>Шлюз<select value={parent} onChange={event => setParent(event.target.value)}><option value="">{gateways.length || cloudGateways.length ? 'Выберите шлюз' : 'Нет настроенных шлюзов'}</option>{gateways.map(item => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{!item.enabled && ' · отключён'}</option>)}{cloudGateways.map(item => <option key={item.id} value={'cloud:' + item.id}>{item.name} · требуется локальная настройка</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>IP в домашней сети<input value={ip} onChange={event => setIp(event.target.value)} placeholder="192.168.1.40" /></label><label>Версия локального протокола<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">Локальный ключ доступен на сервере.</p> : <label>Локальный ключ<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">16 символов. Ключ не отображается в ответах сервиса.</span></label>}</>}
+        <label>Источник показаний<select value={mode} onChange={event => setMode(event.target.value as 'local' | 'cloud')}><option value="local">Локальный опрос + подписи Tuya</option>{provider && !gatewayOnly && <option value="cloud">Облачные отчёты Tuya</option>}</select></label>
       </div>
-      {kind === 'zigbee' && !gateways.length && <p className="saved-summary">Сначала добавьте сам Tuya шлюз как Wi-Fi устройство с ролью «Tuya шлюз». Затем выберите его здесь — ключ ребёнка не нужен.</p>}
+      {kind === 'zigbee' && <div className="saved-summary">
+        {selectedCloudGateway ? <><p>«{selectedCloudGateway.name}» найден в Smart Life. Сначала настройте его локальное подключение: понадобятся IP, версия протокола и локальный ключ, если его нет на сервере. После сохранения вернёмся к датчику.</p><p className="help">Выберите шлюз, к которому действительно подключён датчик. Smart Life не передал эту связь приложению.</p><button type="button" className="secondary compact" onClick={() => setGatewaySetup({ device: selectedCloudGateway })}>Настроить выбранный шлюз</button></> : !gateways.length ? <p>{cloudGateways.length ? 'Выберите шлюз из Smart Life и настройте его локальное подключение.' : 'В этом подключении Smart Life шлюзы не найдены. Для локального управления датчиком сначала настройте его шлюз.'} Для обычного управления через Smart Life этот мастер не нужен.</p> : null}
+        <button type="button" className="secondary compact" onClick={() => setGatewaySetup({})}>Настроить другой шлюз вручную</button>
+      </div>}
+      {gatewayOnly && <p className="help">Настраиваем шлюз. После сохранения вернёмся к подключению датчика; введённые данные сохранятся.</p>}
       {mode === 'cloud' && <p className="saved-summary">Облачные отчёты могут приходить с задержкой. Они помогут увидеть изменения; для проверки локальных DP понадобится отдельный локальный опрос.</p>}
       <button disabled={busy || !name.trim() || !id.trim() || !childReady || (mode === 'local' && !localReady)}>Начать опрос</button>
     </form> : <>
