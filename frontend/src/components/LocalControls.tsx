@@ -25,7 +25,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(session.data.state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!session.data ? 'Проверяем связь' : !session.data.state.enabled ? 'Отключено в настройках' : session.data.state.available ? 'Доступно дома' : 'Состояние неизвестно'} online={session.data?.state.enabled && session.data?.state.available} />}>
-    <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><div className="control-actions">
+    <div className="control-toolbar"><span className="help">{item.is_gateway ? 'Локальное подключение к шлюзу.' : item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><div className="control-actions">
       {Object.values(item.capabilities).some(cap => cap.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || aliasBusy || !session.readOK || !session.data?.state.enabled} onApply={() => void drafts.apply(changes => session.execute(async () => {
         for (const change of changes) validateControlValue(change.spec, change.value!);
         const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
@@ -41,7 +41,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
       if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
       return { text: 'Команда принята.' };
     })} />)}</div>
-    {session.data && !Object.keys(item.capabilities).length && <p className="saved-summary">Возможности ещё не настроены. Задайте проверенные capabilities устройству или его типу через REST API.</p>}
+    {session.data && !Object.keys(item.capabilities).length && <p className="saved-summary">{item.is_gateway ? 'Шлюз настроен для локального подключения дочерних устройств. Их показания и управление находятся в карточках самих устройств.' : 'Возможности ещё не настроены. Задайте проверенные capabilities устройству или его типу через REST API.'}</p>}
     {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
     <DeviceNetwork api={api} deviceId={item.device_id} provider="local" onAuthError={onAuthError} />
     <ControlFeedback busy={session.busy} notice={session.notice} />
