@@ -5843,6 +5843,62 @@
           }
         }
       }
+    },
+    "/api/v1/gateways/setup": {
+      "post": {
+        "tags": [
+          "Gateways"
+        ],
+        "summary": "Setup",
+        "operationId": "setup_api_v1_gateways_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewaySetup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewaySetupResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Verified gateway created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewaySetupResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -8399,6 +8455,89 @@
           "interface_address"
         ],
         "title": "StartNetworkScan"
+      },
+      "GatewaySetup": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Device Id"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "sharing",
+              "developer"
+            ],
+            "title": "Provider"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          },
+          "discovery_seconds": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 3.0,
+            "title": "Discovery Seconds",
+            "default": 8
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "provider",
+          "interface_address"
+        ],
+        "title": "GatewaySetup"
+      },
+      "GatewaySetupResult": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "unchanged"
+            ],
+            "title": "Action"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceRead"
+          },
+          "verified": {
+            "type": "boolean",
+            "const": true,
+            "title": "Verified",
+            "default": true
+          },
+          "key_source": {
+            "type": "string",
+            "enum": [
+              "device",
+              "child"
+            ],
+            "title": "Key Source"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "device",
+          "key_source",
+          "interface_address"
+        ],
+        "title": "GatewaySetupResult"
       }
     },
     "securitySchemes": {
