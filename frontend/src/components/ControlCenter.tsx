@@ -44,8 +44,8 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const privacyBlock=cameraPrivacyBlock(privacyView?.route===route ? privacyView.value : typeof cloud?.controls?.snapshot.status.basic_private==='boolean' ? cloud.controls.snapshot.status.basic_private : undefined);
   const local = device.local;
   const battery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
-  // These two devices were explicitly deferred; browsing must not activate them.
-  const postponed = ['tracer focus 3','workgtzb'].includes(device.name.trim().toLocaleLowerCase());
+  // This device remains deferred; WorkGtZb setup has been resumed.
+  const postponed = device.name.trim().toLocaleLowerCase() === 'tracer focus 3';
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   return <li className="device-card" aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>

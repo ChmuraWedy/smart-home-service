@@ -26,7 +26,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
 }) {
   const [step, setStep] = useState<'configure' | 'observe' | 'review'>('configure');
   const [name, setName] = useState(device?.name || ''), [id, setId] = useState(device?.id || '');
-  const [kind, setKind] = useState(gatewayOnly ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
+  const [kind, setKind] = useState(gatewayOnly || device?.category === 'wg2' ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
   const [ip, setIp] = useState(''), [version, setVersion] = useState('3.5'), [key, setKey] = useState('');
   const [parent, setParent] = useState(''), [cid, setCid] = useState(device?.node_id || '');
   const [room, setRoom] = useState(placement?.room_id ? String(placement.room_id) : ''), [building, setBuilding] = useState(placement?.building_id ? String(placement.building_id) : ''), [aliases, setAliases] = useState('');

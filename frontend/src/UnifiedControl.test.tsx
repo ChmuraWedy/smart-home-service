@@ -120,14 +120,14 @@ describe('unified device identity and management', () => {
   it('keeps deferred devices visible without activating their controls', async () => {
     const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (input,init) => {
-      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json(['TRACER FOCUS 3','WorkGtZb'].map((name,index) => ({...shared,id:'deferred-'+index,name})));
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json(['TRACER FOCUS 3'].map((name,index) => ({...shared,id:'deferred-'+index,name})));
       return original(input,init);
     });
     const observers:IntersectionObserverCallback[]=[];
     vi.stubGlobal('IntersectionObserver',class { constructor(callback:IntersectionObserverCallback){observers.push(callback);} observe(){} disconnect(){} });
     try {
       render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
-      for (const name of ['TRACER FOCUS 3','WorkGtZb']) {
+      for (const name of ['TRACER FOCUS 3']) {
         const card=await screen.findByRole('listitem',{name});
         expect(within(card).getByText('Настройка отложена')).toBeInTheDocument();
         expect(within(card).queryByRole('group',{name:'Основные параметры: '+name})).toBeNull();
@@ -135,6 +135,25 @@ describe('unified device identity and management', () => {
       expect(observers).toHaveLength(0);
       expect(calls.some(call => /\/functions|\/status/.test(call.path))).toBe(false);
     } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('resumes WorkGtZb setup from its tile and treats cloud gateways as gateways even with sub=true', async () => {
+    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!, user=userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input,init) => {
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'actual-gateway',name:'WorkGtZb',category:'wg2',sub:true}]);
+      return original(input,init);
+    });
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:'WorkGtZb'});
+    expect(within(card).queryByText('Настройка отложена')).toBeNull();
+    await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
+    expect(screen.getByLabelText('Название')).toHaveValue('WorkGtZb');
+    expect(screen.getByLabelText('Tuya device ID')).toHaveValue('actual-gateway');
+    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
+    expect(screen.getByLabelText('IP в домашней сети')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Шлюз')).toBeNull();
+    expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
+    expect(calls.every(call=>call.method==='GET')).toBe(true);
   });
 
   it('routes commands by the chosen provider or local numeric record, without an automatic fallback', async () => {
