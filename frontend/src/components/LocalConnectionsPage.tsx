@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, NetworkInterface, Provider } from '../api';
-import type { ConnectionFinding, ConnectionSaved, HomeApi, Inventory } from '../home-api';
+import type { ConnectionFinding, ConnectionSaved, HomeApi, Inventory, LocalDevice } from '../home-api';
 
 const proposed = { created: 'Будет добавлено подключение', updated: 'Будет обновлено подключение', unchanged: 'Подключение уже настроено' };
 const saved = { created: 'Подключение сохранено', updated: 'Подключение обновлено', unchanged: 'Подключение проверено: изменений нет' };
 const fields = { ip: 'IP-адрес', version: 'Версия протокола', local_key: 'Локальный ключ' };
 type Preview = { result: ConnectionFinding; expiresAt: number; requestedName: string };
+
+// Cloud key availability alone does not establish a saved LAN connection.
+function connectionConfigured(device: LocalDevice | undefined, devices: LocalDevice[]) {
+  const direct = (row: LocalDevice | undefined) => Boolean(row?.transport === 'wifi' && row.ip && row.version && row.has_local_key);
+  if (device?.transport !== 'zigbee') return direct(device);
+  const parent = devices.find(row => row.id === device.parent_id);
+  return Boolean(device.cid && parent?.is_gateway && direct(parent));
+}
 
 export function LocalConnectionsPage({ api, ready, sharingReady, developerReady, onAuthError, onConnections, onLock }: {
   api: HomeApi; ready: boolean; sharingReady: boolean; developerReady: boolean;
@@ -16,6 +24,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   const [devices, setDevices] = useState<CloudDevice[]>([]), [interfaces, setInterfaces] = useState<NetworkInterface[]>([]);
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [deviceId, setDeviceId] = useState(''), [address, setAddress] = useState('');
+  const [query, setQuery] = useState(''), [showConfigured, setShowConfigured] = useState(false);
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null), [confirmed, setConfirmed] = useState(false);
   const [remaining, setRemaining] = useState(0), [operation, setOperation] = useState<'find' | 'save' | null>(null);
@@ -43,7 +52,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   }, [provider, sharingReady, developerReady]);
   useEffect(() => {
     const controller = new AbortController();
-    reset(); setDeviceId(''); setAddress(''); setDevices([]); setInterfaces([]); setInventory(null);
+    reset(); setDeviceId(''); setAddress(''); setQuery(''); setShowConfigured(false); setDevices([]); setInterfaces([]); setInventory(null);
     if (!connected) { setLoading(false); return; }
     setLoading(true);
     void Promise.all([api.devices(provider, controller.signal), api.networkInterfaces(controller.signal), api.inventory(controller.signal)])
@@ -86,7 +95,10 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     work.current = 'save'; setOperation('save'); callbacks.current.onLock(true); setError('');
     try {
       const result = await api.saveLocalConnection(preview.result.finding_id);
-      if (mounted.current) setSuccess(result);
+      if (mounted.current) {
+        setSuccess(result); setDeviceId('');
+        setInventory(current => current ? { ...current, devices: [...current.devices.filter(row => row.device_id !== result.device.device_id), result.device] } : current);
+      }
     } catch (failure) {
       if (mounted.current) {
         fail(failure);
@@ -102,15 +114,31 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   const room = inventory?.rooms.find(row => row.id === detail?.room_id);
   const building = inventory?.buildings.find(row => row.id === detail?.building_id);
   const saving = operation === 'save';
+  const localDevices = inventory?.devices || [];
+  const rows = devices.map(device => {
+    const local = localDevices.find(row => row.device_id === device.id);
+    return { device, local, configured: connectionConfigured(local, localDevices) };
+  });
+  const unconfigured = rows.filter(row => !row.configured).length;
+  const search = query.trim().toLocaleLowerCase();
+  const matching = rows.filter(({ device, local }) =>
+    [device.name, ...(device.aliases || []), local?.name, ...(local?.aliases || [])].filter(Boolean).join(' ').toLocaleLowerCase().includes(search));
+  const visible = matching.filter(row => showConfigured || !row.configured);
+  function changeFilter() { reset(); setDeviceId(''); }
   return <section className="card local-connections-page" aria-labelledby="local-connections-heading">
     <p className="eyebrow">Домашняя сеть</p><h1 id="local-connections-heading">Локальные подключения</h1>
     <p className="muted">Выберите устройство из своего Tuya-аккаунта и сеть компьютера с сервисом. Найдём адрес и проверим ключ. Сохранение — отдельным действием после вашего подтверждения.</p>
     {!sharingReady && !developerReady && <div className="saved-summary">Сначала подключите Tuya-аккаунт. <button className="secondary" onClick={onConnections}>Открыть подключения</button></div>}
+    <div className="local-connection-filter"><label>Поиск устройства<input type="search" placeholder="Название или алиас" value={query} disabled={!connected || loading || saving} onChange={event => { changeFilter(); setQuery(event.target.value); }} /></label><button className="secondary" aria-pressed={showConfigured} disabled={!connected || loading || saving} onClick={() => { changeFilter(); setShowConfigured(value => !value); }}>Показать настроенные</button>{connected && !loading && <span className="help">Нужно настроить: {unconfigured} · Настроено: {rows.length - unconfigured}</span>}</div>
     <div className="local-connection-form">
       <label>Аккаунт<select value={provider} disabled={!ready || saving || (!sharingReady && !developerReady)} onChange={event => { reset(); setProvider(event.target.value as Provider); }}><option value="sharing" disabled={!sharingReady}>Smart Life / QR</option><option value="developer" disabled={!developerReady}>Tuya Developer</option></select></label>
-      <label>Устройство<select value={deviceId} disabled={!connected || loading || saving} onChange={event => { reset(); setDeviceId(event.target.value); }}><option value="">{loading ? 'Читаем устройства…' : 'Выберите устройство'}</option>{devices.map(row => <option key={row.id} value={row.id}>{row.name}{row.aliases?.length ? ` · ${row.aliases.join(', ')}` : ''}</option>)}</select></label>
+      <label>Устройство<select value={deviceId} disabled={!connected || loading || saving} onChange={event => { reset(); setDeviceId(event.target.value); }}><option value="">{loading ? 'Читаем устройства…' : 'Выберите устройство'}</option>{[false, true].map(configured => {
+        const group = visible.filter(row => row.configured === configured);
+        return group.length > 0 && <optgroup key={String(configured)} label={configured ? 'Настроено' : 'Нужно настроить'}>{group.map(({device: row}) => <option key={row.id} value={row.id}>{row.name}{row.aliases?.length ? ` · ${row.aliases.join(', ')}` : ''}{configured ? ' · Настроено' : ''}</option>)}</optgroup>;
+      })}</select></label>
       <label>Сеть устройства<select value={address} disabled={!connected || loading || saving} onChange={event => { reset(); setAddress(event.target.value); }}><option value="">Выберите сеть</option>{interfaces.map(row => <option key={row.address} value={row.address}>{row.name} · {row.network} · IP {row.address}</option>)}</select></label>
     </div>
+    {connected && !loading && devices.length > 0 && !visible.length && <p className="help">{search ? matching.length ? 'Есть совпадения среди настроенных устройств. Включите «Показать настроенные».' : 'По этому названию или алиасу устройств не найдено.' : 'Все устройства уже имеют локальное подключение. Включите «Показать настроенные», чтобы проверить их повторно.'}</p>}
     <div className="local-connection-actions"><button disabled={!connected || !deviceId || !address || loading || !!operation} onClick={() => void find()}>{operation === 'find' ? 'Ищем и проверяем…' : 'Найти и проверить'}</button>{operation === 'find' ? <button className="secondary" onClick={reset}>Отменить поиск</button> : <button className="secondary" disabled={!connected || loading || saving} onClick={() => { reset(); setRevision(value => value + 1); }}>Обновить списки</button>}</div>
     {operation === 'find' && <p role="status" className="help">Ожидаем объявление в выбранной сети и проверяем соединение. Обычно до 45 секунд. Настройки устройства и база не меняются.</p>}
     {connected && !loading && !error && (!devices.length || !interfaces.length) && <p className="help">{!devices.length ? 'В выбранном аккаунте нет устройств.' : 'Частные IPv4-сети не найдены. Подключите компьютер с сервисом к нужной сети и обновите списки.'}</p>}

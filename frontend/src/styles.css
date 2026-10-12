@@ -14,6 +14,10 @@
 .local-connection-form { display:grid; grid-template-columns:minmax(160px,1fr) minmax(200px,1.4fr) minmax(240px,1.4fr); gap:16px; margin:24px 0 16px; }
 .local-connection-form label { display:flex; flex-direction:column; gap:8px; min-width:0; margin:0; }
 .local-connection-form select { width:100%; min-width:0; }
+.local-connection-filter { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin:20px 0; }
+.local-connection-filter label { flex:1 1 240px; margin:0; }
+.local-connection-filter .help { flex:1 1 220px; margin:0; padding-bottom:12px; }
+.local-connection-filter button[aria-pressed=true] { color:#a4dfcf; border-color:#77b5a7; background:#203b35; }
 .local-connection-actions { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
 .local-connection-preview { border:1px solid #3e6c60; background:#172c2c; border-radius:14px; padding:24px; margin:24px 0; }
 .local-connection-preview-title { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }

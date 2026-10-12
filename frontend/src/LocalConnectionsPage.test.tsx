@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomeApi } from './home-api';
+import type { CloudDevice } from './api';
+import type { LocalDevice } from './home-api';
 import type { ConnectionFinding } from './home-api';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 
@@ -13,19 +15,20 @@ const finding: ConnectionFinding = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const flush = async () => { await act(async () => {}); };
-function backend(result = finding, saveStatus = 201) {
+function backend(result = finding, saveStatus = 201, locals: LocalDevice[] = [], cloud?: CloudDevice[]) {
   const calls: { path: string; method: string; body?: unknown; provider: string | null }[] = [];
   vi.mocked(fetch).mockImplementation(async (input, options) => {
     const url = new URL(String(input)), path = url.pathname;
     calls.push({ path, method: options?.method || 'GET', body: options?.body ? JSON.parse(String(options.body)) : undefined, provider: url.searchParams.get('provider') });
     expect((options?.headers as Record<string, string>)['X-API-Key']).toBe('service-key');
-    if (path === '/api/v1/cloud/devices') return json([{ id: 'lamp', name: finding.device.name, aliases: ['Святло'] }, { id: 'sensor', name: 'Датчик' }]);
+    if (path === '/api/v1/cloud/devices') return json(cloud || [{ id: 'lamp', name: finding.device.name, aliases: ['Святло'] }, { id: 'sensor', name: 'Датчик' }]);
     if (path === '/api/v1/network/interfaces') return json([{ name: 'en1', address: '192.168.40.10', network: '192.168.40.0/24' }, { name: 'en2', address: '192.168.20.10', network: '192.168.20.0/24' }]);
     if (path === '/api/v1/rooms') return json([{ id: 2, building_id: 1, name: 'Кухня' }]);
     if (path === '/api/v1/buildings') return json([{ id: 1, name: 'Дом' }]);
-    if (path === '/api/v1/devices' || path === '/api/v1/groups') return json([]);
+    if (path === '/api/v1/devices') return json(locals);
+    if (path === '/api/v1/groups') return json([]);
     if (path === '/api/v1/local-connections/find') return json(result);
-    if (path === '/api/v1/local-connections/save') return saveStatus < 400 ? json({ action: result.action, device: { ...result.device, id: 1 }, verified: true, key_source: result.key_source, interface_address: result.interface_address }, saveStatus) : json({ detail: 'Предварительный просмотр устарел. Повторите поиск.' }, saveStatus);
+    if (path === '/api/v1/local-connections/save') return saveStatus < 400 ? json({ action: result.action, device: { ...result.device, id: 1, transport: 'wifi', has_local_key: true }, verified: true, key_source: result.key_source, interface_address: result.interface_address }, saveStatus) : json({ detail: 'Предварительный просмотр устарел. Повторите поиск.' }, saveStatus);
     throw new Error('Unexpected endpoint');
   });
   return calls;
@@ -41,8 +44,56 @@ async function select(device = 'lamp') {
 }
 async function find(device = 'lamp') { await select(device); fireEvent.click(screen.getByRole('button', { name: 'Найти и проверить' })); await flush(); }
 const saves = (calls: ReturnType<typeof backend>) => calls.filter(call => call.path.endsWith('/save'));
+const local: LocalDevice = { id: 7, device_id: 'lamp', name: 'Другое локальное имя', aliases: ['Мая лямпа'], building_id: 1, room_id: 2,
+  transport: 'wifi', parent_id: null, cid: null, enabled: true, capabilities: {}, ip: '192.168.40.20', version: '3.5', has_local_key: true };
 
 describe('local connections page', () => {
+  it('hides saved connections by default and offers them for rechecking with clear labels', async () => {
+    const calls = backend(finding, 201, [local]); mount(); await flush();
+    expect(screen.queryByRole('option', { name: /Лямпа/ })).toBeNull();
+    expect(screen.getByRole('option', { name: 'Датчик' })).toBeInTheDocument();
+    expect(screen.getByText('Нужно настроить: 1 · Настроено: 1')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск устройства' }), { target: { value: 'światło' } });
+    expect(screen.getByText(/Есть совпадения среди настроенных устройств/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать настроенные' }));
+    expect(screen.getByRole('option', { name: /Лямпа.*Настроено/ })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Настроено' })).toBeInTheDocument(); expect(calls.every(call => call.method === 'GET')).toBe(true);
+  });
+  it.each([{ has_local_key: false }, { ip: null }, { version: null }])('does not count a cloud key or an incomplete local record %j as configured', async missing => {
+    backend(finding, 201, [{ ...local, ...missing }], [{ id: 'lamp', name: 'Лампа', has_local_key: true, online: true }]);
+    mount(); await flush(); expect(screen.getByRole('option', { name: 'Лампа' })).toBeInTheDocument();
+    expect(screen.getByText('Нужно настроить: 1 · Настроено: 0')).toBeInTheDocument();
+  });
+  it('recognizes saved Zigbee connections only with cid and a configured gateway', async () => {
+    const parent = { ...local, id: 8, device_id: 'gateway', is_gateway: true };
+    const child = { ...local, device_id: 'sensor', transport: 'zigbee' as const, parent_id: 8, cid: 'real-node', has_local_key: false, ip: null, version: null };
+    backend(finding, 201, [parent, child]); const next = mount(); await flush();
+    expect(screen.queryByRole('option', { name: 'Датчик' })).toBeNull();
+    next.unmount(); backend(finding, 201, [{ ...parent, has_local_key: false }, child]); mount(); await flush();
+    expect(screen.getByRole('option', { name: 'Датчик' })).toBeInTheDocument();
+  });
+  it('searches actual cloud names and aliases, including local aliases, without network requests', async () => {
+    const calls = backend(finding, 201, [local]); mount(); await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать настроенные' })); const count = calls.length;
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск устройства' }), { target: { value: 'МАЯ ЛЯМПА' } });
+    expect(screen.getByRole('option', { name: /Лямпа/ })).toBeInTheDocument(); expect(screen.queryByRole('option', { name: 'Датчик' })).toBeNull();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск устройства' }), { target: { value: 'ŚWIATŁO' } });
+    expect(screen.getByRole('option', { name: /Лямпа/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск устройства' }), { target: { value: 'нет такого' } });
+    expect(screen.getByText(/устройств не найдено/)).toBeInTheDocument(); expect(calls).toHaveLength(count);
+  });
+  it('clears selection and preview when filters change', async () => {
+    const calls = backend(); mount(); await find(); fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск устройства' }), { target: { value: 'Датчик' } });
+    expect(screen.queryByRole('checkbox')).toBeNull(); expect(screen.getByRole('combobox', { name: 'Устройство' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Найти и проверить' })).toBeDisabled(); expect(saves(calls)).toHaveLength(0);
+  });
+  it('removes a newly saved connection from the default list immediately', async () => {
+    backend(); mount(); await find(); fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить подключение' })); await flush();
+    expect(screen.queryByRole('option', { name: /Лямпа/ })).toBeNull();
+    expect(screen.getByText('Нужно настроить: 1 · Настроено: 1')).toBeInTheDocument();
+  });
   it('requires explicit device and actual interface; finding shows real metadata without saving', async () => {
     const calls = backend(); mount(); await flush();
     expect(screen.getByRole('button', { name: 'Найти и проверить' })).toBeDisabled();
