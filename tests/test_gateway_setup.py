@@ -14,7 +14,7 @@ from smarthome.network import NetworkMonitor
 from tests.test_capture_tuya import datagram
 from tests.test_gateway_keys import KEY, OTHER, Bridge, install_proof
 
-API = "/api/v1/gateways/setup"
+API = "/api/v1/gateways"
 INTERFACE = {
     "name": "en1",
     "address": "192.168.40.10",
@@ -87,8 +87,23 @@ def setup(client, bridge, monkeypatch):
     return monitor
 
 
+def find(client, **updates):
+    return client.post(API + "/find", json={**BODY, **updates})
+
+
+def save(client, finding, **updates):
+    return client.post(
+        API + "/save", json={"finding_id": finding["finding_id"], "confirmed": True, **updates}
+    )
+
+
 def run(client, **updates):
-    return client.post(API, json={**BODY, **updates})
+    before = inventory(client)
+    result = find(client, **updates)
+    assert inventory(client) == before, "Finding must never change inventory"
+    if result.status_code != 200:
+        return result
+    return save(client, result.json())
 
 
 def inventory(client):
@@ -151,7 +166,7 @@ def test_protocol_proof_uses_existing_read_only_controller(client, setup, factor
     response = run(client)
     assert response.status_code == 201, response.text
     assert response.json()["device"]["version"] == "3.4" and KEY not in response.text
-    assert factory.commands == [("gateway-real", "status", None)] * 2
+    assert factory.commands == [("gateway-real", "status", None)] * 3
     assert all(target.closed for target in factory.instances)
 
 
@@ -170,7 +185,7 @@ def test_developer_provider_and_gateway_own_key_use_selected_account(
     monkeypatch.setattr(client.app.state.controller, "verify_gateway_key", verify)
     response = run(client, provider="developer")
     assert response.status_code == 201 and response.json()["key_source"] == "device"
-    assert seen == [OTHER] and OTHER not in response.text and KEY not in response.text
+    assert seen == [OTHER, OTHER] and OTHER not in response.text and KEY not in response.text
 
 
 def test_unknown_account_member_is_rejected_before_listening(client, setup, bridge, monkeypatch):
@@ -315,7 +330,7 @@ def test_concurrent_inventory_change_is_not_overwritten(client, setup, monkeypat
         return True
 
     monkeypatch.setattr(client.app.state.controller, "verify_gateway_key", probe)
-    assert run(client).status_code == 409
+    assert find(client).status_code == 409
     assert inventory(client)[0]["name"] in ("Changed while probing", "Created concurrently")
 
 
@@ -339,7 +354,8 @@ def test_preconditions_no_scan_and_auth_validation(client, setup, bridge, monkey
     with client.app.state.observations.gateway_probe_lock:
         assert run(client).status_code == 409
     client.app.state.settings = replace(client.app.state.settings, api_token="required")
-    assert run(client).status_code == 401
+    assert find(client).status_code == 401
+    assert client.post(API + "/save", json={}).status_code == 401
     assert setup.started == []
 
 
@@ -380,3 +396,175 @@ def test_real_monitor_filters_other_network_and_ignores_payload_ip(client, setup
     assert response.status_code == 201, response.text
     assert response.json()["device"]["ip"] == ROW["ip"] and KEY not in response.text
     assert monitor.scans == {} and monitor.watches == {}
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_find_only_returns_reviewable_proposal_without_creating_or_updating(
+    client, setup, existing
+):
+    first = run(client).json()["device"] if existing else None
+    before = inventory(client)
+    setup.rows[0]["ip"] = "192.168.40.32"
+    response = find(client)
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["device"]["existing_id"] == (first["id"] if first else None)
+    assert result["action"] == ("updated" if existing else "created")
+    assert result["device"]["changed_fields"] == (
+        ["ip"] if existing else ["ip", "version", "local_key"]
+    )
+    assert result["device"]["ip"] == "192.168.40.32"
+    assert result["verified"] is True and 0 < result["expires_in"] <= gateway_setup.FINDING_TTL
+    assert response.headers["cache-control"] == "no-store"
+    assert KEY not in response.text and "private-scan" not in response.text
+    assert inventory(client) == before
+    assert len(client.app.state.gateway_findings.entries) == 1
+    assert not client.app.state.observations.entries
+    # A finding cannot bypass confirmation through the older commissioning flow.
+    assert (
+        client.post(
+            f"/api/v1/commissioning/{result['finding_id']}/register",
+            json={
+                "name": "Bypass",
+                "reviewed": True,
+            },
+        ).status_code
+        == 404
+    )
+    assert inventory(client) == before
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {},
+        {"confirmed": False},
+        {"confirmed": 1},
+        {"confirmed": "true"},
+        {"confirmed": True, "ip": "192.168.40.99"},
+        {"confirmed": True, "local_key": OTHER},
+    ],
+)
+def test_save_requires_explicit_boolean_confirmation_and_rejects_client_overrides(
+    client, setup, monkeypatch, fields
+):
+    found = find(client).json()
+
+    def forbidden(device):
+        raise AssertionError("Unconfirmed save must not contact the gateway")
+
+    monkeypatch.setattr(client.app.state.controller, "verify_gateway_key", forbidden)
+    response = client.post(API + "/save", json={"finding_id": found["finding_id"], **fields})
+    assert response.status_code == 422 and OTHER not in response.text
+    assert inventory(client) == []
+    assert found["finding_id"] in client.app.state.gateway_findings.entries
+
+
+def test_save_consumes_finding_and_old_autosave_endpoint_is_removed(client, setup):
+    found = find(client).json()
+    response = save(client, found)
+    assert response.status_code == 201, response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert KEY not in response.text
+    assert save(client, found).status_code == 404 and len(inventory(client)) == 1
+    assert client.app.state.gateway_findings.entries == {}
+    before = inventory(client)
+    assert client.post(API + "/setup", json=BODY).status_code == 404
+    assert inventory(client) == before
+
+
+@pytest.mark.parametrize("during_save", [False, True])
+def test_expired_findings_cannot_be_saved(client, setup, monkeypatch, during_save):
+    store = client.app.state.gateway_findings
+    now = [0]
+    store.clock = lambda: now[0]
+    found = find(client).json()
+    if during_save:
+
+        def verify(device):
+            now[0] = gateway_setup.FINDING_TTL + 1
+            return True
+
+        monkeypatch.setattr(client.app.state.controller, "verify_gateway_key", verify)
+    else:
+        now[0] = gateway_setup.FINDING_TTL + 1
+    assert save(client, found).status_code == 404 and inventory(client) == []
+
+
+@pytest.mark.parametrize(
+    "change", ["account", "key", "parent", "category", "interface", "name", "aliases", "room"]
+)
+def test_changes_between_find_and_save_require_a_new_preview(
+    client, setup, bridge, monkeypatch, change
+):
+    found = find(client).json()
+    if change == "account":
+        bridge.auth["token_info"]["uid"] = "another-account"
+    elif change == "key":
+        bridge.children[0].local_key = OTHER
+    elif change == "parent":
+        bridge.children[0].gateway_id = "another-parent"
+    elif change == "category":
+        bridge.gateway.category = "dj"
+    elif change == "interface":
+        monkeypatch.setattr(gateway_setup, "network_interfaces", lambda: [])
+    elif change == "name":
+        bridge.gateway.name = "New cloud name"
+    elif change == "aliases":
+        with Session(client.app.state.engine) as session:
+            session.add(
+                CloudDeviceAlias(
+                    scope=scope_for(bridge, "sharing"), device_id="gateway-real", alias="new alias"
+                )
+            )
+            session.commit()
+    else:
+        monkeypatch.setattr(
+            gateway_setup,
+            "cached",
+            lambda *args: {
+                "placements": [
+                    {
+                        "device_id": "gateway-real",
+                        "building_id": 500,
+                        "room_id": 501,
+                    }
+                ]
+            },
+        )
+    response = save(client, found)
+    assert response.status_code in (409, 422) and KEY not in response.text
+    assert inventory(client) == []
+
+
+def test_save_rechecks_gateway_and_preserves_existing_record_on_failed_proof(
+    client, setup, monkeypatch
+):
+    first = run(client).json()["device"]
+    setup.rows[0]["ip"] = "192.168.40.32"
+    found = find(client).json()
+    monkeypatch.setattr(client.app.state.controller, "verify_gateway_key", lambda device: False)
+    assert save(client, found).status_code == 409
+    assert client.get(f"/api/v1/devices/{first['id']}").json() == first
+
+
+def test_manual_inventory_edit_between_find_and_save_is_not_overwritten(client, setup):
+    first = run(client).json()["device"]
+    setup.rows[0]["ip"] = "192.168.40.32"
+    found = find(client).json()
+    edited = client.patch(f"/api/v1/devices/{first['id']}", json={"name": "Manual edit"}).json()
+    assert save(client, found).status_code == 409
+    assert client.get(f"/api/v1/devices/{first['id']}").json() == edited
+
+
+def test_pending_findings_have_a_bounded_capacity_and_expire(client, setup):
+    from smarthome.commissioning import MAX_SESSIONS
+
+    store = client.app.state.gateway_findings
+    now = [0]
+    store.clock = lambda: now[0]
+    for _ in range(MAX_SESSIONS):
+        assert find(client).status_code == 200
+    assert find(client).status_code == 429 and inventory(client) == []
+    now[0] = gateway_setup.FINDING_TTL + 1
+    assert find(client).status_code == 200 and len(store.entries) == 1

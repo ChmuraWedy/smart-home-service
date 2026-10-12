@@ -589,6 +589,7 @@ def create_app(settings: Settings | None = None, controller=None):
         from .commissioning import Observations
 
         app.state.observations = Observations()
+        app.state.gateway_findings = Observations()
         from .network import NetworkMonitor
 
         app.state.network = NetworkMonitor()
@@ -612,6 +613,7 @@ def create_app(settings: Settings | None = None, controller=None):
             app.state.poller.stop()
             app.state.topology.stop()
             app.state.observations.clear()
+            app.state.gateway_findings.clear()
             app.state.cloud.close()
             engine.dispose()
 
