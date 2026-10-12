@@ -15,7 +15,7 @@ const inventory: Inventory = {
 };
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 
-function server(options: { failedSecond?: boolean; cloud?: boolean; registerFailure?: boolean; devices?: CloudDevice[] } = {}) {
+function server(options: { failedSecond?: boolean; cloud?: boolean; registerFailure?: boolean; devices?: CloudDevice[]; discoveryFailure?: boolean } = {}) {
   const calls: { path: string; method: string; body?: unknown }[] = [];
   let samples = 0, draft: DeviceDraft | undefined;
   const session: ObservationSession = {
@@ -31,7 +31,13 @@ function server(options: { failedSecond?: boolean; cloud?: boolean; registerFail
     if (path === '/api/v1/rooms') return json(inventory.rooms);
     if (path === '/api/v1/groups' || path === '/api/v1/devices') return json([]);
     if (path === '/api/v1/cloud/devices') return json(options.devices || [cloudDevice]);
-    if (path === '/api/v1/commissioning' && method === 'POST') { draft = body.draft; session.device_id = body.draft.device_id; return json(session, 201); }
+    if (path === '/api/v1/commissioning' && method === 'POST') {
+      if (body.discover_gateway_key && options.discoveryFailure) return json({ detail: 'Ни один ключ не подтверждён.' }, 409);
+      draft = body.draft; session.device_id = body.draft.device_id;
+      if (body.discover_gateway_key) session.gateway_verification = { ip: body.draft.ip, version: '3.4', key_source: 'child' };
+      else delete session.gateway_verification;
+      return json(session, 201);
+    }
     if (path.endsWith('/samples')) {
       samples++;
       if (options.failedSecond && samples === 2) return json({ detail: 'Устройство не ответило' }, 502);
@@ -62,6 +68,51 @@ function setup(extra?: Partial<React.ComponentProps<typeof DeviceSurvey>>) {
 describe('device survey before registration', () => {
   const gateway = { id: 'gateway-real', name: 'Шлюз из Smart Life', category: 'wg2', sub: true, online: true, has_local_key: true };
   const sensor = { ...cloudDevice, name: 'Bath2 temperature', sub: true, node_id: 'actual-node' };
+
+  it('verifies a missing gateway key by confirmed IP and saves without inventing DPS or polling', async () => {
+    const calls = server(), user = userEvent.setup(), onSaved = vi.fn();
+    setup({ device: { ...gateway, has_local_key: false }, onSaved });
+    const find = screen.getByRole('button', { name: 'Найти ключ и проверить шлюз' });
+    expect(find).toBeDisabled();
+    await user.type(screen.getByLabelText('IP в домашней сети'), '192.168.1.50');
+    expect(find).toBeDisabled();
+    await user.click(screen.getByLabelText('Я проверил IP шлюза в роутере'));
+    await user.selectOptions(screen.getByLabelText('Версия локального протокола'), '3.1');
+    expect(find).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText('Версия локального протокола'), '3.5');
+    await user.click(find);
+    expect(await screen.findByText('Защищённое соединение со шлюзом подтверждено')).toBeInTheDocument();
+    expect(screen.getByText('192.168.1.50 · Протокол 3.4')).toBeInTheDocument();
+    expect(screen.queryByText('Последние показания')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Продолжить опрос' })).toBeNull();
+    const save = screen.getByRole('button', { name: 'Сохранить локальное подключение' });
+    expect(save).toBeDisabled();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].body).toEqual({ draft: {
+      name: gateway.name, device_id: gateway.id, transport: 'wifi', is_gateway: true,
+      ip: '192.168.1.50', version: '3.5', parent_id: null, cid: null,
+    }, provider: 'sharing', mode: 'local', discover_gateway_key: true });
+    await user.click(screen.getByLabelText('Я проверил IP шлюза и выбранные параметры'));
+    await user.click(save);
+    expect(onSaved).toHaveBeenCalledOnce();
+    expect(calls.filter(call => call.path.endsWith('/register'))).toHaveLength(1);
+    expect(calls.some(call => /samples|commands/.test(call.path))).toBe(false);
+  });
+
+  it('keeps a failed key check editable and requires IP confirmation again after editing', async () => {
+    const calls = server({ discoveryFailure: true }), user = userEvent.setup();
+    setup({ device: { ...gateway, has_local_key: false } });
+    await user.type(screen.getByLabelText('IP в домашней сети'), '192.168.1.50');
+    await user.click(screen.getByLabelText('Я проверил IP шлюза в роутере'));
+    await user.click(screen.getByRole('button', { name: 'Найти ключ и проверить шлюз' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ни один ключ не подтверждён.');
+    expect(screen.getByLabelText('IP в домашней сети')).toHaveValue('192.168.1.50');
+    await user.type(screen.getByLabelText('IP в домашней сети'), '1');
+    expect(screen.getByLabelText('Я проверил IP шлюза в роутере')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Найти ключ и проверить шлюз' })).toBeDisabled();
+    expect(calls).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Сохранить локальное подключение' })).toBeNull();
+  });
 
   it('lists real gateway candidates from the chosen cloud provider without choosing a parent', async () => {
     const calls = server({ devices: [sensor, gateway, { ...gateway, id: 'other', name: 'Лампа', category: 'dj' }] }), user = userEvent.setup();

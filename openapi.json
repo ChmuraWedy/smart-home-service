@@ -8038,6 +8038,11 @@
             ],
             "title": "Mode",
             "default": "local"
+          },
+          "discover_gateway_key": {
+            "type": "boolean",
+            "title": "Discover Gateway Key",
+            "default": false
           }
         },
         "additionalProperties": false,

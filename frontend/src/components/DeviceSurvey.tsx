@@ -29,6 +29,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   const fixedGateway = gatewayOnly || device?.category === 'wg2';
   const [kind, setKind] = useState(fixedGateway ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
   const [ip, setIp] = useState(''), [version, setVersion] = useState('3.5'), [key, setKey] = useState('');
+  const [confirmedIp, setConfirmedIp] = useState(false);
   const [parent, setParent] = useState(''), [cid, setCid] = useState(device?.node_id || '');
   const [room, setRoom] = useState(placement?.room_id ? String(placement.room_id) : ''), [building, setBuilding] = useState(placement?.building_id ? String(placement.building_id) : ''), [aliases, setAliases] = useState('');
   const [mode, setMode] = useState<'local' | 'cloud'>('local');
@@ -54,6 +55,8 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   const childReady = kind !== 'zigbee' || Boolean(gateways.some(item => String(item.id) === parent && item.enabled) && cid.trim());
   const localReady = kind === 'zigbee' ? childReady : Boolean(ip.trim() && version && (key || device?.has_local_key));
   const sessionId = observation?.session_id;
+  const gatewayProof = observation?.gateway_verification;
+  const canDiscover = kind === 'gateway' && Boolean(device && provider) && mode === 'local';
 
   useEffect(() => {
     mounted.current = true;
@@ -95,21 +98,23 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
     return () => { stopped = true; controller.abort(); clearTimeout(timer); };
   }, [api, sessionId, step, paused, hidden, expired]);
 
-  async function begin() {
-    if (busy || !childReady || (mode === 'local' && !localReady)) return;
+  async function begin(discoverKey = false) {
+    if (busy || !childReady || (discoverKey ? !canDiscover || !confirmedIp || !ip.trim() : mode === 'local' && !localReady)) return;
     setBusy(true); setError('');
     const controller = new AbortController(); starting.current = controller;
     const draft: DeviceDraft = {
       name: name.trim(), device_id: id.trim(), transport: kind === 'zigbee' ? 'zigbee' : 'wifi', is_gateway: kind === 'gateway',
       ip: kind === 'zigbee' ? null : ip.trim() || null, version: kind === 'zigbee' ? null : version || null,
       parent_id: kind === 'zigbee' && parent ? Number(parent) : null, cid: kind === 'zigbee' ? cid.trim() || null : null,
-      ...(key && kind !== 'zigbee' ? { local_key: key } : {}),
+      ...(key && kind !== 'zigbee' && !discoverKey ? { local_key: key } : {}),
     };
     try {
-      const result = await api.beginObservation(draft, mode, provider, controller.signal);
+      const result = discoverKey
+        ? await api.discoverGatewayKey(draft, provider!, controller.signal)
+        : await api.beginObservation(draft, mode, provider, controller.signal);
       if (!mounted.current) { void api.cancelObservation(result.session_id).catch(() => {}); return; }
       sessionRef.current = result.session_id; setKey(''); setId(draft.device_id); setObservation(result);
-      setWritable([]); setReviewed(false); setExpired(false); setPaused(false); setStep('observe');
+      setWritable([]); setReviewed(false); setExpired(false); setPaused(false); setStep(result.gateway_verification ? 'review' : 'observe');
     } catch (failure) { report(failure); }
     finally { if (mounted.current) setBusy(false); }
   }
@@ -159,7 +164,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       <div className="survey-form-grid">
         <label>Tuya device ID<input value={id} readOnly={Boolean(device)} required maxLength={128} onChange={event => setId(event.target.value)} /></label>
         <label>Подключение устройства<select value={kind} disabled={fixedGateway} onChange={event => setKind(event.target.value)}>{fixedGateway ? <option value="gateway">Tuya шлюз</option> : <><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></>}</select></label>
-        {kind === 'zigbee' ? <><label>Шлюз<select value={parent} onChange={event => setParent(event.target.value)}><option value="">{gateways.length || cloudGateways.length ? 'Выберите шлюз' : 'Нет настроенных шлюзов'}</option>{gateways.map(item => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{!item.enabled && ' · отключён'}</option>)}{cloudGateways.map(item => <option key={item.id} value={'cloud:' + item.id}>{item.name} · требуется локальная настройка</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>IP в домашней сети<input value={ip} onChange={event => setIp(event.target.value)} placeholder="192.168.1.40" /></label><label>Версия локального протокола<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">Локальный ключ доступен на сервере.</p> : <label>Локальный ключ<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">16 символов. Ключ не отображается в ответах сервиса.</span></label>}</>}
+        {kind === 'zigbee' ? <><label>Шлюз<select value={parent} onChange={event => setParent(event.target.value)}><option value="">{gateways.length || cloudGateways.length ? 'Выберите шлюз' : 'Нет настроенных шлюзов'}</option>{gateways.map(item => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{!item.enabled && ' · отключён'}</option>)}{cloudGateways.map(item => <option key={item.id} value={'cloud:' + item.id}>{item.name} · требуется локальная настройка</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>IP в домашней сети<input value={ip} onChange={event => { setIp(event.target.value); setConfirmedIp(false); }} placeholder="192.168.1.40" /></label><label>Версия локального протокола<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">Локальный ключ доступен на сервере.</p> : <label>Локальный ключ<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">16 символов. Ключ не отображается в ответах сервиса.</span></label>}</>}
         <label>Источник показаний<select value={mode} onChange={event => setMode(event.target.value as 'local' | 'cloud')}><option value="local">Локальный опрос + подписи Tuya</option>{provider && !gatewayOnly && <option value="cloud">Облачные отчёты Tuya</option>}</select></label>
       </div>
       {kind === 'zigbee' && <div className="saved-summary">
@@ -168,19 +173,25 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       </div>}
       {gatewayOnly && <p className="help">Настраиваем шлюз. После сохранения вернёмся к подключению датчика; введённые данные сохранятся.</p>}
       {mode === 'cloud' && <p className="saved-summary">Облачные отчёты могут приходить с задержкой. Они помогут увидеть изменения; для проверки локальных DP понадобится отдельный локальный опрос.</p>}
+      {canDiscover && <div className="saved-summary">
+        <p>Если ключ шлюза отсутствует, проверим ключи дочерних устройств из выбранного аккаунта Smart Life. Проверка читает состояние только по указанному IP и подбирает версию 3.3–3.5. Ключ останется на сервере.</p>
+        <p className="help">Укажите IP этого шлюза из списка клиентов роутера. Ответ по адресу подтверждает ключ, но не название шлюза и не связь с датчиками.</p>
+        <label className="survey-checkbox"><input type="checkbox" checked={confirmedIp} onChange={event => setConfirmedIp(event.target.checked)} />Я проверил IP шлюза в роутере</label>
+        <button type="button" className="secondary" disabled={busy || !confirmedIp || !ip.trim() || !name.trim() || !['3.3', '3.4', '3.5'].includes(version)} onClick={() => void begin(true)}>Найти ключ и проверить шлюз</button>
+      </div>}
       <button disabled={busy || !name.trim() || !id.trim() || !childReady || (mode === 'local' && !localReady)}>Начать опрос</button>
     </form> : <>
-      <p className="help">{name} · {observation?.mode === 'local' ? 'В домашней сети' : 'Через интернет'} · Получено выборок: {observation?.sample_count || 0}</p>
+      {gatewayProof ? <div className="saved-summary"><strong>Защищённое соединение со шлюзом подтверждено</strong><p>{gatewayProof.ip} · Протокол {gatewayProof.version}</p><p>{gatewayProof.key_source === 'child' ? 'Подошёл ключ из метаданных дочернего устройства Smart Life.' : 'Подтверждён ключ шлюза из Smart Life.'} Ключ не отображается в браузере.</p><p className="help">Шлюз может не иметь собственных показаний. После сохранения выберите его при настройке датчика, если это его действительный шлюз. Результат действует 15 минут.</p></div> : <p className="help">{name} · {observation?.mode === 'local' ? 'В домашней сети' : 'Через интернет'} · Получено выборок: {observation?.sample_count || 0}</p>}
       {step === 'observe' && <>
         <div className="survey-prompt"><label>Что проверяем<select value={action} onChange={event => setAction(event.target.value as ObservationAction)}>{Object.entries(actions).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</select></label><p>{actions[action].prompt}</p><p className="help">Выбор действия помечает замеченные изменения; он не определяет назначение параметра автоматически.</p></div>
         <div className="survey-toolbar"><span role="status">{expired ? 'Опрос остановлен. Начните заново.' : hidden ? 'Опрос приостановлен, пока вкладка скрыта.' : paused ? 'Опрос на паузе.' : polling ? 'Читаем состояние…' : 'Ожидаем следующую выборку…'}</span><button className="secondary compact" disabled={expired} onClick={() => setPaused(value => !value)}>{paused ? 'Продолжить' : 'Пауза'}</button></div>
         <p className="help">Сервис читает только выбранное устройство каждые {observation?.interval_seconds} сек. Короткие события между чтениями могут быть пропущены. Опрос действует 15 минут.</p>
       </>}
-      {step === 'review' && <>{placementFields}<p className="saved-summary">Изменение значения не доказывает его назначение. Неизвестные DP будут доступны только для чтения. Управление можно включить для параметров, чей номер DP и формат подтверждены Tuya и локальным ответом.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}
-      <div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output>{step === 'review' && row.can_write && <label className="survey-checkbox"><input type="checkbox" checked={writable.includes(row.key)} onChange={event => setWritable(current => event.target.checked ? [...current, row.key] : current.filter(value => value !== row.key))} />Разрешить управление: {title(row)}</label>}</li>)}</ul>}</div>
+      {step === 'review' && <>{placementFields}{!gatewayProof && <><p className="saved-summary">Изменение значения не доказывает его назначение. Неизвестные DP будут доступны только для чтения. Управление можно включить для параметров, чей номер DP и формат подтверждены Tuya и локальным ответом.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}</>}
+      {!gatewayProof && <><div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output>{step === 'review' && row.can_write && <label className="survey-checkbox"><input type="checkbox" checked={writable.includes(row.key)} onChange={event => setWritable(current => event.target.checked ? [...current, row.key] : current.filter(value => value !== row.key))} />Разрешить управление: {title(row)}</label>}</li>)}</ul>}</div>
       <div className="survey-history"><h3>Замеченные изменения <span className="count">{observation?.changes.length || 0}</span></h3>{!observation?.changes.length ? <p className="help">Изменений пока нет. Исходное состояние не считается изменением.</p> : <ol>{[...observation.changes].reverse().map((row, index) => <li key={index}><span className="help">{timeLabel(row.detected_at)} · {actions[row.action as ObservationAction]?.label || 'Наблюдение'}</span><strong>{title(row)}</strong><span>{textValue(row.previous)} → {textValue(row.value)}</span></li>)}</ol>}</div>
-      <div className="survey-footer">{step === 'observe' ? <><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>Изменить подключение</button><button disabled={expired || polling || !observation?.readings.length} onClick={() => { setStep('review'); setReviewed(false); }}>Перейти к сохранению</button></> : <><label className="survey-checkbox"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />Я проверил показания и выбранные параметры</label><button className="secondary" disabled={busy} onClick={() => setStep('observe')}>Продолжить опрос</button><button disabled={!reviewed || busy || expired || !name.trim()} onClick={() => void save()}>Сохранить локальное подключение</button></>}</div>
+      </>}<div className="survey-footer">{step === 'observe' ? <><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>Изменить подключение</button><button disabled={expired || polling || !observation?.readings.length} onClick={() => { setStep('review'); setReviewed(false); }}>Перейти к сохранению</button></> : <><label className="survey-checkbox"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />{gatewayProof ? 'Я проверил IP шлюза и выбранные параметры' : 'Я проверил показания и выбранные параметры'}</label><button className="secondary" disabled={busy} onClick={() => gatewayProof ? void restart() : setStep('observe')}>{gatewayProof ? 'Изменить подключение' : 'Продолжить опрос'}</button><button disabled={!reviewed || busy || expired || !name.trim()} onClick={() => void save()}>Сохранить локальное подключение</button></>}</div>
     </>}
-    {busy && <p role="status" className="help">Выполняем запрос…</p>}{error && <p role="alert" className="field-error">{error}</p>}
+    {busy && <p role="status" className="help">{step === 'configure' && canDiscover ? 'Проверяем подключение… Это может занять около 30 секунд.' : 'Выполняем запрос…'}</p>}{error && <p role="alert" className="field-error">{error}</p>}
   </section>;
 }

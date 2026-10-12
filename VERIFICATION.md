@@ -1,5 +1,11 @@
 # Проверка проекта
 
+## Gateway key discovery — 2026-10-12
+
+**394 Python tests and 184 frontend tests passed**; Ruff, TypeScript, production build and `git diff --check` passed. Thirty new backend checks cover candidate deduplication and real gateway categories despite `sub=true`, explicit foreign-parent exclusion, one-IP/private-address guards, protocol and time limits, failed/no-key cleanup, serialized verification, account/key/source changes, expiry/cancel, explicit review and server-only persistence. Installed TinyTuya 1.20.0 is exercised with genuine 3.4/3.5 HMAC negotiation and 3.3 AES decoding over simulated responses, including wrong keys; 3.1 is never accepted as key proof. Two new UI checks cover IP confirmation, verification without DPS/polling, explicit save and editable failures.
+
+Browser verification showed the new action in WorkGtZb setup. The local API was restarted with the existing settings/database and its schema exposes `discover_gateway_key`; the browser reloaded all 46 Smart Life devices. Local inventory remains empty. No physical gateway was probed because its IP has not been supplied, and no device state was changed. The feature requires the owner to identify the actual gateway IP; matching a key does not establish a sensor's parent or confirm the gateway name.
+
 ## Unified device list and connection settings — 2026-10-08
 
 **77 frontend tests passed**; TypeScript, production build and `git diff --check` passed. Seven additional checks cover restoring directly to management, settings without a second device list, merging local/Sharing/Developer identities by physical Tuya ID rather than name or database ID, room/alias filtering, explicit cloud-provider versus local-record command routing, retained route choice after closing a control, no retry through another transport, cloud-only operation without import, partial-source failures, and hiding cancelled/server-replaced records. The existing fixture for a motion sensor now has its own physical ID rather than incorrectly reusing the Zigbee lamp's ID. Build: JS 301.34 kB (91.83 kB gzip), CSS 12.57 kB (3.57 kB gzip). No dependency or backend transport changed.

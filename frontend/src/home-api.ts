@@ -37,6 +37,7 @@ export type ObservationSession = {
   session_id: string; device_id: string; mode: 'local' | 'cloud'; expires_in: number;
   interval_seconds: number; sample_count: number; has_local_key: boolean;
   readings: ObservationReading[]; changes: ObservationChange[];
+  gateway_verification?: { ip: string; version: string; key_source: 'device' | 'child' };
 };
 export type ObservationAction = 'observe' | 'power' | 'brightness' | 'temperature' | 'color' | 'sensor' | 'button';
 
@@ -75,6 +76,9 @@ export class HomeApi extends CloudApi {
   groupCommand(id: number, command: 'on' | 'off') { return this.request<GroupResult>(`/groups/${id}/commands/${command}`, 'POST'); }
   beginObservation(draft: DeviceDraft, mode: 'local' | 'cloud', provider?: Provider, signal?: AbortSignal) {
     return this.request<ObservationSession>('/commissioning', 'POST', { draft, mode, provider: provider || null }, signal);
+  }
+  discoverGatewayKey(draft: DeviceDraft, provider: Provider, signal?: AbortSignal) {
+    return this.request<ObservationSession>('/commissioning', 'POST', { draft, mode: 'local', provider, discover_gateway_key: true }, signal);
   }
   observationSample(id: string, action: ObservationAction, signal?: AbortSignal) {
     return this.request<ObservationSession>(`/commissioning/${encodeURIComponent(id)}/samples`, 'POST', { action }, signal);

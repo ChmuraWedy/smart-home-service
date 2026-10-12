@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from .api_dependencies import authenticate, get_session
 from .cloud_api import Provider, cloud_bridge, safe_spec
 from .cloud_mappings import scope_for
+from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
 from .models import Device
 from .schemas import Capability, DeviceCreate, DeviceRead, Name, PositiveID, Schema
 from .service import (
@@ -51,6 +52,7 @@ class StartObservation(Schema):
     draft: DeviceCreate
     provider: Provider | None = None
     mode: Literal["local", "cloud"] = "local"
+    discover_gateway_key: bool = False
 
 
 class SampleObservation(Schema):
@@ -80,6 +82,7 @@ class Observation:
     sample_count: int = 0
     last_poll: float | None = None
     last_cloud_refresh: float | None = None
+    verified_key_source: str | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -88,6 +91,7 @@ class Observations:
         self.clock = clock
         self.entries = {}
         self.lock = threading.Lock()
+        self.gateway_probe_lock = threading.Lock()
 
     def prune(self):
         for token, entry in list(self.entries.items()):
@@ -209,6 +213,19 @@ def view(store, token, entry):
         "readings": list(entry.readings.values()),
         "changes": entry.changes,
         "has_local_key": bool(entry.draft.local_key),
+        **(
+            {
+                "gateway_verification": {
+                    "ip": str(entry.draft.ip),
+                    "version": entry.draft.version,
+                    "key_source": "device"
+                    if entry.verified_key_source == entry.draft.device_id
+                    else "child",
+                }
+            }
+            if entry.verified_key_source
+            else {}
+        ),
     }
 
 
@@ -291,14 +308,28 @@ def start(
         raise HTTPException(
             422, "Сначала опросите устройство; capabilities формируются при сохранении."
         )
+    if body.discover_gateway_key:
+        validate_target(body.draft)
+        if body.mode != "local" or not body.provider or body.draft.local_key:
+            raise HTTPException(
+                422,
+                "Поиск ключа требует выбранного аккаунта и локального режима без введённого ключа.",
+            )
     bridge = cloud_bridge(request, body.provider) if body.provider else None
     if body.mode == "cloud" and bridge is None:
         raise HTTPException(422, "Для облачного опроса выберите подключённый аккаунт.")
     draft, specs, functions, scope = body.draft, {}, set(), None
+    pool = []
     if bridge:
         with bridge.lock:
             scope = scope_for(bridge, body.provider)
             device = bridge.writable_device(draft.device_id)
+            if body.discover_gateway_key:
+                if getattr(device, "category", None) not in GATEWAY_CATEGORIES:
+                    raise HTTPException(
+                        422, "Smart Life не определяет выбранное устройство как шлюз."
+                    )
+                pool = candidates(bridge.devices(), draft.device_id)
             specs, functions = definitions(device)
             updates = {
                 k: getattr(device, k)
@@ -316,6 +347,7 @@ def start(
                 ) from None
     if body.mode == "local":
         values = validate_device(session, device_values(draft))
+    if body.mode == "local" and not body.discover_gateway_key:
         parent = session.get(Device, draft.parent_id) if draft.parent_id else None
         root = parent or Device(**{k: v for k, v in values.items() if k != "aliases"})
         if not root.enabled or not root.ip or not root.local_key or not root.version:
@@ -327,7 +359,43 @@ def start(
         draft, body.provider, scope, body.mode, store.clock() + TTL, specs, functions
     )
     token = store.add(entry)
+    if body.discover_gateway_key:
+        try:
+            if not store.gateway_probe_lock.acquire(blocking=False):
+                raise HTTPException(
+                    409, "Проверка другого шлюза ещё выполняется. Дождитесь её завершения."
+                )
+            try:
+                entry.draft, entry.verified_key_source = discover(
+                    request.app.state.controller, draft, pool
+                )
+            finally:
+                store.gateway_probe_lock.release()
+            checked_gateway_key(request, entry)
+        except Exception:
+            store.remove(token)
+            raise
     return view(store, token, entry)
+
+
+def checked_gateway_key(request, entry):
+    bridge = checked_scope(request, entry)
+    if entry.verified_key_source:
+        with bridge.lock:
+            checked_scope(request, entry)
+            key = entry.draft.local_key.get_secret_value()
+            devices = bridge.devices()
+            gateway = next(
+                (device for device in devices if device.id == entry.draft.device_id), None
+            )
+            if (
+                gateway is None
+                or getattr(gateway, "category", None) not in GATEWAY_CATEGORIES
+                or (entry.verified_key_source, key)
+                not in candidates(devices, entry.draft.device_id)
+            ):
+                raise HTTPException(409, "Ключ в Smart Life изменился. Повторите проверку шлюза.")
+    return bridge
 
 
 @router.post("/{token}/samples")
@@ -341,6 +409,10 @@ def sample(
     response.headers["Cache-Control"] = "no-store"
     store = request.app.state.observations
     with store.use(token) as entry:
+        if entry.verified_key_source:
+            raise HTTPException(
+                409, "Связь со шлюзом уже проверена. Сохраните подключение или начните новый опрос."
+            )
         bridge = checked_scope(request, entry)
         now = store.clock()
         interval = 3 if entry.mode == "local" else 5
@@ -448,8 +520,8 @@ def register(
     response.headers["Cache-Control"] = "no-store"
     store = request.app.state.observations
     with store.use(token) as entry:
-        checked_scope(request, entry)
-        if not entry.sample_count or not entry.readings:
+        checked_gateway_key(request, entry)
+        if not entry.verified_key_source and (not entry.sample_count or not entry.readings):
             raise HTTPException(409, "Сначала получите показания устройства.")
         if session.scalar(select(Device.id).where(Device.device_id == entry.draft.device_id)):
             raise HTTPException(409, "Устройство уже добавлено в дом.")
