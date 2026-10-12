@@ -54,6 +54,17 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
 
 async function go(user: ReturnType<typeof userEvent.setup>, name: string) { await user.click(screen.getByRole('button', { name: 'Меню' })); await user.click(screen.getByRole('button', { name })); }
 
+it('opens local connections from the hamburger and restores its direct URL', async () => {
+  stored(); window.history.replaceState(null, '', '/#local-connections');
+  const backend = fakeApi(); render(<App />); await screen.findByText('API подключён');
+  expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+  await screen.findByRole('option', { name: 'Лампа кухни' });
+  expect(backend.calls.some(call => call.path.endsWith('/find') || call.path.endsWith('/save'))).toBe(false);
+  await go(userEvent.setup(), 'Сеть и пакеты'); expect(window.location.hash).toBe('#network');
+  await go(userEvent.setup(), 'Локальные подключения'); expect(window.location.hash).toBe('#local-connections');
+  expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+});
+
 async function restored(connections = true) {
   stored(); const backend = fakeApi(); render(<App />);
   await screen.findByText('API подключён');

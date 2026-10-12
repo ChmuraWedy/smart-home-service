@@ -40,8 +40,25 @@ export type ObservationSession = {
   gateway_verification?: { ip: string; version: string; key_source: 'device' | 'child' };
 };
 export type ObservationAction = 'observe' | 'power' | 'brightness' | 'temperature' | 'color' | 'sensor' | 'button';
+export type ConnectionAction = 'created' | 'updated' | 'unchanged';
+export type ConnectionFinding = {
+  finding_id: string; expires_in: number; action: ConnectionAction; verified: true;
+  key_source: 'device' | 'child'; interface_address: string;
+  requested_device_id: string; connection_device_id: string; route: 'direct' | 'gateway';
+  device: { device_id: string; existing_id: number | null; name: string; aliases: string[];
+    building_id: number | null; room_id: number | null; ip: string; version: string;
+    changed_fields: ('ip' | 'version' | 'local_key')[]; is_gateway: boolean };
+};
+export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; verified: true;
+  key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  findLocalConnection(device_id: string, provider: Provider, interface_address: string, signal?: AbortSignal) {
+    return this.request<ConnectionFinding>('/local-connections/find', 'POST', { device_id, provider, interface_address }, signal);
+  }
+  saveLocalConnection(finding_id: string) {
+    return this.request<ConnectionSaved>('/local-connections/save', 'POST', { finding_id, confirmed: true });
+  }
   topology(signal?: AbortSignal) { return this.request<Topology>('/cloud/topology', 'GET', undefined, signal); }
   syncTopology(signal?: AbortSignal) { return this.request<TopologyJob>('/cloud/topology/sync', 'POST', undefined, signal); }
   private async list<T>(path: string, signal?: AbortSignal): Promise<T[]> {
