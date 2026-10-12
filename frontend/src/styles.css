@@ -14,10 +14,6 @@
 .local-connection-form { display:grid; grid-template-columns:minmax(160px,1fr) minmax(200px,1.4fr) minmax(240px,1.4fr); gap:16px; margin:24px 0 16px; }
 .local-connection-form label { display:flex; flex-direction:column; gap:8px; min-width:0; margin:0; }
 .local-connection-form select { width:100%; min-width:0; }
-.local-connection-filter { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin:20px 0; }
-.local-connection-filter label { flex:1 1 240px; margin:0; }
-.local-connection-filter .help { flex:1 1 220px; margin:0; padding-bottom:12px; }
-.local-connection-filter button[aria-pressed=true] { color:#a4dfcf; border-color:#77b5a7; background:#203b35; }
 .local-connection-actions { display:flex; flex-wrap:wrap; gap:10px; margin:16px 0; }
 .local-connection-preview { border:1px solid #3e6c60; background:#172c2c; border-radius:14px; padding:24px; margin:24px 0; }
 .local-connection-preview-title { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
@@ -27,6 +23,21 @@
 .local-connection-facts dd { margin:4px 0 0; overflow-wrap:anywhere; }
 .local-connection-confirm { display:flex; align-items:center; gap:10px; font-size:14px; }
 .local-connection-confirm input { flex:0 0 auto; width:18px; height:18px; margin:0; }
+.connection-network-form { grid-template-columns:1fr 2fr; }
+.connection-steps { display:flex; flex-wrap:wrap; gap:16px; padding:0; margin:22px 0; list-style:none; color:#9caebf; font-size:13px; }
+.connection-steps li { display:flex; align-items:center; gap:7px; }
+.connection-steps li>span { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; border:1px solid #435165; }
+.connection-steps li[aria-current=step] { color:#a4dfcf; }
+.connection-steps li[aria-current=step]>span { background:#203b35; border-color:#77b5a7; }
+.connection-progress { padding:24px 0; }
+.connection-progress>.spinner { display:inline-block; margin-right:12px; }
+.connection-device-list { display:grid; gap:8px; margin:20px 0; }
+.connection-device-choice { display:flex; align-items:center; gap:12px; margin:0; padding:14px; border:1px solid #435165; border-radius:10px; }
+.connection-device-choice input { flex:0 0 auto; width:18px; height:18px; min-height:18px; margin:0; }
+.connection-device-choice small { display:block; color:#a1b1c5; font-size:12px; font-weight:400; }
+.connection-results { list-style:none; padding:0; margin:16px 0; }
+.connection-results li { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:10px 0; border-bottom:1px solid #344254; overflow-wrap:anywhere; }
+.connection-results span { font-size:13px; }
 @media(max-width:760px) {
   .local-connections-page { padding:18px; }
   .local-connection-form { grid-template-columns:1fr; }
