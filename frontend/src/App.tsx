@@ -179,7 +179,7 @@ export function App() {
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>User Code, реквизиты Tuya, токены и локальные ключи остаются на Python-сервисе.</p></div>
         </section>
       </div>
-      </> : <><div className="page-heading"><p className="eyebrow">Ваш дом</p><h1>Управление устройствами</h1><p className="muted">Выберите комнату, откройте устройство или группу и настройте доступные функции.</p></div><ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => setView('connections')} /></>}
+      </> : <ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => setView('connections')} />}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />Подождите…</> : notice.text}</div>
       {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>
