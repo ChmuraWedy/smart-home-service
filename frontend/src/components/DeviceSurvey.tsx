@@ -26,7 +26,8 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
 }) {
   const [step, setStep] = useState<'configure' | 'observe' | 'review'>('configure');
   const [name, setName] = useState(device?.name || ''), [id, setId] = useState(device?.id || '');
-  const [kind, setKind] = useState(gatewayOnly || device?.category === 'wg2' ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
+  const fixedGateway = gatewayOnly || device?.category === 'wg2';
+  const [kind, setKind] = useState(fixedGateway ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
   const [ip, setIp] = useState(''), [version, setVersion] = useState('3.5'), [key, setKey] = useState('');
   const [parent, setParent] = useState(''), [cid, setCid] = useState(device?.node_id || '');
   const [room, setRoom] = useState(placement?.room_id ? String(placement.room_id) : ''), [building, setBuilding] = useState(placement?.building_id ? String(placement.building_id) : ''), [aliases, setAliases] = useState('');
@@ -157,7 +158,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       {placementFields}
       <div className="survey-form-grid">
         <label>Tuya device ID<input value={id} readOnly={Boolean(device)} required maxLength={128} onChange={event => setId(event.target.value)} /></label>
-        <label>Подключение устройства<select value={kind} disabled={gatewayOnly} onChange={event => setKind(event.target.value)}><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></select></label>
+        <label>Подключение устройства<select value={kind} disabled={fixedGateway} onChange={event => setKind(event.target.value)}>{fixedGateway ? <option value="gateway">Tuya шлюз</option> : <><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></>}</select></label>
         {kind === 'zigbee' ? <><label>Шлюз<select value={parent} onChange={event => setParent(event.target.value)}><option value="">{gateways.length || cloudGateways.length ? 'Выберите шлюз' : 'Нет настроенных шлюзов'}</option>{gateways.map(item => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{!item.enabled && ' · отключён'}</option>)}{cloudGateways.map(item => <option key={item.id} value={'cloud:' + item.id}>{item.name} · требуется локальная настройка</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>IP в домашней сети<input value={ip} onChange={event => setIp(event.target.value)} placeholder="192.168.1.40" /></label><label>Версия локального протокола<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">Локальный ключ доступен на сервере.</p> : <label>Локальный ключ<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">16 символов. Ключ не отображается в ответах сервиса.</span></label>}</>}
         <label>Источник показаний<select value={mode} onChange={event => setMode(event.target.value as 'local' | 'cloud')}><option value="local">Локальный опрос + подписи Tuya</option>{provider && !gatewayOnly && <option value="cloud">Облачные отчёты Tuya</option>}</select></label>
       </div>

@@ -148,6 +148,8 @@ describe('unified device identity and management', () => {
     expect(screen.getByLabelText('Название')).toHaveValue('WorkGtZb');
     expect(screen.getByLabelText('Tuya device ID')).toHaveValue('actual-gateway');
     expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
+    expect(screen.getByLabelText('Подключение устройства')).toBeDisabled();
+    expect(within(screen.getByLabelText('Подключение устройства')).getAllByRole('option')).toHaveLength(1);
     expect(screen.getByLabelText('IP в домашней сети')).toBeInTheDocument();
     expect(screen.queryByLabelText('Шлюз')).toBeNull();
     expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
