@@ -5616,6 +5616,16 @@
               }
             }
           },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            },
+            "description": "OK"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -6046,6 +6056,62 @@
             "APIKeyHeader": []
           }
         ]
+      }
+    },
+    "/api/v1/commissioning/devices/{device_id}": {
+      "post": {
+        "tags": [
+          "Commissioning"
+        ],
+        "summary": "Start Existing",
+        "description": "Observe functions of a saved connection without exposing or replacing its key.",
+        "operationId": "start_existing_api_v1_commissioning_devices__device_id__post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExistingObservation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -9092,6 +9158,28 @@
           "is_gateway"
         ],
         "title": "ConnectionPreview"
+      },
+      "StartExistingObservation": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sharing",
+                  "developer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StartExistingObservation"
       }
     },
     "securitySchemes": {

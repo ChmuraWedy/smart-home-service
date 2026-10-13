@@ -10,8 +10,8 @@ import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation'
 import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 
-export function LocalControl({ api, device, onClose, onAuthError, closeLabel, room }: {
-  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string;
+export function LocalControl({ api, device, onClose, onAuthError, closeLabel, room, onSetup }: {
+  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
   const load = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
@@ -41,7 +41,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
       if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
       return { text: 'Команда принята.' };
     })} />)}</div>
-    {session.data && !Object.keys(item.capabilities).length && <p className="saved-summary">{item.is_gateway ? 'Шлюз настроен для локального подключения дочерних устройств. Их показания и управление находятся в карточках самих устройств.' : 'Возможности ещё не настроены. Задайте проверенные capabilities устройству или его типу через REST API.'}</p>}
+    {session.data && !Object.keys(item.capabilities).length && <div className="saved-summary">{item.is_gateway ? <p>Шлюз настроен для локального подключения дочерних устройств. Их показания и управление находятся в карточках самих устройств.</p> : <><p>Подключение сохранено. Чтобы появились переключатели и показания, сопоставьте локальные параметры устройства с функциями Tuya.</p>{onSetup && <button disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>Настроить функции</button>}</>}</div>}
     {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
     <DeviceNetwork api={api} deviceId={item.device_id} provider="local" onAuthError={onAuthError} />
     <ControlFeedback busy={session.busy} notice={session.notice} />

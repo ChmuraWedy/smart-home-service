@@ -53,6 +53,9 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
   key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {
+    return this.request<ObservationSession>('/commissioning/devices/' + id, 'POST', { provider: provider || null }, signal);
+  }
   findLocalConnection(device_id: string, provider: Provider, interface_address: string, signal?: AbortSignal, discovery_seconds?: number) {
     return this.request<ConnectionFinding>('/local-connections/find', 'POST', { device_id, provider, interface_address, ...(discovery_seconds === undefined ? {} : { discovery_seconds }) }, signal);
   }

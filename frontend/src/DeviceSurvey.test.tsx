@@ -5,7 +5,7 @@ import { DeviceSurvey } from './components/DeviceSurvey';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 import type { CloudDevice } from './api';
-import type { DeviceDraft, Inventory, ObservationSession } from './home-api';
+import type { DeviceDraft, Inventory, ObservationSession, LocalDevice } from './home-api';
 
 const connection = { baseUrl: 'http://survey-api.test', token: 'service-key' };
 const cloudDevice = { id: 'lamp-1', name: 'Новая лампа', online: true, has_local_key: true };
@@ -66,6 +66,40 @@ function setup(extra?: Partial<React.ComponentProps<typeof DeviceSurvey>>) {
 }
 
 describe('device survey before registration', () => {
+  it('configures an existing connection using only its server ID and saves functions after explicit review', async () => {
+    vi.useFakeTimers(); const calls = server(), user = timedUser();
+    const existing: LocalDevice = { id: 3, device_id: cloudDevice.id, name: 'Сохранённый переключатель', aliases: ['Святло'], building_id: 1, room_id: 2,
+      transport: 'wifi', parent_id: null, cid: null, enabled: true, ip: '192.168.1.40', version: '3.5', has_local_key: true, capabilities: {} };
+    const original = vi.mocked(fetch).getMockImplementation()!, onSaved = vi.fn();
+    vi.mocked(fetch).mockImplementation(async (input, options) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/api/v1/commissioning/devices/3') {
+        calls.push({path,method:'POST',body:JSON.parse(String(options?.body))});
+        return json({session_id:'observe-1',device_id:cloudDevice.id,mode:'local',expires_in:900,interval_seconds:3,sample_count:0,has_local_key:true,readings:[],changes:[]},201);
+      }
+      if (path.endsWith('/register')) {
+        calls.push({path,method:'POST',body:JSON.parse(String(options?.body))});
+        return json({...existing,capabilities:{switch_led:{dp:'1',type:'boolean',readable:true,writable:true}}});
+      }
+      return original(input, options);
+    });
+    setup({ existing, onSaved });
+    expect(screen.getByRole('heading',{name:'Настроить функции устройства'})).toBeInTheDocument();
+    expect(screen.queryByLabelText('Локальный ключ')).toBeNull(); expect(screen.queryByLabelText('IP в домашней сети')).toBeNull();
+    await user.click(screen.getByRole('button',{name:'Начать опрос'})); await act(()=>vi.advanceTimersByTimeAsync(0));
+    expect(calls.find(call=>call.path.endsWith('/devices/3'))?.body).toEqual({provider:'sharing'});
+    expect(calls.some(call=>call.path==='/api/v1/commissioning')).toBe(false);
+    await user.click(screen.getByRole('button',{name:'Перейти к сохранению'}));
+    expect(screen.getByRole('button',{name:'Сохранить функции'})).toBeDisabled();
+    expect(screen.queryByLabelText('Алиасы через запятую')).toBeNull();
+    await user.click(screen.getByLabelText('Разрешить управление: Питание'));
+    expect(calls.some(call=>call.path.endsWith('/register'))).toBe(false);
+    await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
+    await user.click(screen.getByRole('button',{name:'Сохранить функции'}));
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({id:existing.id,name:existing.name,aliases:existing.aliases}));
+    expect(calls.find(call=>call.path.endsWith('/register'))?.body).toMatchObject({reviewed:true,writable:['dp_1']});
+    expect(calls.some(call=>/commands|set_dps/.test(call.path))).toBe(false);
+  });
   const gateway = { id: 'gateway-real', name: 'Шлюз из Smart Life', category: 'wg2', sub: true, online: true, has_local_key: true };
   const sensor = { ...cloudDevice, name: 'Bath2 temperature', sub: true, node_id: 'actual-node' };
 

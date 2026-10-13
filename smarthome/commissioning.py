@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import Field, SecretStr, ValidationError
+from pydantic import Field, SecretStr, ValidationError, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -27,6 +27,8 @@ from .service import (
     create_device,
     device_read,
     device_values,
+    effective_capabilities,
+    get_or_404,
     record_observations,
     validate_device,
 )
@@ -59,6 +61,10 @@ class SampleObservation(Schema):
     action: Action = "observe"
 
 
+class StartExistingObservation(Schema):
+    provider: Provider | None = None
+
+
 class RegisterObservation(Schema):
     name: Name
     aliases: list[Name] = Field(default_factory=list, max_length=32)
@@ -66,6 +72,13 @@ class RegisterObservation(Schema):
     room_id: PositiveID | None = None
     reviewed: Literal[True]
     writable: list[str] = Field(default_factory=list, max_length=64)
+
+    @field_validator("reviewed", mode="before")
+    @classmethod
+    def explicit_review(cls, value):
+        if value is not True:
+            raise ValueError("Explicit review is required")
+        return value
 
 
 @dataclass(repr=False)
@@ -83,6 +96,8 @@ class Observation:
     last_poll: float | None = None
     last_cloud_refresh: float | None = None
     verified_key_source: str | None = None
+    existing_id: int | None = None
+    existing_context: tuple | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -378,6 +393,105 @@ def start(
     return view(store, token, entry)
 
 
+def configuration_context(session, item):
+    root = session.get(Device, item.parent_id) if item.parent_id else item
+    fields = (
+        "id",
+        "device_id",
+        "transport",
+        "is_gateway",
+        "enabled",
+        "ip",
+        "version",
+        "local_key",
+        "parent_id",
+        "cid",
+        "device_type_id",
+    )
+    return (
+        tuple(getattr(item, name) for name in fields),
+        tuple(getattr(root, name) for name in fields) if root else None,
+        json.dumps(effective_capabilities(session, item), sort_keys=True),
+    )
+
+
+def checked_existing(session, entry):
+    if entry.existing_id is None:
+        return None
+    session.expire_all()
+    item = get_or_404(session, Device, entry.existing_id)
+    if configuration_context(session, item) != entry.existing_context:
+        raise HTTPException(
+            409, "Подключение или функции устройства изменились. Начните настройку заново."
+        )
+    return item
+
+
+def existing_definitions(bridge, identifier):
+    device = bridge.writable_device(identifier)
+    if getattr(device, "id", None) != identifier:
+        raise HTTPException(409, "Tuya вернула схему другого устройства.")
+    return definitions(device)
+
+
+@router.post("/devices/{device_id}", status_code=201)
+def start_existing(
+    device_id: int,
+    body: StartExistingObservation,
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+):
+    """Observe functions of a saved connection without exposing or replacing its key."""
+    response.headers["Cache-Control"] = "no-store"
+    item = get_or_404(session, Device, device_id)
+    if item.is_gateway or effective_capabilities(session, item):
+        raise HTTPException(
+            409, "Этот сценарий предназначен для устройства с ещё не настроенными функциями."
+        )
+    source = device_read(session, item).model_dump()
+    draft = DeviceCreate.model_validate(
+        {
+            **{key: value for key, value in source.items() if key in DeviceCreate.model_fields},
+            "local_key": SecretStr(item.local_key) if item.local_key else None,
+            "capabilities": {},
+        }
+    )
+    validate_device(session, device_values(draft), item.id)
+    root = session.get(Device, item.parent_id) if item.parent_id else item
+    if (
+        not item.enabled
+        or not root
+        or not root.enabled
+        or not root.ip
+        or not root.version
+        or not root.local_key
+    ):
+        raise HTTPException(
+            409, "Сначала настройте и включите локальное подключение устройства или шлюза."
+        )
+    specs, functions, scope = {}, set(), None
+    if body.provider:
+        bridge = cloud_bridge(request, body.provider)
+        with bridge.lock:
+            scope = scope_for(bridge, body.provider)
+            specs, functions = existing_definitions(bridge, item.device_id)
+    store = request.app.state.observations
+    entry = Observation(
+        draft,
+        body.provider,
+        scope,
+        "local",
+        store.clock() + TTL,
+        specs,
+        functions,
+        existing_id=item.id,
+        existing_context=configuration_context(session, item),
+    )
+    token = store.add(entry)
+    return view(store, token, entry)
+
+
 def checked_gateway_key(request, entry):
     bridge = checked_scope(request, entry)
     if entry.verified_key_source:
@@ -414,6 +528,7 @@ def sample(
                 409, "Связь со шлюзом уже проверена. Сохраните подключение или начните новый опрос."
             )
         bridge = checked_scope(request, entry)
+        checked_existing(session, entry)
         now = store.clock()
         interval = 3 if entry.mode == "local" else 5
         if entry.last_poll is not None and now - entry.last_poll < interval:
@@ -429,6 +544,7 @@ def sample(
             raw = request.app.state.controller.execute(
                 device, parent
             )  # Status only: no DPS writes.
+            checked_existing(session, entry)
             dp_codes = {}
             for code, spec in entry.specs.items():
                 if "dp_id" in spec:
@@ -509,7 +625,12 @@ def cancel(token: str, request: Request):
     return Response(status_code=204)
 
 
-@router.post("/{token}/register", status_code=201, response_model=DeviceRead)
+@router.post(
+    "/{token}/register",
+    status_code=201,
+    response_model=DeviceRead,
+    responses={200: {"model": DeviceRead}},
+)
 def register(
     token: str,
     body: RegisterObservation,
@@ -520,10 +641,19 @@ def register(
     response.headers["Cache-Control"] = "no-store"
     store = request.app.state.observations
     with store.use(token) as entry:
-        checked_gateway_key(request, entry)
+        bridge = checked_gateway_key(request, entry)
+        if entry.existing_id is not None and bridge:
+            with bridge.lock:
+                specs, functions = existing_definitions(bridge, entry.draft.device_id)
+                if (specs, functions) != (entry.specs, entry.functions):
+                    raise HTTPException(
+                        409, "Схема функций Tuya изменилась. Начните настройку заново."
+                    )
         if not entry.verified_key_source and (not entry.sample_count or not entry.readings):
             raise HTTPException(409, "Сначала получите показания устройства.")
-        if session.scalar(select(Device.id).where(Device.device_id == entry.draft.device_id)):
+        if entry.existing_id is None and session.scalar(
+            select(Device.id).where(Device.device_id == entry.draft.device_id)
+        ):
             raise HTTPException(409, "Устройство уже добавлено в дом.")
         capabilities, allowed = {}, set()
         for row in entry.readings.values():
@@ -546,7 +676,28 @@ def register(
                 "capabilities": capabilities,
             }
         )
-        item = create_device(session, draft)
+        if entry.existing_id is not None:
+            session.rollback()
+            session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            item = checked_existing(session, entry)
+            if not capabilities:
+                raise HTTPException(409, "Поддерживаемые локальные параметры не найдены.")
+            # Only functions change; existing name, aliases, placement and connection survive.
+            validate_device(
+                session,
+                {
+                    **device_values(entry.draft),
+                    "capabilities": capabilities,
+                    "name": item.name,
+                    "room_id": item.room_id,
+                    "building_id": item.building_id,
+                },
+                item.id,
+            )
+            item.capabilities = capabilities
+            response.status_code = 200
+        else:
+            item = create_device(session, draft)
         session.flush()
         # Only a real LAN sample proves local reachability. Cloud codes/values can
         # have a different representation and must never seed the local DPS cache.

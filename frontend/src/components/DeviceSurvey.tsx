@@ -18,14 +18,15 @@ const textValue = (value: JsonValue) => value === true ? 'Вкл / да' : value
 const title = (row: ObservationReading) => row.code ? labelFor(row.code) : 'Параметр ' + (row.dp ? 'DP ' + row.dp : row.key);
 const timeLabel = (stamp: string | null) => stamp ? new Date(stamp).toLocaleString('ru-RU') : 'Время отчёта не указано';
 
-export function DeviceSurvey({ api, inventory, device, provider, placement, cloudDevices = [], gatewayPlacements = [], gatewayOnly = false, onSaved, onClose, onAuthError }: {
+export function DeviceSurvey({ api, inventory, device, provider, placement, cloudDevices = [], gatewayPlacements = [], gatewayOnly = false, onSaved, onClose, onAuthError, existing }: {
   api: HomeApi; inventory: Inventory; device?: CloudDevice; provider?: Provider;
   placement?: Placement; cloudDevices?: CloudDevice[]; gatewayPlacements?: Placement[];
   gatewayOnly?: boolean; onSaved?: (device: LocalDevice) => void;
+  existing?: LocalDevice;
   onClose: () => void; onAuthError: () => void;
 }) {
   const [step, setStep] = useState<'configure' | 'observe' | 'review'>('configure');
-  const [name, setName] = useState(device?.name || ''), [id, setId] = useState(device?.id || '');
+  const [name, setName] = useState(existing?.name || device?.name || ''), [id, setId] = useState(existing?.device_id || device?.id || '');
   const fixedGateway = gatewayOnly || device?.category === 'wg2';
   const [kind, setKind] = useState(fixedGateway ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
   const [ip, setIp] = useState(''), [version, setVersion] = useState('3.5'), [key, setKey] = useState('');
@@ -52,8 +53,8 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   const cloudGateways = cloudDevices.filter(item => item.category === 'wg2' && !availableInventory.devices.some(local => local.device_id === item.id));
   const selectedCloudGateway = cloudGateways.find(item => 'cloud:' + item.id === parent);
   const rooms = inventory.rooms.filter(item => !building || String(item.building_id) === building);
-  const childReady = kind !== 'zigbee' || Boolean(gateways.some(item => String(item.id) === parent && item.enabled) && cid.trim());
-  const localReady = kind === 'zigbee' ? childReady : Boolean(ip.trim() && version && (key || device?.has_local_key));
+  const childReady = Boolean(existing) || kind !== 'zigbee' || Boolean(gateways.some(item => String(item.id) === parent && item.enabled) && cid.trim());
+  const localReady = Boolean(existing) || (kind === 'zigbee' ? childReady : Boolean(ip.trim() && version && (key || device?.has_local_key)));
   const sessionId = observation?.session_id;
   const gatewayProof = observation?.gateway_verification;
   const canDiscover = kind === 'gateway' && Boolean(device && provider) && mode === 'local';
@@ -109,7 +110,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       ...(key && kind !== 'zigbee' && !discoverKey ? { local_key: key } : {}),
     };
     try {
-      const result = discoverKey
+      const result = existing ? await api.beginFunctionSetup(existing.id, provider, controller.signal) : discoverKey
         ? await api.discoverGatewayKey(draft, provider!, controller.signal)
         : await api.beginObservation(draft, mode, provider, controller.signal);
       if (!mounted.current) { void api.cancelObservation(result.session_id).catch(() => {}); return; }
@@ -155,9 +156,9 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
     }} />;
 
   return <section className="card device-survey" aria-labelledby="survey-heading">
-    <div className="card-heading"><div><p className="eyebrow">Локальное подключение · {step === 'configure' ? '1 / 3' : step === 'observe' ? '2 / 3' : '3 / 3'}</p><h2 id="survey-heading">{step === 'configure' ? 'Настроить локальное подключение' : step === 'observe' ? 'Проверьте устройство' : 'Проверьте результаты'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
+    <div className="card-heading"><div><p className="eyebrow">{existing ? 'Функции устройства' : 'Локальное подключение'} · {step === 'configure' ? '1 / 3' : step === 'observe' ? '2 / 3' : '3 / 3'}</p><h2 id="survey-heading">{step === 'configure' ? existing ? 'Настроить функции устройства' : 'Настроить локальное подключение' : step === 'observe' ? 'Проверьте устройство' : 'Проверьте результаты'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
     {step === 'configure' ? <form onSubmit={event => { event.preventDefault(); void begin(); }}>
-      <p className="help">Необязательная настройка управления по домашней сети. Проверим связь и изменения показаний при ваших действиях. Локальное подключение сохранится только после проверки.</p>
+      {existing ? <div className="saved-summary"><strong>{existing.name}</strong><p>Прочитаем реальные локальные параметры и сопоставим их со схемой Tuya. Устройство не переключается автоматически. Вы отдельно разрешите управление распознанными функциями и подтвердите сохранение. Имя, алиасы, комната, ключ и адрес сохранятся.</p>{!provider && <p className="help">Аккаунт Tuya недоступен: параметры можно сохранить только для чтения. Для распознавания переключателей подключите Smart Life или Tuya Developer.</p>}</div> : <><p className="help">Необязательная настройка управления по домашней сети. Проверим связь и изменения показаний при ваших действиях. Локальное подключение сохранится только после проверки.</p>
       {device && <p className="help">Устройство уже доступно через Smart Life. Для обычного управления этот мастер не нужен.</p>}
       {placement && <p className="help">Здание и комната взяты из Smart Life. Изменения здесь относятся только к локальному подключению.</p>}
       {placementFields}
@@ -179,6 +180,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
         <label className="survey-checkbox"><input type="checkbox" checked={confirmedIp} onChange={event => setConfirmedIp(event.target.checked)} />Я проверил IP шлюза в роутере</label>
         <button type="button" className="secondary" disabled={busy || !confirmedIp || !ip.trim() || !name.trim() || !['3.3', '3.4', '3.5'].includes(version)} onClick={() => void begin(true)}>Найти ключ и проверить шлюз</button>
       </div>}
+      </>}
       <button disabled={busy || !name.trim() || !id.trim() || !childReady || (mode === 'local' && !localReady)}>Начать опрос</button>
     </form> : <>
       {gatewayProof ? <div className="saved-summary"><strong>Защищённое соединение со шлюзом подтверждено</strong><p>{gatewayProof.ip} · Протокол {gatewayProof.version}</p><p>{gatewayProof.key_source === 'child' ? 'Подошёл ключ из метаданных дочернего устройства Smart Life.' : 'Подтверждён ключ шлюза из Smart Life.'} Ключ не отображается в браузере.</p><p className="help">Шлюз может не иметь собственных показаний. После сохранения выберите его при настройке датчика, если это его действительный шлюз. Результат действует 15 минут.</p></div> : <p className="help">{name} · {observation?.mode === 'local' ? 'В домашней сети' : 'Через интернет'} · Получено выборок: {observation?.sample_count || 0}</p>}
@@ -187,10 +189,10 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
         <div className="survey-toolbar"><span role="status">{expired ? 'Опрос остановлен. Начните заново.' : hidden ? 'Опрос приостановлен, пока вкладка скрыта.' : paused ? 'Опрос на паузе.' : polling ? 'Читаем состояние…' : 'Ожидаем следующую выборку…'}</span><button className="secondary compact" disabled={expired} onClick={() => setPaused(value => !value)}>{paused ? 'Продолжить' : 'Пауза'}</button></div>
         <p className="help">Сервис читает только выбранное устройство каждые {observation?.interval_seconds} сек. Короткие события между чтениями могут быть пропущены. Опрос действует 15 минут.</p>
       </>}
-      {step === 'review' && <>{placementFields}{!gatewayProof && <><p className="saved-summary">Изменение значения не доказывает его назначение. Неизвестные DP будут доступны только для чтения. Управление можно включить для параметров, чей номер DP и формат подтверждены Tuya и локальным ответом.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}</>}
+      {step === 'review' && <>{!existing && placementFields}{!gatewayProof && <><p className="saved-summary">Изменение значения не доказывает его назначение. Неизвестные DP будут доступны только для чтения. Управление можно включить для параметров, чей номер DP и формат подтверждены Tuya и локальным ответом.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}</>}
       {!gatewayProof && <><div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output>{step === 'review' && row.can_write && <label className="survey-checkbox"><input type="checkbox" checked={writable.includes(row.key)} onChange={event => setWritable(current => event.target.checked ? [...current, row.key] : current.filter(value => value !== row.key))} />Разрешить управление: {title(row)}</label>}</li>)}</ul>}</div>
       <div className="survey-history"><h3>Замеченные изменения <span className="count">{observation?.changes.length || 0}</span></h3>{!observation?.changes.length ? <p className="help">Изменений пока нет. Исходное состояние не считается изменением.</p> : <ol>{[...observation.changes].reverse().map((row, index) => <li key={index}><span className="help">{timeLabel(row.detected_at)} · {actions[row.action as ObservationAction]?.label || 'Наблюдение'}</span><strong>{title(row)}</strong><span>{textValue(row.previous)} → {textValue(row.value)}</span></li>)}</ol>}</div>
-      </>}<div className="survey-footer">{step === 'observe' ? <><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>Изменить подключение</button><button disabled={expired || polling || !observation?.readings.length} onClick={() => { setStep('review'); setReviewed(false); }}>Перейти к сохранению</button></> : <><label className="survey-checkbox"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />{gatewayProof ? 'Я проверил IP шлюза и выбранные параметры' : 'Я проверил показания и выбранные параметры'}</label><button className="secondary" disabled={busy} onClick={() => gatewayProof ? void restart() : setStep('observe')}>{gatewayProof ? 'Изменить подключение' : 'Продолжить опрос'}</button><button disabled={!reviewed || busy || expired || !name.trim()} onClick={() => void save()}>Сохранить локальное подключение</button></>}</div>
+      </>}<div className="survey-footer">{step === 'observe' ? <><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>Изменить подключение</button><button disabled={expired || polling || !observation?.readings.length} onClick={() => { setStep('review'); setReviewed(false); }}>Перейти к сохранению</button></> : <><label className="survey-checkbox"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />{gatewayProof ? 'Я проверил IP шлюза и выбранные параметры' : 'Я проверил показания и выбранные параметры'}</label><button className="secondary" disabled={busy} onClick={() => gatewayProof ? void restart() : setStep('observe')}>{gatewayProof ? 'Изменить подключение' : 'Продолжить опрос'}</button><button disabled={!reviewed || busy || expired || !name.trim()} onClick={() => void save()}>{existing ? 'Сохранить функции' : 'Сохранить локальное подключение'}</button></>}</div>
     </>}
     {busy && <p role="status" className="help">{step === 'configure' && canDiscover ? 'Проверяем подключение… Это может занять около 30 секунд.' : 'Выполняем запрос…'}</p>}{error && <p role="alert" className="field-error">{error}</p>}
   </section>;
