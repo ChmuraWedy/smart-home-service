@@ -66,7 +66,7 @@ function setup(extra?: Partial<React.ComponentProps<typeof DeviceSurvey>>) {
 }
 
 describe('device survey before registration', () => {
-  it('configures an existing connection using only its server ID and saves functions after explicit review', async () => {
+  it('configures an existing connection using only its server ID and saves all functions on a direct Save click', async () => {
     vi.useFakeTimers(); const calls = server(), user = timedUser();
     const existing: LocalDevice = { id: 3, device_id: cloudDevice.id, name: 'Сохранённый переключатель', aliases: ['Святло'], building_id: 1, room_id: 2,
       transport: 'wifi', parent_id: null, cid: null, enabled: true, ip: '192.168.1.40', version: '3.5', has_local_key: true, capabilities: {} };
@@ -86,21 +86,21 @@ describe('device survey before registration', () => {
     setup({ existing, onSaved });
     expect(screen.getByRole('heading',{name:'Настроить функции устройства'})).toBeInTheDocument();
     expect(screen.queryByLabelText('Локальный ключ')).toBeNull(); expect(screen.queryByLabelText('IP в домашней сети')).toBeNull();
-    await user.click(screen.getByRole('button',{name:'Начать опрос'})); await act(()=>vi.advanceTimersByTimeAsync(0));
+    await user.click(screen.getByRole('button',{name:'Начать опрос'}));
+    expect(screen.getByRole('button',{name:'Сохранить функции'})).toBeDisabled();
+    await act(()=>vi.advanceTimersByTimeAsync(0));
     expect(calls.find(call=>call.path.endsWith('/devices/3'))?.body).toEqual({provider:'sharing'});
     expect(calls.some(call=>call.path==='/api/v1/commissioning')).toBe(false);
-    await user.click(screen.getByRole('button',{name:'Перейти к сохранению'}));
-    expect(screen.getByRole('button',{name:'Сохранить функции'})).toBeDisabled();
+    expect(screen.getByRole('button',{name:'Сохранить функции'})).toBeEnabled();
     expect(screen.queryByLabelText('Алиасы через запятую')).toBeNull();
-    expect(screen.getByLabelText('Разрешить управление: Питание')).toBeChecked();
+    expect(screen.queryByLabelText('Разрешить управление: Питание')).toBeNull();
     expect(calls.some(call=>call.path.endsWith('/register'))).toBe(false);
-    await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
     await user.click(screen.getByRole('button',{name:'Сохранить функции'}));
     expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({id:existing.id,name:existing.name,aliases:existing.aliases}));
     expect(calls.find(call=>call.path.endsWith('/register'))?.body).toMatchObject({reviewed:true,writable:['dp_1']});
     expect(calls.some(call=>/commands|set_dps/.test(call.path))).toBe(false);
   });
-  it('keeps deselections across polling, defaults newly verified functions, and excludes unknown parameters', async () => {
+  it('saves all verified functions from observation without a review screen and excludes unknown parameters', async () => {
     vi.useFakeTimers(); const calls = server(), user = timedUser();
     const original = vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (input, options) => {
@@ -115,20 +115,15 @@ describe('device survey before registration', () => {
     await user.type(screen.getByLabelText('IP в домашней сети'), '192.168.1.40');
     await user.click(screen.getByRole('button', { name: 'Начать опрос' }));
     await act(() => vi.advanceTimersByTimeAsync(0));
-    await user.click(screen.getByRole('button', { name: 'Перейти к сохранению' }));
-    expect(screen.getByLabelText('Разрешить управление: Питание')).toBeChecked();
+    expect(screen.queryByRole('heading', { name: 'Проверьте результаты' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Перейти к сохранению' })).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByLabelText('Разрешить управление: Параметр DP 99')).toBeNull();
-    await user.click(screen.getByLabelText('Разрешить управление: Питание'));
-    await user.click(screen.getByRole('button', { name: 'Продолжить опрос' }));
     await act(() => vi.advanceTimersByTimeAsync(3000));
-    await user.click(screen.getByRole('button', { name: 'Перейти к сохранению' }));
-    expect(screen.getByLabelText('Разрешить управление: Питание')).not.toBeChecked();
-    expect(screen.getByLabelText('Разрешить управление: Яркость')).toBeChecked();
-    expect(screen.getByRole('button', { name: 'Сохранить локальное подключение' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить локальное подключение' })).toBeEnabled();
     expect(calls.some(call => call.path.endsWith('/register'))).toBe(false);
-    await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
     await user.click(screen.getByRole('button', { name: 'Сохранить локальное подключение' }));
-    expect(calls.find(call => call.path.endsWith('/register'))?.body).toMatchObject({ reviewed: true, writable: ['dp_22'] });
+    expect(calls.find(call => call.path.endsWith('/register'))?.body).toMatchObject({ reviewed: true, writable: ['dp_1', 'dp_22'] });
     expect(calls.some(call => /commands|set_dps/.test(call.path))).toBe(false);
   });
   const gateway = { id: 'gateway-real', name: 'Шлюз из Smart Life', category: 'wg2', sub: true, online: true, has_local_key: true };
@@ -151,13 +146,12 @@ describe('device survey before registration', () => {
     expect(screen.queryByText('Последние показания')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Продолжить опрос' })).toBeNull();
     const save = screen.getByRole('button', { name: 'Сохранить локальное подключение' });
-    expect(save).toBeDisabled();
+    expect(save).toBeEnabled();
     expect(calls).toHaveLength(1);
     expect(calls[0].body).toEqual({ draft: {
       name: gateway.name, device_id: gateway.id, transport: 'wifi', is_gateway: true,
       ip: '192.168.1.50', version: '3.5', parent_id: null, cid: null,
     }, provider: 'sharing', mode: 'local', discover_gateway_key: true });
-    await user.click(screen.getByLabelText('Я проверил IP шлюза и выбранные параметры'));
     await user.click(save);
     expect(onSaved).toHaveBeenCalledOnce();
     expect(calls.filter(call => call.path.endsWith('/register'))).toHaveLength(1);
@@ -215,8 +209,6 @@ describe('device survey before registration', () => {
     await user.type(screen.getByLabelText('IP в домашней сети'), '192.168.1.50');
     await user.click(screen.getByRole('button', { name: 'Начать опрос' }));
     await act(() => vi.advanceTimersByTimeAsync(0));
-    await user.click(screen.getByRole('button', { name: 'Перейти к сохранению' }));
-    await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
     await user.click(screen.getByRole('button', { name: 'Сохранить локальное подключение' }));
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Название')).toHaveValue('Датчик ванной');
@@ -255,7 +247,7 @@ describe('device survey before registration', () => {
     expect(screen.getByRole('button', { name: 'Начать опрос' })).toBeDisabled();
   });
 
-  it('records owner actions, pauses for review, and saves only after explicit review', async () => {
+  it('records owner actions and saves directly from observation only after clicking Save', async () => {
     vi.useFakeTimers();
     const calls = server(), user = timedUser();
     const { onClose } = setup();
@@ -273,13 +265,12 @@ describe('device survey before registration', () => {
     await act(() => vi.advanceTimersByTimeAsync(3000));
     expect(screen.getByText('Выкл / нет → Вкл / да')).toBeInTheDocument();
     expect(calls.filter(call => call.path.endsWith('/samples'))[1].body).toEqual({ action: 'power' });
-    await user.click(screen.getByRole('button', { name: 'Перейти к сохранению' }));
+    await user.click(screen.getByRole('button', { name: 'Пауза' }));
     const pollCount = calls.filter(call => call.path.endsWith('/samples')).length;
     await act(() => vi.advanceTimersByTimeAsync(10000));
     expect(calls.filter(call => call.path.endsWith('/samples'))).toHaveLength(pollCount);
-    expect(screen.getByRole('button', { name: 'Сохранить локальное подключение' })).toBeDisabled();
-    expect(screen.getByLabelText('Разрешить управление: Питание')).toBeChecked();
-    await user.click(screen.getByLabelText('Я проверил показания и выбранные параметры'));
+    expect(screen.getByRole('button', { name: 'Сохранить локальное подключение' })).toBeEnabled();
+    expect(screen.queryByLabelText('Разрешить управление: Питание')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Сохранить локальное подключение' }));
     expect(calls.find(call => call.path.endsWith('/register'))?.body).toEqual({ name: cloudDevice.name, aliases: ['kitchen_light', 'main_light'], building_id: null, room_id: 2, reviewed: true, writable: ['dp_1'] });
     expect(onClose).toHaveBeenCalledOnce();
@@ -327,7 +318,6 @@ describe('device survey before registration', () => {
     expect(screen.getByRole('button', { name: 'Начать опрос' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Начать опрос' }));
     await act(() => vi.advanceTimersByTimeAsync(0));
-    await user.click(screen.getByRole('button', { name: 'Перейти к сохранению' }));
     expect(screen.getByText(/Облачные значения не сохраняются/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Разрешить управление: Питание')).toBeNull();
   });

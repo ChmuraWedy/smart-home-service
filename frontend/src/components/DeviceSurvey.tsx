@@ -25,7 +25,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   existing?: LocalDevice;
   onClose: () => void; onAuthError: () => void;
 }) {
-  const [step, setStep] = useState<'configure' | 'observe' | 'review'>('configure');
+  const [step, setStep] = useState<'configure' | 'observe'>('configure');
   const [name, setName] = useState(existing?.name || device?.name || ''), [id, setId] = useState(existing?.device_id || device?.id || '');
   const fixedGateway = gatewayOnly || device?.category === 'wg2';
   const [kind, setKind] = useState(fixedGateway ? 'gateway' : device?.sub ? 'zigbee' : 'wifi');
@@ -39,8 +39,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   actionRef.current = action;
   const [paused, setPaused] = useState(false), [hidden, setHidden] = useState(document.hidden);
   const [busy, setBusy] = useState(false), [polling, setPolling] = useState(false), [error, setError] = useState('');
-  const [reviewed, setReviewed] = useState(false), [writeChoices, setWriteChoices] = useState<Record<string, boolean>>({});
-  const writable = observation?.readings.filter(row => row.can_write && writeChoices[row.key] !== false).map(row => row.key) || [];
+  const writable = observation?.readings.filter(row => row.can_write).map(row => row.key) || [];
   const sessionRef = useRef<string | null>(null), mounted = useRef(true), starting = useRef<AbortController | null>(null);
   const [expired, setExpired] = useState(false);
   const [savedGateways, setSavedGateways] = useState<LocalDevice[]>([]);
@@ -78,7 +77,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   }
 
   useEffect(() => {
-    if (!sessionId || step !== 'observe' || paused || hidden || expired) { setPolling(false); return; }
+    if (!sessionId || step !== 'observe' || gatewayProof || busy || paused || hidden || expired) { setPolling(false); return; }
     let stopped = false, timer: ReturnType<typeof setTimeout> | undefined;
     const controller = new AbortController();
     const interval = (observation?.interval_seconds || 5) * 1000;
@@ -98,7 +97,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
     }
     timer = setTimeout(() => void poll(), observation?.sample_count ? interval : 0);
     return () => { stopped = true; controller.abort(); clearTimeout(timer); };
-  }, [api, sessionId, step, paused, hidden, expired]);
+  }, [api, sessionId, step, gatewayProof, busy, paused, hidden, expired]);
 
   async function begin(discoverKey = false) {
     if (busy || !childReady || (discoverKey ? !canDiscover || !confirmedIp || !ip.trim() : mode === 'local' && !localReady)) return;
@@ -116,7 +115,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
         : await api.beginObservation(draft, mode, provider, controller.signal);
       if (!mounted.current) { void api.cancelObservation(result.session_id).catch(() => {}); return; }
       sessionRef.current = result.session_id; setKey(''); setId(draft.device_id); setObservation(result);
-      setWriteChoices({}); setReviewed(false); setExpired(false); setPaused(false); setStep(result.gateway_verification ? 'review' : 'observe');
+      setExpired(false); setPaused(false); setStep('observe');
     } catch (failure) { report(failure); }
     finally { if (mounted.current) setBusy(false); }
   }
@@ -130,8 +129,8 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   }
 
   async function save() {
-    if (!observation || !reviewed || busy || expired) return;
-    setBusy(true); setError('');
+    if (!observation || busy || polling || expired || !name.trim() || (!gatewayProof && !observation.readings.length)) return;
+    setPaused(true); setBusy(true); setError('');
     try {
       const saved = await api.registerObservation(observation.session_id, {
         name: name.trim(), aliases: aliases.split(',').map(value => value.trim()).filter(Boolean),
@@ -157,9 +156,9 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
     }} />;
 
   return <section className="card device-survey" aria-labelledby="survey-heading">
-    <div className="card-heading"><div><p className="eyebrow">{existing ? 'Функции устройства' : 'Локальное подключение'} · {step === 'configure' ? '1 / 3' : step === 'observe' ? '2 / 3' : '3 / 3'}</p><h2 id="survey-heading">{step === 'configure' ? existing ? 'Настроить функции устройства' : 'Настроить локальное подключение' : step === 'observe' ? 'Проверьте устройство' : 'Проверьте результаты'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
+    <div className="card-heading"><div><p className="eyebrow">{existing ? 'Функции устройства' : 'Локальное подключение'} · {step === 'configure' ? '1 / 2' : '2 / 2'}</p><h2 id="survey-heading">{step === 'configure' ? existing ? 'Настроить функции устройства' : 'Настроить локальное подключение' : 'Проверьте устройство'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
     {step === 'configure' ? <form onSubmit={event => { event.preventDefault(); void begin(); }}>
-      {existing ? <div className="saved-summary"><strong>{existing.name}</strong><p>Прочитаем реальные локальные параметры и сопоставим их со схемой Tuya. Устройство не переключается автоматически. Все проверенные функции выбраны для управления по умолчанию. Можно снять отдельные флажки перед подтверждением сохранения. Имя, алиасы, комната, ключ и адрес сохранятся.</p>{!provider && <p className="help">Аккаунт Tuya недоступен: параметры можно сохранить только для чтения. Для распознавания переключателей подключите Smart Life или Tuya Developer.</p>}</div> : <><p className="help">Необязательная настройка управления по домашней сети. Проверим связь и изменения показаний при ваших действиях. Локальное подключение сохранится только после проверки.</p>
+      {existing ? <div className="saved-summary"><strong>{existing.name}</strong><p>Прочитаем реальные локальные параметры и сопоставим их со схемой Tuya. Устройство не переключается автоматически. Все проверенные функции станут доступны после нажатия «Сохранить функции». Имя, алиасы, комната, ключ и адрес сохранятся.</p>{!provider && <p className="help">Аккаунт Tuya недоступен: параметры можно сохранить только для чтения. Для распознавания переключателей подключите Smart Life или Tuya Developer.</p>}</div> : <><p className="help">Необязательная настройка управления по домашней сети. Проверим связь и изменения показаний при ваших действиях. Локальное подключение сохранится только после проверки.</p>
       {device && <p className="help">Устройство уже доступно через Smart Life. Для обычного управления этот мастер не нужен.</p>}
       {placement && <p className="help">Здание и комната взяты из Smart Life. Изменения здесь относятся только к локальному подключению.</p>}
       {placementFields}
@@ -185,15 +184,15 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       <button disabled={busy || !name.trim() || !id.trim() || !childReady || (mode === 'local' && !localReady)}>Начать опрос</button>
     </form> : <>
       {gatewayProof ? <div className="saved-summary"><strong>Защищённое соединение со шлюзом подтверждено</strong><p>{gatewayProof.ip} · Протокол {gatewayProof.version}</p><p>{gatewayProof.key_source === 'child' ? 'Подошёл ключ из метаданных дочернего устройства Smart Life.' : 'Подтверждён ключ шлюза из Smart Life.'} Ключ не отображается в браузере.</p><p className="help">Шлюз может не иметь собственных показаний. После сохранения выберите его при настройке датчика, если это его действительный шлюз. Результат действует 15 минут.</p></div> : <p className="help">{name} · {observation?.mode === 'local' ? 'В домашней сети' : 'Через интернет'} · Получено выборок: {observation?.sample_count || 0}</p>}
-      {step === 'observe' && <>
+      {!gatewayProof && <>
         <div className="survey-prompt"><label>Что проверяем<select value={action} onChange={event => setAction(event.target.value as ObservationAction)}>{Object.entries(actions).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</select></label><p>{actions[action].prompt}</p><p className="help">Выбор действия помечает замеченные изменения; он не определяет назначение параметра автоматически.</p></div>
         <div className="survey-toolbar"><span role="status">{expired ? 'Опрос остановлен. Начните заново.' : hidden ? 'Опрос приостановлен, пока вкладка скрыта.' : paused ? 'Опрос на паузе.' : polling ? 'Читаем состояние…' : 'Ожидаем следующую выборку…'}</span><button className="secondary compact" disabled={expired} onClick={() => setPaused(value => !value)}>{paused ? 'Продолжить' : 'Пауза'}</button></div>
         <p className="help">Сервис читает только выбранное устройство каждые {observation?.interval_seconds} сек. Короткие события между чтениями могут быть пропущены. Опрос действует 15 минут.</p>
       </>}
-      {step === 'review' && <>{!existing && placementFields}{!gatewayProof && <><p className="saved-summary">Все функции, подтверждённые Tuya и локальным ответом, выбраны для управления по умолчанию. Снимите флажки у ненужных функций. Неизвестные параметры останутся только для чтения. Изменения сохранятся после вашего подтверждения.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}</>}
-      {!gatewayProof && <><div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output>{step === 'review' && row.can_write && <label className="survey-checkbox"><input type="checkbox" checked={writable.includes(row.key)} onChange={event => setWriteChoices(current => ({ ...current, [row.key]: event.target.checked }))} />Разрешить управление: {title(row)}</label>}</li>)}</ul>}</div>
+      {!gatewayProof && <><p className="help">При сохранении будут доступны все проверенные функции. Неизвестные параметры останутся только для чтения.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}
+      {!gatewayProof && <><div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output></li>)}</ul>}</div>
       <div className="survey-history"><h3>Замеченные изменения <span className="count">{observation?.changes.length || 0}</span></h3>{!observation?.changes.length ? <p className="help">Изменений пока нет. Исходное состояние не считается изменением.</p> : <ol>{[...observation.changes].reverse().map((row, index) => <li key={index}><span className="help">{timeLabel(row.detected_at)} · {actions[row.action as ObservationAction]?.label || 'Наблюдение'}</span><strong>{title(row)}</strong><span>{textValue(row.previous)} → {textValue(row.value)}</span></li>)}</ol>}</div>
-      </>}<div className="survey-footer">{step === 'observe' ? <><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>Изменить подключение</button><button disabled={expired || polling || !observation?.readings.length} onClick={() => { setStep('review'); setReviewed(false); }}>Перейти к сохранению</button></> : <><label className="survey-checkbox"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />{gatewayProof ? 'Я проверил IP шлюза и выбранные параметры' : 'Я проверил показания и выбранные параметры'}</label><button className="secondary" disabled={busy} onClick={() => gatewayProof ? void restart() : setStep('observe')}>{gatewayProof ? 'Изменить подключение' : 'Продолжить опрос'}</button><button disabled={!reviewed || busy || expired || !name.trim()} onClick={() => void save()}>{existing ? 'Сохранить функции' : 'Сохранить локальное подключение'}</button></>}</div>
+      </>}<div className="survey-footer"><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>{existing ? 'Начать заново' : 'Изменить подключение'}</button><button disabled={busy || polling || expired || !name.trim() || (!gatewayProof && !observation?.readings.length)} onClick={() => void save()}>{existing ? 'Сохранить функции' : 'Сохранить локальное подключение'}</button></div>
     </>}
     {busy && <p role="status" className="help">{step === 'configure' && canDiscover ? 'Проверяем подключение… Это может занять около 30 секунд.' : 'Выполняем запрос…'}</p>}{error && <p role="alert" className="field-error">{error}</p>}
   </section>;
