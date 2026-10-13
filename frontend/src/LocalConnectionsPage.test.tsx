@@ -148,6 +148,7 @@ describe('network configuration wizard', () => {
     fireEvent.click(screen.getByRole('checkbox')); expect(saves(calls)).toHaveLength(0);
     const button = screen.getByRole('button', { name: 'Сохранить подключения' }); fireEvent.click(button); fireEvent.click(button); await flush();
     expect(saves(calls)).toHaveLength(1); expect(saves(calls)[0].body).toEqual({ finding_id: 'lamp'.padEnd(32, '_'), confirmed: true });
+    expect(screen.getByRole('link', { name: cloud[0].name })).toHaveAttribute('href', '#device/lamp?route=local');
     expect(onLock).toHaveBeenCalledWith(true); expect(onLock).toHaveBeenLastCalledWith(false);
     expect(screen.getByRole('heading', { name: 'Ещё не настроены: 1' })).toBeInTheDocument();
     expect(screen.getByText('Датчик Zigbee')).toBeInTheDocument();
@@ -199,8 +200,8 @@ describe('network configuration wizard', () => {
     expect(screen.getByRole('heading', { name: 'Найдено устройств: 0' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Завершить без сохранения' }));
     expect(screen.getByRole('heading', { name: 'Ещё не настроены: 2' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ŚWIATŁO' } });
-    expect(screen.getByText(cloud[0].name)).toBeInTheDocument(); expect(screen.queryByText('Датчик Zigbee')).toBeNull(); expect(saves(calls)).toHaveLength(0);
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.getByText(cloud[0].name)).toBeInTheDocument(); expect(screen.getByText('Датчик Zigbee')).toBeInTheDocument(); expect(saves(calls)).toHaveLength(0);
   });
   it('reports partial save failures without retrying and keeps those devices unconfigured', async () => {
     const calls = backend({ saveErrors: { lamp: 409 } }); mount(); await discover(true); await verify([/Лямпа/, /Шлюз/]); await confirmSave();
@@ -233,9 +234,21 @@ describe('network configuration wizard', () => {
     const many = Array.from({ length: 18 }, (_, index) => ({ ...cloud[0], id: 'lamp-' + index, name: 'Лампа ' + index }));
     backend({ cloud: many, locals: [], observed: many.map((device, index) => announcement(device.id, '192.168.40.' + (30 + index))) });
     mount(); await discover();
-    const choices = screen.getAllByRole('checkbox'); fireEvent.click(screen.getByRole('button', { name: 'Выбрать первые 16' }));
+    const choices = screen.getAllByRole('checkbox', { name: /^Выбрать Лампа / }); fireEvent.click(screen.getByRole('checkbox', { name: 'Выбрать первые 16 устройств' }));
     expect(choices[16]).toBeDisabled(); expect(choices[17]).toBeDisabled();
-    fireEvent.click(choices[0]); expect(choices[16]).toBeEnabled();
+    fireEvent.click(choices[0]); expect(choices[16]).toBeEnabled(); fireEvent.click(choices[17]);
+    expect(screen.getByRole('checkbox', { name: 'Выбрать первые 16 устройств' })).toBePartiallyChecked();
+  });
+  it('uses the table header checkbox to select, indicate a partial selection and clear all rows', async () => {
+    backend(); mount(); await discover(true);
+    expect(screen.getByRole('table', { name: 'Найденные устройства' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Выбрать все' })).toBeNull();
+    const header = screen.getByRole('checkbox', { name: 'Выбрать все устройства' });
+    const lamp = screen.getByRole('checkbox', { name: 'Выбрать ' + cloud[0].name });
+    expect(header).not.toBeChecked(); fireEvent.click(lamp); expect(header).toBePartiallyChecked();
+    fireEvent.click(header); expect(header).toBeChecked(); expect(screen.getByText('Выбрано: 2 из 2')).toBeInTheDocument();
+    fireEvent.click(header); expect(header).not.toBeChecked(); expect(lamp).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Проверить выбранные' })).toBeDisabled();
   });
   it.each([null, 'saved-node'])('classifies a Zigbee child using its saved cid %s and gateway, without requiring its own key', async cid => {
     const child: LocalDevice = { ...gateway, id: 9, device_id: 'sensor', name: 'Датчик Zigbee', transport: 'zigbee', is_gateway: false,

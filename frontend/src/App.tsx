@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
 import { loadConnection, saveConnection } from './connection';
@@ -8,6 +8,8 @@ import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
+import { deviceHref, readDeviceLink } from './device-links';
+import type { DeviceLink } from './device-links';
 
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
@@ -16,6 +18,8 @@ type View = 'connections' | 'control' | 'network' | 'local-connections';
 export function App() {
   const [connection, setConnection] = useState<Connection>(() => loadConnection());
   const [view, setView] = useState<View>(() => connection.token ? window.location.hash === '#local-connections' ? 'local-connections' : window.location.hash === '#network' ? 'network' : 'control' : 'connections');
+  const [deviceTarget, setDeviceTarget] = useState(() => readDeviceLink(window.location.hash));
+  const acceptedHash = useRef(window.location.hash);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
   const [controlOpen, setControlOpen] = useState(false);
@@ -145,9 +149,29 @@ export function App() {
   }
 
   function navigate(next: View) {
-    setView(next); setMenuOpen(false); setNotice({ text: '' }); setQR(null);
-    window.history.replaceState(null, '', window.location.pathname + window.location.search + (next === 'network' || next === 'local-connections' ? '#' + next : ''));
+    setView(next); setDeviceTarget(null); setMenuOpen(false); setNotice({ text: '' }); setQR(null);
+    acceptedHash.current = next === 'network' || next === 'local-connections' ? '#' + next : '';
+    window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
   }
+  const changeDeviceTarget = useCallback((target: DeviceLink | null) => {
+    const hash = target ? deviceHref(target.id, target.route) : '';
+    setDeviceTarget(target); acceptedHash.current = hash;
+    if (window.location.hash !== hash) window.history[target ? 'pushState' : 'replaceState'](null, '', window.location.pathname + window.location.search + hash);
+  }, []);
+  useEffect(() => {
+    const changed = () => {
+      const dialogs = document.querySelectorAll('dialog[open]');
+      if (busyRef.current || document.querySelector('dialog[open][aria-busy="true"]') || dialogs.length > 1 || (controlOpen && !dialogs.length)) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
+        return;
+      }
+      acceptedHash.current = window.location.hash;
+      setDeviceTarget(readDeviceLink(window.location.hash)); setMenuOpen(false); setNotice({ text: '' });
+      setView(window.location.hash === '#network' ? 'network' : window.location.hash === '#local-connections' ? 'local-connections' : 'control');
+    };
+    window.addEventListener('hashchange', changed);
+    return () => window.removeEventListener('hashchange', changed);
+  }, [controlOpen]);
   useEffect(() => {
     if (!menuOpen) return;
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !menuRef.current?.contains(event.target)) setMenuOpen(false); };
@@ -197,7 +221,7 @@ export function App() {
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>User Code, реквизиты Tuya, токены и локальные ключи остаются на Python-сервисе.</p></div>
         </section>
       </div>
-      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} /> : <ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} />}
+      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} /> : <ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />Подождите…</> : notice.text}</div>
       {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>

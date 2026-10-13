@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { localSpec } from '../controls';
@@ -16,6 +16,8 @@ import { CardControls } from './CardControls';
 import { CameraLive } from './CameraLive';
 import { cameraPrivacyBlock } from '../camera-controls';
 import type { MouseEvent } from 'react';
+import { deviceCardId } from '../device-links';
+import type { DeviceLink } from '../device-links';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -46,7 +48,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const battery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
-  return <li className="device-card" aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
+  return <li id={deviceCardId(device.id)} className="device-card" aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
     <header className="device-heading device-tile-layout">
       <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? 'В сети' : 'Не в сети') : local && !local.enabled ? 'Отключено в настройках' : state?.available ? 'Доступно дома' : 'Состояние неизвестно'}</span><BatteryBadge reading={battery} /></div></div>
@@ -66,9 +68,10 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
 
 }
 
-export function ControlCenter({ api, ready, sharingReady = false, developerReady = false, onAuthError, onLock, onConnections }: {
+export function ControlCenter({ api, ready, sharingReady = false, developerReady = false, onAuthError, onLock, onConnections, deviceLink, onDeviceLinkChange }: {
   api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
   onAuthError: () => void; onLock: (locked: boolean) => void; onConnections?: () => void;
+  deviceLink?: DeviceLink | null; onDeviceLinkChange?: (target: DeviceLink | null) => void;
 }) {
   const mask = `${sharingReady}:${developerReady}`;
   const [record, setRecord] = useState<Loaded | null>(null);
@@ -85,6 +88,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState<{ api: HomeApi; mask: string; value: Selection } | null>(null);
   const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
+  const activeLink = useRef<string | null>(null);
   const [states, setStates] = useState<Record<number, DeviceState>>({});
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
   const [commandCards,setCommandCards] = useState(new Set<string>());
@@ -94,7 +98,7 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   }),[]);
   const now = useClock();
   useEffect(() => { onLock(Boolean(selected) || commandCards.size > 0); return () => onLock(false); }, [selected, commandCards, onLock]);
-  useEffect(() => { setSelection(null); }, [api, ready, mask]);
+  useEffect(() => { setSelection(null); activeLink.current = null; }, [api, ready, mask]);
   useEffect(() => {
     if (!ready) return;
     const controller = new AbortController(); setBusy(true); setPage(0);
@@ -120,6 +124,23 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
     return () => controller.abort();
   }, [api, ready, mask, revision]);
   const devices = useMemo(() => mergeDevices(inventory?.devices || [], cloud), [inventory, cloud]);
+  const linked = deviceLink ? devices.find(device => device.id === deviceLink.id) : undefined;
+  const linkedRoute = linked ? deviceLink?.route || deviceRoutes(linked)[0] : undefined;
+  const linkError = deviceLink && ready && current && !busy ? !linked ? 'Устройство из ссылки не найдено в доступных списках.' : linkedRoute && !deviceRoutes(linked).includes(linkedRoute) ? 'Указанный в ссылке способ управления недоступен для этого устройства.' : '' : '';
+  useEffect(() => {
+    if (!deviceLink) {
+      if (activeLink.current && selected?.kind === 'device') setSelection(null);
+      activeLink.current = null; return;
+    }
+    if (!ready || busy || !current || !linked || !linkedRoute || linkError) return;
+    const key = deviceLink.id + ':' + linkedRoute;
+    if (activeLink.current === key && selected?.kind === 'device' && selected.device.id === linked.id && selected.route === linkedRoute) return;
+    activeLink.current = key;
+    if (selected?.kind === 'device' && selected.device.id === linked.id && selected.route === linkedRoute) return;
+    setBuilding(''); setRoom(''); setSearch('');
+    setPage(Math.floor(((inventory?.groups.length || 0) + devices.indexOf(linked)) / PAGE_SIZE));
+    setSelection({ api, mask, value: { kind: 'device', device: linked, route: linkedRoute } });
+  }, [deviceLink, ready, busy, current, linked, linkedRoute, linkError, selected, api, mask, devices, inventory]);
   const filteredRooms = inventory?.rooms.filter(item => !building || String(item.building_id) === building) || [];
   const entries = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
@@ -146,12 +167,16 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
     }
     return () => controller.abort();
   }, [api, visible]);
-  function choose(value: Selection) { setSelection({ api, mask, value }); }
-  function close() { setSelection(null); setRevision(value => value + 1); }
+  function choose(value: Selection) {
+    setSelection({ api, mask, value });
+    onDeviceLinkChange?.(value.kind === 'device' ? { id: value.device.id, route: value.route } : null);
+  }
+  function close() { setSelection(null); onDeviceLinkChange?.(null); setRevision(value => value + 1); }
   if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} provider={selected.provider} cloudDevices={selected.provider ? cloud[selected.provider] : undefined} gatewayPlacements={Array.from(placements.values())} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={close} onAuthError={onAuthError} />;
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading"><div><p className="eyebrow">Ваш дом</p><h2 id="control-center-heading">Устройства и группы{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div><div className="survey-toolbar"><button className="secondary compact" disabled={!inventory || busy} onClick={() => choose({ kind: 'survey' })}>Настроить локальное устройство</button><button className="secondary compact" disabled={!ready || busy} onClick={() => setRevision(value => value + 1)}>Обновить список</button></div></div>
     {!ready ? <p className="saved-summary">Сначала сохраните доступ к сервису в настройках подключения.</p> : <>
+      {linkError && <p className="field-error" role="alert">{linkError}</p>}
       <p className="help">Основные параметры доступны прямо здесь. Расписания, журнал и дополнительные настройки — в подробной карточке.</p>
       {sharingReady && <div className="topology-summary">
         <div><h3>Комнаты из Smart Life</h3><p className="help">{topology.busy ? `Получаем структуру дома… ${topology.data?.job.processed || 0} / ${topology.data?.job.total || '…'}` : topology.data?.synced_at ? 'Синхронизировано: ' + new Date(topology.data.synced_at).toLocaleString('ru-RU') : 'Подставим здание и комнату в карточки и мастер добавления.'}</p></div>

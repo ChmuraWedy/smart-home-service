@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, LanDevice, NetworkInterface, NetworkScan, Provider } from '../api';
 import type { ConnectionFinding, HomeApi, Inventory, LocalDevice } from '../home-api';
+import { deviceHref } from '../device-links';
 
 type Stage = 'start' | 'search' | 'choose' | 'verify' | 'confirm' | 'save' | 'done';
 type Candidate = { device: CloudDevice; observed: LanDevice[]; configured: boolean };
 type Checked = { candidate: Candidate; finding?: ConnectionFinding; expiresAt?: number; error?: string };
-type Outcome = { id: string; name: string; message: string; saved: boolean };
+type Outcome = { id: string; name: string; message: string; saved: boolean; connectionId?: string };
 const actions = { created: 'Будет добавлено', updated: 'Будет обновлено', unchanged: 'Изменений нет' };
 const savedActions = { created: 'Подключение сохранено', updated: 'Подключение обновлено', unchanged: 'Проверено: изменений нет' };
 const changes = { ip: 'IP-адрес', version: 'версия протокола', local_key: 'локальный ключ' };
@@ -40,7 +41,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   const [stage, setStage] = useState<Stage>('start'), [loading, setLoading] = useState(false), [revision, setRevision] = useState(0);
   const [candidates, setCandidates] = useState<Candidate[]>([]), [selected, setSelected] = useState<string[]>([]);
   const [checked, setChecked] = useState<Checked[]>([]), [confirmed, setConfirmed] = useState(false);
-  const [outcomes, setOutcomes] = useState<Outcome[]>([]), [query, setQuery] = useState('');
+  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [error, setError] = useState(''), [progress, setProgress] = useState(''), [seconds, setSeconds] = useState(SEARCH_SECONDS);
   const [now, setNow] = useState(Date.now()), [unknown, setUnknown] = useState(0), [excluded, setExcluded] = useState(0);
   const request = useRef<AbortController | null>(null), scan = useRef<string | null>(null), busy = useRef(false), mounted = useRef(true);
@@ -52,6 +53,9 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   const pending = devices.filter(device => !configured(local.find(row => row.device_id === device.id), local));
   const valid = checked.filter(row => row.finding && row.expiresAt! > now);
   const expired = checked.some(row => row.finding && row.expiresAt! <= now);
+  const selectAll = useRef<HTMLInputElement>(null);
+  const allSelected = candidates.length > 0 && candidates.slice(0, MAX_SELECTION).every(row => selected.includes(row.device.id));
+  useEffect(() => { if (selectAll.current) selectAll.current.indeterminate = selected.length > 0 && !allSelected; }, [selected, allSelected, stage]);
 
   function fail(failure: unknown) {
     setError(message(failure));
@@ -63,7 +67,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   }
   function startOver() {
     stop(); setStage('start'); setCandidates([]); setSelected([]); setChecked([]); setConfirmed(false);
-    setOutcomes([]); setQuery(''); setError(''); setProgress('');
+    setOutcomes([]); setError(''); setProgress('');
   }
   useEffect(() => {
     mounted.current = true;
@@ -199,7 +203,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
           const result = await api.saveLocalConnection(finding.finding_id);
           if (!mounted.current) break;
           setInventory(current => current ? { ...current, devices: [...current.devices.filter(item => item.device_id !== result.device.device_id), result.device] } : current);
-          results.push({ id: row.candidate.device.id, name: result.device.name, message: savedActions[result.action], saved: true });
+          results.push({ id: row.candidate.device.id, connectionId: result.device.device_id, name: result.device.name, message: savedActions[result.action], saved: true });
         } catch (failure) {
           if (!mounted.current) break;
           results.push({ id: row.candidate.device.id, name: finding.device.name, message: failure instanceof ApiError ? failure.message : 'Ответ не получен. Подключение могло сохраниться; нужен новый поиск для проверки.', saved: false });
@@ -211,10 +215,6 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     } finally { busy.current = false; callbacks.current.onLock(false); }
   }
   const step = stage === 'start' || stage === 'search' ? 0 : stage === 'choose' || stage === 'verify' ? 1 : stage === 'confirm' || stage === 'save' ? 2 : 3;
-  const visiblePending = pending.filter(device => {
-    const item = local.find(row => row.device_id === device.id);
-    return [device.name, ...(device.aliases || []), item?.name, ...(item?.aliases || [])].filter(Boolean).join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
-  });
   return <section className="card local-connections-page" aria-labelledby="local-connections-heading">
     <p className="eyebrow">Домашняя сеть</p><h1 id="local-connections-heading">Локальные подключения</h1>
     <ol className="connection-steps" aria-label="Этапы настройки">{['Сеть', 'Найденные устройства', 'Подтверждение', 'Результат'].map((label, index) => <li key={label} aria-current={step === index ? 'step' : undefined}><span>{index + 1}</span>{label}</li>)}</ol>
@@ -234,9 +234,9 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     {working && <div className="connection-progress" role="status"><span className="spinner" aria-hidden="true" /><strong>{stage === 'search' ? 'Ищем устройства · осталось ' + seconds + ' сек.' : progress}</strong><p className="help">{stage === 'search' ? 'Принимаем объявления только в выбранной сети.' : stage === 'verify' ? 'Проверяем ключ чтением состояния. Несколько устройств проверяются по очереди; это может занять несколько минут.' : 'Каждое подтверждённое подключение сохраняется отдельно.'}</p>{stage !== 'save' && <button className="secondary" onClick={() => { stop(); setChecked([]); setStage(stage === 'search' ? 'start' : 'choose'); }}>Отмена</button>}</div>}
     {stage === 'choose' && <>
       <h2>Найдено устройств: {candidates.length}</h2><p className="help">Выберите подключения для проверки. Перед сохранением покажем проверенные параметры. За один раз можно выбрать до {MAX_SELECTION} устройств.</p>
-      {candidates.length > 0 && <div className="local-connection-actions"><button className="secondary" onClick={() => setSelected(candidates.slice(0, MAX_SELECTION).map(row => row.device.id))}>{candidates.length > MAX_SELECTION ? 'Выбрать первые ' + MAX_SELECTION : 'Выбрать все'}</button><button className="secondary" disabled={!selected.length} onClick={() => setSelected([])}>Снять выбор</button></div>}
       {!candidates.length && <p className="saved-summary">Подходящих устройств в этой сети не найдено. Проверьте сеть и питание. Отсутствие объявления не означает, что устройство выключено.</p>}
-      <div className="connection-device-list">{candidates.map(row => <label className="connection-device-choice" key={row.device.id}><input type="checkbox" checked={selected.includes(row.device.id)} disabled={!selected.includes(row.device.id) && selected.length >= MAX_SELECTION} onChange={event => setSelected(current => event.target.checked ? [...current, row.device.id] : current.filter(id => id !== row.device.id))} /><span><strong>{row.device.name}</strong>{row.device.aliases?.length ? <small>{row.device.aliases.join(' · ')}</small> : null}<small>{row.observed.map(item => item.ip).join(', ')} · {row.configured ? 'Уже настроено' : 'Не настроено локально'}</small></span></label>)}</div>
+      {candidates.length > 0 && <div className="connection-table-wrap"><table className="connection-device-table" aria-label="Найденные устройства"><thead><tr><th scope="col"><input ref={selectAll} type="checkbox" aria-label={candidates.length > MAX_SELECTION ? 'Выбрать первые 16 устройств' : 'Выбрать все устройства'} checked={allSelected} onChange={event => setSelected(event.target.checked ? candidates.slice(0, MAX_SELECTION).map(row => row.device.id) : [])} /></th><th scope="col">Устройство</th><th scope="col">IP-адрес</th><th scope="col">Подключение</th></tr></thead><tbody>{candidates.map(row => <tr key={row.device.id}><td><input type="checkbox" aria-label={'Выбрать ' + row.device.name} checked={selected.includes(row.device.id)} disabled={!selected.includes(row.device.id) && selected.length >= MAX_SELECTION} onChange={event => setSelected(current => event.target.checked ? [...current, row.device.id] : current.filter(id => id !== row.device.id))} /></td><td><strong>{row.device.name}</strong>{row.device.aliases?.length ? <small>{row.device.aliases.join(' · ')}</small> : null}</td><td>{row.observed.map(item => item.ip).join(', ')}</td><td>{row.configured ? 'Уже настроено' : 'Не настроено локально'}</td></tr>)}</tbody></table></div>}
+      {candidates.length > 0 && <p className="help">Выбрано: {selected.length} из {candidates.length}{candidates.length > MAX_SELECTION ? '. Общая галочка выбирает первые 16 устройств; остальные можно настроить следующим проходом.' : ''}</p>}
       {excluded > 0 && <p className="help">Уже настроенных устройств пропущено: {excluded}. Чтобы включить их, измените флажок на первом шаге.</p>}
       {unknown > 0 && <p className="help">Объявлений Tuya вне выбранного аккаунта: {unknown}. Они не предлагаются для настройки.</p>}
       <div className="local-connection-actions"><button disabled={!selected.length} onClick={() => void verify()}>Проверить выбранные</button><button className="secondary" onClick={startOver}>Назад к выбору сети</button><button className="secondary" onClick={() => { setOutcomes([]); setStage('done'); }}>Завершить без сохранения</button></div>
@@ -260,11 +260,10 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     </>}
     {stage === 'done' && <>
       <h2>Результат настройки</h2>
-      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}><strong>{row.name}</strong><span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">Подключения не сохранялись.</p>}
+      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}>{row.saved && row.connectionId ? <a href={deviceHref(row.connectionId, 'local')}>{row.name}</a> : <strong>{row.name}</strong>}<span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">Подключения не сохранялись.</p>}
       <h3>Ещё не настроены: {pending.length}</h3><p className="help">Это устройства аккаунта без полного локального подключения. Они могут быть в другой сети или не передавать объявления. Zigbee-датчики подключаются через явно назначенный шлюз и не имеют собственного IP.</p>
-      <label>Поиск ненастроенных устройств<input type="search" placeholder="Название или алиас" value={query} onChange={event => setQuery(event.target.value)} /></label>
-      <ul className="connection-results">{visiblePending.map(device => <li key={device.id}><strong>{device.name}</strong>{device.aliases?.length ? <span>{device.aliases.join(' · ')}</span> : null}</li>)}</ul>
-      {!visiblePending.length && <p className="help">{pending.length ? 'Совпадений не найдено.' : 'Все устройства имеют локальное подключение.'}</p>}
+      <ul className="connection-results">{pending.map(device => <li key={device.id}><strong>{device.name}</strong>{device.aliases?.length ? <span>{device.aliases.join(' · ')}</span> : null}</li>)}</ul>
+      {!pending.length && <p className="help">Все устройства имеют локальное подключение.</p>}
       <div className="local-connection-actions"><button onClick={() => { startOver(); setRevision(value => value + 1); }}>Новый поиск</button></div>
     </>}
     {error && <p role="alert" className="field-error">{error}</p>}
