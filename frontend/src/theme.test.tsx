@@ -1,0 +1,109 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import bootstrapHTML from '../index.html?raw';
+
+let theme: typeof import('./theme');
+let App: typeof import('./App')['App'];
+const media = Object.assign(new EventTarget(), { matches: false });
+const systemChange = (dark: boolean) => {
+  media.matches = dark;
+  act(() => { media.dispatchEvent(new Event('change')); });
+};
+
+beforeAll(async () => {
+  Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true, value: () => media });
+  theme = await import('./theme');
+  App = (await import('./App')).App;
+});
+beforeEach(() => {
+  media.matches = false;
+  theme.setTheme('system', false);
+  document.head.innerHTML = '<meta name="theme-color" content="#f3f6fa">';
+});
+
+describe('appearance preferences', () => {
+  it('defaults to System and follows OS changes only in System mode', () => {
+    expect(theme.savedTheme()).toBe('system');
+    expect(theme.getTheme()).toBe('system');
+    expect(theme.resolvedTheme()).toBe('day');
+    systemChange(true);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.querySelector('meta[name=theme-color]')).toHaveAttribute('content', '#101720');
+    theme.setTheme('day');
+    systemChange(false); systemChange(true);
+    expect(document.documentElement.dataset.theme).toBe('day');
+    theme.setTheme('dark'); systemChange(false);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    theme.setTheme('system');
+    expect(document.documentElement.dataset.theme).toBe('day');
+  });
+
+  it.each(['system','dark','day'] as const)('saves %s without touching connection or language', choice => {
+    localStorage.setItem('smart-home.ui.connection.v1', 'unchanged-connection-fixture');
+    localStorage.setItem('smart-home.ui.language.v1', 'be');
+    theme.setTheme(choice);
+    expect(theme.savedTheme()).toBe(choice);
+    expect(document.documentElement.dataset.themePreference).toBe(choice);
+    expect(localStorage.getItem('smart-home.ui.connection.v1')).toBe('unchanged-connection-fixture');
+    expect(localStorage.getItem('smart-home.ui.language.v1')).toBe('be');
+  });
+
+  it('accepts cross-tab changes and falls back to System when the preference is removed', () => {
+    render(<App/>);
+    act(()=>window.dispatchEvent(new StorageEvent('storage', {key:theme.THEME_STORAGE_KEY,newValue:'dark'})));
+    expect(screen.getByLabelText('Тема')).toHaveValue('dark');
+    systemChange(true);
+    act(()=>window.dispatchEvent(new StorageEvent('storage', {key:theme.THEME_STORAGE_KEY,newValue:null})));
+    expect(screen.getByLabelText('Тема')).toHaveValue('system');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    act(()=>window.dispatchEvent(new StorageEvent('storage', {key:theme.THEME_STORAGE_KEY,newValue:'invalid'})));
+    expect(theme.getTheme()).toBe('system');
+  });
+
+  it('keeps switching usable when storage is blocked', () => {
+    const read=vi.spyOn(Storage.prototype,'getItem').mockImplementation(()=>{throw new Error('blocked');});
+    const write=vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('blocked');});
+    try {
+      expect(theme.savedTheme()).toBe('system');
+      expect(()=>theme.setTheme('dark')).not.toThrow();
+      expect(document.documentElement.dataset.theme).toBe('dark');
+    } finally { read.mockRestore(); write.mockRestore(); }
+  });
+
+  it('preserves a live API/key draft and translates the selector with the interface', () => {
+    render(<App/>);
+    const address=screen.getByLabelText('Адрес API');
+    const key=screen.getByLabelText('Ключ доступа к сервису');
+    fireEvent.change(address,{target:{value:'http://draft-api.test:8080'}});
+    fireEvent.change(key,{target:{value:'чернавік-Łąka'}});
+    for (const choice of ['dark','day','system']) {
+      fireEvent.change(screen.getByLabelText('Тема'),{target:{value:choice}});
+      expect(screen.getByLabelText('Адрес API')).toBe(address);
+      expect(address).toHaveValue('http://draft-api.test:8080');
+      expect(key).toHaveValue('чернавік-Łąka');
+    }
+    fireEvent.change(screen.getByLabelText('Язык'),{target:{value:'pl'}});
+    expect(screen.getByLabelText('Motyw')).toHaveValue('system');
+    expect(screen.getByRole('option',{name:'Dzienny'})).toHaveValue('day');
+    fireEvent.change(screen.getByLabelText('Język'),{target:{value:'be'}});
+    expect(screen.getByLabelText('Тэма')).toHaveValue('system');
+    expect(screen.getByRole('option',{name:'Цёмная'})).toHaveValue('dark');
+    expect(key).toHaveValue('чернавік-Łąka');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('applies the persisted choice before React paints', () => {
+    const script=bootstrapHTML.match(/<script>([\s\S]*?)<\/script>/)![1];
+    localStorage.setItem(theme.THEME_STORAGE_KEY,'dark');
+    new Function(script)();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    localStorage.setItem(theme.THEME_STORAGE_KEY,'day');
+    new Function(script)();
+    expect(document.documentElement.dataset.theme).toBe('day');
+    localStorage.setItem(theme.THEME_STORAGE_KEY,'invalid');
+    media.matches=true;
+    new Function(script)();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(document.documentElement.dataset.themePreference).toBe('system');
+  });
+});
