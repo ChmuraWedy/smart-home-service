@@ -4,6 +4,7 @@ import { CloudControl } from './components/CloudControl';
 import { CloudApi } from './api';
 import { LanguageSelector } from './components/LanguageSelector';
 import { LANGUAGES, setLocale, t, useLocale } from './i18n';
+import { setTheme } from './theme';
 
 const device={id:'room-lamp',name:'Лампа Łąka',online:true,has_local_key:false};
 const json=(value:unknown)=>new Response(JSON.stringify(value),{status:200});
@@ -26,6 +27,11 @@ describe('localized device controls',()=>{
     const brightness=await screen.findByRole('spinbutton',{name:'Brightness (%)'});
     fireEvent.change(brightness,{target:{value:'78'}});
     expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
+    for (const choice of ['dark','day','system'] as const) {
+      act(()=>setTheme(choice));
+      expect(brightness).toHaveValue(78);
+      expect(writes).toEqual([]);
+    }
     for (const language of LANGUAGES) {
       act(()=>setLocale(language.value));
       expect(screen.getByRole('spinbutton',{name:t('Яркость')+' (%)'})).toBe(brightness);

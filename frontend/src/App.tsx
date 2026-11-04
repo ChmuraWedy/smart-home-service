@@ -5,6 +5,7 @@ import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './
 import { loadConnection, saveConnection } from './connection';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { LanguageSelector } from './components/LanguageSelector';
+import { ThemeSelector } from './components/ThemeSelector';
 import { DeveloperForm, REGIONS, UserCodeForm } from './components/CredentialForms';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
@@ -189,7 +190,7 @@ export function App() {
       <button className="secondary app-menu-button" ref={menuButton} aria-label={t("Меню")} aria-expanded={menuOpen} aria-controls="app-sections" disabled={locked} onClick={() => setMenuOpen(value => !value)}><span aria-hidden="true">☰</span></button>
       {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label={t("Раздел приложения")}>{([['control', t("Управление")], ['network', t("Сеть и пакеты")], ['local-connections', t("Локальные подключения")], ['connections', t("Подключения")]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => navigate(key)}>{label}</button>)}</nav>}
     </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span>{t("Ваш дом под управлением")}</span></div></div>
-      <LanguageSelector /><span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t("API подключён") : t("API не подключён")}</span></header>
+      <div className="appearance-settings"><ThemeSelector /><LanguageSelector /></div><span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t("API подключён") : t("API не подключён")}</span></header>
     <main>
       <input id="access-token" type="hidden" value={connection.token} readOnly />
       {view === 'connections' ? <>

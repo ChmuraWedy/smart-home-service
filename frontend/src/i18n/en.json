@@ -1000,5 +1000,9 @@
   "Шлюз устройства изменился. Повторите поиск.": "The device gateway changed. Search again.",
   "Шлюз этого Zigbee-устройства неизвестен. Сначала выберите и настройте его шлюз.": "This Zigbee device's gateway is unknown. Select and configure its gateway first.",
   "Штора: open/close/stop и положение": "Curtain: open/close/stop and position",
-  "Этот сценарий предназначен для устройства с ещё не настроенными функциями.": "This setup is for devices whose functions are not yet configured."
+  "Этот сценарий предназначен для устройства с ещё не настроенными функциями.": "This setup is for devices whose functions are not yet configured.",
+  "Тема": "Theme",
+  "Системная": "System",
+  "Тёмная": "Dark",
+  "Дневная": "Day"
 }

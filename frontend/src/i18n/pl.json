@@ -1000,5 +1000,9 @@
   "Шлюз устройства изменился. Повторите поиск.": "Bramka urządzenia się zmieniła. Wyszukaj ponownie.",
   "Шлюз этого Zigbee-устройства неизвестен. Сначала выберите и настройте его шлюз.": "Bramka tego urządzenia Zigbee jest nieznana. Najpierw wybierz i skonfiguruj bramkę.",
   "Штора: open/close/stop и положение": "Zasłona: otwieranie/zamykanie/zatrzymanie i pozycja",
-  "Этот сценарий предназначен для устройства с ещё не настроенными функциями.": "Ta konfiguracja dotyczy urządzeń, których funkcje nie są jeszcze skonfigurowane."
+  "Этот сценарий предназначен для устройства с ещё не настроенными функциями.": "Ta konfiguracja dotyczy urządzeń, których funkcje nie są jeszcze skonfigurowane.",
+  "Тема": "Motyw",
+  "Системная": "Systemowy",
+  "Тёмная": "Ciemny",
+  "Дневная": "Dzienny"
 }

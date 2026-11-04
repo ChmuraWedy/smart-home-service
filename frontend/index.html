@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111923" />
+    <script>
+      (() => {
+        let theme = 'system';
+        try { const saved = localStorage.getItem('smart-home.ui.theme.v1'); if (['system', 'dark', 'day'].includes(saved)) theme = saved; } catch {}
+        const resolved = theme === 'system' ? window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'day' : theme;
+        document.documentElement.dataset.theme = resolved;
+        document.documentElement.dataset.themePreference = theme;
+        document.querySelector('meta[name="theme-color"]').content = resolved === 'dark' ? '#101720' : '#f3f6fa';
+      })();
+    </script>
     <title>Smart Home · Tuya</title>
   </head>
   <body>
