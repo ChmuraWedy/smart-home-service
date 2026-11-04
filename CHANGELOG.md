@@ -4,7 +4,9 @@ Entries below describe the changes at the stated date; later entries can superse
 
 ## After 0.8.3 — 2026-11-04
 
-- Added real Sleep Cam live video and settings screenshots. The main camera example shows actual 640×360 playback with resolution/state/download information; a separate screenshot covers privacy, image/detection settings, siren, and SD-card readiness.
+- Camera screenshot headings use the requested Security Camera display label, applied only in the capture browser without changing the saved device name.
+
+- Added real security-camera live video and settings screenshots. The main camera example shows actual 640×360 playback with resolution/state/download information; a separate screenshot covers privacy, image/detection settings, siren, and SD-card readiness.
 
 - Added actual Polish bulb and Belarusian motion-sensor localization examples, with English documentation captions. Renamed overview headings and screenshot assets by device type rather than installation-specific rooms.
 

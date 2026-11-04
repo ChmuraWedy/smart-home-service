@@ -47,7 +47,7 @@ Tuya documents both [device-side video detection](https://developer.tuya.com/en/
 
 ## SD card and detection region
 
-Recording and formatting require a known ready card. Absent/unknown storage disables those actions, even if a cached `record_switch` is true. Readiness is rechecked before submitting a draft. Formatting requires a deletion confirmation and is disabled while formatting is already in progress. Known raw `sd_status` codes are categorical rather than scaled measurements. The inspected Sleep Cam reported no ready card, despite a true cached recording switch.
+Recording and formatting require a known ready card. Absent/unknown storage disables those actions, even if a cached `record_switch` is true. Readiness is rechecked before submitting a draft. Formatting requires a deletion confirmation and is disabled while formatting is already in progress. Known raw `sd_status` codes are categorical rather than scaled measurements. The inspected security camera reported no ready card, despite a true cached recording switch.
 
 The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A red rectangle can be moved/resized over separately started video, using pointer, keyboard, or percentage inputs. Saving updates the draft; Apply sends it. Cancellation keeps the original, unknown object fields are retained, and unsupported/multiple-region formats are not replaced by a fabricated rectangle.
 
@@ -55,4 +55,4 @@ The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A 
 
 Two-way talk, browser snapshot/video saving, detection schedules, camera archive playback, cloud subscription pages, additional region formats, and P2P camera-quality control require separate APIs and implementation. Camera SD recording differs from browser recording. The application's device log is not the Smart Life video/event archive.
 
-Historical playback testing confirmed Sleep Cam HLS at 640×360 with browser CORS. This does not establish compatibility with every Tuya camera or every Developer service plan.
+Historical playback testing confirmed security-camera HLS at 640×360 with browser CORS. This does not establish compatibility with every Tuya camera or every Developer service plan.
