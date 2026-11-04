@@ -248,6 +248,8 @@ def test_global_and_card_observations_share_sockets_and_release_extra_ports(monk
         pytest.fail("Listener did not reach expected state")
 
     try:
+        monitor.start_global()
+        wait_for(lambda: monitor.ports == [6666, 6667, 7000])
         card = monitor.start("device", "device", "direct", None)
         scan = monitor.start_scan()
         wait_for(lambda: len(monitor.ports) == 5)
@@ -256,10 +258,11 @@ def test_global_and_card_observations_share_sockets_and_release_extra_ports(monk
         wait_for(lambda: monitor.ports == [6666, 6667, 7000])
         assert all(channel.closed for channel in sockets if channel.port in (1900, 5353))
         monitor.remove(card["watch_id"])
-        wait_for(lambda: not monitor.ports)
-        assert all(channel.closed for channel in sockets)
+        assert monitor.ports == [6666, 6667, 7000]
+        assert monitor.thread.is_alive()
     finally:
         monitor.close()
+    assert all(channel.closed for channel in sockets)
 
 
 def test_current_ip_neighbors_survive_a_tuya_address_change(monitor):
@@ -404,3 +407,28 @@ def test_scan_requires_an_available_network_and_interface_inventory_is_authentic
     response = client.get("/api/v1/network/interfaces", headers={"X-API-Key": "required"})
     assert response.status_code == 200 and response.json() == []
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_network_page_reuses_global_announcements_with_subnet_filter_and_fresh_counters(monitor):
+    interface = {
+        "name": "eth1",
+        "address": "192.168.40.10",
+        "network": "192.168.40.0/24",
+        "broadcast": "192.168.40.255",
+    }
+    monitor.ingest(datagram({"gwId": "other-network"}), "192.168.20.15")
+    monitor.ingest(datagram({"gwId": "moved-device"}), "192.168.20.16")
+    monitor.ingest(datagram({"gwId": "moved-device"}), "192.168.40.20")
+    scan = monitor.start_scan(interface)
+    assert len(scan["devices"]) == 1 and scan["devices"][0]["device_id"] == "moved-device"
+    assert scan["devices"][0]["cached"] and scan["devices"][0]["changes"] == []
+    assert scan["packets"] == 0 and scan["events"] == []
+    monitor.ingest(datagram({"gwId": "moved-device"}), "192.168.40.21")
+    current = monitor.read_scan(scan["scan_id"])
+    assert current["packets"] == current["devices"][0]["packets"] == 1
+    assert current["devices"][0]["changes"][-1]["previous_ip"] == "192.168.40.20"
+    monitor.remove_scan(scan["scan_id"])
+    assert (
+        monitor.observation("moved-device", "moved-device", "direct", None)["observed_ip"]
+        == "192.168.40.21"
+    )

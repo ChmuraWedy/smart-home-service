@@ -3,9 +3,9 @@ import { useCallback, useState } from 'react';
 import { displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
-import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceNetwork } from './DeviceNetwork';
-import { useControlDrafts } from '../control-drafts';
+import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
@@ -16,28 +16,29 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
   const load = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
-    const [metadata, state] = await Promise.all([api.device(device.id, signal), api.state(device.id, refresh, signal)]);
+    const [metadata, state] = await Promise.all([api.device(device.id, signal), api.state(device.id, refresh, signal, document.visibilityState !== 'hidden')]);
     if (metadata.id !== device.id || state.device_id !== device.id) throw new Error(t("Сервис вернул другое устройство."));
     return { metadata, state };
   }, [api, device.id]);
-  const session = useControlSession(load, onAuthError), now = useClock();
+  const poll = useCallback(async (current: {metadata: LocalDevice; state: DeviceState}, signal: AbortSignal) => {
+    const state = await api.state(device.id, false, signal, true);
+    if (state.device_id !== device.id) throw new Error(t("Сервис вернул другое устройство."));
+    return {...current, state};
+  }, [api, device.id]);
+  const session = useControlSession(load, onAuthError, poll), now = useClock();
   const item = session.data?.metadata || device;
-  const drafts = useControlDrafts();
+  const drafts = useAutomaticControls(changes => session.execute(async () => {
+    for (const change of changes) validateControlValue(change.spec, change.value!);
+    const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
+    if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
+    return {text:t("Команда принята.")};
+  }), !session.busy && !aliasBusy && session.readOK && !!session.data?.state.enabled);
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(session.data.state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!session.data ? t("Проверяем связь") : !session.data.state.enabled ? t("Отключено в настройках") : session.data.state.available ? t("Доступно дома") : t("Состояние неизвестно")} online={session.data?.state.enabled && session.data?.state.available} />}>
-    <div className="control-toolbar"><span className="help">{item.is_gateway ? t("Локальное подключение к шлюзу.") : item.transport === 'zigbee' ? t("Команды передаются через настроенный шлюз.") : t("Прямое подключение к устройству.")}</span><div className="control-actions">
-      {Object.values(item.capabilities).some(cap => cap.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || aliasBusy || !session.readOK || !session.data?.state.enabled} onApply={() => void drafts.apply(changes => session.execute(async () => {
-        for (const change of changes) validateControlValue(change.spec, change.value!);
-        const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
-        if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
-        return {text:t("Команда принята.")};
-      }))} />}
-    </div></div>
-    <p className="help">{t("Первое открытие читает кеш. «Обновить статус» опрашивает устройство. Команды и ключи Tuya обрабатывает сервер.")}</p>
     {session.data && !session.data.state.enabled && <p className="saved-summary">{t("Устройство или его шлюз отключены в настройках сервиса.")}</p>}
     {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
-    <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>{session.data && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={drafts.stage} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
+    <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>{session.data && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={cap.type === 'boolean' ? undefined : drafts.stage} immediatePower reading={session.data!.state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
       const result = await api.setCapability(item.id, key, value);
       if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
       return { text: t("Команда принята.") };

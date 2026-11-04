@@ -4,11 +4,11 @@ import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, CloudSnapshot, JsonValue, Provider } from '../api';
 import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
-import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceMappings } from './DeviceMappings';
 import { ChannelAliases } from './ChannelAliases';
 import { DeviceNetwork } from './DeviceNetwork';
-import { useControlDrafts } from '../control-drafts';
+import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import { BatteryBadge, batteryFromSpecs, isBattery, isCamera } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
@@ -50,7 +50,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     return {...current,snapshot,fetchedAt:snapshot.snapshot_received_at ? receiptTime(snapshot) : current.fetchedAt};
   },[api,device.id,provider]);
   const session = useControlSession<Data>(load, onAuthError, provider === 'sharing' && !editingBusy ? poll : undefined);
-  const now = useClock(), drafts = useControlDrafts();
+  const now = useClock();
   const definitions = session.data ? labels ? withChannelLabels(session.data.definitions, labels) : session.data.definitions : null;
   const specs = session.data && definitions ? cloudSpecs(definitions, session.data.snapshot) : [];
   const camera = isCamera(device.category);
@@ -67,6 +67,13 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
     return { text: t("Команда принята.") };
   });
+  const drafts = useAutomaticControls(changes => session.execute(async () => {
+    changes.forEach(change => ensureStorage(change.spec));
+    const commands = cloudBatchCommands(changes.map(change => ({spec:change.spec,value:change.value!})), session.data!.definitions, session.data!.snapshot.status);
+    const result = await api.sendDeviceCommands(device.id, provider, commands);
+    if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
+    return {text:t("Команда принята.")};
+  }), !session.busy && !editingBusy && session.readOK);
   const field = (spec: ControlSpec, headingActions?: ReactNode) => {
     const info = camera && spec.help;
     const helpIcon = info ? <FieldInfo label={spec.label} text={info} /> : undefined;
@@ -74,7 +81,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     if (camera && spec.key==='record_switch' && !storage.ready) return <section className="capability camera-record-unavailable" key={spec.key} aria-label={spec.label}><div className="capability-row"><div className="capability-heading"><div className="capability-label-line"><h3>{spec.label}</h3>{helpIcon}</div></div><span>{t("Недоступна")}</span></div><p className="help">{storage.label}. {session.data?.snapshot.status.record_switch===true ? t("Сохранённая настройка записи включена, но это не означает, что камера записывает видео.") : t("Запись станет доступна после установки исправной карты памяти.")}</p></section>;
     if (camera && spec.key === 'sd_format' && spec.writable && spec.kind === 'boolean') return <CameraFormat key={spec.key} information={helpIcon} disabled={disabled} onFormat={()=>sendValue(spec,true)} />;
     const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
-    return <CapabilityField headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={privacyButton ? undefined : drafts.stage} immediatePower={privacyButton} booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t("Нет данных") : value ? t("Включена") : t("Выключена") : undefined} onBooleanStateChange={privacyButton ? setPrivacyState : undefined} reading={camera && spec.key==='sd_status' ? {...cloudReading(spec,session.data!.snapshot.status[spec.key],session.data!.snapshot.status_observations?.[spec.key]),value:storage.label} : cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} onRefresh={session.refresh} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
+    return <CapabilityField headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t("Нет данных") : value ? t("Включена") : t("Выключена") : undefined} onBooleanStateChange={privacyButton ? setPrivacyState : undefined} reading={camera && spec.key==='sd_status' ? {...cloudReading(spec,session.data!.snapshot.status[spec.key],session.data!.snapshot.status_observations?.[spec.key]),value:storage.label} : cloudReading(spec, session.data!.snapshot.status[spec.key], session.data!.snapshot.status_observations?.[spec.key])} now={now} local={false} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
   };
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
@@ -83,15 +90,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   const networkSignal = signal && session.data ? displayReading(signal,cloudReading(signal,session.data.snapshot.status[signal.key])) : undefined;
   return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,session.data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || t("Устройство Tuya")} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={session.data ? (session.data.snapshot.online ? t("В сети") : t("Не в сети")) : t("Проверяем связь")} online={session.data?.snapshot.online} />}>
     {camera && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock} headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined} />}
-    <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? t("В сети") : t("Не в сети")) : t("Проверяем связь")}</span><div className="control-actions">
-      {specs.some(spec => spec.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || editingBusy || !session.readOK} onApply={() => void drafts.apply(changes => session.execute(async () => {
-        changes.forEach(change=>ensureStorage(change.spec));
-        const commands = cloudBatchCommands(changes.map(change => ({spec:change.spec,value:change.value!})), session.data!.definitions, session.data!.snapshot.status);
-        const result = await api.sendDeviceCommands(device.id, provider, commands);
-        if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
-        return {text:t("Команда принята.")};
-      }))} />}
-    </div></div>
+    <div className="control-toolbar"><span className={'presence' + (session.data?.snapshot.online ? ' online' : '')}>{session.data ? (session.data.snapshot.online ? t("В сети") : t("Не в сети")) : t("Проверяем связь")}</span></div>
     <details className="status-details"><summary>{t("О показаниях")}</summary>
     <p className="help">{specs.some(spec => spec.writable) ? t("Облачный снимок состояния. Принятие команды не подтверждает изменение устройства; облако может вернуть прежнее показание.") : t("Последнее известное состояние в облаке. Обновите статус для получения нового снимка.")}</p>
     {session.data && <p className="help">{t("Снимок получен:") + " "}{new Date(session.data.fetchedAt).toLocaleString(dateLocale())}</p>}

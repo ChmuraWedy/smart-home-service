@@ -50,7 +50,7 @@ function AreaDialog({initial,api,deviceId,provider,onAuthError,onClose,onSave,vi
     <CameraLive viewingBlocked={viewingBlocked} api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} compact overlay={overlay} />
     <div className="camera-area-values">{(['x','y','xlen','ylen'] as const).map(key=><label key={key}>{({x:t("Слева"),y:t("Сверху"),xlen:t("Ширина"),ylen:t("Высота")})[key]} (%)<input type="number" min={key==='x'||key==='y'?0:1} max={100} step={1} value={area[key]} onChange={event=>setArea({...area,[key]:Number(event.target.value)})} /></label>)}</div>
     {!validArea(area) && <p role="alert" className="error">{t("Область должна целиком находиться внутри изображения и иметь ненулевой размер.")}</p>}
-    <p className="help">{t("«Сохранить» перенесёт область в настройки. Для отправки камере нажмите «Применить» в подробной карточке.")}</p>
+    <p className="help">{t("«Сохранить» отправит выбранную область камере.")}</p>
     </div>
     <div className="camera-format-actions camera-area-footer"><button type="button" className="secondary" onClick={onClose}>{t("Отмена")}</button><button type="button" disabled={!validArea(area)} onClick={()=>onSave(area)}>{t("Сохранить")}</button></div>
   </ControlDialog>;

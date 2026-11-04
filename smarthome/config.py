@@ -18,6 +18,12 @@ class Settings:
         default_factory=lambda: float(os.getenv("SMART_HOME_LOCK_TIMEOUT", "5"))
     )
 
+    network_monitor_enabled: bool = field(
+        default_factory=lambda: (
+            os.getenv("SMART_HOME_NETWORK_MONITOR_ENABLED", "1").lower() in {"1", "true", "yes"}
+        )
+    )
+
     display_poll_interval: float = field(
         default_factory=lambda: float(os.getenv("SMART_HOME_DISPLAY_POLL_INTERVAL", "30"))
     )

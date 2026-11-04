@@ -20,6 +20,7 @@ from .api_dependencies import authenticate, get_session
 from .cloud_api import Provider, cloud_bridge, safe_spec
 from .cloud_mappings import scope_for
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
+from .local_lighting import color_capability
 from .models import Device
 from .schemas import Capability, DeviceCreate, DeviceRead, Name, PositiveID, Schema
 from .service import (
@@ -268,6 +269,9 @@ def proposed_capability(entry, row):
     )
     if kind is None:
         return None, False
+    color = color_capability(entry.specs, entry.functions, entry.readings.values(), code, dp, value)
+    if color:
+        return color, True
     cap = Capability(dp=dp, type=kind, writable=False)
     spec = entry.specs.get(code, {})
     limits = spec.get("values", {})
@@ -613,6 +617,10 @@ def sample(
                 )
                 entry.changes = entry.changes[-100:]
             entry.readings[row["key"]] = row
+        # Re-evaluate after all rows are present: color depends on a confirmed
+        # mode DP, irrespective of the order of DPS in a LAN response.
+        for row in entry.readings.values():
+            _, row["can_write"] = proposed_capability(entry, row)
         entry.sample_count += 1
         return view(store, token, entry)
 

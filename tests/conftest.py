@@ -52,6 +52,12 @@ class Factory:
         return item
 
 
+@pytest.fixture(autouse=True)
+def disable_live_network_monitor(monkeypatch):
+    # App tests must not bind real discovery sockets on the developer's LAN.
+    monkeypatch.setenv("SMART_HOME_NETWORK_MONITOR_ENABLED", "0")
+
+
 @pytest.fixture
 def factory():
     return Factory()

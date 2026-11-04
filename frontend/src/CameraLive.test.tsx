@@ -226,7 +226,7 @@ describe('camera live viewing',()=>{
     await screen.findByText('Последнее известное состояние в облаке. Обновите статус для получения нового снимка.');
     expect(vi.mocked(fetch).mock.calls.every(([,options])=>options?.method!=='POST')).toBe(true);
   });
-  it('groups only advertised camera settings and sends edited original mode values together',async()=>{
+  it('groups only advertised camera settings and sends edited original mode values automatically',async()=>{
     const functions=[
       {code:'basic_private',type:'Boolean',values:'{}'},
       {code:'basic_nightvision',type:'Enum',values:'{"range":["0","1","2"]}'},
@@ -258,11 +258,10 @@ describe('camera live viewing',()=>{
     expect(screen.getByRole('button',{name:'Форматировать…'})).toBeEnabled();
     await user.selectOptions(within(image).getByRole('combobox',{name:'Ночное видение'}),'1');
     await user.selectOptions(within(storage).getByRole('combobox',{name:'Режим записи'}),'1');
-    await user.click(screen.getByRole('button',{name:/Применить/}));
-    await waitFor(()=>expect(vi.mocked(fetch).mock.calls.some(([,options])=>options?.method==='POST')).toBe(true));
-    const [path,options]=vi.mocked(fetch).mock.calls.find(([,options])=>options?.method==='POST')!;
-    expect(String(path)).toContain('provider=sharing');
-    expect(JSON.parse(String(options?.body)).commands).toEqual(expect.arrayContaining([{code:'basic_nightvision',value:'1'},{code:'record_mode',value:'2'}]));
-    expect(JSON.parse(String(options?.body)).commands).toHaveLength(2);
+
+    await waitFor(()=>expect(vi.mocked(fetch).mock.calls.filter(([,options])=>options?.method==='POST')).toHaveLength(2));
+    const posts=vi.mocked(fetch).mock.calls.filter(([,options])=>options?.method==='POST');
+    expect(posts.every(([path])=>String(path).includes('provider=sharing'))).toBe(true);
+    expect(posts.flatMap(([,options])=>JSON.parse(String(options?.body)).commands)).toEqual([{code:'basic_nightvision',value:'1'},{code:'record_mode',value:'2'}]);
   });
 });

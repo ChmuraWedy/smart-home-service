@@ -18,7 +18,7 @@ function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise
 }
 
 describe('camera action buttons',()=>{
-  it('toggles privacy immediately while leaving other edited settings for Apply',async()=>{
+  it('sends privacy and other settings immediately without Apply',async()=>{
     const writes=mountSettings(),user=userEvent.setup();
     const privacy=await screen.findByRole('button',{name:'Режим приватности'});
     await waitFor(()=>expect(privacy).toBeEnabled());
@@ -30,11 +30,11 @@ describe('camera action buttons',()=>{
     await user.selectOptions(night,'1');
     await user.click(privacy); await waitFor(()=>expect(privacy).toBeEnabled());
     expect(privacy).toHaveAttribute('aria-pressed','true');
-    expect(writes.map(write=>write.body)).toEqual([{commands:[{code:'basic_private',value:true}]}]);
+    expect(writes.map(write=>write.body)).toEqual([{commands:[{code:'basic_nightvision',value:'1'}]},{commands:[{code:'basic_private',value:true}]}]);
     expect(night).toHaveDisplayValue('Выключено');
-    await user.click(screen.getByRole('button',{name:/Применить/}));
+
     await waitFor(()=>expect(writes).toHaveLength(2));
-    expect(writes[1].body).toEqual({commands:[{code:'basic_nightvision',value:'1'}]});
+    expect(writes[0].body).toEqual({commands:[{code:'basic_nightvision',value:'1'}]});
   });
   it('shows privacy state and waits for the camera to confirm off before enabling video',async()=>{
     const status={value:true},writes=mountSettings('sharing',undefined,1,status),user=userEvent.setup();
@@ -82,7 +82,7 @@ describe('camera action buttons',()=>{
     expect(screen.getByRole('button',{name:'Форматировать…'})).toBeDisabled();
     expect(screen.queryByRole('switch',{name:'Запись на карту памяти'})).toBeNull();
     expect(writes).toEqual([]);
-    expect(screen.getByRole('button',{name:/Применить/})).toBeDisabled();
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
   });
   it('formats only after confirmation, never stages an off value, and prevents double submissions',async()=>{
     let resolve!:(response:Response)=>void;
@@ -106,6 +106,6 @@ describe('camera action buttons',()=>{
     await act(async()=>resolve(json({acknowledged:true})));
     await waitFor(()=>expect(screen.queryByRole('dialog',{name:'Форматирование карты памяти'})).toBeNull());
     expect(writes).toHaveLength(1);
-    expect(screen.getByRole('button',{name:/Применить/})).toBeDisabled();
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
   });
 });

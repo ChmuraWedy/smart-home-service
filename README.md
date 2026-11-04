@@ -37,7 +37,7 @@ The example bulb exposes white/color modes, brightness, color temperature, a col
 
 ### Bulb: precise color controls
 
-Expand the color row to see hue, saturation, and color brightness. Opening this panel does not change the light; edits are sent with **Apply**.
+Expand the color row to see hue, saturation, and color brightness. Opening this panel does not change the light. Controls send changes automatically; sliders wait briefly for editing to stop.
 
 ![Bulb with the precise color sliders expanded](docs/screenshots/bulb-color-day.png)
 

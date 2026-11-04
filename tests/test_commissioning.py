@@ -549,3 +549,60 @@ def test_existing_zigbee_setup_uses_saved_parent_and_rejects_parent_changes(
     )
     assert save(client, token, writable=["dp_1"]).status_code == 409
     assert client.get(f"/api/v1/devices/{child['id']}").json()["capabilities"] == {}
+
+
+@pytest.mark.parametrize(
+    "code,raw,encoding",
+    [
+        ("colour_data_v2", "007803e803e8", "tuya_hsv"),
+        ("colour_data_v2", '{"h":120,"s":1000,"v":1000}', "tuya_hsv_json"),
+        ("colour_data", "00ff000078ffff", "tuya_rgbhsv"),
+    ],
+)
+def test_verified_local_color_is_editable_and_selects_confirmed_mode_dp(
+    client, factory, observer, code, raw, encoding
+):
+    _, bridge = observer
+    bridge.device.function = {
+        code: SimpleNamespace(code=code, type="Json", values="{}", dp_id=88),
+        "work_mode": SimpleNamespace(
+            code="work_mode", type="Enum", values='{"range":["white","colour"]}', dp_id=87
+        ),
+    }
+    # Color can arrive before mode, and neither DP is assumed from its category.
+    factory.result = {"dps": {"88": raw, "87": "white"}}
+    token = begin(client, provider="sharing")
+    observed = sample(client, token)
+    assert next(row for row in observed["readings"] if row["dp"] == "88")["can_write"]
+    saved = save(client, token, writable=["dp_88", "dp_87"])
+    assert saved.status_code == 201, saved.text
+    item = saved.json()
+    color = item["capabilities"][code]
+    assert color["type"] == "object" and color["encoding"] == encoding
+    assert color["writable"] and color["write_dps"] == {"87": "colour"}
+    state = client.get(f"/api/v1/devices/{item['id']}/state").json()
+    assert state["values"][code]["value"] == {"h": 120, "s": 1000, "v": 1000}
+    result = client.post(
+        f"/api/v1/devices/{item['id']}/commands/capabilities",
+        json={"values": {code: {"h": 120, "s": 1000, "v": 1000}}},
+    )
+    assert result.status_code == 200, result.text
+    assert factory.commands[-1][2] == {"87": "colour", "88": raw}
+
+
+@pytest.mark.parametrize("raw", ["not-a-color", "ffff03e803e8", "0000ffff03e8"])
+def test_invalid_local_color_remains_read_only(client, factory, observer, raw):
+    _, bridge = observer
+    bridge.device.function = {
+        "colour_data_v2": SimpleNamespace(
+            code="colour_data_v2", type="Json", values="{}", dp_id=24
+        ),
+        "work_mode": SimpleNamespace(
+            code="work_mode", type="Enum", values='{"range":["white","colour"]}', dp_id=21
+        ),
+    }
+    factory.result = {"dps": {"24": raw, "21": "white"}}
+    token = begin(client, provider="sharing")
+    observed = sample(client, token)
+    assert not next(row for row in observed["readings"] if row["dp"] == "24")["can_write"]
+    assert save(client, token, writable=["dp_24"]).status_code == 422

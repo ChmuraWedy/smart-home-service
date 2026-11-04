@@ -55,8 +55,10 @@ export type NetworkWatch = {
   last_seen: string | null; packets: number; listening: boolean; ports: number[]; failed_ports: number[];
   remaining_seconds: number; changes: { at: string; previous_ip: string | null; ip: string }[];
 };
+export type NetworkObservation = Omit<NetworkWatch, 'watch_id' | 'remaining_seconds'> & { enabled: boolean };
 export type NetworkInterface = { name: string; address: string; network: string; broadcast: string };
 export type LanDevice = {
+  cached?: boolean;
   ip: string; device_id: string | null; version: string | null; hostname: string | null;
   mac: string | null; protocols: string[]; services: string[]; packets: number;
   first_seen: string | null; last_seen: string | null;
@@ -150,6 +152,9 @@ export class CloudApi {
   status(signal?: AbortSignal) { return this.json<CloudStatus>('/status', 'GET', undefined, signal); }
   deviceActivity(id: string, provider: Provider | 'local', before?: number, signal?: AbortSignal) {
     return this.request<{ device_id: string; events: DeviceEvent[]; next_before: number | null }>('/activity/devices/' + encodeURIComponent(id) + '?provider=' + provider + (before ? '&before=' + before : ''), 'GET', undefined, signal);
+  }
+  deviceNetworkObservation(id: string, provider: Provider | 'local', signal?: AbortSignal) {
+    return this.request<NetworkObservation>('/network/devices/' + encodeURIComponent(id) + '/observation?provider=' + provider, 'GET', undefined, signal);
   }
   startNetworkWatch(id: string, provider: Provider | 'local', signal?: AbortSignal) {
     return this.request<NetworkWatch>('/network/devices/' + encodeURIComponent(id) + '/watch?provider=' + provider, 'POST', {}, signal);

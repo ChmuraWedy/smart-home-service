@@ -2,11 +2,17 @@
 
 The menu's **Network and packets** page works independently of Smart Life. It receives available LAN announcements, displays known network identities, and exports a local report. It does not reveal Zigbee radio traffic or automatically configure devices.
 
+## Shared passive receiver
+
+The service starts one shared Tuya announcement receiver on UDP 6666/6667/7000. It runs while cards and browser pages are closed, using the same sockets as detailed network observations. It receives announcements without sending device status requests or discovery probes. `SMART_HOME_NETWORK_MONITOR_ENABLED=0` disables this automatic background mode; explicit legacy watches and detailed observations can still open their listeners on demand.
+
+The shared cache holds the most recently seen 256 Tuya identities and up to 20 IP changes each. It retains only sender IP, declared device ID, supported protocol version, timestamps, counters, and address changes. It stores no raw packets or switch readings, and resets when the service restarts. Missing announcements do not establish that a device is offline. Busy ports are reported and retried without reopening healthy sockets.
+
 ## Select the real network
 
 The service lists its actual IPv4 interfaces and prefixes; select the subnet where the devices live before starting. The page does not assume a fixed third octet or silently scan another network. On a Linux container, use the [host-network override](../deploy/docker.md#linux-lan-discovery) to see the target's real interfaces.
 
-Observation can receive Tuya UDP discovery on ports 6666/6667/7000, mDNS/SSDP announcements, and available neighbor-cache information. An explicit discovery action requests standard Tuya announcements. It is not a switch command, a TCP connection to every host, or a full TLS packet capture.
+A detailed observation begins with cached Tuya identities matching the selected subnet. These are labeled as cached announcements and do not count as newly received packets. It can also receive Tuya UDP discovery on ports 6666/6667/7000, mDNS/SSDP announcements, and available neighbor-cache information. An explicit discovery action requests standard Tuya announcements. It is not a switch command, a TCP connection to every host, or a full TLS packet capture.
 
 Rows can include the sender IP, declared Tuya ID and verified protocol version, MAC from the neighbor table, mDNS/SSDP service types, a validated host A-record name, counters, and recent IP changes. An ARP-only row is not evidence of a received packet or current reachability. Discovery is unauthenticated; it does not prove identity or justify automatically replacing inventory IPs.
 
@@ -24,15 +30,17 @@ All endpoints require the service key and use no-store responses:
 | POST | `/scans/{scan_id}/discover` | Explicit standard discovery request |
 | DELETE | `/scans/{scan_id}` | Stop observation |
 
-The selected address must belong to an existing interface. Sessions share listeners with per-device watches: at most four network scans and 32 total watches, a 15-second renewable lease, and a 900-second maximum lifetime. The UI reads every three seconds and stops when hidden, navigated away, or reconnected elsewhere. Abandoned sessions expire and release sockets.
+The selected address must belong to an existing interface. Detailed sessions share the global receiver and legacy per-device watches: at most four network scans and 32 total watches, a 15-second renewable lease, and a 900-second maximum lifetime. The UI reads every three seconds and stops when hidden, navigated away, or reconnected elsewhere. Abandoned sessions expire and release their additional mDNS/SSDP sockets. The shared Tuya receiver continues until service shutdown.
 
 Memory holds up to 256 records, the last 200 events, and up to 20 IP changes per identity. Port and neighbor-table failures are reported independently. Stopping keeps the last UI snapshot. Export includes the selected network, addresses/IDs, services, changes, events, and counters, without session IDs, keys, tokens, raw packets, TXT records, or HTTP content. The report is downloaded locally.
 
 ## Observation from a device card
 
-The device's home-network section starts a watch for its exact Tuya ID. A Zigbee watch uses an explicitly known local parent or cloud `gateway_id`; names, rooms, and neighboring packets do not establish that parent.
+The home-network section automatically reads the shared cache while expanded. There is no per-device Start/Stop button and no new receiving socket per card. Closing or hiding the panel stops its cache reads, not global reception.
 
-`POST /network/devices/{id}/watch?provider=sharing|developer|local` starts it. GET/DELETE `/network/watches/{watch_id}` reads/renews or stops it. The observed address comes from the packet's sender rather than an untrusted payload IP. History belongs only to this in-memory watch; it does not change saved connection settings. The same lease/lifetime behavior applies.
+`GET /network/devices/{id}/observation?provider=sharing|developer|local` resolves the exact device or its explicitly known gateway and returns the latest saved announcement. A Zigbee child uses its configured local parent or cloud `gateway_id`; names, rooms, and nearby packets never establish that relationship. The observed IP comes from the packet sender, not its claimed payload address. Discovery never changes saved connection settings automatically.
+
+Legacy `POST /network/devices/{id}/watch` and GET/DELETE `/network/watches/{watch_id}` remain available for older clients with their existing lease and lifetime limits. New cards do not allocate those sessions.
 
 ## Standalone capture tool
 

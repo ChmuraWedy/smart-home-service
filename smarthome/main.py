@@ -350,12 +350,15 @@ def normalized_state(
     item_id: EntityRef,
     request: Request,
     refresh: bool = False,
+    watch: bool = False,
     max_age: int = Query(60, ge=1, le=86400),
     session: Session = Depends(get_session),
 ):
     item = get_by_ref(session, Device, item_id)
     if refresh:
         run_command(request, session, item, "status")
+    if watch:
+        request.app.state.visible_status.touch(item.id)
     return device_state(session, item, max_age=max_age)
 
 
@@ -593,6 +596,8 @@ def create_app(settings: Settings | None = None, controller=None):
         from .network import NetworkMonitor
 
         app.state.network = NetworkMonitor()
+        if settings.network_monitor_enabled:
+            app.state.network.start_global()
         from .topology import TopologySync
 
         app.state.topology = TopologySync()
@@ -606,10 +611,15 @@ def create_app(settings: Settings | None = None, controller=None):
 
         app.state.poller = DisplayPoller(app)
         app.state.poller.start()
+        from .visible_status import VisibleStatusPoller
+
+        app.state.visible_status = VisibleStatusPoller(app)
+        app.state.visible_status.start()
         try:
             yield
         finally:
             app.state.network.close()
+            app.state.visible_status.stop()
             app.state.poller.stop()
             app.state.topology.stop()
             app.state.observations.clear()
