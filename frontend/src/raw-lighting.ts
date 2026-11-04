@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { JsonValue } from './api';
 import { defaultObject, rawBytes, validateObject } from './lighting';
 import type { JsonSchema } from './lighting';
@@ -53,17 +54,17 @@ export function decodeRawSchedule(code:string,value:string):Model|undefined {
 
 export function defaultSchedule(code:string):Model {
   const schema=rawSchemas[code];
-  if(!schema) throw new Error('Неизвестный формат расписания.');
+  if(!schema) throw new Error(t("Неизвестный формат расписания."));
   const model=defaultObject(schema);
   if(code === 'random_timing') (model.nodes as Model[])[0].end=1439;
   return model;
 }
 function validateSchedule(code:string,value:Model) {
   const schema=rawSchemas[code];
-  if(!schema) throw new Error('Неизвестный формат расписания.');
+  if(!schema) throw new Error(t("Неизвестный формат расписания."));
   validateObject(value,schema);
-  if((value.nodes as JsonValue[]).length>rawNodeLimits[code]) throw new Error('Слишком много точек расписания.');
-  if(code==='rhythm_mode' && Number(value.mode)>0 && Number(value.mode)<15) throw new Error('Переход: 0 (авто) или от 15 минут.');
+  if((value.nodes as JsonValue[]).length>rawNodeLimits[code]) throw new Error(t("Слишком много точек расписания."));
+  if(code==='rhythm_mode' && Number(value.mode)>0 && Number(value.mode)<15) throw new Error(t("Переход: 0 (авто) или от 15 минут."));
 }
 export function encodeRawSchedule(code:string,value:Model):string {
   validateSchedule(code,value);

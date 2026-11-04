@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { JsonValue } from './api';
 
 export type JsonSchema = Record<string, Record<string, unknown>>;
@@ -22,23 +23,23 @@ export function defaultObject(schema: JsonSchema): Record<string, JsonValue> {
 }
 
 export function validateObject(value: JsonValue, schema: JsonSchema): void {
-  if (!object(value) || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(Object.keys(schema).sort())) throw new Error('Заполните все поля команды устройства.');
+  if (!object(value) || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(Object.keys(schema).sort())) throw new Error(t("Заполните все поля команды устройства."));
   for (const [key, rule] of Object.entries(schema)) {
     const current = value[key];
-    if (Array.isArray(rule.range)) { if (!rule.range.includes(String(current)) || typeof current !== 'string') throw new Error('Недопустимый режим эффекта.'); }
+    if (Array.isArray(rule.range)) { if (!rule.range.includes(String(current)) || typeof current !== 'string') throw new Error(t("Недопустимый режим эффекта.")); }
     else if (typeof rule.min === 'number' && typeof rule.max === 'number') {
-      if (!Number.isInteger(current) || Number(current) < rule.min || Number(current) > rule.max || (Number(current) - rule.min) % Number(rule.step || 1)) throw new Error('Значение эффекта вне допустимого диапазона или шага.');
+      if (!Number.isInteger(current) || Number(current) < rule.min || Number(current) > rule.max || (Number(current) - rule.min) % Number(rule.step || 1)) throw new Error(t("Значение эффекта вне допустимого диапазона или шага."));
     } else if (['scene_units','nodes'].includes(key)) {
-      if (!Array.isArray(current) || (key === 'scene_units' && !current.length) || current.length > 32) throw new Error('Недопустимое количество шагов.');
+      if (!Array.isArray(current) || (key === 'scene_units' && !current.length) || current.length > 32) throw new Error(t("Недопустимое количество шагов."));
       for (const unit of current) validateObject(unit, rule as JsonSchema);
     } else validateObject(current as JsonValue, rule as JsonSchema);
   }
 }
 
 export function rawBytes(value: string, maximum = 16384): Uint8Array {
-  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw new Error('Некорректные данные производителя (base64).');
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw new Error(t("Некорректные данные производителя (base64)."));
   const bytes = Uint8Array.from(atob(value), c => c.charCodeAt(0));
-  if (bytes.length > maximum) throw new Error('Данные производителя превышают допустимый размер.');
+  if (bytes.length > maximum) throw new Error(t("Данные производителя превышают допустимый размер."));
   return bytes;
 }
 
@@ -54,7 +55,7 @@ export function decodePowerMemory(value: string): PowerMemory | undefined {
   } catch { return; }
 }
 export function encodePowerMemory(value: PowerMemory): string {
-  if (!Number.isInteger(value.mode) || value.mode < 0 || value.mode > 2 || !Number.isInteger(value.h) || value.h < 0 || value.h > 360 || [value.s,value.v,value.bright,value.temperature].some(v => !Number.isInteger(v) || v < 0 || v > 1000)) throw new Error('Некорректное состояние после включения питания.');
+  if (!Number.isInteger(value.mode) || value.mode < 0 || value.mode > 2 || !Number.isInteger(value.h) || value.h < 0 || value.h > 360 || [value.s,value.v,value.bright,value.temperature].some(v => !Number.isInteger(v) || v < 0 || v > 1000)) throw new Error(t("Некорректное состояние после включения питания."));
   const bytes = new Uint8Array(12), view = new DataView(bytes.buffer);
   bytes[1] = value.mode;
   [value.h,value.s,value.v,value.bright,value.temperature].forEach((v,i) => view.setUint16(2+i*2,v));

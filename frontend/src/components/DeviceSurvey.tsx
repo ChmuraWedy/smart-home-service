@@ -1,3 +1,4 @@
+import { dateLocale, localizeMessages, t } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, JsonValue, Provider } from '../api';
@@ -5,7 +6,7 @@ import { labelFor } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceDraft, Inventory, ObservationAction, ObservationReading, ObservationSession, Placement, LocalDevice } from '../home-api';
 
-const actions: Record<ObservationAction, { label: string; prompt: string }> = {
+const actions: Record<ObservationAction, { label: string; prompt: string }> = localizeMessages({
   observe: { label: 'Наблюдение', prompt: 'Получим исходное состояние. Затем выберите действие, которое хотите проверить.' },
   power: { label: 'Включение и выключение', prompt: 'Включите устройство физической кнопкой или в Smart Life. Подождите показания, затем выключите и снова подождите.' },
   brightness: { label: 'Яркость', prompt: 'Измените яркость в Smart Life, подождите показания, затем выберите другое значение.' },
@@ -13,10 +14,10 @@ const actions: Record<ObservationAction, { label: string; prompt: string }> = {
   color: { label: 'Цвет', prompt: 'Выберите два разных цвета в Smart Life. Между действиями дождитесь новых показаний.' },
   sensor: { label: 'Датчик', prompt: 'Вызовите событие, например движение, открытие или изменение освещённости. Спящий датчик может передать показания с задержкой.' },
   button: { label: 'Кнопка или пульт', prompt: 'Нажмите нужную кнопку, дождитесь отчёта, затем повторите. Некоторые пульты передают события только в облако.' },
-};
-const textValue = (value: JsonValue) => value === true ? 'Вкл / да' : value === false ? 'Выкл / нет' : value === null ? 'Нет значения' : typeof value === 'object' ? JSON.stringify(value) : String(value);
-const title = (row: ObservationReading) => row.code ? labelFor(row.code) : 'Параметр ' + (row.dp ? 'DP ' + row.dp : row.key);
-const timeLabel = (stamp: string | null) => stamp ? new Date(stamp).toLocaleString('ru-RU') : 'Время отчёта не указано';
+});
+const textValue = (value: JsonValue) => value === true ? t("Вкл / да") : value === false ? t("Выкл / нет") : value === null ? t("Нет значения") : typeof value === 'object' ? JSON.stringify(value) : String(value);
+const title = (row: ObservationReading) => row.code ? labelFor(row.code) : t("Параметр ") + (row.dp ? 'DP ' + row.dp : row.key);
+const timeLabel = (stamp: string | null) => stamp ? new Date(stamp).toLocaleString(dateLocale()) : t("Время отчёта не указано");
 
 export function DeviceSurvey({ api, inventory, device, provider, placement, cloudDevices = [], gatewayPlacements = [], gatewayOnly = false, onSaved, onClose, onAuthError, existing }: {
   api: HomeApi; inventory: Inventory; device?: CloudDevice; provider?: Provider;
@@ -72,7 +73,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
 
   function report(failure: unknown) {
     if (!mounted.current) return;
-    setError(failure instanceof Error ? failure.message : 'Не удалось выполнить опрос.');
+    setError(failure instanceof Error ? failure.message : t("Не удалось выполнить опрос."));
     if (failure instanceof ApiError && failure.status === 401) onAuthError();
   }
 
@@ -86,7 +87,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       try {
         const result = await api.observationSample(sessionId!, actionRef.current, controller.signal);
         if (stopped) return;
-        if (result.session_id !== sessionId || result.device_id !== id) throw new Error('Сервис вернул другое устройство.');
+        if (result.session_id !== sessionId || result.device_id !== id) throw new Error(t("Сервис вернул другое устройство."));
         setObservation(result); setError('');
       } catch (failure) {
         if (stopped) return;
@@ -142,10 +143,10 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   }
 
   const placementFields = <div className="survey-form-grid">
-    <label>Название<input value={name} maxLength={120} onChange={event => setName(event.target.value)} required /></label>
-    <label>Алиасы через запятую<input aria-label="Алиасы через запятую" value={aliases} onChange={event => setAliases(event.target.value)} placeholder="kitchen_light, main_light" /><span className="help">Латинские буквы, цифры, . _ -; начинайте с буквы. Название тоже станет алиасом.</span></label>
-    <label>Здание<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); }}><option value="">Не выбрано</option>{inventory.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-    <label>Комната<select value={room} onChange={event => setRoom(event.target.value)}><option value="">Не выбрана</option>{rooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+    <label>{t("Название")}<input value={name} maxLength={120} onChange={event => setName(event.target.value)} required /></label>
+    <label>{t("Алиасы через запятую")}<input aria-label={t("Алиасы через запятую")} value={aliases} onChange={event => setAliases(event.target.value)} placeholder="kitchen_light, main_light" /><span className="help">{t("Латинские буквы, цифры, . _ -; начинайте с буквы. Название тоже станет алиасом.")}</span></label>
+    <label>{t("Здание")}<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); }}><option value="">{t("Не выбрано")}</option>{inventory.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+    <label>{t("Комната")}<select value={room} onChange={event => setRoom(event.target.value)}><option value="">{t("Не выбрана")}</option>{rooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
   </div>;
 
   if (gatewaySetup) return <DeviceSurvey api={api} inventory={availableInventory} device={gatewaySetup.device} provider={gatewaySetup.device ? provider : undefined} gatewayOnly
@@ -156,44 +157,44 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
     }} />;
 
   return <section className="card device-survey" aria-labelledby="survey-heading">
-    <div className="card-heading"><div><p className="eyebrow">{existing ? 'Функции устройства' : 'Локальное подключение'} · {step === 'configure' ? '1 / 2' : '2 / 2'}</p><h2 id="survey-heading">{step === 'configure' ? existing ? 'Настроить функции устройства' : 'Настроить локальное подключение' : 'Проверьте устройство'}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>Отмена</button></div>
+    <div className="card-heading"><div><p className="eyebrow">{existing ? t("Функции устройства") : t("Локальное подключение")} · {step === 'configure' ? '1 / 2' : '2 / 2'}</p><h2 id="survey-heading">{step === 'configure' ? existing ? t("Настроить функции устройства") : t("Настроить локальное подключение") : t("Проверьте устройство")}</h2></div><button className="secondary compact" disabled={busy} onClick={onClose}>{t("Отмена")}</button></div>
     {step === 'configure' ? <form onSubmit={event => { event.preventDefault(); void begin(); }}>
-      {existing ? <div className="saved-summary"><strong>{existing.name}</strong><p>Прочитаем реальные локальные параметры и сопоставим их со схемой Tuya. Устройство не переключается автоматически. Все проверенные функции станут доступны после нажатия «Сохранить функции». Имя, алиасы, комната, ключ и адрес сохранятся.</p>{!provider && <p className="help">Аккаунт Tuya недоступен: параметры можно сохранить только для чтения. Для распознавания переключателей подключите Smart Life или Tuya Developer.</p>}</div> : <><p className="help">Необязательная настройка управления по домашней сети. Проверим связь и изменения показаний при ваших действиях. Локальное подключение сохранится только после проверки.</p>
-      {device && <p className="help">Устройство уже доступно через Smart Life. Для обычного управления этот мастер не нужен.</p>}
-      {placement && <p className="help">Здание и комната взяты из Smart Life. Изменения здесь относятся только к локальному подключению.</p>}
+      {existing ? <div className="saved-summary"><strong>{existing.name}</strong><p>{t("Прочитаем реальные локальные параметры и сопоставим их со схемой Tuya. Устройство не переключается автоматически. Все проверенные функции станут доступны после нажатия «Сохранить функции». Имя, алиасы, комната, ключ и адрес сохранятся.")}</p>{!provider && <p className="help">{t("Аккаунт Tuya недоступен: параметры можно сохранить только для чтения. Для распознавания переключателей подключите Smart Life или Tuya Developer.")}</p>}</div> : <><p className="help">{t("Необязательная настройка управления по домашней сети. Проверим связь и изменения показаний при ваших действиях. Локальное подключение сохранится только после проверки.")}</p>
+      {device && <p className="help">{t("Устройство уже доступно через Smart Life. Для обычного управления этот мастер не нужен.")}</p>}
+      {placement && <p className="help">{t("Здание и комната взяты из Smart Life. Изменения здесь относятся только к локальному подключению.")}</p>}
       {placementFields}
       <div className="survey-form-grid">
         <label>Tuya device ID<input value={id} readOnly={Boolean(device)} required maxLength={128} onChange={event => setId(event.target.value)} /></label>
-        <label>Подключение устройства<select value={kind} disabled={fixedGateway} onChange={event => setKind(event.target.value)}>{fixedGateway ? <option value="gateway">Tuya шлюз</option> : <><option value="wifi">Wi-Fi устройство</option><option value="gateway">Tuya шлюз</option><option value="zigbee">Zigbee через шлюз</option></>}</select></label>
-        {kind === 'zigbee' ? <><label>Шлюз<select value={parent} onChange={event => setParent(event.target.value)}><option value="">{gateways.length || cloudGateways.length ? 'Выберите шлюз' : 'Нет настроенных шлюзов'}</option>{gateways.map(item => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{!item.enabled && ' · отключён'}</option>)}{cloudGateways.map(item => <option key={item.id} value={'cloud:' + item.id}>{item.name} · требуется локальная настройка</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>IP в домашней сети<input value={ip} onChange={event => { setIp(event.target.value); setConfirmedIp(false); }} placeholder="192.168.1.40" /></label><label>Версия локального протокола<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">Локальный ключ доступен на сервере.</p> : <label>Локальный ключ<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">16 символов. Ключ не отображается в ответах сервиса.</span></label>}</>}
-        <label>Источник показаний<select value={mode} onChange={event => setMode(event.target.value as 'local' | 'cloud')}><option value="local">Локальный опрос + подписи Tuya</option>{provider && !gatewayOnly && <option value="cloud">Облачные отчёты Tuya</option>}</select></label>
+        <label>{t("Подключение устройства")}<select value={kind} disabled={fixedGateway} onChange={event => setKind(event.target.value)}>{fixedGateway ? <option value="gateway">{t("Tuya шлюз")}</option> : <><option value="wifi">{t("Wi-Fi устройство")}</option><option value="gateway">{t("Tuya шлюз")}</option><option value="zigbee">{t("Zigbee через шлюз")}</option></>}</select></label>
+        {kind === 'zigbee' ? <><label>{t("Шлюз")}<select value={parent} onChange={event => setParent(event.target.value)}><option value="">{gateways.length || cloudGateways.length ? t("Выберите шлюз") : t("Нет настроенных шлюзов")}</option>{gateways.map(item => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{!item.enabled && t(" · отключён")}</option>)}{cloudGateways.map(item => <option key={item.id} value={'cloud:' + item.id}>{item.name}{" " + t("· требуется локальная настройка")}</option>)}</select></label><label>cid / node_id<input value={cid} maxLength={128} onChange={event => setCid(event.target.value)} /></label></> : <><label>{t("IP в домашней сети")}<input value={ip} onChange={event => { setIp(event.target.value); setConfirmedIp(false); }} placeholder="192.168.1.40" /></label><label>{t("Версия локального протокола")}<select value={version} onChange={event => setVersion(event.target.value)}>{['3.1', '3.2', '3.3', '3.4', '3.5'].map(value => <option key={value}>{value}</option>)}</select></label>{device?.has_local_key ? <p className="saved-summary">{t("Локальный ключ доступен на сервере.")}</p> : <label>{t("Локальный ключ")}<input type="password" autoComplete="off" value={key} maxLength={16} onChange={event => setKey(event.target.value)} /><span className="help">{t("16 символов. Ключ не отображается в ответах сервиса.")}</span></label>}</>}
+        <label>{t("Источник показаний")}<select value={mode} onChange={event => setMode(event.target.value as 'local' | 'cloud')}><option value="local">{t("Локальный опрос + подписи Tuya")}</option>{provider && !gatewayOnly && <option value="cloud">{t("Облачные отчёты Tuya")}</option>}</select></label>
       </div>
       {kind === 'zigbee' && <div className="saved-summary">
-        {selectedCloudGateway ? <><p>«{selectedCloudGateway.name}» найден в Smart Life. Сначала настройте его локальное подключение: понадобятся IP, версия протокола и локальный ключ, если его нет на сервере. После сохранения вернёмся к датчику.</p><p className="help">Выберите шлюз, к которому действительно подключён датчик. Smart Life не передал эту связь приложению.</p><button type="button" className="secondary compact" onClick={() => setGatewaySetup({ device: selectedCloudGateway })}>Настроить выбранный шлюз</button></> : !gateways.length ? <p>{cloudGateways.length ? 'Выберите шлюз из Smart Life и настройте его локальное подключение.' : 'В этом подключении Smart Life шлюзы не найдены. Для локального управления датчиком сначала настройте его шлюз.'} Для обычного управления через Smart Life этот мастер не нужен.</p> : null}
-        <button type="button" className="secondary compact" onClick={() => setGatewaySetup({})}>Настроить другой шлюз вручную</button>
+        {selectedCloudGateway ? <><p>«{selectedCloudGateway.name}{t("» найден в Smart Life. Сначала настройте его локальное подключение: понадобятся IP, версия протокола и локальный ключ, если его нет на сервере. После сохранения вернёмся к датчику.")}</p><p className="help">{t("Выберите шлюз, к которому действительно подключён датчик. Smart Life не передал эту связь приложению.")}</p><button type="button" className="secondary compact" onClick={() => setGatewaySetup({ device: selectedCloudGateway })}>{t("Настроить выбранный шлюз")}</button></> : !gateways.length ? <p>{cloudGateways.length ? t("Выберите шлюз из Smart Life и настройте его локальное подключение.") : t("В этом подключении Smart Life шлюзы не найдены. Для локального управления датчиком сначала настройте его шлюз.")}{" " + t("Для обычного управления через Smart Life этот мастер не нужен.")}</p> : null}
+        <button type="button" className="secondary compact" onClick={() => setGatewaySetup({})}>{t("Настроить другой шлюз вручную")}</button>
       </div>}
-      {gatewayOnly && <p className="help">Настраиваем шлюз. После сохранения вернёмся к подключению датчика; введённые данные сохранятся.</p>}
-      {mode === 'cloud' && <p className="saved-summary">Облачные отчёты могут приходить с задержкой. Они помогут увидеть изменения; для проверки локальных DP понадобится отдельный локальный опрос.</p>}
+      {gatewayOnly && <p className="help">{t("Настраиваем шлюз. После сохранения вернёмся к подключению датчика; введённые данные сохранятся.")}</p>}
+      {mode === 'cloud' && <p className="saved-summary">{t("Облачные отчёты могут приходить с задержкой. Они помогут увидеть изменения; для проверки локальных DP понадобится отдельный локальный опрос.")}</p>}
       {canDiscover && <div className="saved-summary">
-        <p>Если ключ шлюза отсутствует, проверим ключи дочерних устройств из выбранного аккаунта Smart Life. Проверка читает состояние только по указанному IP и подбирает версию 3.3–3.5. Ключ останется на сервере.</p>
-        <p className="help">Укажите IP этого шлюза из списка клиентов роутера. Ответ по адресу подтверждает ключ, но не название шлюза и не связь с датчиками.</p>
-        <label className="survey-checkbox"><input type="checkbox" checked={confirmedIp} onChange={event => setConfirmedIp(event.target.checked)} />Я проверил IP шлюза в роутере</label>
-        <button type="button" className="secondary" disabled={busy || !confirmedIp || !ip.trim() || !name.trim() || !['3.3', '3.4', '3.5'].includes(version)} onClick={() => void begin(true)}>Найти ключ и проверить шлюз</button>
+        <p>{t("Если ключ шлюза отсутствует, проверим ключи дочерних устройств из выбранного аккаунта Smart Life. Проверка читает состояние только по указанному IP и подбирает версию 3.3–3.5. Ключ останется на сервере.")}</p>
+        <p className="help">{t("Укажите IP этого шлюза из списка клиентов роутера. Ответ по адресу подтверждает ключ, но не название шлюза и не связь с датчиками.")}</p>
+        <label className="survey-checkbox"><input type="checkbox" checked={confirmedIp} onChange={event => setConfirmedIp(event.target.checked)} />{t("Я проверил IP шлюза в роутере")}</label>
+        <button type="button" className="secondary" disabled={busy || !confirmedIp || !ip.trim() || !name.trim() || !['3.3', '3.4', '3.5'].includes(version)} onClick={() => void begin(true)}>{t("Найти ключ и проверить шлюз")}</button>
       </div>}
       </>}
-      <button disabled={busy || !name.trim() || !id.trim() || !childReady || (mode === 'local' && !localReady)}>Начать опрос</button>
+      <button disabled={busy || !name.trim() || !id.trim() || !childReady || (mode === 'local' && !localReady)}>{t("Начать опрос")}</button>
     </form> : <>
-      {gatewayProof ? <div className="saved-summary"><strong>Защищённое соединение со шлюзом подтверждено</strong><p>{gatewayProof.ip} · Протокол {gatewayProof.version}</p><p>{gatewayProof.key_source === 'child' ? 'Подошёл ключ из метаданных дочернего устройства Smart Life.' : 'Подтверждён ключ шлюза из Smart Life.'} Ключ не отображается в браузере.</p><p className="help">Шлюз может не иметь собственных показаний. После сохранения выберите его при настройке датчика, если это его действительный шлюз. Результат действует 15 минут.</p></div> : <p className="help">{name} · {observation?.mode === 'local' ? 'В домашней сети' : 'Через интернет'} · Получено выборок: {observation?.sample_count || 0}</p>}
+      {gatewayProof ? <div className="saved-summary"><strong>{t("Защищённое соединение со шлюзом подтверждено")}</strong><p>{gatewayProof.ip}{" " + t("· Протокол") + " "}{gatewayProof.version}</p><p>{gatewayProof.key_source === 'child' ? t("Подошёл ключ из метаданных дочернего устройства Smart Life.") : t("Подтверждён ключ шлюза из Smart Life.")}{" " + t("Ключ не отображается в браузере.")}</p><p className="help">{t("Шлюз может не иметь собственных показаний. После сохранения выберите его при настройке датчика, если это его действительный шлюз. Результат действует 15 минут.")}</p></div> : <p className="help">{name} · {observation?.mode === 'local' ? t("В домашней сети") : t("Через интернет")}{" " + t("· Получено выборок:") + " "}{observation?.sample_count || 0}</p>}
       {!gatewayProof && <>
-        <div className="survey-prompt"><label>Что проверяем<select value={action} onChange={event => setAction(event.target.value as ObservationAction)}>{Object.entries(actions).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</select></label><p>{actions[action].prompt}</p><p className="help">Выбор действия помечает замеченные изменения; он не определяет назначение параметра автоматически.</p></div>
-        <div className="survey-toolbar"><span role="status">{expired ? 'Опрос остановлен. Начните заново.' : hidden ? 'Опрос приостановлен, пока вкладка скрыта.' : paused ? 'Опрос на паузе.' : polling ? 'Читаем состояние…' : 'Ожидаем следующую выборку…'}</span><button className="secondary compact" disabled={expired} onClick={() => setPaused(value => !value)}>{paused ? 'Продолжить' : 'Пауза'}</button></div>
-        <p className="help">Сервис читает только выбранное устройство каждые {observation?.interval_seconds} сек. Короткие события между чтениями могут быть пропущены. Опрос действует 15 минут.</p>
+        <div className="survey-prompt"><label>{t("Что проверяем")}<select value={action} onChange={event => setAction(event.target.value as ObservationAction)}>{Object.entries(actions).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</select></label><p>{actions[action].prompt}</p><p className="help">{t("Выбор действия помечает замеченные изменения; он не определяет назначение параметра автоматически.")}</p></div>
+        <div className="survey-toolbar"><span role="status">{expired ? t("Опрос остановлен. Начните заново.") : hidden ? t("Опрос приостановлен, пока вкладка скрыта.") : paused ? t("Опрос на паузе.") : polling ? t("Читаем состояние…") : t("Ожидаем следующую выборку…")}</span><button className="secondary compact" disabled={expired} onClick={() => setPaused(value => !value)}>{paused ? t("Продолжить") : t("Пауза")}</button></div>
+        <p className="help">{t("Сервис читает только выбранное устройство каждые") + " "}{observation?.interval_seconds}{" " + t("сек. Короткие события между чтениями могут быть пропущены. Опрос действует 15 минут.")}</p>
       </>}
-      {!gatewayProof && <><p className="help">При сохранении будут доступны все проверенные функции. Неизвестные параметры останутся только для чтения.</p>{observation?.mode === 'cloud' && <p className="help">Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.</p>}</>}
-      {!gatewayProof && <><div className="survey-readings"><h3>Последние показания</h3>{!observation?.readings.length ? <p className="empty-state">Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : 'Номер DP не известен'}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output></li>)}</ul>}</div>
-      <div className="survey-history"><h3>Замеченные изменения <span className="count">{observation?.changes.length || 0}</span></h3>{!observation?.changes.length ? <p className="help">Изменений пока нет. Исходное состояние не считается изменением.</p> : <ol>{[...observation.changes].reverse().map((row, index) => <li key={index}><span className="help">{timeLabel(row.detected_at)} · {actions[row.action as ObservationAction]?.label || 'Наблюдение'}</span><strong>{title(row)}</strong><span>{textValue(row.previous)} → {textValue(row.value)}</span></li>)}</ol>}</div>
-      </>}<div className="survey-footer"><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>{existing ? 'Начать заново' : 'Изменить подключение'}</button><button disabled={busy || polling || expired || !name.trim() || (!gatewayProof && !observation?.readings.length)} onClick={() => void save()}>{existing ? 'Сохранить функции' : 'Сохранить локальное подключение'}</button></div>
+      {!gatewayProof && <><p className="help">{t("При сохранении будут доступны все проверенные функции. Неизвестные параметры останутся только для чтения.")}</p>{observation?.mode === 'cloud' && <p className="help">{t("Облачные значения не сохраняются как локальное состояние или capabilities. Управление через аккаунт Tuya остаётся доступным.")}</p>}</>}
+      {!gatewayProof && <><div className="survey-readings"><h3>{t("Последние показания")}</h3>{!observation?.readings.length ? <p className="empty-state">{t("Пока нет показаний. Если устройство спит, попробуйте разбудить его или выбрать облачные отчёты.")}</p> : <ul>{observation.readings.map(row => <li key={row.key}><div><strong>{title(row)}</strong><span className="help">{row.dp ? 'DP ' + row.dp : t("Номер DP не известен")}{row.code && ' · ' + row.code} · {timeLabel(row.received_at)}</span></div><output>{textValue(row.value)}</output></li>)}</ul>}</div>
+      <div className="survey-history"><h3>{t("Замеченные изменения") + " "}<span className="count">{observation?.changes.length || 0}</span></h3>{!observation?.changes.length ? <p className="help">{t("Изменений пока нет. Исходное состояние не считается изменением.")}</p> : <ol>{[...observation.changes].reverse().map((row, index) => <li key={index}><span className="help">{timeLabel(row.detected_at)} · {actions[row.action as ObservationAction]?.label || t("Наблюдение")}</span><strong>{title(row)}</strong><span>{textValue(row.previous)} → {textValue(row.value)}</span></li>)}</ol>}</div>
+      </>}<div className="survey-footer"><button className="secondary" disabled={busy || polling} onClick={() => void restart()}>{existing ? t("Начать заново") : t("Изменить подключение")}</button><button disabled={busy || polling || expired || !name.trim() || (!gatewayProof && !observation?.readings.length)} onClick={() => void save()}>{existing ? t("Сохранить функции") : t("Сохранить локальное подключение")}</button></div>
     </>}
-    {busy && <p role="status" className="help">{step === 'configure' && canDiscover ? 'Проверяем подключение… Это может занять около 30 секунд.' : 'Выполняем запрос…'}</p>}{error && <p role="alert" className="field-error">{error}</p>}
+    {busy && <p role="status" className="help">{step === 'configure' && canDiscover ? t("Проверяем подключение… Это может занять около 30 секунд.") : t("Выполняем запрос…")}</p>}{error && <p role="alert" className="field-error">{t(error)}</p>}
   </section>;
 }

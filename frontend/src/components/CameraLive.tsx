@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
@@ -15,16 +16,16 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   const video = useRef<HTMLVideoElement>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
   const [source, setSource] = useState<string | null>(null), [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('Видео включается только по вашему запросу.');
+  const [message, setMessage] = useState(t("Видео включается только по вашему запросу."));
   const [error, setError] = useState(false);
   const [levels,setLevels] = useState<VideoLevel[]>([]), [selectedLevel,setSelectedLevel] = useState(-1);
   const [resolution,setResolution] = useState(''), [speed,setSpeed] = useState<number | null>(null);
-  const [playback,setPlayback] = useState('Подключение');
+  const [playback,setPlayback] = useState(t("Подключение"));
   const [aspect,setAspect] = useState(16/9);
-  function resetMetrics() { setLevels([]); setSelectedLevel(-1); setResolution(''); setSpeed(null); setPlayback('Подключение'); }
+  function resetMetrics() { setLevels([]); setSelectedLevel(-1); setResolution(''); setSpeed(null); setPlayback(t("Подключение")); }
   function stop() {
     pending.current?.abort(); pending.current = null;
-    setLoading(false); setSource(null); setError(false); setMessage('Просмотр остановлен.'); resetMetrics();
+    setLoading(false); setSource(null); setError(false); setMessage(t("Просмотр остановлен.")); resetMetrics();
   }
   useEffect(() => {
     const hide = () => { if (document.hidden) stop(); };
@@ -37,24 +38,24 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     let active = true, player: Hls | undefined;
     const fail = () => {
       if (!active) return;
-      setError(true); setMessage('Не удалось воспроизвести видео. Попробуйте подключиться заново.'); setSource(null); resetMetrics();
+      setError(true); setMessage(t("Не удалось воспроизвести видео. Попробуйте подключиться заново.")); setSource(null); resetMetrics();
     };
     const timeout = window.setTimeout(fail, 45_000);
     const dimensions = () => { if (element.videoWidth > 0 && element.videoHeight > 0) {setResolution(resolutionLabel(element.videoWidth,element.videoHeight)); setAspect(element.videoWidth/element.videoHeight);} };
-    const playing = () => { window.clearTimeout(timeout); setMessage('Прямой эфир'); setPlayback('Воспроизводится'); dimensions(); };
-    const waiting = () => setPlayback('Буферизация'), paused = () => setPlayback('Пауза');
+    const playing = () => { window.clearTimeout(timeout); setMessage(t("Прямой эфир")); setPlayback(t("Воспроизводится")); dimensions(); };
+    const waiting = () => setPlayback(t("Буферизация")), paused = () => setPlayback(t("Пауза"));
     element.addEventListener('playing', playing);
     element.addEventListener('error', fail);
     element.addEventListener('waiting',waiting); element.addEventListener('stalled',waiting);
     element.addEventListener('pause',paused); element.addEventListener('ended',paused);
     element.addEventListener('loadedmetadata',dimensions); element.addEventListener('resize',dimensions);
-    const play = () => { void element.play().catch(() => { if (active) setMessage('Нажмите ▶ в плеере для просмотра.'); }); };
+    const play = () => { void element.play().catch(() => { if (active) setMessage(t("Нажмите ▶ в плеере для просмотра.")); }); };
     void (async () => {
       const { default: HlsPlayer } = await import('hls.js');
       if (!active) return;
       if (!HlsPlayer.isSupported()) {
         if (element.canPlayType('application/vnd.apple.mpegurl')) { element.src = source; play(); return; }
-        setError(true); setMessage('Этот браузер не поддерживает просмотр HLS-видео.'); setSource(null); return;
+        setError(true); setMessage(t("Этот браузер не поддерживает просмотр HLS-видео.")); setSource(null); return;
       }
       player = new HlsPlayer({ debug:false, enableWorker:true, lowLatencyMode:true, backBufferLength:15, maxBufferLength:20 });
       hls.current = player;
@@ -84,17 +85,17 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   async function start() {
     if (viewingBlocked || pending.current || source) return;
     const controller = new AbortController(); pending.current = controller;
-    setLoading(true); setError(false); setMessage('Подключаем видео…'); resetMetrics();
+    setLoading(true); setError(false); setMessage(t("Подключаем видео…")); resetMetrics();
     try {
       const result = await api.cameraStream(deviceId, provider, controller.signal);
       if (controller.signal.aborted) return;
       const url = new URL(result.url);
-      if (result.device_id !== deviceId || result.type !== 'hls' || url.protocol !== 'https:' || url.username || url.password) throw new Error('Сервис вернул недопустимый видеопоток.');
+      if (result.device_id !== deviceId || result.type !== 'hls' || url.protocol !== 'https:' || url.username || url.password) throw new Error(t("Сервис вернул недопустимый видеопоток."));
       setSource(result.url);
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
-      setError(true); setMessage(failure instanceof ApiError ? failure.message : 'Не удалось подключить видео камеры.');
+      setError(true); setMessage(failure instanceof ApiError ? failure.message : t("Не удалось подключить видео камеры."));
     } finally {
       if (pending.current === controller) { pending.current = null; setLoading(false); }
     }
@@ -102,25 +103,25 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   useEffect(()=>{ if (viewingBlocked) stop(); },[viewingBlocked]);
   // Inline instances mount only after the user expands the camera tile.
   useEffect(() => { if (autoStart) void start(); }, [autoStart]);
-  return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label="Видео камеры">
-    <div className="camera-live-heading"><h3>Видео камеры</h3>
-      <div className="camera-live-actions">{headingActions}{source || loading ? <button className="secondary compact" onClick={stop}>Остановить</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? 'Подключиться заново' : 'Смотреть видео'}</button>}</div>
+  return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label={t("Видео камеры")}>
+    <div className="camera-live-heading"><h3>{t("Видео камеры")}</h3>
+      <div className="camera-live-actions">{headingActions}{source || loading ? <button className="secondary compact" onClick={stop}>{t("Остановить")}</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t("Подключиться заново") : t("Смотреть видео")}</button>}</div>
     </div>
-    {!compact && <div className="camera-stream-info" aria-label="Качество видео и связи">
-      <label>HD/SD <select aria-label="Качество видео HD/SD" value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
+    {!compact && <div className="camera-stream-info" aria-label={t("Качество видео и связи")}>
+      <label>HD/SD <select aria-label={t("Качество видео HD/SD")} value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
         const index = Number(event.target.value);
         if (!hls.current || (index !== -1 && !levels.some(level => level.index === index))) return;
         hls.current.currentLevel = index; setSelectedLevel(index);
-      }}><option value={-1}>{levels.length < 2 && resolution ? resolution.split(' · ')[0] : 'Авто'}</option>{levels.length > 1 && levels.map(level => <option key={level.index} value={level.index}>{level.width && level.height ? resolutionLabel(level.width,level.height) : 'Вариант '+(level.index+1)}{level.bitrate > 0 ? ' · '+Math.round(level.bitrate/1000)+' кбит/с' : ''}</option>)}</select></label>
-      <span>{resolution || 'Разрешение —'}</span>
-      <span>Видеосвязь: {error ? 'Ошибка' : loading ? 'Подключение' : !source ? 'Просмотр выключен' : playback}</span>
-      <span title="Скорость загрузки последнего видеосегмента в браузере.">Загрузка: {speed === null ? '—' : speed+' КБ/с'}</span>
-      <span title={networkSignal ? 'Последнее показание сигнала, сообщённое камерой.' : 'Подключение не предоставило уровень сигнала камеры.'}>Wi-Fi: {networkSignal || 'Нет данных'}</span>
-      <p className="help">{!source ? 'Доступные варианты HD/SD появятся после запуска видео.' : levels.length < 2 ? 'Переключение HD/SD недоступно для этого потока.' : 'Качество выбирается из вариантов видеопотока.'}</p>
+      }}><option value={-1}>{levels.length < 2 && resolution ? resolution.split(' · ')[0] : t("Авто")}</option>{levels.length > 1 && levels.map(level => <option key={level.index} value={level.index}>{level.width && level.height ? resolutionLabel(level.width,level.height) : t("Вариант ")+(level.index+1)}{level.bitrate > 0 ? ' · '+Math.round(level.bitrate/1000)+t(" кбит/с") : ''}</option>)}</select></label>
+      <span>{resolution || t("Разрешение —")}</span>
+      <span>{t("Видеосвязь:") + " "}{error ? t("Ошибка") : loading ? t("Подключение") : !source ? t("Просмотр выключен") : playback}</span>
+      <span title={t("Скорость загрузки последнего видеосегмента в браузере.")}>{t("Загрузка:") + " "}{speed === null ? '—' : speed+t(" КБ/с")}</span>
+      <span title={networkSignal ? t("Последнее показание сигнала, сообщённое камерой.") : t("Подключение не предоставило уровень сигнала камеры.")}>Wi-Fi: {networkSignal || t("Нет данных")}</span>
+      <p className="help">{!source ? t("Доступные варианты HD/SD появятся после запуска видео.") : levels.length < 2 ? t("Переключение HD/SD недоступно для этого потока.") : t("Качество выбирается из вариантов видеопотока.")}</p>
     </div>}
     {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
     {(!viewingBlocked && source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
-      {source && !viewingBlocked ? <video ref={video} controls={!overlay} muted autoPlay playsInline preload="none" aria-label="Прямой эфир камеры" /> : <div className="camera-area-placeholder">{viewingBlocked || 'Для изображения нажмите «Смотреть видео»'}</div>}{overlay}
+      {source && !viewingBlocked ? <video ref={video} controls={!overlay} muted autoPlay playsInline preload="none" aria-label={t("Прямой эфир камеры")} /> : <div className="camera-area-placeholder">{viewingBlocked || t("Для изображения нажмите «Смотреть видео»")}</div>}{overlay}
     </div>}
     <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
   </section>;

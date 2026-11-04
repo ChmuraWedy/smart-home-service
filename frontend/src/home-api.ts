@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 
@@ -69,11 +70,11 @@ export class HomeApi extends CloudApi {
     // Page metadata only; loading the inventory never contacts physical devices.
     for (let offset = 0; offset < 10_000; offset += 500) {
       const page = await this.request<T[]>(`${path}?offset=${offset}&limit=500`, 'GET', undefined, signal);
-      if (!Array.isArray(page)) throw new Error('Сервис вернул неожиданный список.');
+      if (!Array.isArray(page)) throw new Error(t("Сервис вернул неожиданный список."));
       result.push(...page);
       if (page.length < 500) return result;
     }
-    throw new Error('Список слишком большой. Используйте REST API для такого инвентаря.');
+    throw new Error(t("Список слишком большой. Используйте REST API для такого инвентаря."));
   }
   async inventory(signal?: AbortSignal): Promise<Inventory> {
     const [buildings, rooms, devices, groups] = await Promise.all([
