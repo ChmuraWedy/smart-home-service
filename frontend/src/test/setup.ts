@@ -1,3 +1,4 @@
+import { setLocale } from '../i18n';
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
@@ -7,6 +8,7 @@ HTMLDialogElement.prototype.close = function () { this.open = false; };
 
 beforeEach(() => {
   localStorage.clear();
+  setLocale('ru', false);
   window.history.replaceState(null, '', '/');
   vi.stubGlobal('fetch', vi.fn());
   URL.createObjectURL = vi.fn(() => 'blob:qr-test');

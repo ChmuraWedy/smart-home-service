@@ -1,9 +1,10 @@
+import { localizeMessages, t } from "./i18n";
 import type { ControlSpec } from './controls';
 import type { JsonValue } from './api';
 
 // Tuya's standard camera DP names. Availability and writable ranges still come
 // exclusively from the selected device's API definitions.
-export const CAMERA_LABELS: Record<string, string> = {
+export const CAMERA_LABELS: Record<string, string> = localizeMessages({
   basic_private: 'Режим приватности', basic_nightvision: 'Ночное видение',
   basic_flip: 'Перевернуть изображение', basic_osd: 'Дата и время на видео',
   basic_anti_flicker: 'Устранение мерцания', basic_indicator: 'Индикатор камеры', basic_wdr: 'Расширенный динамический диапазон',
@@ -15,19 +16,19 @@ export const CAMERA_LABELS: Record<string, string> = {
   record_switch: 'Запись на карту памяти', record_mode: 'Режим записи', record_loop: 'Циклическая запись',
   sd_storge: 'Ёмкость карты памяти', sd_status: 'Состояние карты памяти',
   sd_format: 'Форматирование карты памяти', sd_format_state: 'Состояние форматирования',
-};
+});
 
 // Numeric strings have different meanings for different DPs; never translate
 // them globally or change the original command value.
-export const CAMERA_OPTIONS: Record<string, Record<string, string>> = {
+export const CAMERA_OPTIONS: Record<string, Record<string, string>> = localizeMessages({
   basic_nightvision: { '0':'Авто', '1':'Выключено', '2':'Включено' },
   basic_anti_flicker: { '0':'Выключено', '1':'50 Гц', '2':'60 Гц' },
   motion_sensitivity: { '0':'Низкая', '1':'Средняя', '2':'Высокая' },
   decibel_sensitivity: { '0':'Низкая', '1':'Высокая' },
   record_mode: { '1':'По событиям', '2':'Непрерывно' },
-};
+});
 
-export const CAMERA_HELP: Record<string, string> = {
+export const CAMERA_HELP: Record<string, string> = localizeMessages({
   basic_private: 'Отключает аудио- и видеосоединения камеры для защиты приватности. Для просмотра снова выключите режим приватности.\n\nКнопка отправляет команду сразу; общая кнопка «Применить» не требуется.',
   basic_nightvision: 'Инфракрасная подсветка позволяет получать чёрно-белое изображение в темноте.\n\nАвто — камера выбирает ночной режим по освещению. Включено — ночное видение включено постоянно. Выключено — инфракрасное ночное видение отключено.',
   basic_flip: 'Переворачивает изображение камеры. Используйте эту настройку, если камера установлена в перевёрнутом положении.',
@@ -48,24 +49,24 @@ export const CAMERA_HELP: Record<string, string> = {
   sd_status: 'Состояние карты сообщает сама камера: готова, ошибка, недостаточно места, форматирование или карта не установлена.\n\nЗапись доступна только при состоянии «Карта памяти готова». Неизвестное состояние не считается подтверждением готовности.',
   sd_format: 'Форматирование удаляет все записи с карты памяти. Перед отправкой команды приложение попросит подтвердить удаление.\n\nКоманда недоступна без карты, при неизвестном состоянии и во время уже выполняющегося форматирования.',
   sd_format_state: 'Камера сообщает ход или ошибку форматирования. По документации Tuya положительное значение обозначает прогресс; −2000 — форматирование идёт, −2001 — ошибка форматирования, −2002 — карта отсутствует, −2003 — ошибка карты.\n\nЭто показание камеры, а не кнопка запуска форматирования.',
-};
+});
 
-export const CAMERA_QUICK_LABELS: Record<string, string> = {
+export const CAMERA_QUICK_LABELS: Record<string, string> = localizeMessages({
   basic_private:'Приватность', motion_switch:'Движение', decibel_switch:'Звук', siren_switch:'Сирена',
-};
+});
 
-const GROUPS = [
+const GROUPS = localizeMessages([
   { title:'Изображение и звук', keys:['basic_private','basic_nightvision','basic_flip','basic_osd','basic_anti_flicker','basic_indicator','basic_wdr','basic_shimmer','basic_device_volume'] },
   { title:'Обнаружение и оповещения', keys:['motion_switch','motion_sensitivity','humanoid_filter','motion_area_switch','motion_area','decibel_switch','decibel_sensitivity','siren_switch'] },
   { title:'Запись и карта памяти', keys:['record_switch','record_mode','record_loop','sd_status','sd_storge','sd_format_state'] },
-];
+]);
 
 export function cameraStorage(status:Record<string,JsonValue>) {
   // sd_status is a categorical code, not a scaled measurement. Interpret only
   // the documented raw codes; never infer a mounted card from record_switch.
-  const labels:Record<string,string>={'1':'Карта памяти готова','2':'Ошибка карты памяти','3':'Недостаточно места на карте','4':'Карта памяти форматируется','5':'Карта памяти не установлена'};
+  const labels:Record<string,string>={'1':t("Карта памяти готова"),'2':t("Ошибка карты памяти"),'3':t("Недостаточно места на карте"),'4':t("Карта памяти форматируется"),'5':t("Карта памяти не установлена")};
   const code=typeof status.sd_status==='number' || typeof status.sd_status==='string' ? String(status.sd_status) : '';
-  return {ready:code==='1',canFormat:['1','2','3'].includes(code),label:labels[code] || 'Состояние карты памяти неизвестно'};
+  return {ready:code==='1',canFormat:['1','2','3'].includes(code),label:labels[code] || t("Состояние карты памяти неизвестно")};
 }
 
 export const isStorageSetting=(key:string)=>['record_switch','record_mode','record_loop','ipc_mute_record','sd_format'].includes(key);
@@ -79,5 +80,5 @@ export function cameraSettingsGroups(specs: ControlSpec[]) {
 }
 
 export function cameraPrivacyBlock(value:boolean | null | undefined) {
-  return value===true ? 'Режим приватности включён. Выключите его для просмотра видео.' : value===null ? 'Проверяем режим приватности. Дождитесь показания камеры.' : undefined;
+  return value===true ? t("Режим приватности включён. Выключите его для просмотра видео.") : value===null ? t("Проверяем режим приватности. Дождитесь показания камеры.") : undefined;
 }

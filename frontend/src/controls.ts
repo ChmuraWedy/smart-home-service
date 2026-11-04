@@ -1,3 +1,4 @@
+import { localizeMessages, rawMessages, t } from "./i18n";
 import type { CloudFunction, CloudFunctions, CloudSnapshot, JsonValue } from './api';
 import type { Capability, Reading } from './home-api';
 import { editableSchema, rawBytes, validateObject } from './lighting';
@@ -15,8 +16,8 @@ export type ControlSpec = {
 
 const MOTION_KEYS = new Set(['motion', 'pir', 'pir_state']);
 
-const LABELS: Record<string, string> = {
-  ...CAMERA_LABELS,
+const LABELS: Record<string, string> = localizeMessages({
+  ...rawMessages(CAMERA_LABELS),
   switch: 'Питание', switch_led: 'Питание', brightness: 'Яркость', bright_value: 'Яркость', bright_value_v2: 'Яркость',
   color: 'Цвет', colour_data: 'Цвет', colour_data_v2: 'Цвет', color_temperature: 'Цветовая температура',
   temp_value: 'Цветовая температура', temp_value_v2: 'Цветовая температура', target_temperature: 'Заданная температура',
@@ -34,23 +35,23 @@ const LABELS: Record<string, string> = {
   switch_inching: 'Автовыключение (импульсный режим)', rhythm_mode: 'Суточный ритм света', sleep_mode: 'Свет перед сном',
   wakeup_mode: 'Свет для пробуждения', power_memory: 'Поведение после включения питания',
   do_not_disturb: 'Не беспокоить', remote_switch: 'Параметр пульта', random_timing: 'Случайное расписание',
-};
-const LIGHT_COMMAND_HELP: Record<string, string> = {
+});
+const LIGHT_COMMAND_HELP: Record<string, string> = localizeMessages({
   music_data: 'Команды изменения света в такт музыке. Для синхронизации нужен источник аудио, который отправляет такие команды.',
   control_data: 'Команда быстрого или плавного изменения света. Текущее состояние смотрите в полях цвета и яркости.',
-};
-const OPTIONS: Record<string, string> = { white: 'Белый свет', colour: 'Цветной свет', scene: 'Сцена', music: 'Музыка',
-  auto: 'Авто', manual: 'Вручную', open: 'Открыть', close: 'Закрыть', stop: 'Стоп', low: 'Низкая', medium: 'Средняя', high: 'Высокая', dock: 'На базу' };
-export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? 'Канал ' + key.slice(7) : /^countdown_[1-9][0-9]*$/.test(key) ? 'Таймер канала ' + key.slice(10) : /^relay_status_[1-9][0-9]*$/.test(key) ? 'Состояние канала ' + key.slice(13) + ' после подачи питания' : key.replaceAll('_', ' '));
-const RELAY_OPTIONS: Record<string, string> = { power_off: 'Выключено', off: 'Выключено', power_on: 'Включено', on: 'Включено', last: 'Восстановить предыдущее состояние', memory: 'Восстановить предыдущее состояние' };
-export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key ? CAMERA_OPTIONS[key]?.[value] : undefined) || (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : JSON.stringify(value);
-const unitLabel = (unit: string | undefined) => unit === 's' ? 'с' : unit === '℃' ? '°C' : unit === '℉' ? '°F' : unit;
+});
+const OPTIONS: Record<string, string> = localizeMessages({ white: 'Белый свет', colour: 'Цветной свет', scene: 'Сцена', music: 'Музыка',
+  auto: 'Авто', manual: 'Вручную', open: 'Открыть', close: 'Закрыть', stop: 'Стоп', low: 'Низкая', medium: 'Средняя', high: 'Высокая', dock: 'На базу' });
+export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? t("Канал {0}", [key.slice(7)]) : /^countdown_[1-9][0-9]*$/.test(key) ? t("Таймер канала {0}", [key.slice(10)]) : /^relay_status_[1-9][0-9]*$/.test(key) ? t("Состояние канала {0} после подачи питания", [key.slice(13)]) : key.replaceAll('_', ' '));
+const RELAY_OPTIONS: Record<string, string> = localizeMessages({ power_off: 'Выключено', off: 'Выключено', power_on: 'Включено', on: 'Включено', last: 'Восстановить предыдущее состояние', memory: 'Восстановить предыдущее состояние' });
+export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key ? CAMERA_OPTIONS[key]?.[value] : undefined) || (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? t("Да") : t("Нет")) : JSON.stringify(value);
+const unitLabel = (unit: string | undefined) => unit === 's' ? t("с") : unit === '℃' ? '°C' : unit === '℉' ? '°F' : unit;
 function controlHelp(key: string): string | undefined {
   if (CAMERA_HELP[key]) return CAMERA_HELP[key];
-  if (key === 'relay_status' || /^relay_status_[1-9][0-9]*$/.test(key)) return 'Какое состояние восстановить после отключения и повторной подачи электропитания. Это настройка, а не текущий статус реле.';
-  if (key === 'switch_backlight') return 'Включение и выключение подсветки клавиш выключателя.';
-  if (/^countdown(?:_[1-9][0-9]*)?$/.test(key)) return 'Обратный отсчёт до переключения. Время задаётся в секундах.';
-  if (key === 'switch_inching') return 'После включения выключатель автоматически отключается через заданное время. Например, через минуту. Настройка передаётся строкой; её формат не описан в API этого устройства.';
+  if (key === 'relay_status' || /^relay_status_[1-9][0-9]*$/.test(key)) return t("Какое состояние восстановить после отключения и повторной подачи электропитания. Это настройка, а не текущий статус реле.");
+  if (key === 'switch_backlight') return t("Включение и выключение подсветки клавиш выключателя.");
+  if (/^countdown(?:_[1-9][0-9]*)?$/.test(key)) return t("Обратный отсчёт до переключения. Время задаётся в секундах.");
+  if (key === 'switch_inching') return t("После включения выключатель автоматически отключается через заданное время. Например, через минуту. Настройка передаётся строкой; её формат не описан в API этого устройства.");
 }
 export const sameValue = (left: JsonValue, right: JsonValue) => JSON.stringify(left) === JSON.stringify(right);
 export const cloudLabel = (fn: CloudFunction) => labelFor(fn.code);
@@ -104,7 +105,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
     indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
   const unit = typeof limits.unit === 'string' ? unitLabel(limits.unit) : undefined;
-  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? 'Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.' : base.help };
+  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? t("Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.") : base.help };
   if (fn.type === 'Integer') {
     const scale = limits.scale ?? 0;
     const validScale = Number.isInteger(scale) && (scale as number) >= 0 && (scale as number) <= 9;
@@ -120,12 +121,12 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
       minimum: finite(limits.min) ? limits.min * factor : undefined,
       maximum: finite(limits.max) ? limits.max * factor : undefined,
       step: (finite(limits.step) ? limits.step : 1) * factor, unit: displayUnit,
-      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? 'Единица измерения не указана устройством.' : base.help,
-      reason: !writable || validBounds ? undefined : 'Нет корректного диапазона; управление недоступно.' };
+      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? t("Единица измерения не указана устройством.") : base.help,
+      reason: !writable || validBounds ? undefined : t("Нет корректного диапазона; управление недоступно.") };
   }
   if (fn.type === 'Enum') {
     const choices = Array.isArray(limits.range) && limits.range.every(value => typeof value === 'string') ? limits.range as string[] : [];
-    return { ...base, kind: 'enum', writable: writable && choices.length > 0, choices, reason: !writable || choices.length ? undefined : 'Нет списка допустимых режимов.' };
+    return { ...base, kind: 'enum', writable: writable && choices.length > 0, choices, reason: !writable || choices.length ? undefined : t("Нет списка допустимых режимов.") };
   }
   if (fn.type === 'String') return { ...base, kind: 'text' };
   if (fn.type === 'Json') {
@@ -136,9 +137,9 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
     const maximum = limits.maxlen === undefined ? 16384 : Number(limits.maxlen);
     const valid = Number.isInteger(maximum) && maximum >= 0;
     return { ...base, kind: 'raw', writable: writable && valid, maximumBytes: valid ? Math.min(maximum,16384) : undefined,
-      reason: valid ? undefined : 'Не указан корректный размер данных производителя.' };
+      reason: valid ? undefined : t("Не указан корректный размер данных производителя.") };
   }
-  return { ...base, kind: 'unsupported', writable: false, reason: 'Этот формат доступен только для просмотра.' };
+  return { ...base, kind: 'unsupported', writable: false, reason: t("Этот формат доступен только для просмотра.") };
 }
 
 export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot): ControlSpec[] {
@@ -200,41 +201,41 @@ export function isStale(reading: Reading | undefined, now: number, local: boolea
 }
 
 export function displayReading(spec: ControlSpec, reading: Reading | undefined): string {
-  if (!reading?.known || reading.value === null) return 'Нет данных';
+  if (!reading?.known || reading.value === null) return t("Нет данных");
   const motion = motionState(spec, reading);
-  if (motion !== undefined) return motion === null ? 'Нет данных' : motion ? 'Движение обнаружено' : 'Движения нет';
+  if (motion !== undefined) return motion === null ? t("Нет данных") : motion ? t("Движение обнаружено") : t("Движения нет");
   const value = reading.value;
-  if (typeof value === 'boolean') return ['switch', 'switch_led'].includes(spec.key) || spec.key.startsWith('switch_') ? (value ? 'Включено' : 'Выключено') : (value ? 'Да' : 'Нет');
-  if (spec.kind === 'color' && typeof value === 'object' && !Array.isArray(value)) return `Тон ${value.h}°, насыщенность ${rounded(Number(value.s) / 10)}%, яркость ${rounded(Number(value.v) / 10)}%`;
+  if (typeof value === 'boolean') return ['switch', 'switch_led'].includes(spec.key) || spec.key.startsWith('switch_') ? (value ? t("Включено") : t("Выключено")) : (value ? t("Да") : t("Нет"));
+  if (spec.kind === 'color' && typeof value === 'object' && !Array.isArray(value)) return t("Тон {0}°, насыщенность {1}%, яркость {2}%", [value.h, rounded(Number(value.s) / 10), rounded(Number(value.v) / 10)]);
   return (typeof value === 'number' ? String(rounded(value)) : optionLabel(value, spec.key)) + (spec.unit ? ' ' + spec.unit : '');
 }
 
 export function validateControlValue(spec: ControlSpec, value: JsonValue): void {
-  if (!spec.writable) throw new Error('Эта возможность доступна только для чтения.');
+  if (!spec.writable) throw new Error(t("Эта возможность доступна только для чтения."));
   if (spec.kind === 'enum') {
-    if (!spec.choices?.some(option => sameValue(option, value))) throw new Error('Выберите допустимое значение.');
+    if (!spec.choices?.some(option => sameValue(option, value))) throw new Error(t("Выберите допустимое значение."));
   } else if (spec.kind === 'boolean') {
-    if (typeof value !== 'boolean') throw new Error('Нужно логическое значение.');
+    if (typeof value !== 'boolean') throw new Error(t("Нужно логическое значение."));
   } else if (spec.kind === 'number') {
-    if (!finite(value) || (spec.integer && !Number.isInteger(value))) throw new Error('Введите корректное число.');
-    if ((spec.minimum !== undefined && value < spec.minimum - 1e-6) || (spec.maximum !== undefined && value > spec.maximum + 1e-6)) throw new Error('Значение вне допустимого диапазона.');
+    if (!finite(value) || (spec.integer && !Number.isInteger(value))) throw new Error(t("Введите корректное число."));
+    if ((spec.minimum !== undefined && value < spec.minimum - 1e-6) || (spec.maximum !== undefined && value > spec.maximum + 1e-6)) throw new Error(t("Значение вне допустимого диапазона."));
     if (spec.step) {
       const ticks = (value - (spec.minimum ?? 0)) / spec.step;
-      if (Math.abs(ticks - Math.round(ticks)) > 1e-5) throw new Error('Значение не соответствует допустимому шагу.');
+      if (Math.abs(ticks - Math.round(ticks)) > 1e-5) throw new Error(t("Значение не соответствует допустимому шагу."));
     }
   } else if (spec.kind === 'color') {
     const hsv = limitsOf(value);
     if (!Number.isInteger(hsv.h) || !Number.isInteger(hsv.s) || !Number.isInteger(hsv.v) ||
-      (hsv.h as number) < 0 || (hsv.h as number) > 360 || (hsv.s as number) < 0 || (hsv.s as number) > 1000 || (hsv.v as number) < 0 || (hsv.v as number) > 1000) throw new Error('Цвет должен содержать тон 0–360 и насыщенность/яркость 0–1000.');
+      (hsv.h as number) < 0 || (hsv.h as number) > 360 || (hsv.s as number) < 0 || (hsv.s as number) > 1000 || (hsv.v as number) < 0 || (hsv.v as number) > 1000) throw new Error(t("Цвет должен содержать тон 0–360 и насыщенность/яркость 0–1000."));
   } else if (spec.kind === 'text') {
-    if (typeof value !== 'string') throw new Error('Введите текст.');
+    if (typeof value !== 'string') throw new Error(t("Введите текст."));
   } else if (spec.kind === 'json') {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Введите JSON-объект.');
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(t("Введите JSON-объект."));
     if (spec.schema) validateObject(value,spec.schema);
   } else if (spec.kind === 'raw') {
-    if (typeof value !== 'string') throw new Error('Нужны данные производителя (base64).');
+    if (typeof value !== 'string') throw new Error(t("Нужны данные производителя (base64)."));
     rawBytes(value,spec.maximumBytes);
-  } else throw new Error('Формат управления пока не поддержан.');
+  } else throw new Error(t("Формат управления пока не поддержан."));
 }
 
 export function cloudCommands(spec: ControlSpec, value: JsonValue, definitions: CloudFunctions): { code: string; value: JsonValue }[] {
@@ -266,7 +267,7 @@ export function cloudBatchCommands(changes: { spec: ControlSpec; value: JsonValu
   const mode = explicitMode?.value ?? inferredMode;
   const result = [...commands].map(([code, value]) => ({ code, value }));
   if (mode !== undefined && (explicitMode || !sameValue(mode, status.work_mode ?? null))) result.unshift({ code: 'work_mode', value: mode });
-  if (result.length > 16) throw new Error('За один раз можно применить до 16 параметров.');
+  if (result.length > 16) throw new Error(t("За один раз можно применить до 16 параметров."));
   return result;
 }
 

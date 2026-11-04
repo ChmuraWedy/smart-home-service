@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import { normalizeApiBase } from './api';
 import type { Connection } from './api';
 
@@ -21,5 +22,5 @@ export function loadConnection(defaultBase = DEFAULT_API_BASE): Connection {
 
 export function saveConnection(connection: Connection): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(connection)); }
-  catch { throw new Error('Браузер не разрешил сохранить подключение. Проверьте настройки хранилища.'); }
+  catch { throw new Error(t("Браузер не разрешил сохранить подключение. Проверьте настройки хранилища.")); }
 }

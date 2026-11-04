@@ -1,0 +1,39 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { CloudControl } from './components/CloudControl';
+import { CloudApi } from './api';
+import { LanguageSelector } from './components/LanguageSelector';
+import { setLocale, useLocale } from './i18n';
+
+const device={id:'room-lamp',name:'Лампа Łąka',online:true,has_local_key:false};
+const json=(value:unknown)=>new Response(JSON.stringify(value),{status:200});
+function Harness(){
+  useLocale();
+  return <><LanguageSelector/><CloudControl api={api} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()}/></>;
+}
+const api=new CloudApi({baseUrl:'http://localization-api.test',token:'fixture-key'});
+
+describe('localized device controls',()=>{
+  it('updates a loaded device without resetting the brightness draft, renaming the device, or sending a command',async()=>{
+    const writes:unknown[]=[];
+    const functions=[{code:'switch_led',type:'Boolean',values:'{}'},{code:'bright_value_v2',type:'Integer',values:{min:10,max:1000,step:1}}];
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      if(init?.method==='POST'){writes.push(JSON.parse(String(init.body)));return json({acknowledged:true});}
+      if(String(input).includes('/functions'))return json({device_id:device.id,functions});
+      return json({device_id:device.id,online:true,source:'cloud',status:{switch_led:true,bright_value_v2:500}});
+    });
+    setLocale('en');render(<Harness/>);
+    const brightness=await screen.findByRole('spinbutton',{name:'Brightness (%)'});
+    fireEvent.change(brightness,{target:{value:'78'}});
+    expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
+    act(()=>setLocale('ru'));
+    expect(screen.getByRole('spinbutton',{name:'Яркость (%)'})).toBe(brightness);
+    expect(brightness).toHaveValue(78);
+    expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
+    expect(writes).toEqual([]);
+    act(()=>setLocale('en'));
+    expect(screen.getByRole('spinbutton',{name:'Brightness (%)'})).toHaveValue(78);
+    fireEvent.click(screen.getByRole('button',{name:'Apply'}));
+    await waitFor(()=>expect(writes).toEqual([{commands:[{code:'bright_value_v2',value:780}]}]));
+  });
+});
