@@ -1,0 +1,5 @@
+# Linux only: observe the Dell's real LAN interfaces and discovery broadcasts.
+services:
+  smart-home:
+    network_mode: host
+    ports: !reset []

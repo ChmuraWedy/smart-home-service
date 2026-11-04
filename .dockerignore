@@ -1,0 +1,28 @@
+# Only application sources enter the build context. Secrets and state stay outside.
+**
+!Dockerfile
+!pyproject.toml
+!requirements.txt
+!requirements-cloud.txt
+!smarthome/
+!smarthome/**
+smarthome/**/__pycache__/
+!deploy/
+!deploy/nginx.conf
+!deploy/docker-entrypoint.sh
+!frontend/
+!frontend/package.json
+!frontend/pnpm-lock.yaml
+!frontend/index.html
+!frontend/tsconfig.json
+!frontend/vite.config.ts
+!frontend/src/
+!frontend/src/**
+!frontend/public/
+!frontend/public/**
+# Explicitly exclude generated/developer files even when a parent is re-included.
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/.env*
+smarthome/**/__pycache__/
