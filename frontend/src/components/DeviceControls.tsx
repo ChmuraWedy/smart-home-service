@@ -150,8 +150,8 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, onRefresh, aliasEditor, headingActions, stage, immediatePower = false, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; onRefresh?: () => Promise<void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
@@ -280,7 +280,6 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
       {spec.readable && !reading?.known && <span>{t("Нет показания")}</span>}
       {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{" " + t("с назад")}</span>}
       {!spec.writable ? <span className="read-only">{t("Только чтение")}</span> : !spec.readable && <span className="read-only">{t("Команда")}</span>}
-      {onRefresh && <button type="button" className="reading-refresh" aria-label={t("Обновить показание ") + spec.label} title={t("Обновить показание")} disabled={disabled} onClick={() => void onRefresh()}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 1-2.4-5.7L20 9" /></svg></button>}
     </div></div>
     {awaiting && <p className="help pending-reading">{t("Ожидаем новое показание")}</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}

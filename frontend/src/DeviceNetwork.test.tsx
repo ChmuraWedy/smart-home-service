@@ -1,53 +1,48 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { ApiError, CloudApi } from './api';
-import type { NetworkWatch } from './api';
+import type { NetworkObservation } from './api';
 import { DeviceNetwork } from './components/DeviceNetwork';
 
-const connection = { baseUrl: 'http://api.test', token: 'key' };
-const observation: NetworkWatch = {
-  watch_id: 'watch', device_id: 'child', target_id: 'gateway', route: 'gateway',
-  configured_ip: '192.168.1.10', observed_ip: null, version: null, last_seen: null,
-  packets: 0, listening: true, ports: [6666, 6667, 7000], failed_ports: [],
-  remaining_seconds: 899, changes: [],
+const observation:NetworkObservation={
+  device_id:'child',target_id:'gateway',route:'gateway',configured_ip:'192.168.1.10',observed_ip:'192.168.1.20',version:'3.5',
+  last_seen:'2026-11-04T15:00:00Z',packets:1,enabled:true,listening:true,ports:[6666,6667,7000],failed_ports:[],changes:[],
 };
-afterEach(() => vi.useRealTimers());
+function expand(open=true) {
+  const details=screen.getByText('Устройство в домашней сети').closest('details')!;
+  details.open=open; fireEvent(details,new Event('toggle'));
+}
 
-it('starts only on request, shows gateway IP changes and stops on card close without device commands', async () => {
-  const api = new CloudApi(connection);
-  const start = vi.spyOn(api, 'startNetworkWatch').mockResolvedValue(observation);
-  const poll = vi.spyOn(api, 'networkWatch').mockResolvedValue({ ...observation, observed_ip: '192.168.1.30', packets: 2,
-    last_seen: '2026-10-09T20:00:00Z', changes: [
-      { at: '2026-10-09T19:00:00Z', previous_ip: null, ip: '192.168.1.20' },
-      { at: '2026-10-09T20:00:00Z', previous_ip: '192.168.1.20', ip: '192.168.1.30' },
-    ] });
-  const stop = vi.spyOn(api, 'stopNetworkWatch').mockResolvedValue();
-  const command = vi.spyOn(api, 'sendDeviceCommands');
-  const view = render(<DeviceNetwork api={api} deviceId="child" provider="sharing" onAuthError={vi.fn()} />);
-  expect(start).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText('Устройство в домашней сети'));
+it('reads shared cached announcements without start/stop actions, then stops reads when closed',async()=>{
+  const api=new CloudApi({baseUrl:'http://api.test',token:'fixture-key'});
+  const read=vi.spyOn(api,'deviceNetworkObservation').mockResolvedValue(observation);
+  const start=vi.spyOn(api,'startNetworkWatch'),stop=vi.spyOn(api,'stopNetworkWatch'),command=vi.spyOn(api,'sendDeviceCommands');
+  const view=render(<DeviceNetwork api={api} deviceId="child" provider="local" onAuthError={vi.fn()}/>);
+  expect(read).not.toHaveBeenCalled();
   vi.useFakeTimers();
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Наблюдать в сети' })); });
-  expect(screen.getByText('Шлюз устройства', { exact: false })).toBeInTheDocument();
-  expect(start).toHaveBeenCalledWith('child', 'sharing', expect.any(AbortSignal));
-  expect(screen.getByText('Объявлений пока нет')).toBeInTheDocument();
-  await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
-  expect(poll).toHaveBeenCalledOnce();
-  expect(screen.getByText('Обнаруженный IP отличается от сохранённого в настройках.')).toBeInTheDocument();
+  await act(async()=>expand());
+  expect(screen.getByText('192.168.1.20')).toBeInTheDocument();
+  expect(read).toHaveBeenCalledWith('child','local',expect.any(AbortSignal));
+  expect(screen.queryByRole('button')).toBeNull();
+  read.mockResolvedValue({...observation,observed_ip:'192.168.1.30',packets:2,changes:[{at:'2026-11-04T15:01:00Z',previous_ip:'192.168.1.20',ip:'192.168.1.30'}]});
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1000);});
   expect(screen.getByText(/192.168.1.20 → 192.168.1.30/)).toBeInTheDocument();
+  expand(false);
+  const count=read.mock.calls.length;
+  await act(async()=>{await vi.advanceTimersByTimeAsync(3000);});
+  expect(read).toHaveBeenCalledTimes(count);
   view.unmount();
-  expect(stop).toHaveBeenCalledWith('watch');
-  expect(command).not.toHaveBeenCalled();
+  expect(start).not.toHaveBeenCalled();expect(stop).not.toHaveBeenCalled();expect(command).not.toHaveBeenCalled();
 });
 
-it('explains an unknown gateway without inventing an address and handles authentication failures', async () => {
-  const api = new CloudApi(connection), onAuthError = vi.fn();
-  vi.spyOn(api, 'startNetworkWatch').mockRejectedValueOnce(new ApiError('Gateway unknown', 409)).mockRejectedValueOnce(new ApiError('Access denied', 401));
-  render(<DeviceNetwork api={api} deviceId="child" provider="sharing" onAuthError={onAuthError} />);
-  fireEvent.click(screen.getByText('Устройство в домашней сети'));
-  fireEvent.click(screen.getByRole('button', { name: 'Наблюдать в сети' }));
+it('explains unknown gateways and handles authentication failures without creating watches',async()=>{
+  const api=new CloudApi({baseUrl:'http://api.test',token:'fixture-key'}),auth=vi.fn();
+  const read=vi.spyOn(api,'deviceNetworkObservation').mockRejectedValueOnce(new ApiError('Unknown gateway',409)).mockRejectedValueOnce(new ApiError('Access denied',401));
+  render(<DeviceNetwork api={api} deviceId="child" provider="sharing" onAuthError={auth}/>);
+  expand();
   expect(await screen.findByRole('alert')).toHaveTextContent('Шлюз этого устройства пока неизвестен');
-  expect(screen.queryByText('Обнаруженный IP')).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Наблюдать в сети' }));
-  await waitFor(() => expect(onAuthError).toHaveBeenCalledOnce());
+  expect(screen.queryByText('Обнаруженный IP')).toBeNull();
+  expand(false);expand();
+  await waitFor(()=>expect(auth).toHaveBeenCalledOnce());
+  expect(read).toHaveBeenCalledTimes(2);
 });

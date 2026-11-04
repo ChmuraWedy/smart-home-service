@@ -1,5 +1,13 @@
 # Project verification
 
+## Shared passive discovery and simplified refresh — 2026-11-04
+
+**547 backend tests and 256 frontend tests passed** (frontend run limited to four workers to avoid contention on the development machine). Ruff, TypeScript, production build, and `git diff --check` passed. The existing large-bundle advisory remains.
+
+Network checks cover reception before any card opens, read-only authenticated device/gateway snapshots, immutable cached histories, bounded recent-identity eviction, no retained payload credentials or switch readings, application startup/shutdown, shared discovery sockets across global/card/detailed views, retry of a busy port without reopening healthy sockets, subnet-filtered reuse of prior announcements, and fresh scan counters. Automatic reception is disabled in app-test fixtures so the suite does not bind real LAN discovery sockets; socket lifecycle checks use simulated sockets.
+
+An isolated 375 × 667 touch preview confirmed exactly one device-header refresh action, zero per-value refresh icons, and zero listener Start/Stop buttons. Expanding network details performed three cached GETs over 2.2 seconds; closing the section stopped further reads, and no network-watch write was issued. The new observation endpoint was simulated in the isolated browser because the running service has not yet been deployed with this branch. No physical device command, live listener deployment, or saved connection change was performed.
+
 ## Automatic controls, visible-device status, and mobile details — 2026-11-04
 
 **256 frontend tests passed**, including automatic submission without Apply, coalesced edits, unchanged/invalid values, rejected commands without retries, pending targets over old cache readings, cancelled edits, one-second cache reads, hidden-view cleanup, connection/battery updates, color serialization, and nested-dialog click/scroll isolation. The complete backend run passed **541 tests**; after adding a connection-change race regression, all **45 focused commissioning/collector tests** passed. Ruff, TypeScript, production build, and `git diff --check` passed. The existing large-bundle build advisory remains.

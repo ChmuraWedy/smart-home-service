@@ -16,7 +16,7 @@ Local views read the SQLite cache once per second. Visible local cards add `watc
 
 The collector supports at most 64 watched devices and four concurrent reads, without a queued backlog or overlapping reads of one device. Slow devices can delay their next reading. Zigbee children use their saved gateway. Disabled or incomplete connections are skipped. Failed reads preserve existing observations and timestamps. Recent reports from commands, explicit reads, or room displays avoid an immediate duplicate background read.
 
-Explicit Refresh still requests a TinyTuya read immediately. Cache requests without `watch=true` remain passive. Selected room displays retain their separately configured collector. Observations older than the freshness threshold are marked stale rather than presented as newly measured. Sleeping Zigbee sensors may not answer LAN requests; an absent motion reading remains unknown.
+One manual Refresh button per device card still requests a TinyTuya read immediately. Redundant per-value refresh icons are removed. Cache requests without `watch=true` remain passive. Selected room displays retain their separately configured collector. Observations older than the freshness threshold are marked stale rather than presented as newly measured. Sleeping Zigbee sensors may not answer LAN requests; an absent motion reading remains unknown.
 
 ## Sending changes
 
@@ -27,3 +27,7 @@ With automatic status updates active, commands do not trigger an extra immediate
 On mobile, details occupy the full screen with a fixed header and a scrolling content pane. The page underneath cannot scroll or receive detail clicks. Nested dialogs restore scrolling only after the final dialog closes.
 
 [Activity logs](device-activity.md) preserve received events and available snapshots; they do not reconstruct the complete Smart Life history.
+
+## Passive IP announcements
+
+A single always-running Tuya receiver maintains the [shared network announcement cache](packet-capture.md). This is separate from five-second status reads: announcements reveal an observed IP and protocol, not whether a light is on. Device cards read cached network details when their network section is expanded; no per-device listener Start/Stop action is needed.

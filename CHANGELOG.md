@@ -4,6 +4,9 @@ Entries below describe the changes at the stated date; later entries can superse
 
 ## After 0.8.3 — 2026-11-04
 
+- Made Tuya announcement reception global at service startup, sharing one receiver with detailed network observations. Added a bounded recent-device/IP-change cache and a read-only per-device observation endpoint. Cards no longer need listener Start/Stop buttons; network observations reuse cached identities from the selected subnet without inflating fresh packet counters. Busy ports retry automatically.
+- Removed per-value refresh icons; one manual refresh action remains per device card. One-second cache updates and five-second status collection for visible local cards continue independently of passive discovery.
+
 - `feat/immediate-controls-mobile`: removed the shared Apply action. Switches send immediately; valid slider, color, text, and wizard edits send automatically with short coalescing and no command retries. Active status sessions wait for scheduled readings instead of issuing an extra read after every command.
 - Visible local and Sharing cards check the server cache every second. Local cache heartbeats lease a bounded shared collector that reads visible devices every five seconds, expires abandoned watches, deduplicates browsers, and preserves observations on failure. Sharing continues to use Tuya MQTT reports rather than periodic remote HTTP polling.
 - Local commissioning now recognizes verified Tuya color encodings and includes the confirmed color-mode DP. Mobile details occupy the whole screen, isolate clicks, and lock background scrolling, including nested dialogs.

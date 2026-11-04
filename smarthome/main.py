@@ -596,6 +596,8 @@ def create_app(settings: Settings | None = None, controller=None):
         from .network import NetworkMonitor
 
         app.state.network = NetworkMonitor()
+        if settings.network_monitor_enabled:
+            app.state.network.start_global()
         from .topology import TopologySync
 
         app.state.topology = TopologySync()

@@ -8,6 +8,7 @@ import socket
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from datetime import datetime, timezone
 from ipaddress import ip_address, ip_network
 from typing import Literal
@@ -71,12 +72,49 @@ class NetworkMonitor:
     def __init__(self):
         self.lock = threading.RLock()
         self.watches = {}
+        self.global_enabled = False
+        self.observations = OrderedDict()
         self.scans = {}
         self.last_discovery_request = None
         self.thread = None
         self.closed = False
         self.ports = []
         self.failed_ports = []
+
+    def _ensure_listener(self):
+        if not self.thread or not self.thread.is_alive():
+            self.thread = threading.Thread(
+                target=self._listen, name="network-announcements", daemon=True
+            )
+            self.thread.start()
+
+    def start_global(self):
+        with self.lock:
+            if self.closed:
+                return
+            self.global_enabled = True
+            self._ensure_listener()
+
+    def observation(self, device_id, target_id, route, configured_ip):
+        with self.lock:
+            row = self.observations.get("tuya:" + target_id, {})
+            return copy.deepcopy(
+                {
+                    "device_id": device_id,
+                    "target_id": target_id,
+                    "route": route,
+                    "configured_ip": configured_ip,
+                    "observed_ip": row.get("ip"),
+                    "version": row.get("version"),
+                    "last_seen": row.get("last_seen"),
+                    "packets": row.get("packets", 0),
+                    "changes": row.get("changes", []),
+                    "enabled": self.global_enabled,
+                    "listening": bool(self.ports),
+                    "ports": list(self.ports),
+                    "failed_ports": list(self.failed_ports),
+                }
+            )
 
     def start(self, device_id, target_id, route, configured_ip):
         with self.lock:
@@ -98,9 +136,7 @@ class NetworkMonitor:
                 "expires": now + LEASE_SECONDS,
                 "deadline": now + MAX_SECONDS,
             }
-            if not self.thread or not self.thread.is_alive():
-                self.thread = threading.Thread(target=self._listen, daemon=True)
-                self.thread.start()
+            self._ensure_listener()
             return {"watch_id": watch_id, **self._snapshot(self.watches[watch_id])}
 
     def start_scan(self, interface=None):
@@ -124,9 +160,29 @@ class NetworkMonitor:
                 "expires": now + LEASE_SECONDS,
                 "deadline": now + MAX_SECONDS,
             }
-            if not self.thread or not self.thread.is_alive():
-                self.thread = threading.Thread(target=self._listen, daemon=True)
-                self.thread.start()
+            scan = self.scans[scan_id]
+            # Reuse announcements received before the page was opened. Never
+            # import cloud/inventory guesses, or observations from other subnets.
+            for key, row in self.observations.items():
+                if interface and ip_address(row["ip"]) not in ip_network(interface["network"]):
+                    continue
+                cached = copy.deepcopy(row)
+                cached["cached"] = True
+                cached["packets"] = 0  # Counts in this detailed observation start now.
+                cached["first_seen"] = cached["last_seen"]
+                if interface:
+                    network = ip_network(interface["network"])
+                    cached["changes"] = [
+                        change
+                        for change in cached["changes"]
+                        if ip_address(change["ip"]) in network
+                        and (
+                            not change["previous_ip"]
+                            or ip_address(change["previous_ip"]) in network
+                        )
+                    ]
+                scan["devices"][key] = cached
+            self._ensure_listener()
             return self.read_scan(scan_id)
 
     def _scan(self, scan_id):
@@ -285,6 +341,14 @@ class NetworkMonitor:
             self._expire()
             if decoded:
                 identifier, address, version = decoded
+                key = "tuya:" + identifier
+                if key not in self.observations and len(self.observations) >= MAX_DEVICES:
+                    self.observations.popitem(last=False)
+                cache = {"devices": self.observations, "truncated": False}
+                self._record(
+                    cache, key, address, "tuya", now, device_id=identifier, version=version
+                )
+                self.observations.move_to_end(key)
                 for row in self.watches.values():
                     if identifier != row["target_id"]:
                         continue
@@ -353,14 +417,16 @@ class NetworkMonitor:
 
     def _listen(self):
         listeners, attempted, neighbor_at = {}, set(), 0
-        memberships = {}
+        memberships, retry_at = {}, {}
         try:
             while True:
                 with self.lock:
                     self._expire()
                     if self.closed:
                         break
-                    wanted = set(PORTS) if self.watches or self.scans else set()
+                    wanted = (
+                        set(PORTS) if self.global_enabled or self.watches or self.scans else set()
+                    )
                     if self.scans:
                         wanted.update(MULTICAST)
                     for port in list(listeners):
@@ -368,19 +434,28 @@ class NetworkMonitor:
                             listeners.pop(port).close()
                             memberships.pop(port, None)
                     attempted.intersection_update(wanted)
+                    for port in wanted - set(listeners):
+                        if time.monotonic() >= retry_at.get(port, 0):
+                            attempted.discard(port)
                     self.failed_ports = [port for port in self.failed_ports if port in wanted]
                     for port in sorted(wanted - attempted):
                         attempted.add(port)
-                        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                        listener = None
                         try:
+                            listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                             listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                             if port in MULTICAST and hasattr(socket, "SO_REUSEPORT"):
                                 listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
                             listener.bind(("", port))
                             listeners[port] = listener
+                            if port in self.failed_ports:
+                                self.failed_ports.remove(port)
                         except OSError:
-                            listener.close()
-                            self.failed_ports.append(port)
+                            if listener is not None:
+                                listener.close()
+                            if port not in self.failed_ports:
+                                self.failed_ports.append(port)
+                            retry_at[port] = time.monotonic() + 30
                     addresses = {
                         scan["interface"]["address"] if scan["interface"] else "0.0.0.0"
                         for scan in self.scans.values()
@@ -417,10 +492,31 @@ class NetworkMonitor:
                 if not listeners:
                     time.sleep(0.5)
                     continue
-                ready, _, _ = select.select(list(listeners.values()), [], [], 0.5)
+                try:
+                    ready, _, _ = select.select(list(listeners.values()), [], [], 0.5)
+                except OSError:
+                    with self.lock:
+                        for port, listener in listeners.items():
+                            listener.close()
+                            retry_at[port] = time.monotonic() + 30
+                        self.failed_ports = sorted(listeners)
+                        listeners.clear()
+                        memberships.clear()
+                        self.ports = []
+                    continue
                 for listener in ready:
-                    data, peer = listener.recvfrom(65535)
                     port = next(port for port, value in listeners.items() if value is listener)
+                    try:
+                        data, peer = listener.recvfrom(65535)
+                    except OSError:
+                        with self.lock:
+                            listeners.pop(port).close()
+                            memberships.pop(port, None)
+                            retry_at[port] = time.monotonic() + 30
+                            if port not in self.failed_ports:
+                                self.failed_ports.append(port)
+                            self.ports = sorted(listeners)
+                        continue
                     self.ingest(data, peer[0], port)
         except OSError:
             with self.lock:
@@ -434,6 +530,7 @@ class NetworkMonitor:
     def close(self):
         with self.lock:
             self.closed = True
+            self.global_enabled = False
             self.watches.clear()
             self.scans.clear()
             worker = self.thread
@@ -464,6 +561,23 @@ def resolve_target(session, request, device_id, provider):
         gateway = session.scalar(sql_select(Device).where(Device.device_id == gateway_id))
         return gateway_id, "gateway", gateway.ip if gateway else None
     return None, "gateway_unknown", None
+
+
+@router.get("/devices/{device_id}/observation")
+def device_observation(
+    device_id: Identifier,
+    request: Request,
+    response: Response,
+    provider: Literal["sharing", "developer", "local"] = "sharing",
+    session: Session = Depends(get_session),
+):
+    target_id, route, configured_ip = resolve_target(session, request, device_id, provider)
+    response.headers["Cache-Control"] = "no-store"
+    if target_id is None:
+        raise HTTPException(
+            409, "Gateway is not known. Select the device's gateway in the local inventory first."
+        )
+    return request.app.state.network.observation(device_id, target_id, route, configured_ip)
 
 
 @router.post("/devices/{device_id}/watch")

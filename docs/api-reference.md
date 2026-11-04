@@ -17,6 +17,7 @@ All `/api/v1/*` requests use `X-API-Key` when `SMART_HOME_API_TOKEN` is configur
 | `SMART_HOME_CORS_ORIGINS` | empty | Allowed browser origins, comma-separated |
 | `SMART_HOME_FRONTEND_URL` | empty | Optional redirect from the old `/cloud` page |
 | `SMART_HOME_DISPLAY_POLL_INTERVAL` | `30` | Poll selected display devices; `0` disables periodic polling |
+| `SMART_HOME_NETWORK_MONITOR_ENABLED` | `1` | Start the shared passive Tuya announcement receiver |
 | `SMART_HOME_CLOUD_ENABLED` | `0` | Enable optional Tuya cloud access |
 | `SMART_HOME_CLOUD_SESSION` | application default | Sharing session file |
 | `SMART_HOME_DEVELOPER_SESSION` | Sharing path + `.developer.json` | Developer credentials file |
@@ -330,6 +331,7 @@ This index is generated from the application's OpenAPI routes. Consult the live 
 
 | Method | Path | Operation |
 | --- | --- | --- |
+| GET | `/api/v1/network/devices/{device_id}/observation` | Read Shared Device Observation |
 | POST | `/api/v1/network/devices/{device_id}/watch` | Start Watch |
 | GET | `/api/v1/network/watches/{watch_id}` | Read Watch |
 | DELETE | `/api/v1/network/watches/{watch_id}` | Stop Watch |

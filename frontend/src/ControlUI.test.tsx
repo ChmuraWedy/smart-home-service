@@ -188,7 +188,7 @@ describe('cloud device control', () => {
       await act(async () => { vi.advanceTimersByTime(1000); });
       expect(within(channel).getByRole('switch')).toHaveAttribute('aria-checked','true');
       expect(within(channel).queryByText('Отчёт устройства')).not.toBeInTheDocument();
-      expect(within(channel).getByRole('button', {name:'Обновить показание Канал 2'})).toBeEnabled();
+      expect(within(channel).queryByRole('button', {name:/Обновить показание/})).toBeNull();
       expect(input).toHaveValue(70.5);
       expect(reads.filter(path=>path.includes('/functions'))).toHaveLength(1);
       expect(reads.filter(path=>path.includes('/status?refresh=true'))).toHaveLength(1);
@@ -355,7 +355,8 @@ describe('cloud device control', () => {
     expect(within(power).getByText('Выключено')).toBeInTheDocument();
     expect(within(power).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('21.5 °C')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Температура' })).getByRole('button', {name:'Обновить показание Температура'})).toBeEnabled();
+    expect(screen.getByRole('button',{name:'Обновить статус'})).toBeEnabled();
+    expect(screen.queryByRole('button',{name:/Обновить показание/})).toBeNull();
   });
   it('sends brightness and color automatically with their matching mode', async () => {
     const server = cloudServer(); const user = userEvent.setup();
