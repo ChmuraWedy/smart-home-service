@@ -1,39 +1,25 @@
-# Облачные статусы и скорость
+# Device readings and status updates
 
-Sharing использует сохранённую QR-авторизацию и официальный [Tuya Device Sharing SDK](https://github.com/tuya/tuya-device-sharing-sdk). Интернет нужен для запросов и потока отчётов; local_key в браузер не передаётся.
+A reported value, an HTTP snapshot, and a command acknowledgement are different kinds of evidence. The interface keeps their source and timestamp separate and never treats missing data as false or zero.
 
-## Загрузка
+## Sharing reports
 
-Список устройств выполняет запрос домов и по одному запросу инвентаря каждого дома. Полные определения функций, стратегии DP и типов отчёта загружаются только для выбранного устройства и кешируются в процессе. Прежний `update_device_cache()` SDK запрашивал их для каждого устройства: в исследованном аккаунте 46 устройств одно обновление статуса запускало примерно 186 последовательных HTTP-запросов.
+The backend uses the official Sharing SDK's MQTT reports. Reports are stored in SQLite with per-DP timestamps; a newer reading for one DP does not refresh another DP. The browser reads our cache every three seconds while the relevant view is visible. This is not a fresh Tuya HTTP request on every poll.
 
-`GET /api/v1/cloud/devices/{tuya_id}/status?provider=sharing&refresh=true` читает HTTP-снимок одного устройства. `refresh=false` читает кеш после первоначальной загрузки инвентаря и определений. Первый запрос статуса также запускает MQTT-подписку; открываемые далее устройства добавляются в неё. Подписки остаются до остановки сервиса, выхода из аккаунта или его смены. Список и функции сами не отправляют команды. Developer также обновляет выбранный статус без предварительного обновления всего инвентаря, но MQTT-поток этого провайдера пока не подключён.
+Definitions are fetched when a device needs them. A manual refresh requests a selected-device HTTP snapshot. Newer reports take priority over older snapshots. Opening or closing a card does not send a device command. Inventory subscription can continue receiving reports when details are closed; visible tiles read only their relevant saved data.
 
-## Достоверность показаний
+Late responses from cancelled views are ignored. Background reads preserve unsaved field edits and do not overwrite a newer manual refresh or command result. Hidden pages, off-screen tiles, and the list behind an open dialog stop their browser polling. Local and Developer control do not gain automatic cloud polling from this behavior.
 
-Tuya HTTP API может успешно вернуть старый статус. Поэтому полученный MQTT-отчёт имеет приоритет для своего code; ручное HTTP-обновление его не затирает. Сообщение с более старой отметкой устройства также не заменяет более новое. Для параметров, по которым отчётов ещё нет, используется HTTP-снимок. ACK команды не подставляет отправленное значение в статус.
+## Local readings
 
-Ответ статуса дополнен полями:
+Local list/detail views initially read the SQLite cache. Explicit refresh performs a TinyTuya read; commands are followed by a separate read. Selected room displays can also poll their configured devices through the collector. Observations older than the freshness threshold are marked stale rather than presented as newly measured.
 
-| Поле | Значение |
-| --- | --- |
-| `status` | Последние известные значения по code |
-| `snapshot_received_at` | Время приёма HTTP-снимка сервером, UTC; чтение кеша его не обновляет |
-| `status_observations[code].observed_at` | UTC-время из отчёта Tuya, либо `null` |
-| `status_observations[code].received_at` | UTC-время приёма отчёта сервером |
-| `event_stream_connected` | Подключён ли MQTT-клиент; не подтверждает свежесть каждого параметра |
+Sleeping Zigbee sensors may not answer a LAN status request. Their old reading remains old, and an absent motion reading remains unknown. A timeout does not create a new observation.
 
-Источник верхнего уровня `tuya_cloud_snapshot` сохраняется: ответ может объединять HTTP-снимок и отчёты отдельных параметров. Наличие `status_observations[code]` указывает на полученный отчёт этого параметра. Пустая карта означает отсутствие таких отчётов. Спящий датчик может не отправить новое показание по запросу; последнее движение нельзя считать временем получения HTTP-снимка.
+## Applying changes
 
-Последние значения отчётов с оригинальными отметками времени сохраняются в новой таблице `cloud_status_reports` существующей SQLite-базы. Кеш разделён по хешу UID аккаунта, не содержит токенов/local_key и очищается для текущего аккаунта при logout. Перезапуск сохраняет кеш; это последнее известное состояние, а не новое физическое измерение. При недоступной записи SQLite приём продолжает работать в памяти. Для `:memory:` запись на диск отключена. Перед обновлением рабочей установки сделайте резервную копию SQLite.
+The full card keeps drafts until **Apply**, compares them with the initial values, and sends only changes. Power controls on main-screen tiles send immediately. A pending accepted target is distinguished from the observed value so an old cache response does not cause a misleading visual rollback.
 
-## React
+ACK means the command was accepted, not that physical state changed. Read failure after ACK is shown separately from command rejection. The service does not automatically retry a command or switch its transport after a timeout.
 
-Пока Sharing-форма управления видима, React читает кеш сервиса раз в три секунды. Эти запросы не опрашивают Tuya HTTP API. Время показания видно справа от поля в секундах; сведения об источнике находятся в «О показаниях». Фоновое чтение сохраняет неприменённые изменения регуляторов. Одна кнопка «Применить» проверяет все черновики и отправляет только изменённые значения одним запросом. Ручное обновление и команда отменяют незавершённое фоновое чтение, чтобы запоздалый ответ не заменил более новый. Закрытие формы прекращает чтение. Локальные устройства и Developer автоматически этим механизмом не опрашиваются.
-
-Если поток ещё не подключён или разорван, форма сообщает об этом. Ручное обновление остаётся доступным, но успешный HTTP-ответ всё равно не доказывает физическое изменение устройства. Автоматических повторов команд нет.
-
-## Проверенная установка
-
-После ручного переключения владельцем `WorkroomLigthSwith` получен MQTT-отчёт `switch_2=true` с временем устройства `2026-10-08T07:13:43.426Z`; сервис принял его через 0,267 секунды. Прежний HTTP-снимок возвращал `false`. React показал «Канал 2 — Включено» и исходное время отчёта. Проверены сохранение после перезапуска и приоритет над старым HTTP-снимком.
-
-В этой установке загрузка холодного инвентаря заняла 0,73 секунды, отдельный HTTP-статус — 0,1–0,3 секунды, чтение кеша — около 0,002 секунды. Это измерения одного аккаунта и сети. Задержка интерфейса дополнительно зависит от трёхсекундного интервала чтения. Отчёты всех моделей устройств и физический LAN-транспорт в этой проверке не подтверждались; агент не отправлял команд выключателю.
+The details view shows reading age and refresh actions. [Activity logs](device-activity.md) preserve received events and available snapshots; they do not reconstruct the complete Smart Life history.

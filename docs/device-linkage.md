@@ -1,66 +1,60 @@
-# Лампы и связи устройств
+# Bulb controls and device mappings
 
-## Почему работает без нового входа
+[Interface guide](../frontend/README.md) · [Switch channels](switch-controls.md)
 
-QR-вход уже сохранил Tuya-сеанс на Python-сервисе. Браузер использует сохранённый ключ нашего API, а сервис — сохранённые Tuya-токены. Страница подключения теперь показывает восстановленный аккаунт как подключённый. Новый QR нужен при смене аккаунта или восстановлении доступа; скрытое поле не означает отсутствие авторизации. Облачное управление требует интернета. Локальный TinyTuya-путь использует ранее настроенные IP/version/local_key, а для Zigbee — parent/cid; нового облачного входа для него не требуется.
+## Authentication and available controls
 
-## Все объявленные функции лампы
+A confirmed QR session persists on the server; the browser authenticates to our API with its own saved service key. Reopening a card therefore does not require a new QR login while that session is valid. Cloud commands need internet access. Local commands independently use the saved IP, protocol, key, and optional gateway/child route.
 
-Read-only проверка `WorkRoomLamp0` дала следующий набор. Это карта именно исследованного устройства, а не универсальные DP всех ламп. UI использует фактические определения выбранного устройства. `dp_id` возвращается лишь при единственном известном соответствии; `dp_ids` сохраняет неоднозначность. Неизвестный DP не угадывается, local_key в этих ответах отсутствует.
+The UI follows the selected device's actual definitions. The inspected WorkRoomLamp0 exposed the following functions; this table is not a universal DP map for every bulb.
 
-| Код | DP | Управление |
-| --- | ---: | --- |
-| switch_led | 20 | Питание |
-| work_mode | 21 | Белый свет, цвет, сцена, музыка |
-| bright_value_v2 | 22 | Яркость |
-| temp_value_v2 | 23 | Температура белого света |
-| colour_data_v2 | 24 | HSV и выбор цвета |
-| scene_data_v2 | 25 | Номер сцены и список шагов: режим перехода, длительности, белый свет/HSV |
-| countdown_1 | 26 | Обратный отсчёт в секундах |
-| music_data | 27 | Светомузыка: режим перехода и белый свет/HSV |
-| control_data | 28 | Разовый переход света: режим и белый свет/HSV |
-| rhythm_mode | 30 | Суточный ритм: включение, дни, время, точки света |
-| sleep_mode | 31 | Сон: дни, время, длительность, свет |
-| wakeup_mode | 32 | Пробуждение: дни, время, длительность/удержание, свет |
-| power_memory | 33 | Настройки производителя, последнее или заданное состояние |
-| do_not_disturb | 34 | Boolean параметр «Не беспокоить» |
-| remote_switch | 41 | Boolean параметр пульта; список привязок — отдельная функция приложения |
-| random_timing | 210 | Случайное расписание: каналы, дни, интервал времени, свет |
+| Code | DP | Purpose |
+| --- | --- | --- |
+| `switch_led` | 20 | Power |
+| `work_mode` | 21 | White, color, scene, music |
+| `bright_value_v2` | 22 | White brightness |
+| `temp_value_v2` | 23 | White color temperature |
+| `colour_data_v2` | 24 | HSV color |
+| `scene_data_v2` | 25 | Scene ID and transition/light steps |
+| `countdown_1` | 26 | Countdown in seconds |
+| `music_data` | 27 | Music lighting command |
+| `control_data` | 28 | One-time immediate/smooth transition |
+| `rhythm_mode` | 30 | Circadian lighting points |
+| `sleep_mode` | 31 | Sleep schedule |
+| `wakeup_mode` | 32 | Wake-up schedule |
+| `power_memory` | 33 | Manufacturer, last, or custom power-on state |
+| `do_not_disturb` | 34 | Do-not-disturb setting |
+| `remote_switch` | 41 | Remote-control Boolean; bindings are separate |
+| `random_timing` | 210 | Random timing interval, days, channels, light |
 
-Сложные поля находятся в **«Эффекты и дополнительные параметры»**. JSON-редакторы следуют схеме устройства: у этой лампы `music_data`/`control_data` имеют s/v 0–255, а цвет — 0–1000. `music_data` и `control_data` являются командами без показания состояния: пустая строка в снимке не говорит, что функция отсутствует. Передача `music_data` может переключить лампу в объявленный режим `music`; передача `scene_data_v2` — в `scene`.
+`dp_id` is returned only for an unambiguous known mapping; `dp_ids` retains ambiguity. Missing numbers are not guessed. These responses do not contain local keys.
 
-Управление светомузыкой здесь отправляет отдельный световой кадр. Захват микрофона, анализ аудио и непрерывная синхронизация музыки не реализованы. Кнопка «Применить» отправляет только явно подготовленное значение; открытие формы ничего не меняет.
+## Color, effects, and schedules
 
-Raw-параметры передаются base64. Для стандартного формата Tuya **версии 0** добавлены редакторы пяти параметров выше. Проверяются длина, версия, количество точек, диапазоны и big-endian поля. Неизвестная версия/структура остаётся исходным значением; её можно передать вручную. Новое расписание заменяет весь Raw-параметр после явного применения. Ограничение `maxlen` проверяется по декодированным байтам, с общим пределом 16 KiB. Это кодирование стандартного протокола; фактическое выполнение расширенных режимов этой прошивкой на железе ещё не проверено.
+The card has one Apply action for edited values. A color-row expander shows hue, saturation, and color brightness. White brightness and temperature are distinct from the HSV value used for colored light.
 
-Форматы: [Tuya Lighting Function Definition](https://developer.tuya.com/en/docs/iot/product-function-definition?id=K9s9rhj576ypf), [стандартные световые JSON](https://developer.tuya.com/en/docs/iot/dj?id=K9i5ql3v98hn3), [Raw/base64 transport](https://developer.tuya.com/en/docs/iot/basic-features?id=Kaumiwx9b4kkp). Приоритет имеют определения конкретного устройства.
+Popup wizards edit circadian lighting, sleep, wake-up, random schedules, lighting effects, music commands, and transitions. They explain repetition, timing, points, and review before returning a draft to the card. Cancellation does not replace the original. A final Apply sends the edited draft.
 
-## Связанные устройства: что доступно сейчас
+JSON editors follow device schemas. On the inspected bulb, music/transition saturation and brightness use 0–255, while its color function uses 0–1000. Command-only fields can be empty in status without being unsupported. `music_data` can select the declared music mode; `scene_data_v2` can select scene mode. Sending a music frame does not implement microphone capture, audio analysis, or continuous music synchronization.
 
-В карточке облачного устройства откройте **«Связанные устройства и сопоставления»**. Выберите тип, направление, другое устройство и параметры источника/назначения, затем сохраните. Номера DP берутся из метаданных; если номера нет, его можно указать вручную или оставить неизвестным. Можно сохранить связь «пульт → лампа», находясь в карточке лампы. В списке видны имя и ID обоих устройств, code и DP обеих сторон; связь показывается в обеих карточках и переживает перезапуск SQLite.
+Known Tuya version-0 raw formats have structured editors. Parsing validates length, version, point counts, ranges, and big-endian fields. Unknown versions and structures remain unchanged. Creating a replacement schedule explicitly replaces the entire raw parameter. Raw transport is base64; declared maximum length applies to decoded bytes, with a 16 KiB global cap. Protocol encoding tests do not prove that every firmware executes every extended mode.
 
-Типы записей: `remote`, `zigbee_group`, `multi_control`. Это **ручные сопоставления**, не физические группы Zigbee и не применённые Tuya-привязки. Они не отправляют команд, не копируют нажатия и не запускают автоматизацию. Тип фиксирует намерение пользователя; совместимость физических устройств не выводится из его выбора.
+Sources: [lighting function definitions](https://developer.tuya.com/en/docs/iot/product-function-definition?id=K9s9rhj576ypf), [standard lighting JSON](https://developer.tuya.com/en/docs/iot/dj?id=K9i5ql3v98hn3), and [raw transport](https://developer.tuya.com/en/docs/iot/basic-features?id=Kaumiwx9b4kkp). Actual device metadata takes precedence.
 
-Текущий Sharing SDK 0.2.15 не предоставляет чтение/редактирование Smart Life-привязок. Его device/local_strategy содержит карту code↔DP, но не ID устройств, добавленных в панель пульта. Обнаруженное отсутствие этих полей не доказывает отсутствие привязок в Smart Life. Пустой список нашего сервиса означает только отсутствие ручных записей.
+## Related devices and manual mappings
 
-У Tuya существуют отдельные интерфейсы: [mobile multi-control](https://developer.tuya.com/en/docs/app-development/devicemulticontrol?id=Kceuh30jk2dcu), [association control](https://developer.tuya.com/en/docs/app-development/associationControl?id=Ke6l68yd78zed), [Zigbee remote group panel](https://developer.tuya.com/en/miniapp-codelabs/codelabs/panel-zigbee-remote-group-guide/index.html), [Wi-Fi FFC](https://developer.tuya.com/en/docs/iot-device-dev/TuyaOS-iot_abi_remote_wifi_ffc?id=Kd5s860mw66uf). Это разные механизмы, требующие соответствующего SDK/панели/прошивки; наличие документов не делает их доступными через Sharing-токен. [Sharing SDK](https://github.com/tuya/tuya-device-sharing-sdk) используется только в рамках его доступных методов. Изменение существующих Smart Life-привязок и выполнение локальных правил остаются отдельной задачей.
+Mappings record the intended source/target devices and functions in this application's database. Types are `remote`, `zigbee_group`, and `multi_control`. They are not applied Zigbee groups or Smart Life bindings. Saving does not send commands, forward button presses, or create an automation.
 
-## REST API ручных сопоставлений
+Select a kind, direction, other device, and source/target functions. Known DP numbers come from metadata; unknown numbers may remain null or be entered explicitly when valid. Incoming and outgoing mappings appear on both devices and survive restart. An empty list means no local manual records, not proof that Smart Life has no bindings.
 
-Все адреса защищены тем же `X-API-Key`. `provider=sharing` по умолчанию; `developer` использует независимый аккаунт/проект. Записи изолированы по провайдеру и идентификатору аккаунта/проекта, который не возвращается в API. Обе стороны проверяются по доступному инвентарю; источник может быть readonly кнопкой/датчиком, назначение должно иметь writable функцию. Указанный DP должен соответствовать известным метаданным. Совпадающая запись даёт 409, неверный DP/code — 422.
+Sharing SDK 0.2.15 exposes function/DP mappings but not Smart Life binding CRUD. Separate Tuya mechanisms exist for [mobile multi-control](https://developer.tuya.com/en/docs/app-development/devicemulticontrol?id=Kceuh30jk2dcu), [association control](https://developer.tuya.com/en/docs/app-development/associationControl?id=Ke6l68yd78zed), and [Zigbee remote panels](https://developer.tuya.com/en/miniapp-codelabs/codelabs/panel-zigbee-remote-group-guide/index.html); those APIs are not automatically available through Sharing authorization.
+
+## Mapping API
+
+Routes require `X-API-Key` and the selected `provider=sharing|developer`. Data is isolated by provider/account. Both devices must be in that account's inventory; a source can be read-only, but the destination must be writable. DP/code mismatches return 422 and duplicate records return 409.
 
 ```sh
-# BASE=http://127.0.0.1:8765/api/v1; TOKEN — ключ нашего API
-# SOURCE/TARGET — реальные Tuya ID, взятые из GET /cloud/devices.
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/cloud/devices/$SOURCE/functions?provider=sharing"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/cloud/devices/$TARGET/mappings?provider=sharing"
-
-# Пример с вымышленными ID; замените ID, code и DP своими значениями.
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"kind":"remote","source_code":"switch_1","source_dp_id":1,"target_device_id":"demo-lamp","target_code":"switch_led","target_dp_id":20}' \
-  "$BASE/cloud/devices/demo-switch/mappings?provider=sharing"
+curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d '{"kind":"remote","source_code":"switch_1","source_dp_id":1,"target_device_id":"demo-lamp","target_code":"switch_led","target_dp_id":20}'   "$BASE/cloud/devices/demo-switch/mappings?provider=sharing"
 ```
 
-Ответ записи: `id`, `kind`, `source_device_id`, `source_code`, `source_dp_id`, `target_device_id`, `target_code`, `target_dp_id`, `origin: "manual"`, `applied_to_tuya: false`. Ответ списка дополнительно содержит `device_id`, `provider`, `tuya_bindings_available: false`; возвращает входящие и исходящие связи выбранного устройства. Неизвестные DP имеют значение `null`.
-
-`PUT /cloud/devices/{source_device_id}/mappings/{id}` принимает то же тело для изменения записи. `DELETE` по этому адресу удаляет только запись нашего сервиса (204). Для входящей связи изменения/удаление адресуются через её `source_device_id`. UI сейчас создаёт и удаляет сопоставления; редактирование через PUT доступно в REST API. Новая таблица создаётся при старте; существующие устройства и токены не мигрируются и не заменяются.
+`BASE` includes `/api/v1`. GET on the same collection returns incoming/outgoing records, `origin:manual`, `applied_to_tuya:false`, and `tuya_bindings_available:false`. PUT/DELETE address `/cloud/devices/{source_device_id}/mappings/{id}`. Incoming records must still be changed via their source device. DELETE removes only our database record. UI creation/deletion and REST editing do not change actual Tuya bindings.

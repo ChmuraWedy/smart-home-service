@@ -1,4 +1,4 @@
-# Проверка проекта
+# Project verification
 
 ## Gateway key discovery — 2026-10-12
 
@@ -98,22 +98,22 @@ Real capture: 498 decoded UDP packets (496 device messages plus two own discover
 
 Browser verification used an isolated local app with fake Tuya responses: saved service access, selected Developer, saved the pair with `us-e`, verified fields became hidden, connected and listed three fake devices, opened empty replacement fields, cancelled, reloaded and restored the saved region/connection; QR login remained available. The real localhost page was reloaded and left on the new Developer form with empty credentials. The user's existing QR session was preserved; no real Developer credentials, Developer account login, hardware command or real inventory import was used. Screenshot: workspace `deliverables/tuya-developer-login.png`. Firmware is unchanged.
 
-Дата: 7 октября 2026. Версия сервиса: 0.8.3. Среда проверки: macOS ARM64, Python 3.14.7. Ниже сохранены проверки предыдущих этапов. Linux/OpenWrt и физические Tuya-устройства в этой среде не проверялись.
+Date: 7 October 2026. Service version: 0.8.3. Environment: macOS ARM64, Python 3.14.7. Earlier-stage checks are preserved below. Linux/OpenWrt and physical Tuya devices were not tested in that environment.
 
-- `python -m pytest -q`: **117 passed** (45 первоначальных, 41 проверка алиасов и 31 проверка поиска по названию).
+- `python -m pytest -q`: **117 passed** (45 initial tests, 41 alias tests, and 31 name-search tests).
 - `ruff check .`: **All checks passed**.
-- `sh -n deploy/smart-home.init`: синтаксис корректен. Реальный procd/systemd не запускался.
-- Пакет собран из `pyproject.toml` и установлен во временное виртуальное окружение. Команда `smart-home` работает из другого каталога.
-- Импорт примеров `devices.example.json` + `snapshot.example.json`: 3 устройства, без предупреждений; dry-run не сохраняет устройства.
-- Для v0.1.0 настоящий Uvicorn запускался на localhost: `/health`=200, анонимный inventory=401, авторизованный inventory, parent/cid и hierarchy. В v0.2.0 новые адреса алиасов проверены через FastAPI TestClient; реальный LAN-транспорт в тестах не вызывается.
-- Алиасы проверены для зданий, комнат и устройств: нормализация, уникальность, создание/замена/удаление, освобождение после удаления объекта, hierarchy и guard-проверки, фильтр `alias`, команды Wi-Fi и Zigbee, API-токен, импорт/dry-run/откат конфликтов и сохранение после перезапуска.
-- Проверено обновление базы v0.1.0: автоматически добавляются три таблицы алиасов, существующий device_id и local_key сохраняются, алиасы работают после повторного запуска.
-- Поиск проверен для зданий, комнат, типов и устройств: кириллица/регистр/NFC, точное и частичное совпадение, пагинация, обычные `%`/`_`/кавычки, уточнение расположения, пустые/длинные запросы, конфликты с алиасами и числовыми названиями, bounded-список неоднозначных совпадений, авторизация, name-адреса CRUD/hierarchy и команды Wi-Fi/Zigbee без реальной сети.
-- OpenAPI-схема сохранена в `openapi.json`; это снимок схемы, актуальная версия доступна у запущенного сервера.
+- `sh -n deploy/smart-home.init`: syntax passed. Actual procd/systemd services were not started.
+- Built the package from `pyproject.toml` and installed it in a temporary virtual environment. The `smart-home` command works from another directory.
+- Imported example `devices.example.json` and `snapshot.example.json`: three devices, no warnings; dry-run persisted none.
+- v0.1.0 used a real localhost Uvicorn process: health 200, anonymous inventory 401, authenticated inventory, parent/cid, and hierarchy. v0.2.0 alias routes used FastAPI TestClient without real LAN transport.
+- Building/room/device alias checks cover normalization, uniqueness, create/replace/delete/reuse, hierarchy guards, filtering, Wi-Fi/Zigbee commands, API authorization, import/dry-run/conflict rollback, and restart persistence.
+- A v0.1.0 database upgrade automatically adds three alias tables while preserving device IDs/local keys; aliases work after restart.
+- Name-search checks cover Unicode/Cyrillic, case/NFC, exact/substring search, pagination, literal wildcard/quote characters, placement scopes, empty/long queries, alias/numeric-name conflicts, bounded ambiguity lists, authentication, name-based CRUD/hierarchy, and simulated Wi-Fi/Zigbee commands.
+- Saved OpenAPI in `openapi.json`; this is a snapshot, while the running server exposes the current schema.
 
-В тестах используются поддельные ответы транспорта для контроля Wi-Fi, Zigbee, timeout/error и ACK. Дополнительно реальные объекты TinyTuya создаются без сетевого соединения, и проверяется структура child control payload и наследование версии gateway для 3.3/3.4/3.5. Это проверка интеграции с библиотекой, не подтверждение совместимости конкретного шлюза или устройства.
+Tests use controlled transport responses for Wi-Fi, Zigbee, timeout/error, and ACK behavior. Real TinyTuya objects are also constructed without network connections to check child payload structure and inherited gateway protocols 3.3/3.4/3.5. This verifies library integration rather than compatibility with a particular physical product.
 
-Установленные версии:
+Installed versions:
 
 ```text
 fastapi==0.142.2
@@ -127,7 +127,7 @@ httpx==0.28.1
 ruff==0.16.10
 ```
 
-Тестовая среда выдала одно предупреждение Starlette о будущей замене `httpx` в TestClient; тесты прошли. Файл `requirements.txt` содержит диапазоны совместимых версий: на Python 3.10/другой архитектуре resolver может выбрать другие версии зависимостей. Работоспособность всего диапазона версий отдельно не проверялась. Ресурсы RAM/flash на OpenWrt не измерялись; Python и нативные crypto/Pydantic-пакеты нужно учитывать в образе устройства.
+The environment emitted one Starlette warning about future TestClient replacement of httpx; tests passed. Requirements use compatible version ranges, so another Python version/architecture may resolve different packages. The entire version matrix was not tested. OpenWrt RAM/flash use was not measured; Python and native crypto/Pydantic dependencies must be included in target sizing.
 
 ## Alias lookup update
 
@@ -172,7 +172,7 @@ The owner approved the service QR login in Smart Life. A read-only metadata quer
 
 ## Saved User Code field visibility / 2026-10-07
 
-Verified the updated localhost page in the browser against the saved session: after checking the service access key, the User Code field is hidden and the «Хочу изменить» link is visible. Clicking the link reveals an empty field and focuses it. Reloading the page and checking the access key returns to the hidden-field state. No new User Code was submitted and no QR login or device command was initiated. This update changes only the page and documentation; the 212-test backend result above remains the last full test run.
+Verified the updated localhost page in the browser against the saved session: after checking the service access key, the User Code field is hidden and the “Edit saved value” link is visible. Clicking the link reveals an empty field and focuses it. Reloading the page and checking the access key returns to the hidden-field state. No new User Code was submitted and no QR login or device command was initiated. This update changes only the page and documentation; the 212-test backend result above remains the last full test run.
 
 ## Separate credential save buttons / 2026-10-07
 
@@ -182,7 +182,7 @@ In the real localhost browser page, verified both save buttons and change links.
 
 ## Hidden service access token / 2026-10-07
 
-Verified the revised localhost page in the browser: reload automatically restored the saved token and read the authorized User Code status. The token input has type `hidden`, the access-key editor is invisible in the normal form, and «Настройки подключения» is collapsed. Expanding settings reveals the empty editor and its save button; closing settings restores the normal form. The server still requires `X-API-Key`, and the page source does not contain the configured server token. This update changes only HTML/JavaScript and documentation; the 222-test backend run above remains the last full test run. No new credential was saved, QR login initiated or device command sent during this check.
+Verified the revised localhost page in the browser: reload automatically restored the saved token and read the authorized User Code status. The token input has type `hidden`, the access-key editor is invisible in the normal form, and “Connection settings” is collapsed. Expanding settings reveals the empty editor and its save button; closing settings restores the normal form. The server still requires `X-API-Key`, and the page source does not contain the configured server token. This update changes only HTML/JavaScript and documentation; the 222-test backend run above remains the last full test run. No new credential was saved, QR login initiated or device command sent during this check.
 
 ## Shared child keys as gateway candidates / 2026-10-07
 
@@ -351,3 +351,7 @@ Detail dialogs now use a fixed flex header and a separately scrolling body. Remo
 All 252 frontend tests passed (244 existing plus eight theme cases). New checks cover System/explicit appearance behavior, persistence, cross-tab removal/updates, blocked storage, localized options, API/key draft preservation, no theme-triggered requests and pre-paint initialization. The loaded-device regression also preserves its brightness draft and exact command across every theme. TypeScript, production build and diff checks passed. The existing bundle-size advisory remains.
 
 Browser verification used a separate production-preview tab with a read-only proxy to the existing Dell API. All non-read API methods were blocked; the browser used a dummy preview credential, with the real key retained only by the local proxy. Checked the actual 47-device inventory and the reported Zigbee Plug 2 card in Day and Dark modes. The desktop header stayed at y=41 while the body scrolled 480px and the outer dialog remained at scrollTop=0. All three header actions measured 44x44px with zero borders and transparent backgrounds. Mobile checks at 390x844 had no horizontal overflow, a stable header while scrolling and separated toggle/refresh bounds. Emulated light/dark OS settings updated System mode correctly; explicit Dark survived reload despite a light OS setting. Checked the information popup and keyboard focus styling. Screenshots remain outside Git under `/tmp/smart-home-theme-*.png`. No actuator commands, video starts or device configuration writes were sent. The Dell deployment was not changed.
+
+## English documentation and expanded gallery / 2026-11-04
+
+All 23 tracked Markdown documents are English-only, with no remaining Cyrillic prose or parallel translated copies. Checked 92 local links/anchors and all 114 endpoint-index entries against the application-generated OpenAPI schema. GitHub Markdown rendering produced seven standalone images; a browser loaded all seven at their original dimensions, and the Workroom bulb/color and WC2 motion sections were visually reviewed. The added bulb color screenshot used the existing production build through a read-only preview, without changing a device value. Documentation-only credential checks and Gitleaks found no secrets; diff checks passed. Application/firmware source and deployment state were unchanged, so their previous runtime test results remain historical results rather than a new test run.

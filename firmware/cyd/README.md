@@ -1,72 +1,52 @@
-# Панель комнаты для Cheap Yellow Display
+# Cheap Yellow Display room panel
 
-Прошивка ESP32 подключается к нашему REST-сервису. Выбираете комнату (рядом показано здание), отмечаете устройства и группы, нажимаете «Сохранить выбор». Конфигурация сохраняется в SQLite сервера и NVS панели; после перезапуска панель перечитывает серверную конфигурацию. «Назад» из выбора комнат отменяет несохранённые изменения и возвращает прежний набор плиток. Повторное сохранение сохраняет явно заданные через REST списки capabilities оставленных плиток.
+ESP32 firmware uses this service's REST API. Choose a room, select arbitrary devices/groups, then save. The server keeps the selection in SQLite and the panel in NVS; restart reloads the server configuration. Back cancels unsaved room selection. Re-saving retained widgets preserves explicitly configured capability lists.
 
-Главный экран формируется из сохранённого списка выбранных устройств и групп выбранной комнаты. Можно выбрать только устройства, только группы, смешанный список или пустой список; пример с лампами, температурой, влажностью и движением не задаёт обязательных плиток. Состав можно изменить через «Комната / выбор» и снова сохранить.
+Cards are generated from capabilities, including power, sensors, cover position, fan modes, brightness, and color where available. Groups open their actual members. The panel is an LVGL application, separate from the browser's React interface. Tuya device keys are never sent to firmware.
 
-Карточка устройства показывает его выбранные читаемые capabilities: например, мощность розетки, положение шторы, скорость вентилятора или показания датчика. Нажатие открывает доступные органы управления, которые формируются из capabilities этого устройства. Группа показывает общее состояние питания и раскрывает участников для индивидуального управления. В зависимости от возможностей устройства доступны кнопки, ползунки, выбор режима или цвета; отсутствующие возможности не добавляются на экран.
+## Components and board profiles
 
-## Библиотеки и компоненты
+The implementation uses [LVGL 8.4](https://lvgl.io/docs/open/8.4/), [LovyanGFX](https://github.com/lovyan03/LovyanGFX), ArduinoJson, and a separate FreeRTOS task for HTTP so network waits do not block LVGL. Board information was researched from [Sunton](https://github.com/rzeldent/platformio-espressif32-sunton), [esp32-smartdisplay](https://github.com/rzeldent/esp32-smartdisplay), and [Cheap Yellow Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display).
 
-Выбран [LVGL 8.4](https://lvgl.io/docs/open/8.4/): `button`, `checkbox`, `slider`, `dropdown`, `colorwheel`, `label`, прокручиваемые flex-контейнеры. Это позволяет получать набор органов управления из capabilities REST API. Экран/касание обслуживает [LovyanGFX](https://github.com/lovyan03/LovyanGFX), JSON — ArduinoJson. HTTP выполняется в отдельной FreeRTOS-задаче; сетевое ожидание не блокирует LVGL.
-
-Рассмотрены [ESPHome LVGL](https://esphome.io/components/lvgl/) и [esp32-smartdisplay](https://github.com/rzeldent/esp32-smartdisplay). ESPHome удобен для заранее заданных HA-сущностей; здесь нужен выбор комнат и устройств из собственного API во время работы. Поэтому реализована самостоятельная прошивка. Код драйверов esp32-smartdisplay не включён в проект; ниже использованы сведения о платах из его [матрицы](https://github.com/rzeldent/esp32-smartdisplay/blob/main/BOARD_MATRIX.md) и [определений Sunton](https://github.com/rzeldent/platformio-espressif32-sunton). Исходная 2.8″ CYD описана в [проекте witnessmenow](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display).
-
-| PlatformIO environment | Семейство платы | LCD / касание | Размер LCD |
-|---|---|---|---|
+| PlatformIO environment | Board family | LCD / touch | Resolution |
+| --- | --- | --- | --- |
 | `cyd-028r` | ESP32-2432S028R, R v2 | ILI9341 / XPT2046 | 240×320 |
 | `cyd-028r-st7789` | ESP32-2432S028R v3 / CYD2USB | ST7789 / XPT2046 | 240×320 |
-| `cyd-028c` | **JC2432W328C** | ST7789 / CST816S | 240×320 |
-| `cyd-035r` | ESP32-3248S035R | ST7796 / XPT2046, общий SPI | 320×480 |
+| `cyd-028c` | JC2432W328C | ST7789 / CST816S | 240×320 |
+| `cyd-035r` | ESP32-3248S035R | ST7796 / XPT2046, shared SPI | 320×480 |
 | `cyd-035c` | ESP32-3248S035C | ST7796 / GT911 | 320×480 |
 
-Это пять компилируемых профилей, а не гарантия совместимости всех плат с жёлтым экраном. 2.8″ capacitive платы с другими обозначениями могут иметь другой контроллер/распиновку. ESP32-S3/4.3″ RGB/7″ не поддержаны этим драйвером. Надпись на плате и тип LCD/touch нужно сверить перед загрузкой; физический экземпляр для проверки не предоставлен. Профили не перебирают GPIO автоматически.
+These are five compilable profiles, not universal yellow-display compatibility. ESP32-S3 and 4.3/7-inch RGB panels are not supported by this driver. Verify the exact LCD, touch controller, and pinout; profiles do not probe GPIO automatically.
 
-## Указанная плата ESP32-2432S028 / XXSR69
+The reported `ESP32-2432S028 XXSR69` board with two USB connectors provisionally uses `cyd-028r-st7789`, which is the default environment. Connector count or XXSR69 alone does not prove the controller. If verified power/flash succeeds but the display is wrong, inspect the actual hardware and consider `cyd-028r`. Color order, inversion, and touch calibration require hardware verification.
 
-Владелец сообщил маркировку `ESP32-2432S028 XXSR69` и наличие двух USB-разъёмов. Для первого запуска выбран `cyd-028r-st7789`: в [матрице Sunton](https://github.com/rzeldent/platformio-espressif32-sunton#supported-boards) вариант R v3 с USB-C + Micro-USB имеет LCD ST7789 2.8″, 240×320 и резистивное касание XPT2046. [Конфигурация CYD2USB у witnessmenow](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display/blob/main/DisplayConfig/CYD2USB/User_Setup.h) тоже использует ST7789. Теперь это профиль по умолчанию для `pio run -d firmware/cyd`.
+## Build and upload
 
-Это предварительный выбор: число USB-разъёмов само по себе не подтверждает контроллер. [Автор CYD_Doodler](https://github.com/gabe-sky/CYD_Doodler#hardware) отмечает экземпляры CYD с ILI9341 и ST7789, не позволяющие надёжно выбрать драйвер только по разъёмам или коробке. Для маркировки `XXSR69` подтверждённого соответствия LCD/ревизии в проверенных источниках не найдено. Если выбранный профиль не даёт изображения, после проверки питания и загрузки можно собрать альтернативный `cyd-028r`; при неверных цветах отдельно проверяются `DISPLAY_RGB_ORDER` и `DISPLAY_INVERT`. Совместимость касания и его калибровка проверяются на самой плате.
-
-На ESP32 остаётся собственный интерфейс LVGL: выбор комнаты → выбор произвольных устройств/групп → сохранение → плитки состояния и управление. Отдельный React frontend работает в браузере. Панель обращается прямо к Python REST API; адрес React на порту `5173` в `API_BASE` не используется.
-
-## Сборка и запуск
-
-Сначала запустите сервер с `SMART_HOME_API_TOKEN`, создайте здания, комнаты, устройства с проверенными capabilities и группу ламп. Примеры — [документация панелей](../../docs/displays.md). Панель использует локальные команды TinyTuya; child остаётся связан с gateway через `parent_id` + `cid` на сервере. Tuya local_key в прошивку не передаётся.
+First configure rooms, devices with verified capabilities, and optional groups on the server. See [room displays](../../docs/displays.md).
 
 ```sh
 python -m pip install platformio
 cp firmware/cyd/include/config.example.h firmware/cyd/include/panel_config.h
-# В panel_config.h: Wi-Fi, API_BASE, API_TOKEN, уникальный PANEL_ID.
+# Set Wi-Fi, API_BASE, API_TOKEN, and a unique PANEL_ID in panel_config.h.
 pio run -d firmware/cyd -e cyd-028r-st7789
 pio run -d firmware/cyd -e cyd-028r-st7789 -t upload
 pio device monitor -d firmware/cyd -b 115200
 ```
 
-`API_BASE` должен быть `http://<LAN-IP-сервера>:<порт-API>/api/v1`, без завершающего `/`: например, `8000` при стандартном запуске или `8765` для текущего проверочного сервиса. `127.0.0.1` на ESP32 означает саму панель; нужен LAN-IP компьютера с API. Сервер запускайте с `--host 0.0.0.0 --workers 1` и соответствующим `--port`. Этот профиль использует HTTP в доверенной домашней сети; для подключения через интернет нужен отдельный TLS-транспорт с проверкой сертификата. Введите уникальный `PANEL_ID` для каждого дисплея; пустая строка создаёт ID из MAC. Файл `panel_config.h` и каталог `.pio` исключены из Git. В бинарном файле будут Wi-Fi/API credentials, поэтому собранные с реальными данными бинарники не публикуйте.
+`API_BASE` is the reachable API address ending in `/api/v1`, with no trailing slash, for example `http://<server-LAN-IP>:8000/api/v1` for a direct API or port 8080 for Docker. Do not use the React development port. `127.0.0.1` on ESP32 refers to the panel itself. Bind the API to the appropriate LAN address and use one worker.
 
-`DISPLAY_ROTATION=1` даёт горизонтальную ориентацию; драйвер LVGL берёт фактическую ширину/высоту после поворота. Для своего LCD настройте `DISPLAY_INVERT` и `DISPLAY_RGB_ORDER`, если цвета неверны. Для резистивного сенсора настройте `TOUCH_X_MIN/MAX`, `TOUCH_Y_MIN/MAX`, `TOUCH_ROTATION`: фабричная калибровка различается. [LovyanGFX](https://github.com/lovyan03/LovyanGFX/tree/master/examples) предоставляет примеры калибровки; универсальной калибровки без самой платы нет.
+Each panel needs a unique `PANEL_ID`; an empty ID is derived from its MAC. `panel_config.h` and `.pio` are ignored. A compiled image contains its Wi-Fi/API credentials and must not be published with real settings. This profile uses HTTP on a trusted LAN; internet access requires a separately implemented certificate-validating TLS transport.
 
-## Поведение и ограничения
+`DISPLAY_ROTATION=1` selects landscape. Verify `DISPLAY_INVERT`, `DISPLAY_RGB_ORDER`, `TOUCH_X_MIN/MAX`, `TOUCH_Y_MIN/MAX`, and `TOUCH_ROTATION` on the actual panel. There is no universal touch calibration.
 
-- Сервер опрашивает выбранные устройства раз в 30 секунд (`SMART_HOME_DISPLAY_POLL_INTERVAL`); панель читает кеш раз в 10 секунд. После команды запрашивает внеочередное обновление. Статус движения при таком опросе может пропустить короткое событие; постоянный событийный канал для sleeping Zigbee sensors пока не реализован.
-- ACK отображается как «Команда принята. Ждём статус». Панель не подменяет фактический статус отправленным значением, не повторяет команды автоматически и не хранит очередь команд на период отсутствия связи.
-- Значения `known=false`/`stale=true`, отключённое устройство и потеря связи показываются как неизвестные; это не «выкл», не отсутствие движения и не 0 °C. После 25 секунд без успешного ответа сервера управление блокируется; свежесть отдельных DPS определяет сервер.
-- Можно выбрать до 12 плиток, а сервер дополнительно ограничивает их состав 12 разными устройствами. Группа разворачивается в её участников. Общая команда группы последовательная, не атомарная; частичная ошибка видна отдельно от полного подтверждения.
-- Числовые регуляторы требуют `minimum` и `maximum`. Цвет требует capability `color` с поддержанным HSV encoding. Слайдеры отправляют значение только после «Применить»; отсутствующие возможности не получают органов управления.
-- API выдаёт по 8 комнат/устройств/групп на страницу. HTTP response ограничен 32 KiB, JSON snapshot — 32 KiB, JSON списка — 24 KiB, LVGL arena — 48 KiB. Слишком большой ответ отклоняется; при крупных enum/длинных названиях сократите набор capabilities в конфигурации дисплея. PSRAM не обязательна.
-- Используется раздел `huge_app` для 4 MB flash, OTA не включена. NVS сохраняет выбор только после успешного ответа на PUT; при неопределённом результате можно перезагрузить панель, чтобы получить подтверждённую серверную конфигурацию.
+## Runtime limits and verification
 
-## Проверка без платы
+- The server collector defaults to 30 seconds; the panel reads its cache every 10 seconds and requests an extra refresh after a command. Short motion events can be missed without a persistent event channel.
+- ACK is shown as accepted/waiting for status, without replacing observed state. Commands are not automatically retried or queued offline.
+- Unknown/stale/disabled values are not Off, no motion, or zero. Control is disabled after 25 seconds without a successful server response.
+- Up to 12 widgets and 12 distinct devices are allowed, including group members. Group writes are sequential and can partially fail.
+- Numeric controls require bounds; color needs a supported HSV encoding. Draft sliders apply explicitly.
+- API lists page in groups of eight. HTTP/snapshot limits are 32 KiB, list JSON 24 KiB, and the LVGL arena 48 KiB. Reduce selected capabilities for large payloads. PSRAM is not required.
+- The 4 MB `huge_app` partition is used; OTA is not enabled. Build success does not verify pinout, touch, runtime RAM, or physical device control.
 
-```sh
-c++ -std=c++11 -Wall -Wextra -pedantic -I firmware/cyd/include \
-  firmware/cyd/test/model_test.cpp -o /tmp/panel-model-test
-/tmp/panel-model-test
-pio run -d firmware/cyd -e cyd-028r -e cyd-028r-st7789 -e cyd-028c -e cyd-035r -e cyd-035c
-python -m pytest -q tests/test_dashboard.py tests/test_device_variants.py
-```
-
-Native C++ assertions проверяют навигацию группа → лампа → цвет → назад, выбор/лимит/смену комнаты, отсутствие ложного статуса при stale/offline и шаг числовых значений. Python проверяет полный REST-сценарий комнаты с тремя лампами, выключателем, температурой/влажностью и движением, сохранение выбора, отдельные команды Wi-Fi/Zigbee, ACK и ошибки. Сборка прошивки не подтверждает электрическую совместимость, правильность касания, runtime RAM или реальную связь с устройствами — эти проверки требуют платы и устройств.
-
-Русский шрифт `panel_font.c` с ASCII/Latin/Cyrillic создан из Noto Sans Regular; лицензия SIL OFL находится в [fonts/OFL.txt](fonts/OFL.txt). Для регенерации используйте `lv_font_conv@1.5.3 --font NotoSans-Regular.ttf --size 16 --bpp 2 --range 0x20-0x7f,0xa0-0x17f,0x400-0x4ff --format lvgl --no-compress --output src/panel_font.c` и include `lvgl.h`. Источник шрифта: [notofonts/latin-greek-cyrillic](https://github.com/notofonts/latin-greek-cyrillic).
+The included `panel_font.c` covers ASCII, Latin, and Cyrillic from Noto Sans Regular under [SIL OFL](fonts/OFL.txt). Regenerate with `lv_font_conv@1.5.3`, size 16, bpp 2, ranges `0x20-0x7f,0xa0-0x17f,0x400-0x4ff`, LVGL format, and no compression; include `lvgl.h`. Font source: [Noto](https://github.com/notofonts/latin-greek-cyrillic).

@@ -1,134 +1,79 @@
-# Docker на Dell 5070
+# Docker deployment and Dell 5070
 
-Dell 5070 — компьютер назначения. Порт веб-интерфейса по умолчанию — **8080**.
-Нужны Linux, Docker Engine и Docker Compose v2. Сначала проверьте `uname -m`,
-`docker version`, `docker compose version` и свободные порты 8080/8000 на самом Dell.
+The Dell 5070 is the target computer, not a port number. The web port defaults to **8080**. [Dockerfile](../Dockerfile) builds React and the Python API into one image, with nginx serving the static UI and proxying API requests. No Node.js runtime is needed on the target outside the build container.
 
-## Установленный экземпляр
+## Build and start
 
-Приложение развёрнуто на Dell Wyse 5070 (Debian 13):
-`http://homeassistant.dom:8080`. Home Assistant продолжает использовать порт 8123.
-
-SSH-алиас на управляющем Mac — `dell5070`; каталог установки на сервере —
-`/home/damawik/smart-home-service`. Используется готовый образ
-`smart-home-service:dell5070` и Linux LAN override.
-
-```sh
-ssh dell5070
-cd /home/damawik/smart-home-service
-sudo docker compose -f compose.yaml -f compose.lan.yaml ps
-```
-
-Для перезапуска используйте те же два Compose-файла и команду `restart`.
-При обновлении подготовьте и загрузите новый образ, затем **с управляющего Mac**
-из корня репозитория выполните:
-
-```sh
-python3 deploy/activate-dell.py
-```
-
-Это завершающий шаг каждого развёртывания Dell: создаётся новый случайный
-ключ API (256 бит), передаётся по SSH и проверяется после запуска контейнера.
-Одинаковый новый ключ сохраняется в локальном `.env` и `.env` Dell; в выводе
-и аргументах команд его нет. Все браузеры должны заново сохранить ключ
-`SMART_HOME_API_TOKEN` в настройках подключения. Обычный `restart` ключ не меняет.
-
-Команда использует готовый образ из `.env`, не собирает и не загружает его сама.
-Локальный и серверный ключи перед запуском должны совпадать. Настройки Tuya,
-ключи устройств и остальные переменные `.env` сохраняются. Если запуск или
-проверка нового ключа не удались, восстанавливаются прежние образ и `.env`.
-Закрытые резервные `.env.before-deploy` имеют режим 0600 и исключены из Git.
-При потере SSH-ответа локальный `.env.pending-deploy` сохраняет новый ключ;
-проверьте фактическое состояние Dell и согласуйте `.env` перед повторным запуском.
-Команда не повторяет неопределённую операцию автоматически.
-
-Текущие данные находятся в постоянном volume; повторный импорт базы не требуется.
-
-## Сборка и запуск
-
-Скопируйте репозиторий на Dell, не перенося `.venv`, `node_modules` и `.git`.
-Из корня репозитория:
+From the repository root:
 
 ```sh
 cp .env.example .env
 chmod 600 .env
 ```
 
-Задайте в `.env` собственный `SMART_HOME_API_TOKEN`. Для Smart Life также задайте
-`SMART_HOME_CLOUD_ENABLED=1`. Не помещайте ключ в Dockerfile или исходники интерфейса.
-Существующий ключ сервиса можно сохранить при переносе. Compose сам читает `.env`;
-сервер в контейнере использует пути внутри volume, независимо от старых путей Mac.
+Set a generated `SMART_HOME_API_TOKEN`; use `SMART_HOME_CLOUD_ENABLED=1` for cloud connections. Keep credentials out of source files, Dockerfile, and frontend build variables. Compose reads `.env`; the standalone Python service does not.
 
 ```sh
 docker compose up -d --build --wait
 ```
 
-Откройте `http://<адрес-Dell>:8080`. В настройках подключения адрес API уже совпадает
-с адресом страницы; введите существующий ключ сервиса. Ключи браузера с другого
-origin автоматически не переносятся. Внешний Python-порт не публикуется.
+Open `http://<server-address>:8080`, then save the API address and service key in connection settings. Browser credentials from another origin do not automatically transfer. The Python API port is not separately published.
 
-Обычный Compose публикует `0.0.0.0:8080`. Можно задать `SMART_HOME_PORT` в `.env`,
-например `SMART_HOME_PORT=8090`, и повторить запуск. Это меняет только порт хоста.
+The ordinary Compose configuration binds `0.0.0.0:${SMART_HOME_PORT:-8080}`. Change `SMART_HOME_PORT` and recreate the service to use another host port.
 
-## Поиск устройств в домашней сети
-
-На Linux для страницы «Сеть и пакеты», mDNS/SSDP и Tuya UDP discovery используйте:
+## Linux LAN discovery
 
 ```sh
 docker compose -f compose.yaml -f compose.lan.yaml up -d --build --wait
 ```
 
-Этот override использует сетевой стек Dell: видны его реальные интерфейсы и
-LAN-объявления. В этом режиме nginx слушает **8080** непосредственно на Dell;
-`SMART_HOME_PORT` не применяется. Внутренний API слушает только `127.0.0.1:8000`.
-Привилегированный контейнер не требуется. Перед запуском проверьте оба порта.
-Bridge-режим показывает интерфейсы контейнера, поэтому не заменяет наблюдение
-реальной домашней сети.
+The LAN override uses Linux host networking so discovery sees the target computer's real interfaces. nginx listens directly on 8080 and the API only on `127.0.0.1:8000`; `SMART_HOME_PORT` does not change this override. Check both ports first. The container does not require privileged mode.
 
-Семантика host networking и сброса публикации портов:
-[Docker host networking](https://docs.docker.com/engine/network/drivers/host/),
-[Compose merge/reset](https://docs.docker.com/reference/compose-file/merge/#reset-value).
-На Docker Desktop host networking имеет ограничения и не даёт прямого доступа
-к физическим интерфейсам Mac; эта конфигурация предназначена для Linux на Dell.
+Bridge networking exposes container interfaces and is not equivalent to observing the host LAN. Docker Desktop host networking cannot provide the same direct access to a Mac's physical interfaces. See [Docker host networking](https://docs.docker.com/engine/network/drivers/host/) and [Compose merge/reset](https://docs.docker.com/reference/compose-file/merge/#reset-value).
 
-## Данные и перенос
+## Persistent data and migration
 
-Постоянный volume `smart-home-service_smart-home-data` содержит базу, сессии Tuya
-и отчёты. Он не включён в образ и сохраняется при пересоздании контейнера.
-Обычный `docker compose down` сохраняет данные; `down -v` удаляет их.
+The `smart-home-service_smart-home-data` volume contains the SQLite database, Tuya sessions, and reports. Container recreation and ordinary `docker compose down` preserve it; `down -v` deletes it.
 
-Существующую базу переносите через SQLite backup либо после остановки старого
-сервера, вместе с файлами сессий. В контейнере используются:
+Paths inside the container are:
 
-- `/app/data/smarthome.db`;
-- `/app/data/tuya-cloud.json`;
-- `/app/data/tuya-cloud.json.developer.json`.
+- `/app/data/smarthome.db`
+- `/app/data/tuya-cloud.json`
+- `/app/data/tuya-cloud.json.developer.json`
 
-Если старые файлы назывались иначе, переименуйте их при переносе. Целевой volume
-должен быть пустым; существующие данные Dell нельзя перезаписывать без проверки.
-Владельцем файлов должен быть UID/GID `1000:1000`; каталоги 0700, файлы 0600.
-Перенос состояния не отправляет команды устройствам.
+Back up SQLite with its backup API or stop the old service before copying its database. Include session files. Never overwrite an existing target volume as part of a routine update. For an initial migration into an empty volume, ensure UID/GID `1000:1000`, directories 0700, and files 0600. Migration does not send device commands.
 
-Образ можно собрать на другой машине для архитектуры Dell и передать через
-`docker save` / `docker load`. Для x86-64:
+The app runs as an unprivileged user, restarts after failure, uses one API worker, and shuts nginx/API down together. The image excludes `.env` and runtime state. Keep its HTTP access within a trusted LAN or provide a VPN/HTTPS reverse proxy.
+
+## Build on another computer
+
+For an x86-64 Dell target:
 
 ```sh
 docker buildx build --platform linux/amd64 --load -t smart-home-service:dell5070 .
 ```
 
-После загрузки задайте `SMART_HOME_IMAGE=smart-home-service:dell5070` в `.env`
-и запускайте Compose без `--build`. Сам образ не содержит `.env` или состояние.
+Transfer with `docker save`/`docker load`, set `SMART_HOME_IMAGE=smart-home-service:dell5070` in the target `.env`, and run Compose without rebuilding. Transfer source separately if needed, excluding `.git`, `.venv`, `node_modules`, `.env`, and data.
 
-## Проверка
+## Deployment key rotation
+
+The existing Dell activation helper is run from the controlling Mac after the merged image/source have been uploaded:
+
+```sh
+python3 deploy/activate-dell.py
+```
+
+Consult `--help` for target settings. The helper activates the ready image; it does not build or upload it. Each deployment generates a new random service key, transfers it over SSH standard input, atomically updates the private local/Dell environment files, recreates the container, waits for health, and checks authorization and inventory. Routine restart does not rotate the key.
+
+Browser connections must then save the new `SMART_HOME_API_TOKEN` from the local `.env`. The key is never printed in deployment output or passed in command arguments. Existing Tuya sessions, device keys, and other environment settings are preserved. Local and target keys must initially match.
+
+Failed activation/authorization checks restore the previous image and environment where possible. Private `.env.before-deploy` backups are ignored by Git. If SSH loses the final outcome, `.env.pending-deploy` retains recovery information privately: inspect the actual target state and reconcile before retrying. Unknown results are not automatically repeated. Concurrent activation is locked.
+
+## Verification
 
 ```sh
 docker compose ps
 curl http://127.0.0.1:8080/health
 ```
 
-`/health` должен вернуть `status: ok`, а `/api/v1/devices` без `X-API-Key` — 401.
-Проверьте интерфейс и авторизованный список устройств по LAN-адресу Dell с другого
-компьютера. Нажимать переключатели для проверки развёртывания не требуется.
-Контейнер запускается от непривилегированного пользователя, перезапускается после
-сбоя и останавливает API/nginx вместе. Один worker сохраняет согласованность
-временных сессий обнаружения.
+Health should return `status:ok`; unauthenticated `/api/v1/devices` should return 401. Verify authenticated inventory and UI from another LAN computer. Check preservation of saved connections and the actual selected discovery network. Deployment verification does not require operating lights or other actuators.

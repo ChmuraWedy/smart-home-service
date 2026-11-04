@@ -1,174 +1,86 @@
-# Smart Home UI
+# Smart Home interface
 
-Отдельное React + TypeScript + Vite приложение. Python-сервис больше не раздаёт страницу подключения. Интерфейс и API могут работать на разных портах, компьютерах или доменах; обязательного Docker нет.
+React + TypeScript + Vite frontend for the [Smart Home service](../README.md). The API and interface can run independently; the production build is static files. Docker packages both behind nginx.
 
-Доступны Smart Life/User Code/QR, Developer Access ID/Secret, семь регионов, отдельные кнопки сохранения и проверки, скрытие сохранённых реквизитов за «Хочу изменить», поиск и управление. Раздел «Управление» показывает единый список устройств из нашей базы и всех подключённых Tuya-аккаунтов, а также группы. Есть фильтры здания/комнаты и поиск имени/алиаса/Tuya ID. После восстановления сохранённого доступа открывается этот список; «Подключения» содержит только настройки входа и доступа к сервису. Добавление устройств в нашу базу проходит через страницу опроса. Создание зданий/комнат/групп, редактирование существующих записей, массовый импорт и сложная настройка DPS доступны через REST API.
+## Development and build
 
-## Язык интерфейса
-
-В шапке доступен выбор **English / Русский / Polski / Беларуская**. При первом открытии используется язык браузера (английский, если подходящего языка нет); выбранный язык сохраняется отдельно от ключа API и применяется без перезагрузки страницы. Переведены меню, управление устройствами, камера, описания, мастера, журнал, сетевые страницы, доступные значения параметров и известные ошибки сервиса. Даты и время используют выбранный язык. Названия устройств/комнат, алиасы и значения команд не переводятся. [Устройство локализации и добавление сообщений](src/i18n/README.md).
-
-## Внешний вид
-
-В шапке доступен выбор темы: **Системная / Тёмная / Дневная**, переведённый на все четыре языка. По умолчанию используется системная тема с автоматическим обновлением при смене настроек ОС. Явный выбор сохраняется отдельно в `smart-home.ui.theme.v1` и синхронизируется между вкладками; ключ API и язык не меняются. Предпочтение применяется до первого отображения React. Если хранилище недоступно, выбор работает до закрытия страницы.
-
-Цвета интерфейса задаются общими CSS-переменными в `src/styles.css`. При добавлении цветов обновляйте обе палитры; фон видеопотока и красная рамка области обнаружения сохраняют свои цвета. В подробных карточках заголовок остаётся неподвижным, прокручивается `.control-dialog-body`. Кнопки обновления, информации и закрытия используют одинаковые SVG-значки без рамок, область нажатия 44px и видимый клавиатурный фокус.
-
-## Меню и наблюдение за сетью
-
-Меню **☰** переключает «Управление», «Сеть и пакеты», «Локальные подключения» и «Подключения». Страница **«Сеть и пакеты»** (`/#network`) работает независимо от Tuya-аккаунтов: явный выбор сети и ручной приём её объявлений LAN, таблица адресов/ID/MAC/сервисов, поиск, фильтр источников и журнал. Отдельная кнопка запрашивает объявления Tuya без команд управления. Отчёт сохраняется локально в JSON для дальнейшего анализа; переход со страницы и скрытие вкладки останавливают наблюдение. Zigbee-радиообмен и дочерние устройства не определяются; облачные имена и категории не используются. [Подробности и ограничения](../docs/packet-capture.md#страница-сеть-и-пакеты).
-
-## Управление устройствами
-
-У карточек есть стабильный HTML ID `device-<кодированный Tuya ID>`. Ссылка `#device/<кодированный Tuya ID>?route=local` открывает локальную карточку; также поддерживаются `sharing` и `developer`. Физический идентификатор не зависит от имени или числового ID записи SQLite. Открытие карточки обновляет адрес; прямая ссылка и перезагрузка открывают то же устройство, включая страницы после первой. Закрытие убирает адрес карточки. Отсутствующее устройство или недоступный способ управления показывают ошибку без автоматической подмены. Навигация не прерывает выполняющуюся операцию.
-
-На вкладке **«Управление»** выберите устройство или группу. Записи объединяются по физическому Tuya Device ID: `device_id` локальной записи соответствует облачному `id`. Числовой `id` нашей базы нужен для адресации локального REST API и не используется для объединения. Одинаковое название не делает устройства одним. Имя, комната и алиасы берутся из нашей записи, если она есть; облачное имя тоже участвует в поиске. Устройства только из облака отображаются без импорта и без назначенной комнаты.
-
-Если устройство доступно несколькими способами, в его единственной карточке выберите **«Способ управления»**: **«В домашней сети»**, **«Через интернет · Smart Life»** или **«Через интернет · Tuya Developer»**. По умолчанию используется подключённый облачный источник, если он есть; выбранный вручную способ сохраняется при обновлении списка в текущем экране. Неудачная команда не повторяется через другой источник. При открытом управлении источник не переключается. Запросы к облаку явно содержат `sharing`/`developer`; local_key в браузер не передаётся. Для облачного управления IP, импорт и настройка DPS не нужны.
-
-Для домашней сети нужны сохранённая локальная запись и проверенные IP, parent/cid и capabilities; наличие облачного local_key само по себе их не заменяет. Wi-Fi устройство управляется прямо через TinyTuya; для Zigbee браузер отправляет числовой ID дочерней записи, а сервер использует настроенные `parent_id` + `cid`, версию, IP и ключ шлюза. Группы пока используют локальное управление и открывают участников для индивидуальных настроек; общие кнопки включения/выключения используют существующий endpoint групп.
-
-При просмотре списка загружается только инвентарь, кеш размещения Smart Life и кешированные локальные показания. Детальные облачные функции/статус запрашиваются при открытии карточки, LAN-опрос не запускается при просмотре. Сбой одного списка не скрывает доступные устройства других источников; при смене сервера или подключённых источников старые карточки и управление сразу убираются, запоздалые ответы отменённой загрузки игнорируются.
-
-**«Синхронизировать Smart Life»** читает дома, устройства домов и комнату каждого устройства. Кнопка запускает фоновую задачу, прогресс читается из нашего сервиса раз в секунду до завершения. Готовый результат хранится в SQLite и подставляет размещение в облачные карточки, фильтр комнат и мастер добавления. При успешном завершении перечитывается локальный инвентарь; открытое управление или опрос остаются открытыми. Ручное локальное размещение имеет приоритет. Пустые комнаты этот API не возвращает. Синхронизация не регистрирует устройства и не отправляет команды; [политика обновлений и API](../docs/api-reference.md#структура-дома-из-smart-life).
-
-Органы управления создаются из действительных writable функций Tuya либо effective capabilities локального устройства, включая определения его типа:
-
-- Boolean: отдельные кнопки включения/выключения, включая несколько каналов.
-- Числа: диапазон, шаг, единица, ползунок и ввод; например яркость, положение шторы, целевая температура или влажность.
-- Enum: допустимые значения с сохранением их типов, например режим или скорость вентилятора.
-- Цвет: выбор RGB и HSV-регуляторы; локальные HSV16/RGB+HSV8/JSON кодирует сервер. Облачные Json `colour_data`/`colour_data_v2` используют объявленные HSV-диапазоны, а при пустом описании — [стандарт Tuya](https://developer.tuya.com/en/docs/iot/dj?id=K9i5ql3v98hn3). При наличии соответствующей writable функции `work_mode` цвет отправляется с `colour`, белая яркость/цветовая температура — с `white`.
-- String/JSON: явный ввод и применение. Для известных световых JSON со схемой устройства доступны отдельные поля и шаги сцен. `music_data`/`control_data` — команды без показания состояния; их пустой статус не считается ошибкой. Для `music_data` выбирается `music`, для `scene_data_v2` — `scene`, только если устройство объявляет соответствующий writable режим.
-- Raw: base64 с проверкой формата и объявленного предела байтов. В дополнительных параметрах лампы доступны редакторы стандартного Tuya v0 для суточного ритма, сна, пробуждения, случайного расписания и памяти питания. Другая версия или неизвестный формат сохраняются исходными данными; создание нового расписания требует явного действия и заменяет весь параметр. Неполные числовые/enum-описания остаются только для просмотра.
-- Датчики: только чтение. Sharing `status_range` даёт масштаб/единицу отдельно от writable функций; без такого описания облачное показание отображается как исходное значение без выдуманной единицы.
-
-У облачной белой яркости и цветовой температуры процент рассчитывается из диапазона конкретной функции. Температура света не переводится в Kelvin без такого определения; у локального профиля единица/пересчёт заданы capabilities. Числовые и цветовые изменения отправляются только по **«Применить»**, выбор режима тоже требует этой кнопки. Открытие списка/формы не отправляет команду.
-
-Начальное открытие локального устройства и карточки списка читают SQLite-кеш. **«Обновить статус»** явно опрашивает устройство; после команды выполняется отдельный опрос. Группа опрашивает участников последовательно. Локальные показания старше 60 секунд помечаются неактуальными и в браузере.
-
-У Sharing сервер подписывается на отчёты открытого устройства через официальный MQTT SDK. Видимая форма читает кеш нашего API раз в три секунды, без повторных запросов в Tuya. Определения функций загружаются один раз на открытие формы. Ручное обновление запрашивает HTTP-снимок только выбранного устройства; принятые отчёты имеют приоритет над этим снимком. Фоновое чтение сохраняет неприменённые изменения полей, прекращается при закрытии формы и не перекрывает результат более нового ручного чтения или команды. Локальный и Developer транспорт автоматически из React не опрашиваются. Подробнее: [status-updates.md](../docs/status-updates.md).
-
-При неизвестном значении показано «Нет данных», а не `false` или ноль. После ACK отображается сообщение о принятии, и отдельно запрашивается статус; UI не подставляет отправленное значение вместо показания. Ошибка последующего чтения отличается от ошибки команды. У группы отдельно перечислены участники без подтверждения. Двойное нажатие блокируется, команды не повторяются автоматически; тайм-аут оставляет физический результат неизвестным. Закрытие формы во время запроса заблокировано. Неактивное локальное устройство/шлюз и offline облачное устройство не получают доступных кнопок записи.
-
-Датчики PIR с `pir`/`pir_state` и локальным Boolean `motion` показывают **«Движение обнаружено» / «Движения нет»** с индикатором. Неизвестное или отсутствующее значение не считается отсутствием движения, а устаревший локальный индикатор становится серым. Пустой список writable функций у датчика нормален: параметры отображаются из readonly `status_range` и статуса. «Свойства устройства» показывают тип, подключение через шлюз/напрямую и доступность команд.
-
-«Снимок получен» — время получения HTTP-снимка сервером Sharing (у Developer — ответа браузером), **не время последнего движения или измерения**. Повторное чтение кеша не меняет это время. Для полученного отчёта у параметра показаны его источник и время из Tuya, либо время приёма при отсутствии отметки устройства. Это последнее известное состояние; подключённый поток не гарантирует свежести каждого параметра, особенно у спящих датчиков. Отчёты переживают перезапуск сервиса в SQLite, с исходными отметками времени. Legacy `battery` без указанной единицы отображается исходным числом с пояснением, без пересчёта по максимальному значению и без добавления `%`. У `battery_percentage` с объявленной единицей `%` проценты сохраняются. [Стандарт Tuya для PIR](https://developer.tuya.com/en/docs/iot/s?id=K9gf48cz3utjt) разделяет эти параметры; определение конкретного устройства имеет приоритет.
-
-Метаданные списка загружаются страницами по 500 до лимита 10 000 записей. На странице отображаются до 24 устройств/групп; кешированные показания запрашиваются только для видимой страницы. Форма не содержит ключа Tuya; в браузерном хранилище по-прежнему только адрес API и ключ сервиса.
-
-## Локальные подключения
-
-Раздел **☰ → «Локальные подключения»** (`#local-connections`) — мастер настройки в четыре шага:
-
-1. **Сеть.** Выберите авторизованный Smart Life / QR или Tuya Developer и фактический сетевой интерфейс сервиса. По умолчанию ищутся только устройства без полного локального подключения. Флажок **«Включить уже настроенные устройства для перенастройки»** включает их в поиск, но не разрешает автоматическое сохранение.
-2. **Найденные устройства.** В течение 15 секунд сервис принимает объявления в выбранной сети и отправляет стандартный запрос Tuya. По точным идентификаторам сопоставляем реально объявившиеся устройства с аккаунтом. Названия/алиасы берутся из аккаунта. Устройства другого аккаунта и обычные ARP-соседи не предлагаются для настройки. Найденные устройства показаны таблицей с отдельными флажками. Флажок в заголовке выбирает все строки (первые 16 при большем количестве), снимает выбор и показывает промежуточное состояние. Выберите до 16 устройств и нажмите **«Проверить выбранные»**.
-3. **Подтверждение.** Для каждого выбранного устройства `/local-connections/find` заново находит адрес и проверяет ключ только чтением, без записи в базу. Проверки идут по очереди с учётом ограничения частоты объявлений. Предварительный просмотр показывает фактическое устройство, IP, протокол, имя, алиасы, здание/комнату, источник ключа и предлагаемые изменения. Результаты действуют пять минут; ключи остаются на сервере. Отметка подтверждения по умолчанию снята. Только кнопка **«Сохранить подключения»** вызывает `/local-connections/save` с идентификаторами успешных проверок и `confirmed: true`.
-4. **Результат.** Видны успешные сохранения и ошибки, затем полный список устройств аккаунта, ещё не имеющих локального подключения. Отдельного поля поиска на этом шаге нет; можно запустить новый сетевой поиск. Название каждого успешно сохранённого устройства — ссылка на его локальную карточку. После успешного сохранения данные обновляются сразу. Ошибки одного устройства не откатывают другие сохранения; неизвестный результат не повторяется автоматически. **«Новый поиск»** перечитывает фактический инвентарь.
-
-У Wi-Fi настроенным считается сохранённое подключение с IP, версией и локальным ключом; у Zigbee нужны сохранённые cid и родительский шлюз с таким подключением. Наличие облачного ключа не означает локальную настройку; наличие конфигурации не гарантирует текущую доступность. Zigbee-датчики не имеют собственного IP и могут отсутствовать в LAN-объявлениях. Их связи не угадываются: для дальнейшего сопоставления используйте мастер карточки.
-
-Поиск и проверка отменяются при уходе со страницы или скрытии вкладки; приёмник закрывается и запоздалые ответы игнорируются. Изменение выбора после проверки сбрасывает подтверждение. Во время сохранения смена раздела и повторные нажатия заблокированы. Прежний мастер карточки остаётся доступен для сопоставления функций управления. **«Сеть и пакеты»** остаётся отдельным независимым разделом без Smart Life.
-
-## Опрос перед добавлением
-
-Если локальное подключение уже сохранено сетевым мастером, но карточка ещё не содержит переключателей, нажмите **«Настроить функции»** в локальной карточке. Адрес и ключ повторно вводить не нужно: сервер использует существующую запись. Нажмите **«Начать опрос»**, дождитесь показаний и нажмите **«Сохранить функции»** на том же экране. Все проверенные функции включаются для управления; отдельного экрана проверки и флажков разрешения нет. Откроется та же карточка с показаниями и органами управления. Отмена возвращает исходную карточку без изменений. Для шлюза без собственных параметров эта настройка не требуется.
-
-Схема Tuya должна однозначно подтверждать номер DP и его тип. Неизвестные, неоднозначные и сырые форматы не получают право записи; без подключённого аккаунта доступны только показания для чтения. Имя, алиасы, размещение и соединение сохраняются. Обновление подключения, родителя, аккаунта или функций во время опроса требует начать настройку заново.
-
-Для отдельного управления по домашней сети нажмите **«Настроить локальное подключение»** (значок сети) на облачной карточке или **«Настроить локальное устройство»** для ручного ввода. Устройства Smart Life уже доступны для облачного управления; проходить мастер ради этого не нужно. Откроется отдельная страница из двух шагов:
-
-1. Название, алиасы, здание/комната и подключение. Wi-Fi: IP, версия протокола и local_key; если ключ доступен в выбранном Tuya-аккаунте, сервер берёт его сам. Zigbee: настроенный Wi-Fi шлюз с ролью «Tuya шлюз» и `cid`/`node_id`. В списке также показаны шлюзы категории `wg2` из выбранного Tuya-аккаунта с пометкой о необходимой локальной настройке; флаг `sub` не скрывает их. Выбранный облачный шлюз можно настроить в отдельном мастере, затем вернуться к датчику с сохранёнными полями и ID сохранённого шлюза. Приложение не угадывает родителя по имени или количеству шлюзов. Ключ и IP ребёнка не используются. При отсутствии шлюзов предложена ручная настройка.
-2. Исходные показания и ручная проверка: включить/выключить, изменить яркость, цветовую температуру/цвет, вызвать событие датчика или нажать кнопку пульта. Выбор действия только помечает изменения. Сервис **не отправляет команды**. Видны последний ответ, время, DP, доступная подпись Tuya и история изменений. Исходная выборка не считается изменением.
-   Сохранение доступно на этом же экране после получения показаний (для шлюза также подходит подтверждённая проверка ключа). Нажатие кнопки подтверждает запись всех проверенных функций Boolean/Integer/Enum. Неизвестные и неподдерживаемые сырые форматы остаются только для чтения. Отдельного экрана результатов и флажков нет.
-
-Для шлюза Smart Life добавлена кнопка **«Найти ключ и проверить шлюз»**. Введите его IP из списка клиентов роутера и подтвердите адрес. Приложение проверяет ключи выбранного аккаунта по одному IP и подбирает протокол 3.3–3.5. При успехе показывает подтверждение соединения и предлагает сохранение; собственные показания шлюза не требуются. Ключ не приходит в браузер. Совпадение ключа не назначает датчику родителя: после возврата к датчику выберите фактический шлюз. Проверка занимает до примерно 30 секунд и использует не более 16 уникальных ключей; неудача оставляет поля доступными для исправления.
-
-Локальный опрос идёт через TinyTuya каждые 3 секунды после завершения предыдущего запроса, облачный — каждые 5 секунд. Одновременно читается одно выбранное устройство. Есть пауза, остановка при скрытой вкладке и отмена. Короткое событие между выборками может быть пропущено; спящему Zigbee-датчику может потребоваться пробуждение или облачный режим. Подписи без номера DP не сопоставляются по порядку.
-
-Если локальное подключение ещё не настроено, выберите **«Облачные отчёты Tuya»**. Отчёты могут задерживаться; интерфейс показывает их исходное время, если Tuya его передала. Эти значения не записываются как локальный DPS-кеш и не создают локальные capabilities. Устройство после сохранения остаётся доступным через облачный способ управления; локальное подключение можно настроить позже через API.
-
-Наблюдение временное: сессия на сервере действует 15 минут, содержит до 64 параметров/100 изменений; одновременно допускается 16 сессий. Перезапуск сервера завершает опросы. Отмена до сохранения не создаёт Device. При финальном сохранении записываются метаданные, алиасы, размещение и подтверждённые локальные параметры/их последние фактические показания; история опроса отдельно не хранится. REST CRUD и TinyTuya import остаются доступны без мастера для скриптов.
-
-## Разработка: два независимых процесса
-
-Из корня репозитория запустите API:
+Use the Node.js and pnpm versions in [package.json](package.json).
 
 ```sh
-. .venv/bin/activate
-export SMART_HOME_API_TOKEN='replace-with-a-long-random-token'
-export SMART_HOME_CLOUD_ENABLED=1
-export SMART_HOME_CORS_ORIGINS='http://127.0.0.1:5173,http://localhost:5173'
-export SMART_HOME_FRONTEND_URL='http://127.0.0.1:5173'
-python -m uvicorn smarthome.main:app --host 127.0.0.1 --port 8000 --workers 1
-```
-
-Для облачного входа нужен `pip install -r requirements-cloud.txt`. Для сохранения существующего аккаунта используйте прежние `SMART_HOME_DB` и `SMART_HOME_CLOUD_SESSION`; новое QR-подтверждение после переноса UI не требуется.
-
-В другом терминале, с Node.js **22.22.2+ в ветке 22** или **24.15+** и pnpm **11.19.0**:
-
-```sh
-cd frontend
 pnpm install --frozen-lockfile
 pnpm dev
-```
-
-Если pnpm не установлен, те же действия доступны через `npx pnpm@11.19.0 install --frozen-lockfile` и `npx pnpm@11.19.0 dev`. Зафиксированные зависимости находятся в `pnpm-lock.yaml`.
-
-Откройте <http://127.0.0.1:5173>. При первом запуске раскройте «Настройки подключения», укажите адрес API и ключ нашего сервиса, нажмите **Сохранить подключение**. Адрес по умолчанию — `http://127.0.0.1:8000`. Для API на другом порту:
-
-```sh
-VITE_API_BASE_URL=http://127.0.0.1:8765 pnpm dev
-```
-
-Адрес можно изменить в UI без пересборки. При смене сервера нужно ввести его ключ; сохранённый ключ используется только для прежнего адреса. Неверная замена не перезаписывает проверенное подключение. Настройка адреса и ключа хранится в браузере; User Code, Access ID/Secret, облачные токены и local_key в браузерное хранилище не записываются. Сохранённые поля User Code/Developer скрыты, ссылки изменения открывают пустые поля.
-
-В «Настройках подключения» сохранённый ключ сервиса тоже скрыт: показаны сообщение **«Ключ доступа к сервису сохранён в этом браузере»** и ссылка **«Хочу изменить»**. Ссылка открывает пустое поле нового ключа, сохранение проверяет доступ перед заменой, а **«Отменить изменение»** убирает введённое значение без запросов и оставляет прежний ключ. При вводе другого адреса API поле ключа появляется автоматически; черновик ключа очищается при смене адреса.
-
-Старый ключ браузера привязан к origin прежней страницы. При переезде с API-порта на отдельный UI-порт введите ключ сервиса один раз. Подтверждённый Tuya-аккаунт и его реквизиты остаются на сервере. Для установки UI под тем же origin, что и API, поддержано чтение прежнего браузерного ключа.
-
-## Сборка и запуск без Node.js на устройстве
-
-На компьютере разработчика:
-
-```sh
-cd frontend
-pnpm build
-```
-
-Результат — статические файлы в `frontend/dist/`. Скопируйте их на OpenWrt/Orange Pi, другой веб-сервер или отдельный хост. Python API не читает этот каталог и не включает его в wheel. Простой локальный запуск сборки:
-
-```sh
-python3 -m http.server 8080 --bind 127.0.0.1 --directory frontend/dist
-```
-
-Команду выполняйте из корня репозитория. Разрешите origin `http://127.0.0.1:8080` в `SMART_HOME_CORS_ORIGINS`, перезапустите API и откройте корень сайта. Для Vite preview используются `pnpm preview` и origin `http://127.0.0.1:4173`. Сборка не требует Node.js во время работы: можно использовать uHTTPd/nginx/Caddy или любой статический сервер.
-
-Для адреса API по умолчанию в сборке:
-
-```sh
-VITE_API_BASE_URL=https://api.home.example pnpm build
-```
-
-`VITE_*` значения публичны и попадают в сборку: здесь задаётся только адрес, без ключей. Если UI открыт через HTTPS, используйте HTTPS для API. Для доступа с другого компьютера `127.0.0.1` замените адресом сервера; настройте bind API, статического сервера и точный origin UI в CORS.
-
-При reverse proxy можно разместить `dist/` в корне и проксировать `/api/` к Python, выбрав адрес API равным origin сайта. Тогда CORS не нужен. Интерфейс одноэкранный: открывайте `/`; специальная настройка маршрутов SPA не требуется.
-
-## Граница API/UI
-
-- `SMART_HOME_CORS_ORIGINS`: список точных HTTP(S) origins через запятую, без пути и завершающего `/`. По умолчанию пустой. Разрешены методы REST и заголовки `X-API-Key`/`Content-Type`; cookie credentials не используются. CORS не заменяет проверку API-ключа.
-- `SMART_HOME_FRONTEND_URL`: необязательный полный адрес UI. При его настройке прежний `GET /cloud` делает 307 redirect без реквизитов. Без настройки он возвращает JSON 404 с указанием отдельного frontend.
-- Все REST endpoint'ы, включая `/api/v1/cloud/*`, сохранены. QR SVG загружается с выбранного API, а не с origin UI. Ключ не передаётся через URL и не отправляется на сторонний URL QR.
-- Из Python-пакета удалена встроенная HTML-страница; React не требует новых Python-зависимостей. Swagger `/docs` остаётся документацией API.
-
-## Проверки
-
-«Свойства устройства» содержат обычные сведения о типе и подключении. Коды функций, типы значений и известные номера DP находятся в отдельном свёрнутом разделе **«Технические данные для настройки связей»**, с понятными названиями параметров. Отсутствующий DP не угадывается и не мешает облачной команде по code. В разделе **«Связанные устройства и сопоставления»** доступны направление, устройство, параметр и DP обеих сторон, сохранение и удаление SQLite-записи. Это ручная карта, не применённая привязка Smart Life и не автоматизация. Чтение существующих связей через Sharing недоступно. Подробные ограничения, все функции исследованной лампы и curl: [device-linkage.md](../docs/device-linkage.md).
-
-```sh
 pnpm test
 pnpm build
 ```
 
-Проверяются подключение/QR/реквизиты, явные источники и отсутствие секретов в хранилище, HSV и масштаб/шаг чисел, режимы ламп, Wi-Fi и Zigbee адреса команд, термостат и типизированный enum, датчики и stale/unknown, фильтры/алиасы, группа → участник → назад, частичные ACK, ошибка чтения после принятой команды, тайм-аут без повторов и двойное нажатие. Автообновление проверяет кеш, сохранение черновиков, единственную загрузку функций, отмену и защиту от запоздалого ответа. Backend CORS/auth/redirect и read-only ranges проверяются тестами Python. Большинство браузерных проверок использует временный API с вымышленными Tuya-данными; приём реального отчёта выключателя после ручного переключения владельцем описан в [VERIFICATION.md](../VERIFICATION.md).
+Development serves `http://127.0.0.1:5173`. Configure the API's allowed origins accordingly. Save the API URL and service access key under connection settings. A production `VITE_API_BASE_URL=same-origin` build uses the current host; otherwise the configured base or development API default is used. The old Python `/cloud` page can redirect to this separate frontend.
 
-Основа сборки: [React](https://react.dev/learn/build-a-react-app-from-scratch), [Vite](https://vite.dev/guide/) и [FastAPI CORS](https://fastapi.tiangolo.com/tutorial/cors/).
+## Language and themes
+
+The header offers English, Russian, Polish, and Belarusian. Initial language follows the browser with an English fallback. Changes apply without reloading React or discarding device drafts. Device names, aliases, IDs, and command values are not translated. Dates follow the chosen locale. See the [localization guide](src/i18n/README.md).
+
+System, Dark, and Day themes are available in all four languages. System follows the OS, including later changes. Explicit choices persist independently of credentials in `smart-home.ui.theme.v1` and synchronize across tabs. Theme initialization runs before React paints. If storage is unavailable, an in-memory preference works for that page session.
+
+Both palettes use semantic variables in `src/styles.css`. New colors need values in both themes. Video stays black and detection outlines stay red. Device dialogs use a fixed flex header and a scrolling `.control-dialog-body`. Header refresh/info/close icons have a consistent borderless appearance, 44px hit targets, and keyboard focus indicators.
+
+## Navigation and device cards
+
+The menu opens Devices, Network and packets, Local connections, and Connections. Inventory combines local devices, connected cloud accounts, and groups. Physical Tuya device IDs merge the same hardware into one card; equal names do not merge different devices. Search uses names/aliases/IDs, with building and room filters.
+
+Cards expose the main power switches or sensor readings. Bulbs have immediate power controls; full cards add brightness, temperature, color, effects, and schedules where supported. Multi-channel switches expose each real channel. Sensors show compact values and icons; details provide labels, units, timestamps, battery, and activity logs. Clicking a card opens details; child buttons retain their own actions.
+
+Each card has a stable `device-<encoded Tuya ID>` HTML ID. Links of the form `#device/<encoded Tuya ID>?route=local|sharing|developer` open that device and preserve the chosen route on reload. Missing devices/routes produce an error rather than silently selecting another device. Closing details clears its address; navigation does not interrupt a running command.
+
+If multiple routes exist, the selector explicitly chooses home-network, Smart Life, or Developer control. Cloud routes work without a local IP/key import. Local control needs verified inventory connection details; Zigbee uses its saved gateway and child address. The app never retries an uncertain command through another route.
+
+## Editing controls
+
+Definitions come from the selected route's writable Tuya functions or effective local capabilities. Supported editors include Boolean switches, bounded numbers, enums, color, string/JSON, and validated raw data. Unknown or read-only parameters do not gain invented write controls.
+
+Full cards keep edits as drafts and use one **Apply** action, sending only values changed from the initial state. Refreshes preserve drafts. Main-screen power controls send immediately. ACK, readback, failure, and an unknown physical outcome are kept distinct. Missing readings are not converted to false or zero.
+
+The color picker can expand into hue, saturation, and color-brightness controls. Device-declared ranges determine percentages; Kelvin is shown only where the definition provides a real conversion. White brightness and temperature can select white mode, and color can select color mode, when the device declares those writable modes.
+
+Lighting schedules and effects use popup wizards. Circadian, random, wake-up, sleep, effect, music, and transition editors keep drafts until the card's Apply action. Schedule steps cover repetition, points, and review; cancellation preserves the original. Unknown versions/formats remain intact rather than being replaced with fabricated settings. See [lighting controls](../docs/device-linkage.md).
+
+Channel clock buttons expand timers. Power restoration, switch backlight, and unknown inching strings belong in Additional settings. Device and channel aliases edit inline and remain separate from real names. See [aliases](../docs/device-aliases.md) and [switch controls](../docs/switch-controls.md).
+
+## Status, activity, and battery
+
+Initial local views read SQLite cache. Explicit refresh polls the selected device. Sharing reports arrive through the server SDK, while visible controls read our cache every three seconds. Off-screen/hidden views stop browser polling. Developer and local routes are not automatically cloud-polled by React.
+
+Per-value timestamps and known/stale flags distinguish fresh reports from old snapshots. Accepted targets are not immediately erased by an older cache response. See [status updates](../docs/status-updates.md).
+
+Motion logs are prominent in sensor details; other logs start collapsed. Logs offer applicable event filters and cursor pagination, poll only while open, and retain up to 2,000 events per device/source. They are received reports and available snapshots, not a complete Smart Life archive. Battery appears in the upper-right detail header and on tiles when known; raw battery values do not acquire invented units. See [activity logs](../docs/device-activity.md).
+
+## Smart Life topology
+
+**Sync Smart Life** starts a background homes/rooms sync with progress. The saved topology supplies cloud-card room filters and local setup defaults. Reopening the page reads the cache instead of re-querying every room. Manual local placement takes priority; empty rooms are not initially discoverable with this SDK. No devices are registered or switched by synchronization. See the [API policy](../docs/api-reference.md#smart-life-topology).
+
+## Local connections
+
+The wizard replaces an unwieldy all-device dropdown with discovery and review:
+
+1. Choose a real network interface and whether already-configured devices should be included.
+2. Observe LAN announcements during the search period.
+3. Review identified devices in a table, select rows with individual/header checkboxes, and verify their connections.
+4. Confirm which verified configurations to save. Search and verification alone do not save them.
+5. Inspect per-device results, links to configured device cards, and remaining unconfigured devices. Rerun discovery when needed.
+
+Exact physical IDs and confirmed routing determine matches. The server handles keys privately; the UI receives only presence/source/change indicators. Gateways and direct devices share find/save logic; unknown parent links require a real mapping. Existing names, aliases, placement, and capabilities remain intact. See [find/verify/save](../docs/api-reference.md#find-verify-and-save-local-connections).
+
+## Optional commissioning
+
+The API also supports sampling before local registration, including manually entered device details. Observing a changed DP alone cannot prove its function. Known functions are enabled from confirmed metadata without the obsolete per-function approval screen; unknown DPS remain read-only. Saving still requires explicit registration/configuration confirmation.
+
+## Network and packets
+
+`#network` operates without Smart Life. Choose the interface/subnet, start observation, filter devices/sources, and inspect IP, Tuya ID, MAC, mDNS/SSDP services, and the event log. An explicit discovery action sends standard announcements requests, not switch commands. Export saves a JSON report locally. Leaving the page or hiding it stops observation. This is LAN discovery, not a Zigbee radio sniffer. See [network capture](../docs/packet-capture.md).
+
+## Cameras and connections
+
+Camera tiles can expand a small video preview. Privacy, motion, sound, and siren controls appear only when exposed by the device. Details provide the player, supported HD/SD stream variants, available network data, image/detection settings, and SD-card state. Missing features or storage do not gain fictional controls. See [camera details and limitations](../docs/camera-controls.md).
+
+Connection settings keep the service key separate from Tuya login. Saved fields are hidden behind an edit action, and secrets are not filled back into inputs. The Sharing User Code/QR flow and Developer credential flow have separate save/check actions. Seven Developer regions are supported. See [QR login](../docs/qr-login.md) and [Developer login](../docs/developer-login.md).
+
+Cloud account tokens and device local keys stay on the server. The browser stores the service access key for this origin. API key rotation requires reconnecting browsers; changing language or theme does not change credentials or device drafts.

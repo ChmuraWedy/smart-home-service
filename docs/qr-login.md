@@ -1,100 +1,71 @@
-# Бесплатный User Code + QR вход Tuya
+# Smart Life User Code and QR login
 
-В отдельном [React-интерфейсе](../frontend/README.md) есть независимый [вход через Access ID / Access Secret](developer-login.md). Его сохранение и проверка не заменяют QR-сеанс. В REST API источник Developer выбирается явно через `provider=developer`; без параметра используется Sharing.
+[Interface guide](../frontend/README.md) · [Independent Developer connection](developer-login.md)
 
-На 2026-10-07 Tuya описывает Smart Life Integration как бесплатную для разработчиков, без необходимости создавать cloud development project и продлевать IoT Core resources: [официальный README Tuya](https://github.com/tuya/tuya-home-assistant/blob/main/README.md). [Официальная инструкция](https://developer.tuya.com/en/docs/iot/Smart_Life_Integration?id=Kd0gk9baikbb7) описывает User Code, сканирование QR и подтверждение в приложении. Это не гарантия неизменных тарифов/доступности и не подтверждение условий отдельного коммерческого продукта.
+Sharing uses the optional official `tuya-device-sharing-sdk==0.2.15`. It does not require this application's user to create a Tuya Developer project. Tuya's [integration guide](https://developer.tuya.com/en/docs/iot/Smart_Life_Integration?id=Kd0gk9baikbb7) explains User Code and QR confirmation. Availability and commercial terms belong to Tuya; historical availability is not a promise about future plans.
 
-Сервис использует optional [tuya-device-sharing-sdk](https://github.com/tuya/tuya-device-sharing-sdk), версию 0.2.15, и локальный SVG-рендер QR. Опубликованный клиент `HA_3y9q4ak7g4ephrvke` / schema `haauthorize` взят как совместимый интеграционный режим из [HA const.py](https://github.com/home-assistant/core/blob/dev/homeassistant/components/tuya/const.py); [Tuya Local](https://github.com/make-all/tuya-local/blob/main/custom_components/tuya_local/const.py) использует тот же режим. Это публичный идентификатор приложения, не ваш секрет. В приложении Tuya разрешение может называться Home Assistant. Для собственного коммерческого клиента нужно получить подходящий client_id/schema и проверить условия у Tuya; сервис позволяет задать их переменными среды.
+The default integration client ID and `haauthorize` schema are public identifiers used by the Home Assistant integration, not personal secrets. Mobile authorization can therefore be labeled Home Assistant. A commercial integration should obtain its own suitable client/schema and verify Tuya's terms. The service supports overriding these through environment settings.
 
-## Запуск
+## Setup
 
 ```sh
 python -m pip install -e '.[cloud]'
-# Или: python -m pip install -r requirements-cloud.txt
 export SMART_HOME_CLOUD_ENABLED=1
-export SMART_HOME_API_TOKEN='your-service-token'
+export SMART_HOME_API_TOKEN='replace-with-your-service-key'
 export SMART_HOME_CLOUD_SESSION="$PWD/data/tuya-cloud.json"
-python -m uvicorn smarthome.main:app --host 0.0.0.0 --port 8000 --workers 1
+python -m uvicorn smarthome.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Запустите [отдельный UI](../frontend/README.md) и откройте `http://<ui-server>:5173` для разработки или адрес статического сайта для готовой сборки. При первом подключении браузера раскроется раздел «Настройки подключения»: введите адрес Python API, его ключ и нажмите «Сохранить подключение». Затем введите User Code из Smart Life/Tuya Smart → Я → настройки → аккаунт и безопасность и нажмите «Сохранить User Code». Нажмите «Получить QR-код», сканируйте код через приложение и подтвердите вход там. Затем нажмите «Я подтвердил вход в приложении». Пароль Tuya не запрашивается. QR живёт не более 120 секунд; протухший код нужно создать заново. Существующий подтверждённый сеанс после переноса UI сохраняется на сервере. `/cloud` на API может перенаправлять к UI через `SMART_HOME_FRONTEND_URL`.
+1. Start the [interface](../frontend/README.md) or use the Docker deployment.
+2. In connection settings, save the API address and its service key. This is your server's key, separate from Tuya credentials.
+3. Find **User Code** in Smart Life/Tuya Smart under **Me → Settings → Account and Security**, then save it in the interface.
+4. Request a QR code, scan it with the mobile app, and confirm there.
+5. Select the confirmation action in the web interface. Expired QR codes must be regenerated; their maximum lifetime is 120 seconds.
 
-Сохранённый API-ключ работает как токен доступа: он автоматически восстанавливается в скрытом `input type="hidden"` и передаётся в заголовке `X-API-Key`. Для первоначальной настройки или замены откройте «Настройки подключения» внизу страницы. Сохранённый ключ скрыт за сообщением и ссылкой «Хочу изменить»; ссылка открывает пустое поле замены. Новый ключ проверяется сервером до записи в браузер; неудачная проверка сохраняет прежний ключ. Если сохранённый токен перестал подходить, настройки раскрываются для повторного подключения. Сервер не выдаёт свой настроенный токен посетителям страницы, а скрытое поле не отменяет проверку авторизации API.
+The application does not ask for your Tuya password or send the QR image to an external image generator. The old API `/cloud` URL can redirect to the separate interface when `SMART_HOME_FRONTEND_URL` is set.
 
-После успешного входа сервер восстанавливает подтверждённый Tuya-сеанс из сохранённых токенов, а SDK обновляет их при необходимости. При открытии UI браузер авторизует запрос к нашему сервису сохранённым API-ключом; второй QR-вход не нужен, пока сеанс Tuya действителен. Страница показывает «Tuya подключена» и поясняет, где сохранена авторизация. Список устройств загружается по отдельному нажатию. Новый браузер требует ключ нашего сервиса, но может использовать уже подключённый на сервере аккаунт. Локальный TinyTuya-транспорт отдельно использует `device_id`, IP, версию и `local_key`; облачные кнопки React в этом разделе работают через интернет.
+## Persistence and account changes
 
-Поле User Code скрывается после сохранения. Ссылка «Хочу изменить» открывает пустое поле и отдельную кнопку сохранения; сохранённый User Code в поле не подставляется. При перезагрузке страницы наличие кода проверяется на сервере.
+The server stores User Code and confirmed access/refresh tokens atomically in a mode-0600 session file. Tokens are refreshed and persisted for restart. The file contains unencrypted secrets and must stay out of Git and public backups. The API does not return those values.
 
-User Code находится внизу экрана «Аккаунт и безопасность». Его можно сохранить **до QR-входа**: отдельная кнопка только записывает код на сервере, без запроса в Tuya. Сохранённый код переживает перезапуск и используется следующим QR-входом. Сохранение другого кода не заменяет текущий подключённый аккаунт и его токены: аккаунт переключается после подтверждения нового QR. Страница показывает, когда сохранённому коду ещё нужен QR-вход. При сохранении кода ожидающие QR-сеансы сбрасываются. Старые файлы подтверждённых сеансов работают без миграции; их User Code используется автоматически. При прямом API-входе с явно переданным кодом без отдельного сохранения код до подтверждения остаётся только в памяти ожидающего сеанса.
+Saving a User Code alone makes no Tuya request and does not replace the active account. A new account becomes active only after its QR login is confirmed. Saving a new code cancels pending QR sessions. The UI hides saved fields behind an edit action without filling them with stored secrets.
 
-QR не отправляется стороннему генератору изображений. User Code и token_info сохраняются на сервере в файле 0600, запись атомарная; обновлённые access/refresh tokens сохраняются для рестарта. Это обычный файл с секретами, а не шифрованное хранилище. API их не возвращает. По явному нажатию «Сохранить подключение» API-ключ сохраняется в `localStorage` этого браузера для текущего origin; ключ доступен скриптам того же origin, поэтому используйте доверенный браузер и HTTPS при доступе по сети. Сохранение ключа в форме не меняет настроенный `SMART_HOME_API_TOKEN` сервера. Доступ к облачным endpoints требует настроенного API-ключа. По умолчанию cloud disabled и optional SDK не нужен для локального режима.
+A new browser needs the service key, but can use the Tuya account already connected on the server. Its key is saved in that browser's localStorage only after explicit saving and verification. Same-origin scripts can access it; hidden fields are not a substitute for API authentication. Updating this browser value does not change `SMART_HOME_API_TOKEN` on the server.
 
-| Метод | Endpoint `/api/v1/cloud` | Результат |
-|---|---|---|
-| GET | `/status` | Enabled/connected, `has_saved_user_code`, `saved_user_code_requires_login`, без кода и токенов |
-| PUT | `/user-code` | `{user_code:...}` → отдельно сохранить код для следующего QR-входа; без обращения в Tuya |
-| POST | `/login/qr` | `{user_code:...}` или `{}` для сохранённого кода → session_id, URL локального QR |
-| GET | `/login/{session_id}/qr.svg` | Авторизованное SVG, Cache-Control no-store |
-| POST | `/login/{session_id}/confirm` | Завершить подтверждённый вход |
-| DELETE | `/session` | Удалить только локальный сеанс |
-| GET | `/devices?refresh=true` | Устройства/доступные функции, has_local_key, без ключа |
-| GET | `/devices/{tuya_id}/status?refresh=true` | HTTP-снимок выбранного устройства с последними полученными отчётами; `refresh=false` читает кеш |
-| POST | `/devices/{tuya_id}/commands` | Команды `{commands:[{code:...,value:...}]}` |
-| POST | `/imports/local-inventory` | Скопировать выбранную метаинформацию/ключи в локальный инвентарь |
-| GET | `/scenes` | Список cloud scenes; редактор в бесплатном sharing SDK отсутствует |
+Deleting the local session also removes the saved User Code. It does not revoke another integration's Tuya authorization; manage remote permissions in Tuya. Sharing and Developer are independent sessions, and this service does not extract an installed Home Assistant's tokens.
 
-`/session` не вызывает SDK unload с удалённым отзывом terminal, чтобы не затронуть общую авторизацию другой интеграции. Для удалённого отзыва используйте настройки разрешений Tuya. Сервис не извлекает токены уже установленного Home Assistant.
+## API
 
-Удаление локального `/session` удаляет также сохранённый User Code. Значение кода не выдаётся API и не сохраняется в браузерном localStorage.
+All routes below start with `/api/v1/cloud` and require `X-API-Key`.
 
-Пример отдельного сохранения User Code перед входом:
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/status` | Safe enabled/connected/saved-code indicators |
+| PUT | `/user-code` | Save `{user_code:...}` without a cloud request |
+| POST | `/login/qr` | Create a login from an explicit or saved code |
+| GET | `/login/{session_id}/qr.svg` | Authorized local SVG, no-store |
+| POST | `/login/{session_id}/confirm` | Finish mobile-confirmed login |
+| DELETE | `/session` | Remove the local Sharing session |
+| GET | `/devices?refresh=true` | Device metadata and key-presence flags, never keys |
+| GET | `/devices/{id}/status?refresh=true` | Selected-device HTTP snapshot plus newer reports |
+| POST | `/devices/{id}/commands` | Validated Tuya-code commands |
+| POST | `/imports/local-inventory` | Optional metadata/key import into the local database |
+| GET | `/scenes` | Available Sharing scene catalog |
+
+`refresh=false` reads the saved device cache. Cloud commands use function codes and validate writable definitions, types, enums, and ranges. ACK is acceptance, not confirmed physical change. [Status updates](status-updates.md) explains MQTT reports, timestamps, and sleeping sensors.
+
+## Optional local import
+
+Use actual IDs from the cloud inventory and an explicit parent map where required:
 
 ```sh
-curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"user_code":"example-user-code"}' 'http://127.0.0.1:8000/api/v1/cloud/user-code'
+curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d '{"device_ids":["gateway-id","child-id"],"parent_map":{"child-id":"gateway-id"},"dry_run":true}'   'http://127.0.0.1:8000/api/v1/cloud/imports/local-inventory'
 ```
 
-Пример повторного входа с уже сохранённым кодом:
+Review the dry run before repeating with `dry_run:false`. A child needs a real node ID and parent. Keys go directly into the server database. WAN IPs are not reused as LAN addresses; protocol versions are not guessed. Existing usable placement, aliases, and connection settings are preserved when missing from new metadata. The [local connection wizard](../frontend/README.md#local-connections) separately discovers and verifies a reachable route before saving it.
 
-```sh
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{}' 'http://127.0.0.1:8000/api/v1/cloud/login/qr'
-```
+## Historical hardware check: 7 October 2026
 
-## Импорт для локального режима
+An owner-confirmed login returned 44 devices: 22 online, 42 with available keys/local support, and 23 marked `sub=true` with node IDs. Both displayed gateway rows lacked their own key field. Further inspection found two shared keys among 21 child records, grouping 16 and 5 devices. These were gateway-key candidates, not proof of which physical gateway they belonged to.
 
-```sh
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"device_ids":["tuya_gateway_id","tuya_child_id"],"parent_map":{"tuya_child_id":"tuya_gateway_id"},"dry_run":true}' \
-  'http://127.0.0.1:8000/api/v1/cloud/imports/local-inventory'
-```
-
-Выберите фактические ID из `/cloud/devices`; parent_map и node_id необходимы для child. Dry-run откатывает изменения. Для сохранения повторите с `dry_run:false`. Local_key попадает сразу в БД сервера и не выдаётся клиенту. WAN IP не переносится: принимаются только RFC1918 IPv4. Версия LAN-протокола не угадывается, прежние локальные IP/version/aliases сохраняются при отсутствии новых пригодных данных. После импорта настройте IP/version и сверенные capabilities обычным API.
-
-Облачные команды используют **Tuya code**, локальные — числовые DPS. Это разные адреса управления; автоматического переключения транспорта нет, чтобы при неопределённом результате LAN-команды не выполнить её второй раз через облако. Cloud endpoint проверяет наличие code в writable function и тип/диапазон/enum, возвращает ACK отдельно от реального статуса. Sharing подписывается на отчёты открытых устройств через официальный MQTT SDK; HTTP-снимок и подключение потока не гарантируют свежих показаний sleeping sensors. Источник, отметки времени и ограничения описаны в [status-updates.md](status-updates.md).
-
-Проверены fake SDK login, QR, обновление токена, рестарт, отсутствие секретов в ответах, explicit gateway import и cloud ACK. Эти тесты отдельно проверяют поведение приложения и не подтверждают физическое выполнение команды.
-
-## Реальный вход и метаданные — 2026-10-07
-
-Владелец подтвердил QR через Smart Life, после чего локальный сервис прочитал метаданные через установленный `tuya-device-sharing-sdk==0.2.15`. Получен следующий снимок одного аккаунта:
-
-| Данные | Результат |
-|---|---|
-| Устройства | 44 |
-| Online в момент чтения | 22 |
-| `has_local_key=true` | 42 |
-| `support_local=true` | 42 |
-| `sub=true` | 23 |
-| Записи `sub=true` с непустым `node_id` | 23 |
-| Шлюзы без `local_key` | 2 из 2 показанных шлюзов |
-
-Сервис вывел только признаки наличия ключа; значения ключей и токенов не включены в ответы, отчёт и Git. Проверка подтверждает выдачу доступных метаданных через Sharing SDK, а не совместимость всех устройств с TinyTuya или успешное выполнение LAN-команд. `sub=true` сам по себе не определяет Zigbee: у аккаунта есть и другие дочерние устройства.
-
-Отсутствие `local_key` в строках шлюзов не доказывает, что их ключи не были получены: Sharing API может отдавать ключ физического шлюза в записях его children. Такое поведение описано в [проекте tuya-local-key](https://github.com/vineetchoudhary/tuya-local-key/blob/main/README.md#gateways). Для локальных команд нужен именно ключ физического шлюза и проверенный `cid`; происхождение ключа в API не меняет этот транспортный принцип.
-
-Дополнительное чтение метаданных того же аккаунта подтвердило: у 21 дочерней записи с ключом есть всего **два разных ключа**, общих для групп из **16 и 5 устройств**. Все эти ключи имеют длину 16 байт. Две записи категории `wg2` по-прежнему без ключа; обе при этом попали в 23 записи с флагом `sub=true`. Следовательно, `sub` нельзя считать достаточным признаком дочернего устройства. Два общих ключа — кандидаты на ключи двух шлюзов, а не подтверждённое соответствие шлюзам: LAN-соединение ещё не проверялось. Прежний вывод о невозможности получить ключи шлюзов этим входом был слишком категоричным.
-
-Родители для импорта по-прежнему задаются явно через `parent_map`; сервис не переносит кандидатный ключ в родителя автоматически и не угадывает связи по совпадению ключей. LAN IP, версию протокола и соответствие ключа физическому gateway нужно подтвердить в сети. На этой проверке выполнено только чтение метаданных; ключи и идентификаторы не выводились, LAN-запросов и команд не было.
-
-После перезапуска сервиса подтверждённый сеанс сохранился, а страница `/cloud` обнаружила сохранённый User Code без заполнения его поля. Реальные устройства в SQLite-инвентарь не импортировались, команды и изменения сценариев не отправлялись.
+`sub=true`, equal keys, and a node ID alone do not prove Zigbee routing. Verify gateway identity and the actual child address on LAN. This distinction is also described by [tuya-local-key](https://github.com/vineetchoudhary/tuya-local-key#gateways). This historical read did not import devices or send control commands; no real IDs or keys were committed. The confirmed session survived restart.

@@ -1,30 +1,24 @@
-# Можно ли изменять сценарии Tuya
+# Tuya scenes and automation boundaries
 
-Исследование на 2026-10-07. Да, Tuya предоставляет API редактирования сценариев, но возможности зависят от выбранного способа подключения. Бесплатный User Code + QR вход сам по себе не даёт нашего сервиса прав редактора сценариев.
+Research snapshot: 7 October 2026. Tuya has scene-editing APIs, but access depends on the selected SDK, permissions, and project plan. A User Code/QR session does not automatically grant a scene editor to this service.
 
-| Подключение | Читать сценарии | Запускать готовые | Создавать/изменять/удалять |
-|---|---|---|---|
-| TinyTuya / LAN в этом сервисе | Нет универсального каталога cloud scenes | Нет универсального вызова cloud scene | Нет универсального CRUD cloud scenes |
-| Tuya Sharing SDK 0.2.15 / User Code + QR | Да, SDK `query_scenes`; наш GET `/api/v1/cloud/scenes` | SDK `trigger_scene` | В публичном SDK этих методов нет |
-| Tuya Cloud OpenAPI с нужным permission package | Предусмотрено API | Предусмотрено API | Предусмотрено API; права/тарифы проекта требуют отдельной проверки |
-| Tuya Smart App SDK | Предусмотрено SDK | Предусмотрено SDK | Предусмотрено SDK; это отдельная мобильная интеграция |
+| Connection | Read scenes | Trigger | Create/edit/delete |
+| --- | --- | --- | --- |
+| TinyTuya/LAN here | No universal cloud catalog | No universal cloud scene call | No cloud scene CRUD |
+| Sharing SDK 0.2.15 | SDK `query_scenes`; service GET `/api/v1/cloud/scenes` | SDK `trigger_scene`; not exposed by our service | Not provided by this SDK |
+| Cloud OpenAPI with suitable permissions | Defined by Tuya | Defined by Tuya | Requires appropriate permissions/services |
+| Smart App SDK | Supported by its own integration | Supported | Separate mobile SDK integration |
 
-Для Sharing SDK проверен установленный исходник версии 0.2.15: `SceneRepository` содержит query/trigger и не содержит методов редактирования. Он использует маршруты `/v1.0/m/scene/ha/home/scenes` и `/v1.0/m/scene/ha/trigger`. [Первичный источник — Tuya Sharing SDK](https://github.com/tuya/tuya-device-sharing-sdk). Отсутствие методов — ограничение проверенного публичного интерфейса; это не доказательство, что приложение Tuya вообще не умеет редактировать сцены. Наш `/cloud/scenes` возвращает безопасный каталог, редактор и trigger endpoint пока не реализованы.
+The installed Sharing `SceneRepository` exposes query/trigger rather than editing. Its internal routes include `/v1.0/m/scene/ha/home/scenes` and `/v1.0/m/scene/ha/trigger`. See the [official SDK](https://github.com/tuya/tuya-device-sharing-sdk). Our endpoint provides a safe catalog; there is no service trigger/editor endpoint. Developer scenes return 501.
 
-## Cloud OpenAPI
+## Separate concepts
 
-Официальная [страница Modify Scene](https://developer.tuya.com/en/docs/archived-documents/774321d68c?id=Kc29dc54ceuz0) описывает `PUT /v1.0/homes/{home_id}/scenes/{scene_id}` для изменения имени/фона и списка действий. Страница помещена Tuya в archived documents: перед реализацией нужно сверить действующий API конкретного проекта.
+A bulb's `scene_data` or `scene_data_v2` is a device lighting effect, not a home automation such as motion turning on three lamps. Editing the bulb's effect does not modify an existing Smart Life automation.
 
-В актуальном [каталоге User Permission Package](https://developer.tuya.com/en/docs/iot/authentication-user-package?id=Kdjhfzvkrkkm3) также перечислены scene CRUD, `PUT /v1.0/homes/{home_id}/automations/{automation_id}` для automation и семейство `/v2.0/cloud/scene/rule` для linkage rules. Авторизация Cloud OpenAPI отличается от бесплатного HA Sharing клиента; нельзя просто подставить его access token в другой API и считать права полученными. Наличие маршрута в документации не подтверждает его доступность/бесплатность для нашего аккаунта.
+Likewise, [manual device mappings](device-linkage.md) record intent in our database without applying Smart Life bindings or executing rules. Local [groups](displays.md) can switch several devices, but this is not a server automation engine.
 
-Для будущего редактора нужны: выбранный Cloud API продукт и подписка с разрешениями, привязанный дом/аккаунт, чтение исходного правила, проверка допустимых функций устройств/условий, сохранение копии исходной конфигурации и затем изменение через соответствующий endpoint. `tap-to-run` содержит действия, `automation` дополнительно содержит условия/режим их сопоставления. Изменение сценария и запуск сценария — разные операции; успешный HTTP ACK не подтверждает результат каждого устройства.
+A rule such as fresh motion → group on → timed off would require a separately implemented rule engine and a reliable event source. Periodic polling can miss short motion events; it must not be presented as complete motion history.
 
-Отдельный путь — [Tuya Smart App SDK Smart Scenes](https://developer.tuya.com/en/docs/app-development/smartscene?id=Kceufoepm371b): мобильный SDK предоставляет создание, изменение, запуск и удаление с conditions/actions/preconditions. Это не Python Sharing SDK, не обязательная зависимость нашего сервиса и не основание обещать бесплатный редактор в нашем QR-режиме.
+## Further integration
 
-## Что остаётся локальным
-
-`scene_data` / режим `scene` у лампы — световой эффект конкретного устройства, а не облачный сценарий дома. При известной карте DPS эффект можно записывать через `set_dps` или отдельную capability; его формат зависит от модели. Это не изменит правило «движение → включить три лампы» в приложении Tuya.
-
-Локальные группы проекта уже умеют управлять несколькими лампами. Собственные правила «свежий motion=true → группа on, затем таймер off» можно реализовать в сервере независимо от облачных сценариев, но движок автоматизаций сейчас не реализован. Для коротких событий движения сначала нужен постоянный канал событий gateway/облака; периодический status polling не гарантирует их получение.
-
-Практический результат этого этапа: бесплатный QR режим для подключения и управления устройствами, чтение каталога Tuya scenes и документированная граница редактора. Для редактирования существующих Tuya scenarios понадобится отдельная проверка разрешений Cloud API; платную подписку проект не приобретает и обход закрытых app API не реализует.
+Tuya's [Modify Scene documentation](https://developer.tuya.com/en/docs/archived-documents/774321d68c?id=Kc29dc54ceuz0) describes a different cloud interface. Implementing it requires checking current project permissions, supported conditions/actions, validation, and plan terms. This project does not buy subscriptions or bypass closed app APIs. A working device-control login alone does not establish permission to modify cloud automations.
