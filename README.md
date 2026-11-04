@@ -6,7 +6,7 @@ Run it on your own server with Docker, or run the Python API and React interface
 
 **English · Russian · Polish · Belarusian** | **System · Dark · Day themes**
 
-[Quick start](#quick-start) · [Screenshots](#screenshots) · [Localization examples](#localization-examples) · [Documentation](#documentation) · [API reference](docs/api-reference.md)
+[Quick start](#quick-start) · [Screenshots](#screenshots) · [Mobile screenshots](#mobile-screenshots) · [Localization examples](#localization-examples) · [Documentation](#documentation) · [API reference](docs/api-reference.md)
 
 ## What you can do
 
@@ -78,6 +78,34 @@ The camera card shows privacy and video actions, night vision, image options, mo
 ![Camera settings with privacy, video actions, detection controls, and memory-card status](docs/screenshots/camera-controls-dark.png)
 
 [Screenshot capture details and refresh instructions](docs/screenshots/README.md)
+
+## Mobile screenshots
+
+Phone-sized views of the responsive interface at **390 × 844 CSS pixels**, captured in a touch-enabled browser. Main cards stack vertically, and detailed controls use the available phone width with a scrolling body.
+
+### Light and sensor cards
+
+Power controls and compact temperature, humidity, motion, battery, and online-state information on the main screen — Day theme.
+
+![Mobile light cards with immediate power controls](docs/screenshots/mobile-light-cards-day.png) ![Mobile sensor cards with readings, motion state, and battery](docs/screenshots/mobile-sensor-cards-day.png)
+
+### Bulb and two-channel switch details
+
+Brightness, white temperature, precise color sliders, channel aliases, and the expanded channel timer in phone layouts.
+
+![Mobile bulb controls and precise color settings in Day theme](docs/screenshots/mobile-bulb-controls-day.png) ![Mobile two-channel switch and channel timer in Dark theme](docs/screenshots/mobile-two-channel-switch-dark.png)
+
+### Motion activity
+
+The current motion reading and filtered activity log in a scrollable detail card — Dark theme.
+
+![Mobile motion sensor and activity log](docs/screenshots/mobile-motion-activity-dark.png)
+
+### Security camera: inline preview and full player
+
+Actual live video on the main card and in the full player — Dark theme. The screenshot-only Security Camera label leaves the saved device name unchanged.
+
+![Mobile security camera card with quick controls and live preview](docs/screenshots/mobile-camera-card-dark.png) ![Mobile security camera full player with actual live video](docs/screenshots/mobile-camera-live-dark.png)
 
 ## Localization examples
 

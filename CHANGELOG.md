@@ -4,6 +4,8 @@ Entries below describe the changes at the stated date; later entries can superse
 
 ## After 0.8.3 — 2026-11-04
 
+- Added phone-sized screenshots of light/sensor cards, bulb and switch controls, motion activity, and actual live camera playback in both the main card and full player.
+
 - Camera screenshot headings use the requested Security Camera display label, applied only in the capture browser without changing the saved device name.
 
 - Added real security-camera live video and settings screenshots. The main camera example shows actual 640×360 playback with resolution/state/download information; a separate screenshot covers privacy, image/detection settings, siren, and SD-card readiness.
