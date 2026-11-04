@@ -3,22 +3,25 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { CloudApi } from './api';
 import { cloudCommands, cloudSpec, labelFor, optionLabel } from './controls';
-import { LANGUAGE_STORAGE_KEY, dateLocale, detectLocale, getLocale, localizeMessages, savedLocale, setLocale, t } from './i18n';
+import { LANGUAGE_STORAGE_KEY, LANGUAGES, dateLocale, detectLocale, getLocale, localizeMessages, savedLocale, setLocale, t } from './i18n';
 import english from './i18n/en.json';
+import polish from './i18n/pl.json';
 import { STORAGE_KEY } from './connection';
 import { encodePowerMemory } from './lighting';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {status});
 
-describe('English and Russian localization', () => {
+describe('Interface localization', () => {
   it('chooses a supported browser language, honors saved preference and falls back to English', () => {
-    expect(detectLocale(['pl-PL','en-US','ru'])).toBe('en');
+    expect(detectLocale(['pl-PL','en-US','ru'])).toBe('pl');
+    expect(detectLocale(['de-DE','PL-pl','ru'])).toBe('pl');
     expect(detectLocale(['be-BY','ru-RU','en'])).toBe('ru');
-    expect(detectLocale(['pl-PL'])).toBe('en');
-    localStorage.setItem(LANGUAGE_STORAGE_KEY,'en'); expect(savedLocale()).toBe('en');
-    localStorage.setItem(LANGUAGE_STORAGE_KEY,'ru'); expect(savedLocale()).toBe('ru');
+    expect(detectLocale(['de-DE'])).toBe('en');
+    for (const {value} of LANGUAGES) {
+      localStorage.setItem(LANGUAGE_STORAGE_KEY,value); expect(savedLocale()).toBe(value);
+    }
     localStorage.setItem(LANGUAGE_STORAGE_KEY,'unsupported');
-    expect(['en','ru']).toContain(savedLocale());
+    expect(LANGUAGES.map(language=>language.value)).toContain(savedLocale());
   });
 
   it('switches live without clearing credentials or an unfinished connection form', () => {
@@ -65,16 +68,18 @@ describe('English and Russian localization', () => {
     const original=encodePowerMemory(memory);
     const outputs=[];
     vi.mocked(fetch).mockImplementation(async()=>json({acknowledged:true}));
-    for(const locale of ['en','ru'] as const){
+    for(const {value: locale} of LANGUAGES){
       setLocale(locale);
       outputs.push(cloudCommands(cloudSpec(definition,true),'white',definitions));
       expect(encodePowerMemory(memory)).toBe(original);
       await new CloudApi({baseUrl:'http://api.test',token:'existing-test-token'}).sendDeviceCommands('Устройство-Łąka', 'sharing', outputs.at(-1)!);
     }
-    expect(outputs[0]).toEqual(outputs[1]);
+    for (const output of outputs) expect(output).toEqual(outputs[0]);
     const calls=vi.mocked(fetch).mock.calls;
-    expect(calls[0][0]).toBe(calls[1][0]); expect(calls[0][1]?.body).toBe(calls[1][1]?.body);
-    expect(calls[0][1]?.headers).toEqual(calls[1][1]?.headers);
+    for (const call of calls) {
+      expect(call[0]).toBe(calls[0][0]); expect(call[1]?.body).toBe(calls[0][1]?.body);
+      expect(call[1]?.headers).toEqual(calls[0][1]?.headers);
+    }
   });
 
   it('translates known server errors and preserves unknown upstream messages', async () => {
@@ -111,11 +116,53 @@ describe('English and Russian localization', () => {
     }
   });
 
-  it('has complete nonempty English messages and preserves every interpolation placeholder', () => {
-    for(const [source,value] of Object.entries(english)){
+  it.each([['English',english],['Polish',polish]])('has a complete %s catalog and preserves every interpolation placeholder', (_language,messages) => {
+    expect(Object.keys(messages).sort()).toEqual(Object.keys(english).sort());
+    for(const [source,value] of Object.entries(messages)){
       expect(value.trim(),source).not.toBe('');
       expect(value,source).not.toMatch(/[А-Яа-яЁё]/);
       expect([...value.matchAll(/\{\d+\}/g)].map(x=>x[0]).sort(),source).toEqual([...source.matchAll(/\{\d+\}/g)].map(x=>x[0]).sort());
     }
+  });
+
+  it('retranslates formatted notices and timers between every supported language', () => {
+    const source='Tuya Developer подключён. Найдено устройств: {0}.';
+    for(const origin of LANGUAGES){
+      setLocale(origin.value);
+      const notice=t(source,[3]);
+      const timer=t('Таймер канала {0}',[2]);
+      for(const target of LANGUAGES){
+        setLocale(target.value);
+        expect(t(notice)).toBe(t(source,[3]));
+        expect(t(timer)).toBe(t('Таймер канала {0}',[2]));
+      }
+    }
+  });
+
+  it('supports Polish preferences, dates, controls and service errors', async () => {
+    render(<App/>);
+    fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://polish-api.test:8080'}});
+    fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'niezapisany-klucz'}});
+    fireEvent.change(screen.getByLabelText('Язык'),{target:{value:'pl'}});
+    expect(screen.getByRole('heading',{name:'Połącz Tuya'})).toBeInTheDocument();
+    expect(screen.getByLabelText('Adres API')).toHaveValue('http://polish-api.test:8080');
+    expect(screen.getByLabelText('Klucz dostępu do usługi')).toHaveValue('niezapisany-klucz');
+    expect(document.documentElement.lang).toBe('pl');
+    expect(dateLocale()).toBe('pl-PL');
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('pl');
+    expect(labelFor('switch_2')).toBe('Kanał 2');
+    expect(labelFor('countdown_2')).toBe('Timer kanału 2');
+    expect(labelFor('basic_private')).toBe('Tryb prywatności');
+    expect(optionLabel('on','relay_status')).toBe('Włączone');
+    expect(t('Температура')).toBe('Temperatura');
+    expect(t('Firmware-specific response X7')).toBe('Firmware-specific response X7');
+    expect(fetch).not.toHaveBeenCalled();
+    const api=new CloudApi({baseUrl:'http://api.test',token:'test-token'});
+    vi.mocked(fetch).mockImplementation(async()=>json({detail:'Выбранная сеть больше недоступна. Обновите список сетей.'},409));
+    await expect(api.status()).rejects.toThrow('Wybrana sieć nie jest już dostępna. Odśwież listę sieci.');
+    act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:'en'})));
+    expect(screen.getByLabelText('Service access key')).toHaveValue('niezapisany-klucz');
+    act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:'pl'})));
+    expect(screen.getByRole('heading',{name:'Połącz Tuya'})).toBeInTheDocument();
   });
 });

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CloudControl } from './components/CloudControl';
 import { CloudApi } from './api';
 import { LanguageSelector } from './components/LanguageSelector';
-import { setLocale, useLocale } from './i18n';
+import { LANGUAGES, setLocale, t, useLocale } from './i18n';
 
 const device={id:'room-lamp',name:'Лампа Łąka',online:true,has_local_key:false};
 const json=(value:unknown)=>new Response(JSON.stringify(value),{status:200});
@@ -26,11 +26,13 @@ describe('localized device controls',()=>{
     const brightness=await screen.findByRole('spinbutton',{name:'Brightness (%)'});
     fireEvent.change(brightness,{target:{value:'78'}});
     expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
-    act(()=>setLocale('ru'));
-    expect(screen.getByRole('spinbutton',{name:'Яркость (%)'})).toBe(brightness);
-    expect(brightness).toHaveValue(78);
-    expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
-    expect(writes).toEqual([]);
+    for (const language of LANGUAGES) {
+      act(()=>setLocale(language.value));
+      expect(screen.getByRole('spinbutton',{name:t('Яркость')+' (%)'})).toBe(brightness);
+      expect(brightness).toHaveValue(78);
+      expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
+      expect(writes).toEqual([]);
+    }
     act(()=>setLocale('en'));
     expect(screen.getByRole('spinbutton',{name:'Brightness (%)'})).toHaveValue(78);
     fireEvent.click(screen.getByRole('button',{name:'Apply'}));
