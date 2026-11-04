@@ -1,533 +1,364 @@
-# API and operations reference (Русский)
+# API and operations reference
 
-[Project overview and screenshots](../README.md).
+[Project overview](../README.md) · [Interface guide](../frontend/README.md) · [Docker deployment](../deploy/docker.md)
 
-Python RESTful-сервис для локального управления зданиями, комнатами, типами устройств и устройствами Tuya. Стек: FastAPI, синхронный SQLAlchemy 2, SQLite, TinyTuya и PyCryptodome с AES-GCM. Python 3.10+. Docker не требуется.
+The service uses FastAPI, SQLAlchemy 2, SQLite, TinyTuya, and PyCryptodome. Python 3.10+ is required. The React interface is a separate application during development; the Docker image serves both through nginx. See the [quick start](../README.md#quick-start) for installation.
 
-Web UI вынесен в отдельное **React + TypeScript + Vite** приложение: [frontend/README.md](../frontend/README.md). API и интерфейс запускаются независимо; production-сборка — обычные статические файлы, Node.js на OpenWrt/Orange Pi для их раздачи не нужен.
+## Authentication and configuration
 
-Интерфейс поддерживает **English / Русский / Polski / Беларуская** с выбором в шапке, определением языка браузера и сохранением предпочтения. Локализация не меняет имена устройств, алиасы, ключи и значения команд. Темы «Системная», «Тёмная» и «Дневная» выбираются в шапке; выбор сохраняется в браузере и не меняет настройки подключения.
+All `/api/v1/*` requests use `X-API-Key` when `SMART_HOME_API_TOKEN` is configured. `/health`, `/docs`, and `/openapi.json` are public. Standalone Python does not load `.env` automatically; Docker Compose does. An empty API token disables local API authentication; cloud endpoints require a configured service token.
 
-В React устройства и группы находятся в едином списке: выбор здания/комнаты, поиск по имени/алиасу, питание, яркость, цвет, режимы и числовые настройки по capabilities. Одна карточка объединяет локальную запись и облачные источники по Tuya Device ID. Датчики показывают статус без кнопок записи; группа раскрывает участников для индивидуального управления. CRUD/импорт/настройка возможностей выполняются через REST API. [Подробности управления](../frontend/README.md#управление-устройствами).
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `SMART_HOME_DB` | `./data/smarthome.db` | SQLite database |
+| `SMART_HOME_API_TOKEN` | empty | Service access key |
+| `SMART_HOME_TUYA_TIMEOUT` | `3` | Socket timeout, seconds |
+| `SMART_HOME_LOCK_TIMEOUT` | `5` | Device/gateway lock timeout, seconds |
+| `SMART_HOME_CORS_ORIGINS` | empty | Allowed browser origins, comma-separated |
+| `SMART_HOME_FRONTEND_URL` | empty | Optional redirect from the old `/cloud` page |
+| `SMART_HOME_DISPLAY_POLL_INTERVAL` | `30` | Poll selected display devices; `0` disables periodic polling |
+| `SMART_HOME_CLOUD_ENABLED` | `0` | Enable optional Tuya cloud access |
+| `SMART_HOME_CLOUD_SESSION` | application default | Sharing session file |
+| `SMART_HOME_DEVELOPER_SESSION` | Sharing path + `.developer.json` | Developer credentials file |
+| `SMART_HOME_CLOUD_TIMEOUT` | `10` | Cloud request timeout, seconds |
 
-Добавлены [прошивка Yellow Display / CYD](../firmware/cyd/README.md), [группы и выбор устройств](displays.md), [необязательный User Code + QR вход](qr-login.md), [разбор интеграций Home Assistant](integrations.md) и [возможности редактирования сценариев Tuya](scenes.md). Изменения разделены на локальные Git-коммиты.
+Use one worker and one service instance. Device/gateway locks and pending discovery results are held in memory. A request can include several bounded socket operations. Do not automatically retry commands: a missing HTTP response does not prove the device rejected the command.
 
-Меню **☰ → Сеть и пакеты** открывает [наблюдение за LAN](packet-capture.md#страница-сеть-и-пакеты): IP, Tuya ID, MAC, mDNS/SSDP сервисы, журнал и сохранение JSON-отчёта. Страница не использует Smart Life; Zigbee-радиообмен не просматривается.
+Swagger at `/docs` and the generated `/openapi.json` describe request bodies, limits, and response schemas. Select **Authorize** in Swagger and enter the service key.
 
-## Docker на Dell 5070
-
-[Dockerfile](../Dockerfile) собирает интерфейс и API в один образ; [инструкция развёртывания](../deploy/docker.md) описывает постоянное хранилище, запуск через Compose и режим Linux LAN для поиска устройств. Веб-порт по умолчанию — 8080. Dell 5070 — целевой компьютер, а не номер порта. Обновления готового образа на Dell завершаются командой `python3 deploy/activate-dell.py` с управляющего Mac: каждое развёртывание генерирует новый ключ API и сохраняет его в обоих `.env`; браузеры подключаются заново.
-
-## Быстрый запуск
-
-```sh
-cd smart-home-service
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements.txt
-umask 077
-export SMART_HOME_DB="$PWD/data/smarthome.db"
-export SMART_HOME_API_TOKEN='replace-with-a-long-random-token'
-python -m uvicorn smarthome.main:app --host 127.0.0.1 --port 8000 --workers 1
-```
-
-SQLite-файл и таблицы создаются при запуске. Swagger UI: <http://127.0.0.1:8000/docs>, OpenAPI: <http://127.0.0.1:8000/openapi.json>. В Swagger нажмите **Authorize** и укажите `SMART_HOME_API_TOKEN`. `/health` и документация доступны без токена; все `/api/v1/*` защищены заголовком `X-API-Key`, если токен задан. Если переменная пустая, аутентификация отключена.
-
-Для доступа из LAN используйте `--host 0.0.0.0`, задайте токен и разрешите порт только доверенной домашней сети. Внешний доступ организуйте через VPN или HTTPS reverse proxy: встроенный Uvicorn здесь слушает обычный HTTP. CORS по умолчанию не включён.
-
-Для отдельного интерфейса перед запуском API задайте `SMART_HOME_CORS_ORIGINS='http://127.0.0.1:5173,http://localhost:5173'`. Затем в другом терминале выполните `cd frontend`, `pnpm install --frozen-lockfile`, `pnpm dev` и откройте <http://127.0.0.1:5173>. Адрес API и его ключ сохраняются в «Настройках подключения». Прежний `/cloud` больше не раздаёт HTML: необязательный `SMART_HOME_FRONTEND_URL='http://127.0.0.1:5173'` включает перенаправление к отдельному UI.
-
-Настройки из `.env.example` — справочный пример; файл `.env` автоматически не загружается. Переменные среды:
-
-| Переменная | По умолчанию | Значение |
-|---|---|---|
-| `SMART_HOME_DB` | `./data/smarthome.db` | Путь к SQLite |
-| `SMART_HOME_API_TOKEN` | пусто | Токен `X-API-Key` |
-| `SMART_HOME_TUYA_TIMEOUT` | `3` | Тайм-аут операции с сокетом, секунды |
-| `SMART_HOME_LOCK_TIMEOUT` | `5` | Ожидание занятого устройства/шлюза, секунды |
-| `SMART_HOME_CORS_ORIGINS` | пусто | Origins отдельного UI через запятую, без путей и завершающего `/` |
-| `SMART_HOME_FRONTEND_URL` | пусто | Адрес отдельного UI для 307 redirect с `/cloud` |
-
-Запускайте **один worker и один экземпляр сервиса**: синхронизация команд одного gateway хранится в памяти процесса. Ожидание блокировки и сетевой тайм-аут ограничены; полный запрос может занимать несколько сетевых операций, особенно при handshake 3.4/3.5. Не задавайте автоматические HTTP-повторы команд: при потере ответа команда могла уже выполниться.
-
-## Модель данных
+## Data model
 
 ```text
-Building
-  ├─ Room
-  │   ├─ Device (wifi, direct)
-  │   └─ Device (zigbee, parent_id + cid)
-  └─ Device (здание задано, комната ещё не назначена)
-
-DeviceType ── capabilities ── Device.device_type_id
-Device (wifi, is_gateway=true) ── children.parent_id
+Building -> Room -> Device
+DeviceType -> capability definitions -> Device
+Gateway Device (wifi, is_gateway=true) -> child Device (zigbee, parent_id + cid)
+Group -> local member devices
+Display -> selected device/group widgets
 ```
 
-- `Building`: `name`, `address`, `description`, `aliases`.
-- `Room`: `building_id`, `name`, `description`, `aliases`. Имена комнат уникальны внутри здания.
-- `DeviceType`: уникальный `slug`, `name`, `description`, карта `capabilities`.
-- `Device`: `name`, `description`, `aliases`, `device_type_id`, `building_id`, `room_id`, `device_id`, `local_key`, `ip`, `version`, `transport`, `is_gateway`, `parent_id`, `cid`/`node_id`, `enabled`, `product_id`, `category`, `mac`, карта `capabilities`.
-- `device_id` — строковый идентификатор Tuya. `id` и `parent_id` в API — числовые идентификаторы SQLite, это разные поля.
-- `Gateway` представлен устройством с `is_gateway=true`, `transport=wifi`. Список шлюзов: `GET /api/v1/devices?is_gateway=true`.
-- `cid` — адрес дочернего узла, **не** его Tuya `device_id`. `node_id` — входной алиас `cid`; в ответе оба поля содержат одно значение. Пара `(parent_id, cid)` уникальна.
-- При задании `room_id` здание выводится из комнаты. Если одновременно передать другое `building_id`, API вернёт 422. Смена комнаты без явного здания переносит устройство в здание новой комнаты. `room_id:null` убирает комнату и оставляет здание; для полного отвязывания передайте также `building_id:null`.
-- Child и gateway могут находиться в разных комнатах, но при известных зданиях должны принадлежать одному зданию. Поддерживается один уровень шлюза; циклы и вложенные шлюзы отклоняются.
-- Удаление объектов с зависимостями возвращает 409. Удаление здания не удаляет автоматически комнаты и устройства. Gateway нельзя удалить или лишить роли шлюза, пока у него есть children.
+- `id` is the numeric database identifier. `device_id` is the physical Tuya identifier; they are not interchangeable.
+- A device can belong to a building without a room. Assigning a room derives its building. A conflicting explicit building returns 422.
+- Clearing `room_id` leaves the building; clear both fields to remove all placement.
+- A gateway is an ordinary Wi-Fi device with `is_gateway=true`. List gateways with `GET /api/v1/devices?is_gateway=true`.
+- A Zigbee child uses the gateway's IP, protocol, and key. `cid` is its actual child address, not its Tuya device ID. `node_id` is an input alias for `cid`.
+- Parent/child pairs must have compatible buildings. Nested gateways, cycles, and duplicate `(parent_id, cid)` pairs are rejected.
+- Deleting records with dependent rooms, devices, children, groups, or display selections returns a conflict rather than silently removing dependencies.
+- PATCH changes only supplied fields. `null` clears nullable fields. A supplied capability map replaces the map at that level.
 
-Обновления делаются через `PATCH`: не переданные поля сохраняются, `null` очищает только nullable-поля. Карта `capabilities` при PATCH заменяется целиком на соответствующем уровне.
+## CRUD, search, and aliases
 
-## Поиск по названию
+`buildings`, `rooms`, `device-types`, and `devices` support POST, GET list/detail, PATCH, and DELETE. List pagination uses `offset=0&limit=100`, with a maximum limit of 500.
 
-Названия `name`, заданные при создании, используются для поиска зданий, комнат, типов и устройств:
+Device filters include `building_id`, `room_id`, `device_type_id`, `parent_id`, `is_gateway`, `transport`, `unassigned`, `alias`, `name`, and `q`. `q` searches a Unicode-aware name substring; `name` searches an exact name. `%` and `_` are literal search characters. Rooms can also be filtered by building.
 
-- `GET /api/v1/devices?q=розетка` — часть названия; тот же `q` есть у `buildings`, `rooms`, `device-types`.
-- `GET /api/v1/devices?name=Розетка` — точное название; возвращает список всех совпадений.
-- `GET /api/v1/lookup/devices?name=Розетка&room_id=1` — получить один объект по точному названию с уточнением комнаты. Аналогичные `/lookup/buildings`, `/lookup/rooms`, `/lookup/device-types`.
-- `GET /api/v1/devices/name:Розетка/status` и `POST /api/v1/devices/name:Розетка/commands/on` — обращение и управление по точному названию. Префикс `name:` работает также у зданий и комнат во всех существующих адресах, включая hierarchy, PATCH и DELETE.
+Names need not be globally unique. Use `/lookup/devices?name=...&room_id=...` to resolve an exact name within a scope. The corresponding building, room, and device-type lookup endpoints are listed below. No match returns 404; ambiguity returns 409 with a bounded, safe list of candidates. No command is sent when lookup is ambiguous.
 
-Поиск Unicode-aware: кириллица, регистр и составная запись Unicode учитываются корректно; пробелы по краям сравниваемых названий игнорируются. В `q` символы `%`, `_`, кавычки и обратный слеш — обычный текст. Поиск выполняется по `name`, алиасы для него задаются отдельно через `alias`. Можно сочетать `q`/`name` с существующими фильтрами расположения, типа, parent и алиаса. Если передать одновременно `q` и `name`, должны выполняться оба условия. Пагинация применяется после фильтрации.
+Building, room, and device paths accept a numeric ID, a user alias, or an explicit `name:...` reference. URL-encode names in paths. For names containing `/`, use a query lookup instead. Device types use numeric IDs or their dedicated profile/slug interfaces.
 
-Названия не становятся глобально уникальными. Списковый поиск возвращает все совпадения. Обращение `name:...` и `/lookup/...` требуют ровно одного совпадения: 404 — ни одного, 409 — несколько. В 409 есть безопасный список до 20 вариантов (`id`, `name`, доступные ссылки на здание/комнату/parent/тип) и `more_matches`; локальные ключи туда не включаются. При неоднозначном названии команды не отправляются и изменения не выполняются.
-
-Уточнения `/lookup/devices`: `building_id`, `room_id`, `parent_id`, `device_type_id`. Для `/lookup/rooms` доступен `building_id`; здания и типы не имеют этих уточнений. Неподдерживаемое уточнение возвращает 422. Для управления двумя одноимёнными устройствами найдите нужное через `/lookup/devices?name=...&room_id=...`, затем используйте его `id` или алиас. Типы устройств можно искать по названию, их собственные адреса остаются по числовому ID.
-
-Названия в пути нужно URL-кодировать, особенно пробелы и кириллицу. Названия со слешем `/` ищите через query-параметр `/lookup/...`: они не помещаются в один сегмент пути. Явный префикс `name:` также позволяет отличить числовое название от ID, а название, совпавшее с чужим пользовательским алиасом, — искать только по имени. Обычный поиск по алиасу в таком случае вернёт 409. Назначать дополнительный алиас для поиска по `name` не нужно.
+Buildings, rooms, and devices have their current name as an automatic alias and up to 32 additional aliases. Alias lists are replaced as a whole; omitted fields preserve them, `[]` clears additional aliases, and `null` is rejected. Device aliases support Unicode letters and combining marks, spaces, digits, `.`, `-`, and `_`, with NFC normalization, trimmed edges, and lowercase normalization; the first character must be a letter. See [device aliases](device-aliases.md) for UI behavior and storage rules. Scope and validation for each resource are defined in OpenAPI. Alias conflicts return 409 atomically.
 
 ```sh
 export BASE=http://127.0.0.1:8000/api/v1
-export TOKEN='replace-with-a-long-random-token'
-curl -sS -G -H "X-API-Key: $TOKEN" \
-  --data-urlencode 'q=розетка' "$BASE/devices"
-curl -sS -G -H "X-API-Key: $TOKEN" \
-  --data-urlencode 'name=Розетка' --data-urlencode 'room_id=1' "$BASE/lookup/devices"
-curl -sS -G -H "X-API-Key: $TOKEN" \
-  --data-urlencode 'q=кухня' "$BASE/rooms"
-
-# Управление по уникальному точному названию без отдельного алиаса:
-DEVICE_NAME_PATH=$(python -c 'from urllib.parse import quote; print(quote("name:Свет кухня", safe=""))')
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/$DEVICE_NAME_PATH/status"
-curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/devices/$DEVICE_NAME_PATH/commands/on"
+export TOKEN='replace-with-your-service-key'
+curl -sS -G -H "X-API-Key: $TOKEN" --data-urlencode 'q=light' "$BASE/devices"
+curl -sS -G -H "X-API-Key: $TOKEN" --data-urlencode 'name=Desk light' \
+  --data-urlencode 'room_id=1' "$BASE/lookup/devices"
 ```
 
-Версия v0.3.0 не меняет таблицы или данные базы: Unicode-функция поиска регистрируется на SQLite-соединении при запуске. Дополнительных внешних библиотек не требуется.
+## Control and capabilities
 
-## Алиасы зданий, комнат и устройств
+Local commands use numeric Tuya DPS. Cloud commands use Tuya function codes and explicitly select `provider=sharing|developer`. The service never silently falls back to another transport.
 
-Каждый Building, Room и Device имеет автоматический алиас — текущее `name` — и может иметь до 32 дополнительных алиасов, например `home`, `kitchen`, `kitchen_light`, `first-floor.lamp`. Алиасы передаются массивом `aliases` при создании или PATCH. Массив заменяется целиком; отсутствие поля сохраняет алиасы, `[]` очищает дополнительные алиасы, `null` отклоняется. В ответах `aliases` начинается с текущего имени в исходном регистре, затем идут отсортированные дополнительные алиасы. Массив из ответа можно передать обратно: имя распознаётся и не занимает лимит. При переименовании автоматический алиас обновляется; его нельзя удалить отдельно.
+`GET /devices/{ref}/state` reads cached normalized observations; `?refresh=true` requests a device status. `/status` performs a live TinyTuya request. Each capability observation includes `value`, `known`, `stale`, and `observed_at`. A command ACK does not create a confirmed observation.
 
-Дополнительные алиасы приводятся к нижнему регистру, пробелы по краям убираются. После нормализации допускается 1–64 символа: первая латинская буква `a-z`, далее `a-z`, цифры, `_`, `-`, `.`. Чисто числовые алиасы запрещены, поэтому они не конфликтуют с числовыми ID. Дубли внутри массива возвращают 422; занятый алиас — 409 без частичного изменения объекта.
+A local device's effective capabilities combine its type and device definitions. Supported concepts include Boolean switches, numbers, enums, read-only sensors, colors, and write-only actions. Profiles are explicit examples, not automatic product detection. Verify DP numbers, units, ranges, and formats for your hardware before using them.
 
-Уникальность действует **в пределах типа сущности во всём сервисе**. У двух комнат даже в разных зданиях не может быть одинакового алиаса; используйте, например, `home.kitchen` и `office.kitchen`. Здание, комната и устройство могут использовать один и тот же алиас: их адреса различаются префиксом ресурса. DeviceType продолжает использовать числовой ID и свой `slug`.
+| Capability field | Meaning |
+| --- | --- |
+| `dp` / `read_dp` | Write DP and optional separate feedback DP |
+| `scale`, `offset` | `API value = raw value * scale + offset` |
+| `minimum`, `maximum`, `step` | Limits in API units |
+| `raw_type` | Raw numeric representation; integer writes round to a raw tick |
+| `invert` | Invert Boolean values or reflect a numeric range |
+| `value_map` | Explicit `{value, raw}` enum mapping with unambiguous reverse reading |
+| `write_dps` | Constant companion values sent in the same packet |
 
-Во всех адресах `buildings/{id}`, `rooms/{id}`, `devices/{id}`, включая hierarchy, children, status и команды, вместо ID можно передать алиас или явное точное название с префиксом `name:`. Числовые ссылки в JSON (`building_id`, `room_id`, `parent_id`) и существующие фильтры по ID остаются числовыми. Списки поддерживают дополнительный точный фильтр `?alias=...`; неизвестный алиас в адресе возвращает 404, а в фильтре — пустой список.
-
-Отдельный endpoint поиска: `GET /api/v1/lookup/{resource}/alias?alias=...` для buildings, rooms, devices. Он ищет и дополнительные алиасы, и текущее имя, включая кириллицу/пробелы/слеши/числовые имена. Те же уточнения расположения, что у поиска по имени. Неоднозначность имени либо совпадение имени с чужим алиасом возвращает 409; выбор устройства не угадывается. Фильтр списка `?alias=...` возвращает все совпадения.
-
-```sh
-curl -sS -G -H "X-API-Key: $TOKEN" --data-urlencode 'alias=Лампа' \
-  --data-urlencode 'room_id=1' "$BASE/lookup/devices/alias"
-```
-
-Для каждого из ресурсов `buildings`, `rooms`, `devices` также доступны:
-
-| Метод | Путь | Результат |
-|---|---|---|
-| GET | `/{resource}/{id_or_alias}/aliases` | Массив алиасов |
-| POST | `/{resource}/{id_or_alias}/aliases` | Добавить один: `{"alias":"..."}`, 201 и обновлённый объект |
-| DELETE | `/{resource}/{id_or_alias}/aliases/{alias}` | Удалить один, 204 |
-
-При удалении объекта освобождаются его алиасы. Алиасы не обходят проверки зависимостей, авторизацию или правила Zigbee. В TinyTuya передаётся исходный Tuya `device_id`, а child по-прежнему использует настоящий parent + cid.
+Color encodings include HSV16, RGB+HSV8, and JSON HSV. The normalized HSV API uses hue 0–360 and saturation/value 0–1000. Color commands can include the required `colour` mode; white brightness and color temperature can include `white`. The color value's brightness component controls colored light; a separate brightness capability commonly controls white light.
 
 ```sh
-export BASE=http://127.0.0.1:8000/api/v1
-export TOKEN='replace-with-a-long-random-token'
-# Здесь 1 и 3 — существующие числовые ID из вашего инвентаря.
-curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"aliases":["home"]}' "$BASE/buildings/1"
-curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"aliases":["kitchen"]}' "$BASE/rooms/1"
-curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"aliases":["kitchen_light","main_lamp"]}' "$BASE/devices/3"
-
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/buildings/home/hierarchy"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/rooms/kitchen/devices"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices?alias=kitchen_light"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/status"
-curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/commands/on"
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"alias":"evening_light"}' "$BASE/devices/kitchen_light/aliases"
-curl -sS -X DELETE -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/aliases/evening_light"
-```
-
-Обновление базы с v0.1.0 не требует экспорта/повторного импорта: при старте автоматически создаются только три новые таблицы алиасов, существующие таблицы и ключи сохраняются. После обновления у старых объектов `aliases:[name]`; отдельной записи имени в БД не требуется. Перед обновлением рабочей установки сделайте штатную резервную копию базы.
-
-## REST API
-
-Префикс: `/api/v1`. Для `buildings`, `rooms`, `device-types`, `devices` доступны:
-
-| Метод | Путь | Результат |
-|---|---|---|
-| POST | `/{resource}` | Создать, 201 |
-| GET | `/{resource}` | Список, `offset=0&limit=100`, максимум 500 |
-| GET | `/{resource}/{id}` | Получить объект |
-| PATCH | `/{resource}/{id}` | Частичное обновление |
-| DELETE | `/{resource}/{id}` | Удалить, 204 |
-
-Дополнительные пути:
-
-| Метод | Путь | Назначение |
-|---|---|---|
-| GET | `/buildings/{id}/hierarchy` | Здание → комнаты → устройства + `unassigned_devices` |
-| GET | `/buildings/{id}/rooms` | Комнаты здания |
-| GET | `/rooms/{id}/devices` | Устройства комнаты |
-| GET | `/devices/{id}/children` | Children шлюза |
-| GET | `/devices/{id}/status` | Живой запрос статуса TinyTuya |
-| POST | `/devices/{id}/commands/status` | Тот же запрос статуса |
-| POST | `/devices/{id}/commands/on` | Включить через capability `switch` или явный `dp` |
-| POST | `/devices/{id}/commands/off` | Выключить |
-| POST | `/devices/{id}/commands/set_dps` | Записать DPS: `{"dps":{"1":true,"22":500}}` |
-| PUT | `/devices/{id}/capabilities/{name}` | Установить capability: `{"value":...}` |
-| POST | `/devices/{id}/commands/brightness` | Capability `brightness` |
-| POST | `/devices/{id}/commands/color` | Capability `color` |
-| POST | `/devices/{id}/commands/temperature` | Capability `temperature` |
-| POST | `/imports/tinytuya` | Атомарный импорт JSON |
-
-Фильтры устройств: `building_id`, `room_id`, `device_type_id`, `parent_id`, `is_gateway`, `transport=wifi|zigbee`, `unassigned=true` (нет ни комнаты, ни здания), `alias`, `name`, `q`. Фильтры комнат: `building_id`, `alias`, `name`, `q`; зданий — `alias`, `name`, `q`; типов — `name`, `q`. Вложенные списки и hierarchy возвращаются целиком; для большого инвентаря используйте списковые API с пагинацией.
-
-Ошибки: 401 — токен, 404 — объект отсутствует, 409 — конфликт/нет нужной конфигурации, 422 — неверные поля/связи/значения capability, 502 — ошибка Tuya/непригодный ответ, 503 — занят gateway или БД, 504 — нет ответа/тайм-аут. Ошибки валидации возвращают путь поля и тип ошибки без исходного значения.
-
-## Структура дома из Smart Life
-
-На странице управления нажмите **«Синхронизировать Smart Life»** после QR-входа. Home становится Building, Room — Room, расположение устройства сопоставляется по Tuya Device ID. Облачные карточки участвуют в фильтре комнат ещё до локальной регистрации; мастер добавления подставляет здание и комнату. Access ID/Secret для этого пути не требуются.
-
-Синхронизация выполняется в фоне с прогрессом. Результат хранится в SQLite; обычное открытие страницы читает кеш без запросов комнат в облако. Повторная синхронизация использует Tuya ID, сохраняет ручные имена, алиасы и размещение. Автоматически размещённые локальные устройства следуют изменениям в Smart Life, пока пользователь не изменил их расположение вручную. Ограничения групп/панелей и gateway/child сохраняются; пропущенные перемещения учитываются в предупреждениях. Локальные Device не создаются до регистрации, IP/ключи/capabilities синхронизация не меняет.
-
-Защищённые API:
-
-```sh
-API=http://127.0.0.1:8000
-KEY="$SMART_HOME_API_TOKEN"
-# Неблокирующий запуск; повторный запрос при работающей задаче возвращает её прогресс.
-curl -X POST "$API/api/v1/cloud/topology/sync" -H "X-API-Key: $KEY"
-# Кеш структуры + job.status (idle/running/done/failed), processed/total, warnings.
-curl "$API/api/v1/cloud/topology" -H "X-API-Key: $KEY"
-```
-
-При ошибке облака или смене аккаунта прежний снимок остаётся целым. Кеш и задачи разделены по аккаунтам. Перезапуск завершает фоновую задачу; сохранённая структура остаётся. Новые таблицы создаются автоматически, перед обновлением сделайте резервную копию SQLite. Используйте один worker; предел — 2000 устройств/100 домов и 5 минут на одну синхронизацию.
-
-Текущий [Tuya Sharing SDK](https://github.com/tuya/tuya-device-sharing-sdk/blob/main/tuya_sharing/home.py) возвращает список домов и комнату **по устройству**, поэтому пустые комнаты впервые обнаружить нельзя. Известные комнаты и здания не удаляются при исчезновении устройства или дома из облака. Разные комнаты с одинаковым названием получают различающий суффикс. Это чтение структуры Smart Life: группы Zigbee, remote/multi-control и изменения структуры обратно в Smart Life сюда не входят.
-
-Перенос кода и продолжение работы на Mac mini: [docs/mac-mini.md](mac-mini.md).
-
-## Поиск шлюза и сохранение после подтверждения
-
-Оба запроса защищены тем же `X-API-Key`. Автоматического сохранения при поиске нет; прежний `/api/v1/gateways/setup` удалён.
-
-1. `POST /api/v1/gateways/find` принимает точный Tuya `device_id`, выбранный аккаунт `provider: "sharing"|"developer"` и `interface_address` из `GET /api/v1/network/interfaces`. Необязательный `discovery_seconds` — целое число 3–12, по умолчанию 8. Сервис сопоставляет точный ID с объявлением в выбранной подсети и проверяет ключ только чтением. Ничего не создаётся и не обновляется в инвентаре. HTTP 200 возвращает `{finding_id, expires_in, action, device, verified: true, key_source, interface_address}`. В `device` — предварительный просмотр имени, алиасов, комнаты, IP, версии, `existing_id` и `changed_fields`; имя `local_key` в списке изменений означает замену ключа, его значение не раскрывается. `action: "created"|"updated"|"unchanged"` описывает предложенное действие, а не уже выполненную запись.
-2. Покажите пользователю предварительный просмотр. Только после его подтверждения вызовите `POST /api/v1/gateways/save` с `{finding_id, confirmed: true}`. Отсутствующее подтверждение, `false`, число или строка отклоняются. Перед записью сервер повторно проверяет соединение, аккаунт, источник ключа, сеть и неизменность записи. Для нового устройства изменение имени, алиасов или комнаты относительно показанного просмотра требует нового поиска. IP, ключ и метаданные нельзя подменить в запросе сохранения. HTTP 201 означает создание, 200 — обновление либо отсутствие изменений; ответ содержит `DeviceRead` и итоговое `action`.
-
-Результат поиска и ключ хранятся только в памяти сервера до 5 минут; максимум 16 ожидающих результатов, один worker. Успешное сохранение делает `finding_id` недействительным. Истечение срока, перезапуск или повторное использование сохранённого результата дают 404 — нужен новый поиск. Если пользователь не подтвердил результат, сохранения не происходит. Для обычного повторного подключения выполните новый поиск и подтверждение: дубликаты не создаются.
-
-Новая запись получает настоящее имя устройства, существующие алиасы приложения и комнату из сохранённой структуры выбранного аккаунта. Если структура ещё не синхронизирована, комната остаётся пустой. У существующего шлюза обновляются только подтверждённые IP/версия/ключ; имя, алиасы, параметры и дочерние связи сохраняются. Отключённая запись или запись другого типа автоматически не преобразуется. Датчики не создаются и не привязываются, DPS-команды не отправляются, ключ не возвращается. Страница «Сеть и пакеты» остаётся независимой от Tuya-аккаунта; этот отдельный сценарий настройки использует его явно.
-
-Наблюдение за объявлениями всегда закрывается. Поиск занимает выбранные 3–12 секунд плюс до двух секунд ожидания приёмника; проверка ключей ограничена примерно 30 секундами. Задайте клиенту тайм-аут не менее 50 секунд. Одновременно разрешена одна проверка шлюза, включая прежний мастер `/commissioning`. Нет объявления — 404, конфликт или устаревший предварительный просмотр — 409, слишком частый запрос объявлений — 429, порт недоступен — 503, истечение проверки ключа — 504. В интерфейсе этот сценарий доступен через общий раздел ☰ → «Локальные подключения».
-
-Пример поиска (замените ID и адрес фактического интерфейса своими):
-
-```sh
-curl --max-time 50 -X POST "$BASE/gateways/find" \
-  -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"device_id":"demo_gateway","provider":"sharing","interface_address":"192.168.1.10"}'
-```
-
-После подтверждения показанного результата отправьте его `finding_id` вместе с `confirmed: true` на `$BASE/gateways/save`.
-
-## Поиск и назначение локальных ключей других устройств
-
-Для прямых Wi-Fi устройств и шлюзов используйте общие `POST /api/v1/local-connections/find` и `POST /api/v1/local-connections/save`. Тело поиска такое же, как у `/gateways/find`: точный Tuya `device_id`, `provider`, фактический `interface_address`, необязательный `discovery_seconds`. Пара шлюзовых endpoints остаётся совместимой. Общие endpoints тоже требуют `X-API-Key`; поиск не меняет инвентарь, а сохранение требует `finding_id` и строго `confirmed: true`.
-
-Для обычного Wi-Fi устройства проверяется только его собственный ключ из выбранного авторизованного аккаунта. Отсутствующий или некорректный ключ даёт 409: перебора ключей соседних устройств нет. IP определяется по объявлению с точным ID в выбранной подсети, затем ключ проверяется чтением по протоколам 3.3–3.5. Результат дополняет предварительный просмотр полем `device.is_gateway`, а также `requested_device_id`, `connection_device_id` и `route: "direct"|"gateway"`.
-
-Для Zigbee ключ принадлежит шлюзу. Общий поиск принимает ID дочернего устройства, но выбирает шлюз только по явному `gateway_id` в Tuya либо существующему `parent_id` в локальной базе. При неизвестном или противоречивом родителе возвращается 409; одинаковые ключи не устанавливают родство. Признак `sub=true` у самого шлюза учитывается по его категории. Предварительный просмотр явно показывает ID и имя шлюза, которому будет назначен ключ. Подтверждённое сохранение меняет только шлюз: дочерний объект не создаётся, собственный ключ ему не назначается, связь/cid не изменяются. Проверка ключа шлюза не подтверждает доступность или функции дочернего устройства.
-
-Результаты действуют пять минут, используются один раз и делят с шлюзовым сценарием предел 16 ожидающих подтверждения результатов. Перед сохранением повторно проверяются ключ, соединение, аккаунт, сеть, роль устройства и актуальность родительской связи. У существующего Wi-Fi устройства сохраняются имя, алиасы, комната, параметры и дочерние связи; обновляются только подтверждённые IP/версия/ключ. Для нового устройства используется настоящее имя и сохранённые алиасы/комната, capabilities остаются пустыми до отдельного сопоставления. Ключи не возвращаются клиенту. В ☰ → «Локальные подключения» мастер сначала предлагает сеть и флажок включения уже настроенных устройств. За 15 секунд собираются реальные LAN-объявления; затем пользователь выбирает найденные устройства, запускает проверку и отдельно подтверждает сохранение показанных подключений. Проверки и записи выполняются по очереди. На итоговом шаге показаны результаты и оставшиеся ненастроенные устройства; автоматического повтора записи нет. Подробнее — в [описании мастера](../frontend/README.md#локальные-подключения).
-
-## Опрос устройства перед регистрацией
-
-Для устройства, уже добавленного сетевым мастером с пустыми функциями, доступен `POST /api/v1/commissioning/devices/{device_id}` с `{provider: "sharing"|"developer"|null}`; здесь ID — числовой ID локальной записи. Сервер берёт сохранённое соединение без передачи ключа клиенту. Затем используются обычные `/samples`, `/register` и отмена. Регистрация такого опроса возвращает HTTP 200 и обновляет только функции существующей записи; название, алиасы, размещение и соединение из тела регистрации не применяются. Сохранение требует настоящего Boolean `reviewed: true`, фактических локальных показаний и допустимого списка `writable`. Аккаунт и схема Tuya перепроверяются, изменения соединения/родителя/эффективных функций блокируют запись. Сценарий не заменяет уже настроенные функции и не создаёт дубликат устройства. В интерфейсе — кнопка «Настроить функции» в локальной карточке.
-
-В React есть **«Настроить локальное подключение»** (значок сети на облачной карточке) и **«Настроить локальное устройство»** (ручной ввод). Это необязательный мастер отдельного управления по домашней сети; устройства Smart Life уже доступны через облако. До сохранения открывается страница настройки и наблюдения: пользователь сам переключает устройство, сервис только читает значения. [Подробности и ограничения](../frontend/README.md#опрос-перед-добавлением).
-
-Для шлюза Smart Life есть **«Найти ключ и проверить шлюз»**: укажите IP из роутера и подтвердите его. Сервер проверит собственный ключ шлюза и уникальные ключи дочерних устройств выбранного аккаунта, исключив устройства с явно другим родителем. Проверяется один адрес RFC1918, протоколы 3.3–3.5, до 16 ключей и около 30 секунд; одновременно выполняется одна проверка. Автоматического сканирования сети нет. В 3.4/3.5 подтверждением служит защищённое согласование, в 3.3 — расшифрованный ответ. Ответ 3.1 не доказывает ключ. Результат не подтверждает имя устройства по этому IP или родителя датчика: их пользователь выбирает по фактической конфигурации. Ключ остаётся на сервере и сохраняется в Device только после явного сохранения; шлюз без собственных DPS сохраняется с пустыми capabilities. Смена аккаунта, удаление источника или смена ключа/явного родителя блокирует сохранение.
-
-API под тем же `X-API-Key`:
-
-- `POST /api/v1/commissioning` — `{draft: DeviceCreate, mode: "local"|"cloud", provider: "sharing"|"developer"|null, discover_gateway_key?: boolean}`. Если указан provider, метаданные и отсутствующий local_key берутся на сервере из выбранного аккаунта. Никакой Device пока не создаётся. Переданные capabilities должны быть пустыми.
-- Для поиска ключа передайте `discover_gateway_key: true`, `mode: "local"`, выбранный `provider`, `draft.is_gateway: true`, IP и предпочтительную версию (3.3–3.5 или null), без `draft.local_key`. Устройство должно иметь категорию шлюза в Tuya. После успешной проверки ответ содержит `gateway_verification: {ip, version, key_source: "device"|"child"}` и обычный `session_id`. Ключ не возвращается, связь child/parent не создаётся. Эту сессию можно сразу проверить и сохранить; `/samples` для неё недоступен.
-- `POST /api/v1/commissioning/{session_id}/samples` — `{action: "observe"|"power"|"brightness"|"temperature"|"color"|"sensor"|"button"}`. Только status; выбор действия не отправляет команду. Возвращает `readings`, `changes`, `sample_count`, срок и интервал. Поле `can_write` означает проверенный номер/формат. Интерфейс включает все такие функции при нажатии «Сохранить функции» на экране опроса, без отдельного шага проверки и флажков разрешения.
-- `POST /api/v1/commissioning/{session_id}/register` — название, aliases, building_id/room_id, `reviewed: true`, необязательный список ключей параметров `writable`. Требует хотя бы одной успешной выборки с показаниями или подтверждённой проверки ключа шлюза; неизвестные или неоднозначные DP нельзя включить для записи. После сохранения сессия закрывается.
-- `DELETE /api/v1/commissioning/{session_id}` — отменить без сохранения.
-
-Сессии в памяти ограничены 15 минутами, 16 одновременными, 64 параметрами и 100 изменениями; используйте один worker. Частые выборки получают 429, истёкшие сессии — 404. Смена выбранного аккаунта блокирует чтение и регистрацию старой сессии. Для Zigbee локальный опрос и регистрация требуют существующего direct Wi-Fi gateway + cid; root IP/key/version берутся из шлюза. Local_key не возвращается. Локальные показатели сохраняются с фактическим временем чтения; облачные значения не заполняют локальный кеш/capabilities. История изменений остаётся временной. Этот этап обязателен для нового UI-пути, существующие REST CRUD/import сохраняют совместимость.
-
-Пример для подключённого аккаунта и Wi-Fi лампы (идентификаторы/адрес замените своими; ключ из аккаунта остаётся на сервере):
-
-```sh
-export BASE=http://127.0.0.1:8000/api/v1
-export TOKEN='replace-with-a-long-random-token'
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"draft":{"name":"Новая лампа","device_id":"your-device-id","ip":"192.168.1.40","version":"3.5"},"mode":"local","provider":"sharing"}' \
-  "$BASE/commissioning"
-# Возьмите session_id из ответа. Первый status — исходная выборка.
-export OBSERVATION='session-id-from-response'
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"action":"observe"}' "$BASE/commissioning/$OBSERVATION/samples"
-# Переключите лампу вручную; между запросами ждите минимум 3 секунды.
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"action":"power"}' "$BASE/commissioning/$OBSERVATION/samples"
-# После просмотра результатов сохраните. Без writable всё будет только для чтения.
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Новая лампа","aliases":["new_lamp"],"reviewed":true,"writable":[]}' \
-  "$BASE/commissioning/$OBSERVATION/register"
-```
-
-## Пример: здание, комната, Wi-Fi и Zigbee
-
-Ниже пример для **пустой базы**; числовые `id` берите из реальных ответов. IP, device_id, ключи и cid в примере вымышленные. Эти ключи нужны только для демонстрации структуры.
-
-```sh
-export BASE=http://127.0.0.1:8000/api/v1
-export TOKEN='replace-with-a-long-random-token'
-
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Дом","address":"Warsaw"}' "$BASE/buildings"
-
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Кухня","building_id":1}' "$BASE/rooms"
-
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  --data-binary @examples/relay-type.json "$BASE/device-types"
-
-# Wi-Fi напрямую: API id=1
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Розетка","device_id":"demo_wifi_outlet","room_id":1,"device_type_id":1,"ip":"192.168.1.40","version":"3.3","local_key":"fedcba9876543210"}' \
-  "$BASE/devices"
-
-# Gateway: API id=2
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Tuya gateway","device_id":"demo_gateway","building_id":1,"is_gateway":true,"ip":"192.168.1.20","version":"3.5","local_key":"0123456789abcdef"}' \
-  "$BASE/devices"
-
-# Zigbee child: API id=3. Собственные IP и local_key ему не нужны.
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Zigbee реле","device_id":"demo_zigbee_relay","room_id":1,"device_type_id":1,"transport":"zigbee","parent_id":2,"cid":"0011223344556677"}' \
-  "$BASE/devices"
-
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/buildings/1/hierarchy"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/2/children"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices?room_id=1"
-
-# Реальные LAN-команды — выполняйте после замены тестовых реквизитов.
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/1/status"
-curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/devices/3/commands/on"
-curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/devices/3/commands/off"
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"dps":{"1":true}}' "$BASE/devices/3/commands/set_dps"
-
-# Явный номер DP, если capability switch ещё не настроена:
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"dp":"1"}' "$BASE/devices/3/commands/on"
-
-# Переназначение/отвязывание и удаление:
-curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"room_id":null,"building_id":null}' "$BASE/devices/1"
-curl -sS -X DELETE -H "X-API-Key: $TOKEN" "$BASE/devices/1"
-```
-
-## TinyTuya и gateway
-
-Для Wi-Fi создаётся `tinytuya.Device(device_id, ip, local_key, version=...)`. Для Zigbee создаётся gateway с его IP, ключом и версией, затем `tinytuya.Device(child_device_id, parent=gateway, cid=child_cid)`. Собственные IP/ключ/версия child не используются для соединения. Это соответствует [официальному Gateway / Sub-Device API TinyTuya](https://github.com/jasonacox/tinytuya/blob/master/API.md#gateway--sub-device-pattern).
-
-Версия протокола задаётся явно: 3.1/3.2/3.3/3.4/3.5. Импорт без версии допустим для инвентаря, но управление вернёт 409 до заполнения IP, ключа и версии **прямого устройства/шлюза**. Автоматический сетевой discovery в сервис не включён: используйте TinyTuya scan и импорт snapshot, либо DHCP reservation и PATCH IP.
-
-Для наблюдения за переподключением есть отдельный `python tools/capture_tuya.py --seconds 900`: приватная запись исходных UDP-пакетов, декодирование discovery и список IP/версий без опроса и управления. Запуск, остановка и ограничения: [docs/packet-capture.md](packet-capture.md).
-
-На один запрос открывается одно соединение, выполняется команда и соединение закрывается. Операции gateway и всех его children выполняются последовательно внутри одного процесса. Другие программы или Tuya-приложения могут конкурировать за LAN-соединение устройства.
-
-Ответ команды содержит только `device_id` (API id), `command`, `acknowledged`, `dps`, `observed_at`. `acknowledged=true` означает пригодный ответ протокола, но не гарантирует физическое исполнение. Пустой ACK возвращается с `dps:{}`. Запрошенные значения не подставляются как подтверждённые; `last_dps` обновляется только реально полученными DPS. `last_seen_at` — время последнего пригодного ответа; `last_dps` — накопленный кэш последних наблюдений, отдельные значения могут быть старыми. `GET /devices/{id}` читает инвентарь/кэш и не опрашивает сеть.
-
-При ошибке/тайм-ауте после отправки результат физического действия может быть неизвестен. При сбое БД после успешной LAN-команды физическое действие также могло произойти. Проверяйте статус перед повтором. Некоторые спящие Zigbee-датчики не отвечают на polling: для них нужен будущий постоянный receive loop/event ingestion. Matter-шлюзы и отдельные firmware могут не поддерживать локальный Tuya-протокол; наличие parent/cid само по себе не обещает совместимость оборудования.
-
-## Capabilities, brightness/color/temperature
-
-Карта capability связывает смысловое имя с DPS и типом значения. Карта устройства перекрывает одноимённые записи DeviceType; остальные записи наследуются. Номера DPS не угадываются по категории или имени устройства.
-
-Пример типа лампы: [`examples/bulb-type.json`](../examples/bulb-type.json). Он иллюстрирует распространённые DP 20–24, но требует проверки на вашей модели. Включение/выключение использует `switch`; без этой capability или явно заданного `dp` API вернёт 409. `set_dps` — низкоуровневый доступ, обходящий ограничения карты capabilities; он проверяет формат номера DP и JSON, но ответственность за корректность payload остаётся у вызывающего.
-
-Поддерживаются `boolean`, `integer`, `number`, `string`, `object`, `readable`, `writable`, `minimum`, `maximum`, `enum`, `unit`, `encoding`. `readable` — описание свойства; status возвращает сырые DPS независимо от него. Для чтения смысловых значений клиент использует карту capabilities и полученные DPS.
-
-- `brightness` и `temperature` передают **сырые значения диапазона вашей модели**. Автоматического перевода процентов или Kelvin нет. Для термостата задайте отдельную capability, например `target_temperature`, с правильным DP и единицей. Не смешивайте её с цветовой температурой лампы.
-- `color` с `encoding=tuya_hsv` принимает `{"h":0..360,"s":0..1000,"v":0..1000}` и кодирует 12 hex-символов. Старые модели с другим кодированием используйте через `encoding=raw` с `type=string` или `set_dps`.
-- Для ламп режим `white`/`colour` задаётся отдельно через capability `mode`, если этого требует устройство. Автоматического переключения режимов нет.
-
-```sh
-# Создать тип и назначить существующей реальной лампе:
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  --data-binary @examples/bulb-type.json "$BASE/device-types"
-# Далее подставьте реальные id вместо 10 (лампа) и 2 (тип).
-curl -sS -X PATCH -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"device_type_id":2,"capabilities":{}}' "$BASE/devices/10"
-
-curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"value":"white"}' "$BASE/devices/10/capabilities/mode"
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"value":500}' "$BASE/devices/10/commands/brightness"
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"value":300}' "$BASE/devices/10/commands/temperature"
-curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"value":"colour"}' "$BASE/devices/10/capabilities/mode"
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"value":{"h":120,"s":1000,"v":500}}' "$BASE/devices/10/commands/color"
-```
-
-## Импорт devices.json / snapshot.json
-
-Поддерживается список объектов или оболочка `{"devices":[...]}`. Для идентификатора принимаются `id`, `device_id`, `gwId`; ключа — `key`, `local_key`; версии — `version`, `ver`; child — `cid`, `node_id`; родителя — `parent`, `gateway_id`, `parent_device_id`. В исходных TinyTuya-файлах parent содержит строковый Tuya ID шлюза, который преобразуется в числовой `parent_id` базы.
-
-Записи объединяются по Tuya device ID. Snapshot дополняет/обновляет IP, версию и доступные реквизиты. Пустые поля не стирают существующие реквизиты. В snapshot могут отсутствовать children; они сохраняются из devices.json. Дополнительное поле `aliases` импортируется для устройств: отсутствие сохраняет текущие алиасы, `[]` очищает. Конфликт алиасов откатывает весь импорт. `data`, DPS snapshot и произвольные raw/cloud поля не импортируются: старый снимок не считается текущим статусом. Capabilities настраиваются отдельно после импорта. См. [формат snapshot TinyTuya](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/scanner.py) и [parent-поля wizard](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/wizard.py).
-
-Импорт — upsert, повторный запуск не создаёт дубликаты. Явные поля размещения в запросе применяются ко всем импортируемым устройствам; не переданные сохраняются. Родители обрабатываются до children независимо от порядка строк; упомянутые прямые устройства помечаются шлюзами. Если parent неизвестен, импорт не угадывает его по ключу: передайте `parent_map` или исправьте `parent` в источнике. Нет parent/cid, конфликт идентификаторов или неверные поля — откат **всего** импорта. `dry_run=true` выполняет проверки и откатывает изменения; на новой базе таблицы всё равно создаются.
-
-CLI, без работающего HTTP-сервера:
-
-```sh
-# requirements.txt достаточно для вызова модуля:
-python -m smarthome.cli --devices examples/devices.example.json \
-  --snapshot examples/snapshot.example.json --dry-run
-python -m smarthome.cli --devices examples/devices.example.json \
-  --snapshot examples/snapshot.example.json
-
-# Реальные файлы, с размещением (существующие room/type) и уточнением родителя:
-python -m smarthome.cli --devices devices.json --snapshot snapshot.json \
-  --room-id 1 --device-type-id 1 --parent-map examples/parent-map.example.json
-
-# Можно установить проект и использовать короткую команду:
-python -m pip install .
-smart-home --devices devices.json --snapshot snapshot.json --dry-run
-```
-
-Импорт по API не требует multipart-зависимостей и принимает уже прочитанный JSON. Чтобы собрать тело из двух файлов без jq:
-
-```sh
-python -c 'import json; from pathlib import Path; print(json.dumps({"devices":json.loads(Path("examples/devices.example.json").read_text()),"snapshot":json.loads(Path("examples/snapshot.example.json").read_text()),"dry_run":True}))' \
-  > /tmp/smart-home-import.json
-curl -sS -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  --data-binary @/tmp/smart-home-import.json "$BASE/imports/tinytuya"
-# После проверки для реального импорта замените dry_run на false.
-rm /tmp/smart-home-import.json
-```
-
-## Ключи и данные
-
-`local_key` — write-only поле: его можно создать, заменить через PATCH или очистить `null`. В обычных ответах, hierarchy, импорте и ошибках ключ не возвращается. Есть только `has_local_key`. Endpoint раскрытия ключа отсутствует. Gateway ключ используется для всех его children. Ключ должен содержать 16 печатных ASCII-символов. Исключения и сырые `Payload` TinyTuya не попадают в API-ответы; отладочное логирование TinyTuya не включено. IP — конкретный unicast IPv4, соответствующий LAN-транспорту TinyTuya; `0.0.0.0` не принимается, чтобы не запускать неявный discovery.
-
-SQLite хранит ключи в открытом виде, поэтому файл базы создаётся с правами 0600. Используйте `umask 077` для запуска, импорта и резервных копий; не кладите реальную базу или TinyTuya JSON в Git. Примеры содержат только вымышленные реквизиты. Отдельное шифрование секретов и роли пользователей — возможное дальнейшее расширение. Для резервной копии остановите сервис и скопируйте базу или используйте штатный SQLite backup API. `create_all` создаёт начальную схему и новые таблицы алиасов для обновления v0.1.0 → v0.2.0; изменение колонок в будущих версиях потребует отдельной миграции.
-
-## Orange Pi / OpenWrt
-
-На Orange Pi с Debian/Armbian используйте Python из дистрибутива и обычное виртуальное окружение. Пример systemd: [`deploy/smart-home.service`](../deploy/smart-home.service); создайте пользователя `smarthome`, каталог `/var/lib/smart-home` с его владельцем и правами 0700, положите проект/venv в `/opt/smart-home-service`. Токен можно задать в `/etc/smart-home-service.env` с правами 0600. После копирования unit запустите `systemctl daemon-reload` и `systemctl enable --now smart-home`. В примере bind остаётся `127.0.0.1`; для LAN измените его после настройки доступа.
-
-На OpenWrt используйте внешний накопитель/extroot или достаточную flash, Python 3.10+ и пакеты под **вашу архитектуру и libc**. Имена/доступность пакетов зависят от версии OpenWrt. Pydantic 2 требует `pydantic-core` с нативным расширением; PyCryptodome также имеет нативную часть. В опубликованном TinyTuya дистрибутиве есть и зависимость `cryptography`; на архитектуре без готового пакета/колеса её сборка может требовать Rust. Поэтому этот FastAPI-проект нельзя обещать установить простым pip на любой MIPS-роутер с 16/32 MB flash. Бюджет RAM/flash на настоящем MT7628 здесь не измерялся. При дефиците flash нужна собственная сборка OpenWrt и/или облегчённый native daemon.
-
-Пример procd: [`deploy/smart-home.init`](../deploy/smart-home.init). Он использует системный `/usr/bin/python3`; зависимости должны быть доступны этому Python. Скопируйте проект в `/opt/smart-home-service`, script в `/etc/init.d/smart-home`, задайте права 0755. Необязательный `/etc/smart-home-service.conf` — shell-файл с правами 0600, например:
-
-```sh
-SMART_HOME_DB=/opt/smart-home-service/data/smarthome.db
-SMART_HOME_API_TOKEN='replace-with-a-long-random-token'
-SMART_HOME_BIND=127.0.0.1
-SMART_HOME_PORT=8000
-SMART_HOME_SERVICE_USER=root
-```
-
-Затем `/etc/init.d/smart-home enable` и `/etc/init.d/smart-home start`. При наличии отдельного service user задайте его и выдайте права только на каталог данных. Примеры systemd/procd включены для установки на целевое устройство; в этом окружении они не запускались.
-
-## Проверки и дальнейшее расширение
-
-```sh
-python -m pip install -e '.[dev]'
-python -m pytest -q
-ruff check .
-```
-
-Тесты проверяют CRUD, hierarchy, ссылки и запрет удаления зависимостей, секреты, атомарный импорт/dry-run, Wi-Fi и gateway/cid, тайм-ауты, ACK без DPS, capability mapping и блокировку gateway. Для алиасов проверяются CRUD/поиск/команды, уникальность и откат конфликтов, удаление и повторное использование, импорт, авторизация и обновление существующей базы. Отдельные проверки создают реальные объекты TinyTuya и проверяют child payload для 3.3/3.4/3.5 без сетевого соединения. Реальное оборудование не подключалось. Фактические результаты и версии окружения — в `VERIFICATION.md`.
-
-Точки расширения: `tuya.py` — транспорт/receive loop, `service.py` — capability mapping и инварианты, `importer.py` — адаптер TinyTuya-файлов, `models.py` — хранилище. MQTT, расписания, сценарии, постоянный Zigbee event loop и multi-worker locks в первую версию не входят.
-
-## Версионирование
-
-Исходники хранятся в Git, основная ветка — `main`. Начальная версия отмечена тегом `v0.1.0`, поддержка алиасов — `v0.2.0`, поиск по названию — `v0.3.0`; изменения версий описаны в `CHANGELOG.md`. Базы данных, локальные настройки, реальные TinyTuya-файлы и виртуальные окружения исключены через `.gitignore`.
-
-```sh
-git status
-git log --oneline --decorate
-git show v0.3.0
-```
-
-Первый коммит создан от имени `Codex` с локальным техническим адресом `codex@localhost`. Перед своими коммитами задайте имя и email через `git config user.name` и `git config user.email`; глобальные настройки не менялись.
-
-Git bundle содержит исходники, историю и теги и позволяет восстановить репозиторий без удалённого сервера:
-
-```sh
-git clone smart-home-service-v0.3.0.bundle smart-home-service
-cd smart-home-service
-git log --oneline --decorate
-```
-
-ZIP содержит исходники соответствующего тега без служебного каталога `.git`; для сохранения истории используйте bundle.
-
-## Профили и нормализованное управление
-
-Сравнение LocalTuya, Tuya Local и официальной Tuya, реализованные категории и границы совместимости: [docs/integrations.md](integrations.md).
-
-```sh
-# Явно выбранный профиль; DPS нужно сверить с вашим устройством.
 curl -sS -H "X-API-Key: $TOKEN" "$BASE/profiles/bulb-v2"
-curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/kitchen_light/state?refresh=true"
+curl -sS -H "X-API-Key: $TOKEN" "$BASE/devices/desk_light/state?refresh=true"
 curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
   -d '{"values":{"switch":true,"color":{"h":120,"s":1000,"v":500}}}' \
-  "$BASE/devices/kitchen_light/commands/capabilities"
-# Белый режим и цветовая температура:
-curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"value":4600}' "$BASE/devices/kitchen_light/capabilities/color_temperature"
+  "$BASE/devices/desk_light/commands/capabilities"
 ```
 
-Новые capability поля: `read_dp`, `scale`, `offset`, `invert`, `raw_type`, `step`, `value_map`, `write_dps`; color encodings `tuya_hsv`, `tuya_rgbhsv`, `tuya_hsv_json`. Определения без этих полей сохраняют прежнюю семантику. На старте автоматически создаётся таблица наблюдений; каждая температура/влажность/статус имеет собственное время, ACK не обновляет показания.
+The batch endpoint validates conflicting values for the same DP before sending. Hardware may require separate writes even when a combined packet is valid. Read-only definitions cannot be written. Raw `set_dps` is a low-level interface for known device commands, not a guarantee of support for every vendor format.
 
-## Панели комнат и группы
+## Smart Life topology
 
-[docs/displays.md](displays.md): выбор комнаты и произвольного списка устройств/групп для отображения, сохранение конфигурации каждой панели, CRUD групп устройств с общим питанием, компактный dashboard, фоновое получение показаний и curl-примеры. Главный экран формируется из выбранного списка, показания и управление определяются capabilities. `SMART_HOME_DISPLAY_POLL_INTERVAL=30` задаёт период опроса выбранных устройств; `0` — только явный refresh.
+**Sync Smart Life** reads homes and each device's room through Sharing. Homes become buildings; rooms and device placement are matched by Tuya IDs. Cloud cards can use this placement before local registration.
 
-## Вход Tuya по QR
+`POST /cloud/topology/sync` starts a background job; `GET /cloud/topology` returns the saved topology and progress. Refreshes preserve manual names, aliases, and placement. Automatically placed devices follow later cloud moves until placement is changed manually. Existing dependency constraints still apply; skipped moves appear as warnings.
 
-Optional бесплатный Sharing SDK режим: [docs/qr-login.md](qr-login.md). После включения cloud extra и `SMART_HOME_CLOUD_ENABLED=1` откройте отдельный [React UI](../frontend/README.md): при первом подключении браузера сохраните адрес API и ключ в «Настройках подключения», затем User Code → QR → подтверждение в приложении. Ключ автоматически используется через скрытое поле; User Code и токены остаются на сервере. Сохранённый User Code скрыт за ссылкой «Хочу изменить». Токены и local_key остаются на сервере. Облачные команды и импорт метаданных доступны через REST API.
+A failed sync or account change does not partially replace the previous snapshot. Cache and jobs are account-scoped. Empty rooms cannot initially be discovered through this SDK; missing cloud entries do not automatically delete known rooms. This process does not change keys, IPs, capabilities, or Smart Life itself. Limits are 2,000 devices, 100 homes, and five minutes per job.
 
-Sharing получает отчёты открытых устройств через официальный MQTT SDK. React читает кеш сервиса каждые три секунды, пока форма управления видима; ручное обновление делает один HTTP-запрос выбранного устройства. Последние отчёты сохраняются в SQLite и не затираются старым HTTP-снимком. Время и источник показания видны в форме. Подробнее: [обновление статусов](status-updates.md).
+## Find, verify, and save local connections
 
-Второй способ на той же странице — **Access ID / Secret** проекта Tuya: выберите регион, отдельно сохраните реквизиты и нажмите «Проверить и подключить». Он работает с обычным `requirements.txt` при `SMART_HOME_CLOUD_ENABLED=1`, независимо от QR-сеанса. Сохранённые поля скрываются за «Хочу изменить», секреты остаются на сервере. Устройства, статус, функции, команды и импорт доступны с `provider=developer`; без него используется Sharing. Настройка проекта и curl-примеры: [docs/developer-login.md](developer-login.md).
+The [local connection wizard](../frontend/README.md#local-connections) uses separate discovery and save endpoints. A search never writes configuration automatically.
 
-Проверка публичного Smart Life Web после реального входа: [docs/smart-life-web.md](smart-life-web.md). Подтверждены доступ к списку/комнатам и связям шлюзов с дочерними устройствами; выдача `local_key` и `cid` веб-API пока не подтверждена.
+1. `POST /local-connections/find`: supply the exact `device_id`, `provider`, and `interface_address` selected from `/network/interfaces`. `discovery_seconds` is 3–12, default 8.
+2. Review the returned device preview, proposed `action`, changed fields, verified route, and `finding_id`. Key values are never returned.
+3. `POST /local-connections/save` with `{"finding_id":"returned-id","confirmed":true}` saves only that verified preview. Confirmation must be the Boolean `true`.
 
-Полное объявленное управление лампами, команды светомузыки/переходов, стандартные Raw-расписания v0, память питания и сохранение ручных связей с ID/code/DP обеих сторон описаны в [docs/device-linkage.md](device-linkage.md). Сопоставления `remote`/`zigbee_group`/`multi_control` хранятся в SQLite и не применяют привязки в Smart Life; чтение существующих привязок через Sharing пока недоступно.
+The compatible `/gateways/find` and `/gateways/save` pair handles gateways. Results expire after five minutes, are single-use, and are limited to 16 pending results. Expiration, reuse, or a server restart requires a new search. Before saving, the service rechecks the account, network, key source, connection, and unchanged record.
 
+Direct devices use only their own authorized key. Zigbee routing requires an explicit cloud gateway ID or an existing local parent; matching names, equal keys, or `sub=true` do not prove a parent relationship. Child requests configure the verified gateway connection, not an invented direct connection to the sensor. Gateway keys may be available in authorized child metadata but still require verification against the physical gateway.
 
-## Видео камер
+Discovery matches an exact Tuya ID in the selected subnet, then verifies the key by reading through supported local protocols. Existing names, aliases, placement, capabilities, and child links are preserved; only verified connection fields are updated. No switching commands are sent. Allow at least 50 seconds for the gateway search and bounded verification operations.
 
-Настройки камеры сгруппированы по изображению, обнаружению и записи; названия и стандартные режимы переведены. [Сравнение с референсом Smart Life и границы поддержки](camera-controls.md).
+Errors include 404 for no announcement/expired result, 409 for inconsistent or changed configuration, 429 for discovery throttling, 503 for unavailable ports, and 504 for verification timeout. The LAN packet page remains independent of Smart Life; the separate local connection setup explicitly uses an authorized account.
 
-На главной карточке камеры доступны приватность, обнаружение движения, обнаружение звука и сирена, если API устройства объявляет эти переключатели доступными для управления. Изменения отправляются сразу, без «Применить». В подробном плеере показываются разрешение HD/SD, состояние воспроизведения, скорость загрузки последнего видеосегмента и доступное показание Wi-Fi. Выбор качества использует реальные варианты HLS; если вариант один, переключение недоступно. Sharing не предоставляет отдельную команду HD/SD или отдельный запрос Wi-Fi. «Нет данных» не заменяется предполагаемыми процентами сигнала.
+## Commissioning and imports
 
-Камеры Tuya категорий `sp` и `dghsxj` получают значок камеры и кнопку «Видео» на главной плитке. Кнопка «Видео» раскрывает небольшой прямой эфир внутри главной плитки; сворачивание останавливает его. При открытии подробной карточки просмотр на плитке останавливается. В подробной карточке «Смотреть видео» запускает HLS-плеер; «Остановить», закрытие карточки и скрытие вкладки прекращают загрузку видео. Совместимые браузеры используют лениво загружаемый hls.js; при отсутствии MediaSource используется встроенный HLS. Звук изначально выключен, его можно включить в плеере. Микрофон и запись видео не используются.
+The optional commissioning endpoints collect device samples before registration. Observed changes alone do not identify a DP's purpose. Confirmed metadata can supply known writable capabilities; unknown DPS remain read-only. The obsolete per-function approval screen is no longer required by the UI.
 
-`POST /api/v1/cloud/devices/{device_id}/stream?provider=sharing|developer` проверяет принадлежность устройства текущему аккаунту и категорию камеры, затем запрашивает временный HTTPS-адрес HLS только у выбранного подключения. Ответ защищён обычным ключом API и `Cache-Control: no-store`; адрес не сохраняется в БД. При истечении адреса или ошибке воспроизведения пользователь запускает подключение заново. Для Developer нужны соответствующие права сервиса видео Tuya.
+TinyTuya JSON import accepts devices and an optional snapshot, upserts by physical device ID, and handles parents before children. It never guesses a missing gateway from shared keys. A child needs a real parent and `cid`/`node_id`. Alias conflicts and invalid links roll back the entire import. `dry_run:true` validates and rolls back without changing inventory.
 
-Sharing использует `Manager.get_device_stream_allocate`, Developer — [официальный метод выдачи видеопотока](https://developer.tuya.com/en/docs/cloud/2ccd66883c?id=Kam7q5a9ug8b1). В приложении проверено воспроизведение Sleep Cam (640×360); HTTPS HLS-манифест доступен с CORS для браузера.
+```sh
+python -m smarthome.cli --devices examples/devices.example.json \
+  --snapshot examples/snapshot.example.json --dry-run
+```
+
+Use `POST /imports/tinytuya` for already-parsed JSON. Cloud imports use `/cloud/imports/local-inventory` with `device_ids`, optional explicit `parent_map`, and `dry_run`. Secrets go directly to the database, not the API response. WAN addresses are not imported as local IPs; missing usable fields preserve existing connection settings. Old snapshot DPS are not treated as fresh observations.
+
+## Security, backup, and errors
+
+`local_key` is write-only: supply it at creation, replace it through PATCH, or clear it with `null`. Responses expose only `has_local_key`. A key is 16 printable ASCII characters. Device and session secrets are stored unencrypted on the server; use private file permissions and private backups. The database is created with mode 0600. Keep real exports, databases, `.env`, and sessions out of Git.
+
+Back up SQLite through its backup API or stop the service before copying its database. Include Tuya session files separately. Existing Docker data survives container recreation; do not use `down -v` when preserving data. Schema startup creates missing tables; future column changes require migrations.
+
+| HTTP status | Meaning |
+| --- | --- |
+| 401 | Invalid/missing service key |
+| 404 | Object or pending result not found |
+| 409 | Conflict, ambiguity, or missing required configuration |
+| 422 | Invalid fields, links, or capability values |
+| 502 | Tuya failure or unusable device response |
+| 503 | Busy device/gateway, database, or unavailable listener |
+| 504 | Device/verification timeout |
+
+Validation errors identify fields and error types without reflecting secret input. A timeout leaves the physical command outcome unknown. See [status updates](status-updates.md), [activity logs](device-activity.md), [camera controls](camera-controls.md), [groups and displays](displays.md), and [deployment](../deploy/docker.md).
+
+## Endpoint index
+
+This index is generated from the application's OpenAPI routes. Consult the live `/docs` for exact schemas and optional parameters.
+
+### Buildings
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/buildings` | Add Building |
+| GET | `/api/v1/buildings` | List Buildings |
+| GET | `/api/v1/buildings/{item_id}` | Read Building |
+| PATCH | `/api/v1/buildings/{item_id}` | Edit Building |
+| DELETE | `/api/v1/buildings/{item_id}` | Delete Building |
+| GET | `/api/v1/buildings/{item_id}/rooms` | Building Rooms |
+| GET | `/api/v1/buildings/{item_id}/hierarchy` | Hierarchy |
+
+### Rooms
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/rooms` | Add Room |
+| GET | `/api/v1/rooms` | List Rooms |
+| GET | `/api/v1/rooms/{item_id}` | Read Room |
+| PATCH | `/api/v1/rooms/{item_id}` | Edit Room |
+| DELETE | `/api/v1/rooms/{item_id}` | Delete Room |
+| GET | `/api/v1/rooms/{item_id}/devices` | Room Devices |
+
+### Profiles
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/profiles` | List Profiles |
+| GET | `/api/v1/profiles/{identifier}` | Read Profile |
+
+### Device types
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/device-types` | Add Type |
+| GET | `/api/v1/device-types` | List Types |
+| GET | `/api/v1/device-types/{item_id}` | Read Type |
+| PATCH | `/api/v1/device-types/{item_id}` | Edit Type |
+| DELETE | `/api/v1/device-types/{item_id}` | Delete Type |
+
+### Devices
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/devices` | Add Device |
+| GET | `/api/v1/devices` | List Devices |
+| GET | `/api/v1/devices/{item_id}` | Read Device |
+| PATCH | `/api/v1/devices/{item_id}` | Edit Device |
+| DELETE | `/api/v1/devices/{item_id}` | Delete Device |
+| GET | `/api/v1/devices/{item_id}/children` | Children |
+
+### Control
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/devices/{item_id}/state` | Normalized State |
+| POST | `/api/v1/devices/{item_id}/commands/capabilities` | Set Capabilities |
+| POST | `/api/v1/devices/{item_id}/commands/status` | Status |
+| GET | `/api/v1/devices/{item_id}/status` | Status |
+| POST | `/api/v1/devices/{item_id}/commands/on` | Turn On |
+| POST | `/api/v1/devices/{item_id}/commands/off` | Turn Off |
+| POST | `/api/v1/devices/{item_id}/commands/set_dps` | Set Dps |
+| PUT | `/api/v1/devices/{item_id}/capabilities/{capability}` | Capability Value |
+| POST | `/api/v1/devices/{item_id}/commands/brightness` | Brightness |
+| POST | `/api/v1/devices/{item_id}/commands/color` | Color |
+| POST | `/api/v1/devices/{item_id}/commands/temperature` | Temperature |
+
+### Import
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/imports/tinytuya` | Import Devices |
+
+### Search
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/lookup/buildings` | Buildings Lookup By Name |
+| GET | `/api/v1/lookup/rooms` | Rooms Lookup By Name |
+| GET | `/api/v1/lookup/devices` | Devices Lookup By Name |
+| GET | `/api/v1/lookup/device-types` | Device-Types Lookup By Name |
+| GET | `/api/v1/lookup/buildings/alias` | Buildings Lookup By Alias |
+| GET | `/api/v1/lookup/rooms/alias` | Rooms Lookup By Alias |
+| GET | `/api/v1/lookup/devices/alias` | Devices Lookup By Alias |
+
+### Aliases
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/buildings/{item_id}/aliases` | Buildings Aliases |
+| POST | `/api/v1/buildings/{item_id}/aliases` | Buildings Add Alias |
+| DELETE | `/api/v1/buildings/{item_id}/aliases/{alias}` | Buildings Delete Alias |
+| GET | `/api/v1/rooms/{item_id}/aliases` | Rooms Aliases |
+| POST | `/api/v1/rooms/{item_id}/aliases` | Rooms Add Alias |
+| DELETE | `/api/v1/rooms/{item_id}/aliases/{alias}` | Rooms Delete Alias |
+| GET | `/api/v1/devices/{item_id}/aliases` | Devices Aliases |
+| POST | `/api/v1/devices/{item_id}/aliases` | Devices Add Alias |
+| DELETE | `/api/v1/devices/{item_id}/aliases/{alias}` | Devices Delete Alias |
+
+### Groups
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/groups` | Create Group |
+| GET | `/api/v1/groups` | List Groups |
+| GET | `/api/v1/groups/{group_id}` | Read Group |
+| PATCH | `/api/v1/groups/{group_id}` | Edit Group |
+| DELETE | `/api/v1/groups/{group_id}` | Delete Group |
+| GET | `/api/v1/groups/{group_id}/state` | Read Group State |
+| POST | `/api/v1/groups/{group_id}/commands/{command}` | Group Command |
+
+### Displays
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/displays` | List Displays |
+| GET | `/api/v1/displays/{display_id}` | Read Display |
+| PUT | `/api/v1/displays/{display_id}` | Save Display |
+| DELETE | `/api/v1/displays/{display_id}` | Delete Display |
+| GET | `/api/v1/displays/{display_id}/rooms` | Display Rooms |
+| GET | `/api/v1/displays/{display_id}/options` | Display Options |
+| GET | `/api/v1/displays/{display_id}/dashboard` | Read Dashboard |
+| POST | `/api/v1/displays/{display_id}/refresh` | Refresh Display |
+
+### Cloud
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/cloud/status` | Cloud Status |
+| GET | `/api/v1/cloud/developer/status` | Developer Status |
+| PUT | `/api/v1/cloud/developer/credentials` | Developer Credentials |
+| DELETE | `/api/v1/cloud/developer/credentials` | Developer Logout |
+| POST | `/api/v1/cloud/developer/connect` | Developer Connect |
+| PUT | `/api/v1/cloud/user-code` | Save User Code |
+| POST | `/api/v1/cloud/login/qr` | Begin Login |
+| GET | `/api/v1/cloud/login/{session_id}/qr.svg` | Qr Code |
+| POST | `/api/v1/cloud/login/{session_id}/confirm` | Confirm Login |
+| DELETE | `/api/v1/cloud/session` | Logout |
+| GET | `/api/v1/cloud/devices` | Devices |
+| POST | `/api/v1/cloud/imports/local-inventory` | Import Local Inventory |
+| GET | `/api/v1/cloud/devices/{device_id}/status` | Cloud Device Status |
+| GET | `/api/v1/cloud/devices/{device_id}/functions` | Cloud Device Functions |
+| PUT | `/api/v1/cloud/devices/{device_id}/channel-labels` | Save Channel Labels |
+| POST | `/api/v1/cloud/devices/{device_id}/commands` | Cloud Commands |
+| GET | `/api/v1/cloud/scenes` | Cloud Scenes |
+| GET | `/api/v1/cloud/devices/{device_id}/mappings` | List Mappings |
+| POST | `/api/v1/cloud/devices/{device_id}/mappings` | Create Mapping |
+| PUT | `/api/v1/cloud/devices/{device_id}/mappings/{mapping_id}` | Update Mapping |
+| DELETE | `/api/v1/cloud/devices/{device_id}/mappings/{mapping_id}` | Delete Mapping |
+| GET | `/api/v1/cloud/topology` | Get Topology |
+| POST | `/api/v1/cloud/topology/sync` | Sync Topology |
+| GET | `/api/v1/cloud/devices/{device_id}/aliases` | Read Aliases |
+| PUT | `/api/v1/cloud/devices/{device_id}/aliases` | Save Aliases |
+
+### Camera
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/cloud/devices/{device_id}/stream` | Camera Stream |
+
+### Commissioning
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/commissioning` | Start |
+| POST | `/api/v1/commissioning/devices/{device_id}` | Start Existing |
+| POST | `/api/v1/commissioning/{token}/samples` | Sample |
+| DELETE | `/api/v1/commissioning/{token}` | Cancel |
+| POST | `/api/v1/commissioning/{token}/register` | Register |
+
+### Network
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/network/devices/{device_id}/watch` | Start Watch |
+| GET | `/api/v1/network/watches/{watch_id}` | Read Watch |
+| DELETE | `/api/v1/network/watches/{watch_id}` | Stop Watch |
+| GET | `/api/v1/network/interfaces` | List Interfaces |
+| POST | `/api/v1/network/scans` | Start Scan |
+| GET | `/api/v1/network/scans/{scan_id}` | Read Scan |
+| DELETE | `/api/v1/network/scans/{scan_id}` | Stop Scan |
+| POST | `/api/v1/network/scans/{scan_id}/discover` | Discover Scan |
+
+### Gateways
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/gateways/find` | Find |
+| POST | `/api/v1/gateways/save` | Save |
+
+### Local connections
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| POST | `/api/v1/local-connections/find` | Find Connection |
+| POST | `/api/v1/local-connections/save` | Save Connection |
+
+### Activity
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/api/v1/activity/devices/{device_id}` | History |
+
+### System
+
+| Method | Path | Operation |
+| --- | --- | --- |
+| GET | `/health` | Health |

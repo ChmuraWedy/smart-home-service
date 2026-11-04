@@ -1,46 +1,14 @@
-# Продолжение на Mac mini
+# Continue development on another Mac
 
-Проект уже хранится в локальном Git. Удалённый Git-сервер не настроен. Для переноса кода с полной историей можно использовать Git bundle; база, ключи и авторизация находятся в игнорируемом `data/` и в bundle не попадают.
+The repository contains source code and examples; runtime secrets and databases are kept separately. A new checkout alone does not restore the home's credentials or history.
 
-## Код и запуск
+1. Clone the repository and select the required branch.
+2. Create a Python virtual environment and install `.[cloud,dev]` as described in the [quick start](../README.md#development).
+3. Install the frontend's declared Node.js/pnpm versions, install its locked dependencies, and start the frontend separately from the API.
+4. Transfer private settings, a consistent SQLite backup, and Tuya session files through a private channel only when that machine should use the same deployment. Preserve private file permissions and keep those files ignored by Git.
+5. Export the standalone API's environment settings. Update browser API URL/key and CORS origins for the new computer. A browser's localhost address refers to that computer, not the old server.
+6. Verify health and authorized inventory before using device controls. Select the new machine's real LAN interface for discovery; old addresses can be stale.
 
-Скопируйте подготовленный `smart-home-service.bundle` на Mac mini и выполните:
+Use one active service instance/worker for local command locking. Do not run two collectors against shared runtime files or copy a live SQLite file inconsistently. Use SQLite backup or stop the source service. Do not overwrite a working target database with an example import.
 
-```sh
-mkdir -p ~/Projects
-git clone /path/to/smart-home-service.bundle ~/Projects/smart-home-service
-cd ~/Projects/smart-home-service
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install '.[cloud]'
-umask 077
-export SMART_HOME_DB="$PWD/data/smarthome.db"
-export SMART_HOME_CLOUD_ENABLED=true
-export SMART_HOME_API_TOKEN='replace-with-a-long-random-token'
-export SMART_HOME_CORS_ORIGINS='http://127.0.0.1:5173,http://localhost:5173'
-python -m uvicorn smarthome.main:app --host 127.0.0.1 --port 8765 --workers 1
-```
-
-Python 3.10+; для сборки React нужна версия Node.js из `frontend/package.json` и pnpm 11.19.0. В другом терминале:
-
-```sh
-cd ~/Projects/smart-home-service/frontend
-pnpm install --frozen-lockfile
-VITE_API_BASE_URL=http://127.0.0.1:8765 pnpm dev
-```
-
-Откройте `http://127.0.0.1:5173`, сохраните ключ доступа к этому API, выполните QR-вход в Smart Life и синхронизацию комнат. Для локальных команд Mac mini должен иметь доступ к сети Tuya-устройств. Собранный frontend можно раздавать статически: [frontend/README.md](../frontend/README.md).
-
-Для сохранения существующего инвентаря переносится согласованная резервная копия SQLite. QR-сеанс можно восстановить новым входом либо отдельно перенести приватный файл авторизации; пути задаются через переменные из [.env.example](../.env.example). Действующий тестовый экземпляр использует `data/qr-check/`; эти файлы не входят в Git. Не копируйте работающий SQLite обычным файловым копированием: используйте SQLite backup или сначала остановите API. Не публикуйте базу, файлы ключей, дампы пакетов или облачные токены в репозитории.
-
-## Перенос текущего чата Codex
-
-Согласно [документации удалённых подключений Codex](https://learn.chatgpt.com/docs/remote-connections), существующий чат и его Git-состояние можно передать на подключённый хост:
-
-1. Настройте SSH-доступ к Mac mini. Установите и авторизуйте Codex на нём; команда `codex` должна быть доступна в login shell.
-2. В приложении откройте **Settings → Connections**, подключите SSH-хост и сохраните проект той же Git-репозитории на Mac mini. Подкаталог проекта на обеих сторонах должен соответствовать.
-3. Внизу текущего чата выберите место выполнения, затем Mac mini и **Hand off**. Если назначения нет, проверьте подключение и наличие подходящего сохранённого проекта.
-
-Hand off переносит чат и Git-состояние; файлы из игнорируемого `data/`, установленные зависимости и работающие процессы сервиса требуют отдельного переноса/запуска. Агент не может перенести сам себя из текущего чата: действие запускается в интерфейсе или из другого чата. Наличие bundle само по себе не подключает Mac mini к Codex. Bundle — локальная копия репозитория для восстановления; после клонирования его файловый `origin` можно заменить на общий удалённый репозиторий, когда его адрес будет выбран.
-
-Work Cloud с доступом к компьютеру имеет отдельный режим: документация описывает его для новых задач после включения синхронизации. Для продолжения **этого существующего чата** используйте Hand off; не рассчитывайте, что открытие Work на другом компьютере само перенесёт локальную базу и процессы.
+A transferred confirmed Sharing session can survive restart; changing a browser origin requires saving its service access key again. Developer credentials and a validated in-memory connection are separate. Device local keys stay server-side. [Deployment](../deploy/docker.md) explains the Docker/Dell path and per-deployment key rotation.

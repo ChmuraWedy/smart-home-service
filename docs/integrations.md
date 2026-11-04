@@ -1,47 +1,34 @@
-# Сравнение Tuya-интеграций и совместимость
+# Integration choices and device compatibility
 
-Проверено 2026-10-07. LocalTuya: `59c95cd06c2696afc98f6bc52d5fa060f3c517da`; Tuya Local: `908c133d110a80d9b8dca7da76d55b9017aa62cf`. Источники используются для исследования; файлы интеграций и их каталоги не скопированы в проект.
+Research snapshot: 7 October 2026. LocalTuya revision `59c95cd06c2696afc98f6bc52d5fa060f3c517da`; Tuya Local revision `908c133d110a80d9b8dca7da76d55b9017aa62cf`. Their catalogs were studied, not copied into this project.
 
-| Интеграция | Транспорт и настройка | Что берём в сервис |
-|---|---|---|
-| [LocalTuya](https://github.com/rospogrigio/localtuya) | LAN, вручную выбранные DPS; push статуса, optional cloud для ключей | Каналы реле, яркость с диапазонами, инверсия штор, scaling температур, enum режимы |
-| [Tuya Local](https://github.com/make-all/tuya-local) | TinyTuya, каталог конфигураций конкретных продуктов; optional QR cloud для настройки | Явные профили, read-only датчики, подмена значений, отдельные DPS записи/обратной связи, gateway + node_id |
-| [Официальная Tuya](https://www.home-assistant.io/integrations/tuya/) | Облако, User Code + QR; `tuya-device-sharing-sdk` | Сравнение возможностей и отдельный optional cloud adapter; не обязательная зависимость локального управления |
+| Integration | Approach | Relevant ideas |
+| --- | --- | --- |
+| [LocalTuya](https://github.com/rospogrigio/localtuya) | LAN, selected DPS, status push, optional cloud key lookup | Relay channels, scaled brightness/temperature, inverted covers, enums |
+| [Tuya Local](https://github.com/make-all/tuya-local) | TinyTuya with product-specific configurations | Explicit profiles, read-only sensors, separate write/feedback DPS, gateway/child routing |
+| [Official Home Assistant Tuya](https://www.home-assistant.io/integrations/tuya/) | Cloud User Code/QR and Sharing SDK | Optional cloud adapter independent of local control |
 
-Платформы LocalTuya в [const.py](https://github.com/rospogrigio/localtuya/blob/59c95cd06c2696afc98f6bc52d5fa060f3c517da/custom_components/localtuya/const.py): binary_sensor, climate, cover, fan, light, number, select, sensor, switch, vacuum. Tuya Local дополнительно содержит платформы humidifier, water_heater, remote/infrared, lock, button, siren, valve и другие; наличие платформы не означает поддержку каждого товара.
+A category or integration platform does not prove support for every product. Sharing functions/status ranges can be incomplete; a cloud access token is not a device local key.
 
-Официальная интеграция зависит от функций, раскрываемых SDK; `status`, `status_range`, `function` могут оказаться пустыми. Это ограничение описано в [официальной документации HA](https://www.home-assistant.io/integrations/tuya/). Её облачный токен и локальный ключ устройства — разные данные. [Manifest](https://github.com/home-assistant/core/blob/dev/homeassistant/components/tuya/manifest.json) указывает `cloud_push`; [config_flow](https://github.com/home-assistant/core/blob/dev/homeassistant/components/tuya/config_flow.py) сохраняет access/refresh tokens после сканирования QR.
+## Implemented concepts
 
-## Реализованные варианты
+- Relay/outlet/multi-channel Boolean switches and combined DPS writes.
+- Dimmers with explicit ranges and scaling.
+- RGBCCT HSV16, RGB+HSV8, and JSON HSV, with mode companion writes.
+- Covers with open/close/stop, inverted position, and separate feedback DP.
+- Fan power, oscillation, and enum speed.
+- Thermostat targets/modes with scale, offset, and step.
+- Read-only temperature, humidity, motion, presence, and separate voltage/current/power readings.
+- Humidifier targets/power, explicit vacuum clean/pause/dock commands, and write-only button pulses.
 
-| Вариант | Поддержка / тест |
-|---|---|
-| Реле, розетка, многоканальный выключатель | boolean `switch` или `switch_1..3`; единый DPS пакет нескольких каналов |
-| Dimmer | Числовая яркость с масштабом и допустимым диапазоном |
-| RGBCCT v1/v2/JSON | RGB+HSV8, HSV16, JSON HSV; режим `colour` отправляется вместе с цветом, `white` — вместе с белой яркостью/цветовой температурой |
-| Шторы | open/close/stop, инверсия позиции; `read_dp` для отдельного feedback DPS |
-| Вентилятор | Enum скорости, oscillation, питание |
-| Термостат | Температура с scale/offset/step, питание, enum режимы |
-| Температура/влажность/движение/presence | Нормализованное чтение и read-only capabilities; неизвестное показание не превращается в false/0 |
-| Энергомониторинг | Отдельные DPS voltage/current/power с масштабом; упакованные бинарные meter frames пока требуют отдельного декодера |
-| Увлажнитель | Целевая влажность и питание |
-| Пылесос | Явные enum команды clean/pause/dock; карты уборки и vendor-протоколы не реализованы |
-| Кнопка | Write-only импульс; ACK не создаёт фиктивного наблюдаемого состояния |
+These concepts have controlled-transport direct Wi-Fi and parent/cid tests. Those tests do not certify each physical product. Packed energy frames, vacuum maps, vendor IR learning, secure lock operations, and arbitrary vendor payloads need dedicated adapters. [Camera streaming](camera-controls.md) is a separate supported cloud path, not a generic local capability adapter.
 
-Все команды этих вариантов проверены через прямой Wi-Fi и через parent + cid Zigbee на управляемом тестовом транспорте. Также проверены режимы ламп, отказ до отправки при конфликтующих DPS, read-only, недопустимые значения, неизвестный ответ датчика и независимая свежесть DPS. Форматы цвета сверены с установленным TinyTuya. Это программные проверки, **не испытание каждого физического устройства**.
+## Profiles and units
 
-Профили `GET /api/v1/profiles` — примеры явных карт DPS. Автоматического определения по `category` нет. Их номера и диапазоны нужно сверить с реальными `devices.json.mapping`, snapshot/живым status и документацией товара. Например, [RGBCW Tuya Local](https://github.com/make-all/tuya-local/blob/908c133d110a80d9b8dca7da76d55b9017aa62cf/custom_components/tuya_local/devices/rgbwc_lightbulb.yaml) описывает DPS 20–24, а [TH05Z](https://github.com/make-all/tuya-local/blob/908c133d110a80d9b8dca7da76d55b9017aa62cf/custom_components/tuya_local/devices/th05z_temphumidity.yaml) — температуру DPS 1 с делением на 10 и влажность DPS 2. Даже направление цветовой температуры может различаться: у профиля `bulb-v2` по умолчанию прямой диапазон 2700–6500 K; для товара с обратным диапазоном включите `invert:true`.
+`GET /api/v1/profiles` lists explicit example DP maps. There is no universal automatic mapping by category. Verify numbers, formats, and ranges against the product, live status, and trustworthy metadata.
 
-`scale` нашего сервиса означает `API = raw * scale + offset`. В Tuya Local поле scale используется как делитель — его нельзя механически скопировать. У `minimum`, `maximum`, `step` единицы API, а `raw_type:integer` округляет обратное преобразование до сырого целого tick. Для boolean `invert` меняет true/false; для чисел отражает диапазон minimum..maximum.
+Our scaling is `API = raw * scale + offset`; another integration's divisor-style `scale` cannot be copied directly. Limits and step use API units. Integer raw writes round to a tick. Boolean inversion flips truth values; numeric inversion reflects the defined range. `read_dp`, reversible `value_map`, and constant `write_dps` support separate feedback, enums, and mode writes.
 
-`value_map` — список `{value:...,raw:...}` с однозначным обратным чтением; `write_dps` добавляет необходимые постоянные режимы в тот же пакет. `POST /devices/{ref}/commands/capabilities` принимает `{values:{capability:value,...}}`. Конфликт значений одного DPS отклоняется до отправки. Для устройств, требующих только одного DPS в пакете, используйте отдельные операции с подходящей паузой; совместимость пакетной записи нужно подтвердить на товаре. [Tuya Local описывает эти различия](https://github.com/make-all/tuya-local/blob/908c133d110a80d9b8dca7da76d55b9017aa62cf/README.md).
+Normalized color uses hue 0–360, saturation/value 0–1000. White brightness normally uses percent, and a declared temperature profile can use Kelvin. Change HSV value for color-mode brightness; the separate white brightness capability can select white mode. Legacy definitions without conversion fields retain their original units.
 
-Для яркости в цветном режиме меняйте `v` в capability color; профиль brightness управляет белым режимом. Объект HSV в API: h=0..360, s/v=0..1000. Уровень brightness обычно 1..100%, color_temperature в K. Старые определения без scale/offset сохраняют прежние сырые единицы.
-
-## Датчики и свежесть
-
-`GET /devices/{ref}/state` возвращает только сохранённые показания; `?refresh=true` запрашивает status. Каждый capability содержит value, known, stale, observed_at. На стороне БД добавляется таблица `device_observations`; старые last_dps остаются, но свежесть не выдумывается без наблюдения.
-
-ACK команды не доказывает новую физическую позицию/включение. Новый DPS влажности не обновляет timestamp температуры. Sleeping Zigbee датчик может не отвечать на опрос: экран должен показать неизвестное/устаревшее значение. Для таких устройств нужен фактический push через gateway или облачные события; периодический опрос сам по себе не гарантирует получение событий движения.
-
-Камеры/видеопотоки, защищённое отпирание замков, binary/base64 vendor payload, IR learning, условия сложных конфигураций Tuya Local и некоторые нестандартные RGB-форматы не покрываются готовыми адаптерами. `set_dps` остаётся низкоуровневым интерфейсом для известных команд, но не является обещанием полной поддержки этих категорий.
+Batch capability writes reject conflicting DP values before sending. Some products still require separate packets; validate that behavior on hardware. Cached state includes independent known/stale/timestamp fields. Neither ACK nor a fresh humidity value refreshes an old temperature observation. Sleeping Zigbee sensors may need real gateway/cloud reports rather than polling.

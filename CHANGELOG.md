@@ -1,238 +1,181 @@
-# История версий
-
-## После 0.8.3 — 2026-11-04
-
-- В ветке `feat/themes-and-detail-header` добавлены системная, тёмная и дневная темы с общими палитрами, сохранением выбора, обновлением при смене темы ОС и синхронизацией вкладок. Заголовок подробной карточки вынесен из прокручиваемого содержимого; действия справа получили одинаковые SVG-значки без рамок и область нажатия 44px. На телефонах переключатели и обновление показаний больше не перекрываются.
-
-- Добавлен завершающий шаг развёртывания Dell `deploy/activate-dell.py`: новый случайный ключ API при каждом развёртывании, синхронизация локального и серверного `.env`, проверка авторизации и откат ключа/образа при сбое. Ключи не выводятся; резервные файлы закрыты и исключены из Git.
-
-- В ветке `feat/localisation-be` поверх польской локализации добавлена Беларуская: 1 002 сообщения, даты `be-BY`, определение языка браузера и сохранение выбора. Общие проверки охватывают все четыре языка.
-
-- В ветке `feat/localisation-pl` добавлен Polski: полный каталог интерфейса, определение языка браузера, даты, сохранение выбора и синхронизация вкладок. Переключение между языками сохраняет черновики и исходные значения команд.
-
-- В ветке `feat/localisation` добавлены English / Русский, выбор языка в шапке, язык браузера по умолчанию, сохранение предпочтения и синхронизация вкладок. Общий каталог охватывает экраны управления, значения параметров, камеру, мастера, сетевые страницы и известные ошибки сервиса. При смене языка сохраняются черновики; имена, алиасы, идентификаторы и команды не переводятся.
-
-- Приложение развёрнуто на Dell Wyse 5070 с Debian 13: `http://homeassistant.dom:8080`. Перенесены девять локальных устройств и сессия Smart Life; проверены доступ из домашней сети, авторизация, реальные IoT-интерфейсы и сохранность соединений после перезапуска.
-
-- Добавлена Docker-сборка React и Python API с nginx, единым адресом интерфейса/API, обязательным ключом, постоянным volume, healthcheck и корректной остановкой обоих процессов. Compose публикует веб-порт 8080; отдельный Linux LAN override позволяет использовать реальные интерфейсы Dell 5070 для обнаружения устройств. Секреты и локальная база исключены из контекста сборки.
-
-
-## После 0.8.3 — 2026-10-13
-
-- Убран отдельный экран «Проверьте результаты» и флажки разрешения функций. Сохранение доступно прямо на экране опроса после получения показаний и включает все проверенные функции; неизвестные параметры остаются только для чтения. Нажатие «Сохранить» подтверждает запись.
-
-- В мастере настройки функций все проверенные функции выбраны для локального управления по умолчанию. Отдельные флажки можно снять; выбор сохраняется при продолжении опроса. Неизвестные параметры остаются только для чтения, а запись требует финального подтверждения.
-
-- У добавленных локальных устройств без функций появилась кнопка «Настроить функции» вместо инструкции использовать REST API. Опрос сохранённого подключения сопоставляет реальные DP со схемой выбранного Tuya-аккаунта; разрешение управления и сохранение требуют отдельного подтверждения. Обновляются функции существующей записи без дубликата, смены имени, алиасов, комнаты, адреса или ключа. Изменение подключения/родителя/схемы блокирует устаревший просмотр; неизвестные параметры остаются только для чтения.
-
-- Найденные в мастере устройства показаны таблицей с общим флажком в заголовке и промежуточным состоянием выбора. Отдельные кнопки выбора/снятия и поле поиска на итоговом шаге убраны. Результаты успешного сохранения содержат ссылки на локальные карточки. Карточкам назначены стабильные ID; адрес `#device/<Tuya ID>?route=local|sharing|developer` открывает нужное устройство после перезагрузки и при навигации по истории, без переключения на другой способ управления при ошибке.
-
-- Страница локальных подключений переделана в мастер: сеть и флажок перенастройки уже настроенных устройств → поиск LAN-объявлений за 15 секунд → выбор реально найденных устройств и проверка их ключей → отдельное подтверждение сохранения → результаты и список оставшихся ненастроенных устройств. Сопоставление только по точному ID выбранного аккаунта, до 16 подключений за проход; отмена закрывает приёмник. Сохранение не запускается поиском, повтор записи при ошибке не отправляется автоматически.
-
-## После 0.8.3 — 2026-10-12
-
-- На странице локальных подключений по умолчанию скрыты настроенные устройства; добавлены поиск по имени/алиасам, счётчики и кнопка «Показать настроенные» с отдельной группой для повторной проверки. Неполные локальные записи и устройства только с облачным ключом остаются в списке требующих настройки. После сохранения список обновляется сразу.
-
-- В меню ☰ добавлена отдельная страница «Локальные подключения»: выбор авторизованного аккаунта, настоящего устройства и сетевого интерфейса, поиск и проверка ключа, предварительный просмотр и отдельное подтверждённое сохранение. Смена выбора, отмена и истечение пяти минут блокируют сохранение старого результата. Для Zigbee явно показан фактический шлюз. Страница «Сеть и пакеты» сохраняет независимость от Smart Life.
-
-- Добавлены общие `/api/v1/local-connections/find` и `/save` для поиска и подтверждённого назначения ключей Wi-Fi устройствам и шлюзам. Для Wi-Fi проверяется только собственный ключ. Запрос Zigbee-устройства направляется на шлюз лишь при явной или уже сохранённой связи; ключ и связи самого ребёнка не изменяются. Предварительный просмотр показывает фактическое устройство, которому назначается ключ.
-
-- Backend-настройка шлюза разделена на `POST /api/v1/gateways/find` (поиск, проверка и предварительный просмотр без записи) и `POST /api/v1/gateways/save` (сохранение только с `finding_id` и `confirmed: true`). Результат действует 5 минут, используется один раз и хранит ключ только на сервере. Перед сохранением повторно проверяются соединение и неизменность показанных данных. Прежний автоматически сохраняющий `/gateways/setup` удалён.
-
-- Карточка локального шлюза без собственных параметров поясняет, что показания и управление доступны в карточках дочерних устройств; сообщение о ненастроенных возможностях больше не мешает завершённой настройке шлюза.
-
-- Добавлено меню ☰ и независимая страница «Сеть и пакеты»: выбор фактического сетевого интерфейса и ручной приём LAN-объявлений Tuya/mDNS/SSDP только из его подсети, ARP-соседи, IP/MAC/ID/сервисы, журнал и изменения адресов. Без обращения к Smart Life, подстановки облачных названий или догадок о Zigbee-связях. Отдельный стандартный UDP-запрос Tuya и локальный JSON-отчёт для дальнейшего анализа; сеанс останавливается при уходе или скрытии вкладки.
-
-- В мастере шлюза добавлен поиск отсутствующего local_key среди ключей дочерних устройств выбранного Tuya-аккаунта. Проверка одного подтверждённого IP через TinyTuya 3.3–3.5 выполняется только чтением; ключ остаётся на сервере. Подтверждённый шлюз без собственных DPS можно сохранить после проверки пользователя. Смена аккаунта или источника ключа блокирует сохранение, связь датчика со шлюзом не угадывается.
-
-- Для шлюзов, категория которых получена из Smart Life, в мастере закреплён тип «Tuya шлюз»; исключены неподходящие варианты Wi-Fi устройства и дочернего Zigbee устройства. При ручном добавлении выбор типа сохранён.
-
-- Возобновлена настройка TRACER FOCUS 3: восстановлены быстрые параметры и кнопка локального подключения. Удалён список отложенных устройств, заданный по названиям.
-
-- Возобновлена настройка WorkGtZb: убрана пометка об отложенной настройке и восстановлена кнопка локального подключения. Шлюзы категории `wg2` открываются как шлюзы, включая возвращаемые Sharing с `sub=true`. TRACER FOCUS 3 остаётся отложенным.
-
-- В мастере подключения Zigbee список шлюзов включает реальные шлюзы из выбранного аккаунта Smart Life, даже если Sharing помечает сам шлюз `sub=true`. Ненастроенный шлюз можно проверить и сохранить, затем вернуться к датчику с сохранёнными полями. Связь датчика со шлюзом не угадывается; пустой список объясняет причину и предлагает ручную настройку.
-
-- Мастер «Добавить в дом» переименован в «Настроить локальное подключение»: пояснено, что устройства Smart Life уже доступны, а проверка нужна только для отдельного управления по домашней сети. На плитке используется значок сети вместо плюса.
-
-- С главного экрана убраны повторный заголовок «Управление устройствами» и вводное пояснение; список устройств и фильтры комнат теперь расположены сразу под навигацией.
-
-- Кнопка приватности в подробной карточке показывает состояние «Включена» / «Выключена» вместо действия без контекста. Включённая приватность блокирует запуск видео в карточке, мини-превью и редакторе области; приложение объясняет причину. Текущий просмотр и незавершённый запрос останавливаются. После команды выключения просмотр ждёт подтверждения камеры и запускается пользователем.
-
-## После 0.8.3 — 2026-10-11
-
-- Добавлены пояснения по «i» к настройкам камеры: назначения из экранов Smart Life, уровни чувствительности и функции карты памяти. Проверка Sharing SDK и документации Tuya уточнила смысл `humanoid_filter`: фильтр событий человека, без подтверждения условий подписки конкретной модели. Подсказки доступны у заблокированных настроек и помещаются в экран. Текст «⌃ Свернуть» заменён компактной стрелкой с доступным названием.
-
-- Приватность камеры стала кнопкой рядом с видео на плитке и рядом с запуском просмотра в подробностях. Исправлено расположение времени и обновления у тумблеров. Запись без готовой карты и форматирование без карты заблокированы; сохранённое включение записи не означает фактическую запись. Подсказка обнаружения человека учитывает отсутствие сведений о подписке в API. По дополнению к референсу добавлен редактор прямоугольной области с перемещением, изменением размера и сохранением в общий черновик.
-
-- Переключатели камеры размещены в двух рядах с общим отступом основных контролов. Нажатие на свободную область плитки устройства или группы открывает подробности; кнопки, подписи переключателей, выбор подключения и видеоплеер сохраняют свои действия. Во время отправки команды переход блокируется.
-
-- Четыре быстрых переключателя камеры размещены в одном ряду. В подробной карточке приватность стала отдельной кнопкой, пояснение обнаружения человека перенесено под «i», форматирование карты памяти — отдельная команда с подтверждением удаления записей и защитой от повторной отправки.
-
-- Главная карточка камеры получила четыре быстрых переключателя: приватность, движение, звук и сирена. Команда отправляется сразу через выбранное подключение; другие настройки камеры остаются в подробной карточке. В плеере подробной карточки отображаются фактическое разрешение, воспроизведение/буферизация и скорость загрузки сегментов. HD/SD выбирается только из предоставленных HLS-вариантов; для единственного потока переключение недоступно. Уровень Wi-Fi показывается при наличии соответствующего числового показания камеры, иначе — «Нет данных».
-
-- Настройки камер сопоставлены с референсом Smart Life: переведены стандартные названия и значения режимов, добавлены группы изображения, обнаружения и записи. Отображаются только параметры устройства; неизвестные сохранены в дополнительном разделе. Коды, допустимые значения и отправка только изменённых настроек сохранены. Возможности, пока недоступные в приложении, описаны в `docs/camera-controls.md`.
-
-- Кнопка «Видео» на главной карточке камеры раскрывает компактный прямой эфир без перехода в подробную карточку. Сворачивание, переход к подробностям и скрытие вкладки останавливают просмотр.
-
-- Добавлен просмотр видео камер Tuya: кнопка «Видео» на главной плитке, HLS-плеер в подробной карточке, запуск и остановка по запросу. Закрытие карточки или скрытие вкладки освобождает плеер. Временный адрес получается через выбранное подключение, не сохраняется в БД; ошибки не раскрывают секреты. Камеры получают соответствующий значок.
-
-- На главных карточках датчиков оставлены значки и значения без подписей. В подробных карточках и подсказках названия параметров сохранены.
-
-- Таймеры каналов доступны только в подробной карточке; с главных плиток убраны кнопки часов и редакторы таймеров.
-
-- Уменьшен отступ под строкой комнаты и статуса; убраны лишние вертикальные отступы основных переключателей в плитках.
-
-- Уменьшены верхний отступ плиток и высота строки комнаты и статуса сети, включая сенсорные экраны.
-
-- Кнопка обновления главной плитки расположена справа снизу; соседние действия не перекрываются.
-
-- Комната, статус сети и батарея перенесены в правый верхний угол главной плитки, над основными переключателями или показаниями.
-
-- Главные плитки перестроены в три строки: значок и основные переключатели или показания; название с алиасами; комната и статус связи. Переход к подробной карточке и добавление в локальный дом представлены компактными значками. Сохранены оба канала, таймеры, батарея и выбор способа управления.
-
-## После 0.8.3 — 2026-10-10
-
-- Световой эффект, светомузыка и переход света открываются в мастерах с описанием, параметрами и проверкой; «Готово» сохраняет черновик для общего применения. Во всех мастерах крестик справа сверху, отмена и навигация закреплены снизу. В подробных карточках сведения о подключении расположены по центру шапки, кнопки справа сверху; повторная верхняя подпись провайдера убрана.
-
-- В подробных карточках восстановлена подпись «Алиасы:» слева от тегов и кнопки добавления.
-
-- В шапке подробной карточки явно показаны комната, физическое подключение, выбранный путь управления и состояние связи. Все четыре поля видны без открытия ⓘ; всплывающая справка сохраняет пояснения.
-
-- На плитках убраны информационные подписи пути подключения, комната сохранена; у датчиков возвращены русские названия температуры и влажности. Справка о подключении открывается поверх подробной карточки, закрывается по Escape и нажатию снаружи. Тумблеры сближены с названиями, алиасы каналов расположены под подписью. Кнопка часов раскрывает таймер соответствующего канала на плитке и в подробной карточке; сворачивание сохраняет черновик, команда содержит только изменённый таймер.
-
-- Поддерживаемые устройством мастера расписаний света выделены в открытый раздел, отдельно от эффектов. Режимы и расписания берутся только из метаданных конкретного устройства. Название канала служит кликабельной подписью тумблера без повторного «Включено/Выключено»; неизвестное и устаревшее состояние остаётся обозначено. Обновление перенесено вправо вверх плиток и подробных карточек.
-
-- Минимальная ширина плиток 340 px с адаптацией к узкому экрану; число колонок определяется доступной шириной. Убрана видимая подпись «Алиасы:» у тегов устройств и каналов. Кнопка ⓘ в подробной карточке объясняет комнату, подключение устройства, выбранный путь управления и статус связи.
-
-- Компактные плитки: название, комната и подключение в шапке, значки по типу устройства, показания датчиков — иконки со значениями. На плитках ламп и выключателей остаётся питание, отправляемое сразу без «Применить»; остальные настройки в подробной карточке. TRACER FOCUS 3 и WorkGtZb отложены без автоматической загрузки быстрых контролов.
-
-- Основные параметры и показания вынесены прямо в плитки устройств: общая кнопка применения, прежние проверки и выбранный способ управления. Метаданные подгружаются для видимых карточек; автообновление не опрашивает физические устройства, при прокрутке черновики сохраняются.
-- «Закрыть» заменено доступным крестиком с областью нажатия 44×44; возврат в группу — стрелкой. Фильтры журнала соответствуют возможностям устройства: у датчиков температуры больше нет неподходящего «Движение».
-
-- Суточный ритм, случайное расписание, пробуждение и свет перед сном редактируются во всплывающих мастерах с описаниями: повторение, точки, проверка. «Готово» готовит черновик для общего «Применить», отмена сохраняет прежние данные. Питание и логические параметры объединены в один переключатель; выбор цвета и раскрытие точных настроек сдвинуты вправо.
-- Постоянный журнал показаний и команд: для движения открыт первым разделом, для остальных устройств свёрнут. Sharing принимает отчёты при закрытых карточках; снимки, реальные отчёты и результат команды различаются. История начинается после подключения, хранит последние 2000 событий, поддерживает фильтры и загрузку более ранних записей.
-- Батарея отображается справа сверху открытой карточки и под состоянием сети в списке. Показания Bath2 temperature переведены и компактно размещены с иконками; отсутствующая единица батареи не подменяется процентами. Девять новых серверных и десять интерфейсных проверок.
-
-- Одна кнопка «Применить» на карточку: все изменённые значения проверяются и отправляются одним запросом; возврат к исходному значению отменяет правку, отказ сохраняет черновики. Режим света отправляется без повторов. По умолчанию «Цвет» содержит только выбор цвета, точные ползунки раскрываются через «···» в той же строке. Восемь новых проверок пакетного применения.
-- Компактные строки управления без рамок отдельных параметров: кнопки и значения рядом с названием, маленькое редактируемое числовое значение по центру над ползунком. Выбор цвета расположен рядом с заголовком «Цвет», три цветовых ползунка — ниже. Для ламп применены тёмный фон и голубые акценты по доступному текстовому описанию Smart Life; справка о показаниях свёрнута.
-- Редактирование алиаса остаётся внутри границы тега; сохранение, удаление и отмена заменены доступными кнопками-иконками.
-
-
-- Алиасы устройств и каналов редактируются прямо в строке: «Алиасы:», карандаш каждого тега и «+». Поддержаны Unicode, русский, белорусский и польский, включая поиск и проверку повторов после нормализации.
-- Состояние после подачи питания, подсветка выключателя и импульсный режим перенесены в дополнительные настройки. Ползунки и числовые поля объединены в строки, цветовые ползунки расположены рядом под выбором цвета. Убраны повторные подписи отчётов и диапазонов; время показания и обновление находятся справа сверху.
-- Таймер, яркость, температура и режим сохраняют выбранное значение при возврате старого облачного кеша после команды, пока не придёт подтверждение. Ручные сопоставления явно обозначены как записи нашей базы и перенесены в технические данные.
-- Облачный флаг offline больше не блокирует явную отправку команды при противоречивых статусах Tuya. Отказ Tuya 2001 показывается как отсутствие связи с устройством; команды не повторяются автоматически.
-
-## После 0.8.3 — 2026-10-09
-
-- Строка алиасов под названием устройства позволяет создавать, изменять и удалять теги прямо в карточке. Теги под названием в карточке и списке, поиск по алиасу. Для зарегистрированных устройств используется существующее хранилище алиасов; облачные устройства не требуют импорта в дом. Названия Smart Life и алиасы каналов сохраняют прежнее назначение.
-- Наблюдение за Tuya UDP discovery из карточки облачного или локального устройства: обнаруженный IP, последнее объявление и история изменений. Zigbee отслеживается по известному шлюзу; неизвестный шлюз не угадывается. Приём прекращается после закрытия карточки, потери связи с интерфейсом или 15 минут. Сохранённые IP не изменяются.
-- Локальные алиасы каналов облачного выключателя сохраняются в SQLite отдельно для каждого Tuya-аккаунта и устройства. Редактор в карточке и восстановление при повторном открытии; алиасы отображаются тегами под каналами, сохраняя основные подписи каналов, таймеров и параметров сопоставлений. Пустое поле удаляет алиас. Сохранение не отправляет команды и не переименовывает канал в Smart Life.
-- Русские названия подсветки выключателя, состояния после подачи питания, таймеров каналов и импульсного режима. Значения состояния питания переведены в интерфейсе; исходные коды команд сохранены. Добавлены пояснения и русское обозначение секунд.
-
-## После 0.8.3 — 2026-10-08
-
-- React: единый список устройств и групп в «Управлении», объединение локальных/Sharing/Developer записей по Tuya Device ID, комнаты/алиасы из нашей базы, явный выбор способа управления в одной карточке. «Подключения» содержит настройки входа и ключа сервиса; импорт не нужен для показа облачных устройств. Сбой источника не скрывает другие, просмотр не опрашивает LAN и не загружает функции каждого устройства, команды не повторяются через другой источник. Семь дополнительных frontend-проверок.
-- React: выбранная яркость/температура больше не сбрасывается после принятия команды, если Tuya не возвращает показание параметра; неизвестное фактическое значение по-прежнему отображается отдельно. Две проверки воспроизводят лампу с шестью функциями и статусом только питания.
-- React: обычные свойства лампы показывают тип и способ подключения; коды функций и известные DP перенесены в отдельный свёрнутый раздел для настройки связей. Отсутствующие номера DP не показываются как ошибка и не подставляются. Добавлена проверка разделов свойств.
-- Sharing: лёгкая загрузка инвентаря без четырёх дополнительных запросов на каждое устройство; определения по выбранному устройству и один HTTP-запрос его статуса. Приём официальных MQTT-отчётов, защита от старых сообщений/HTTP-снимков, отметки времени каждого параметра, сохранение последних отчётов в SQLite по аккаунту и очистка при logout. Остановка без удалённого отзыва Tuya-сеанса; запоздалое обновление токена не восстанавливает logout. Семь новых backend-проверок.
-- React: автообновление открытой Sharing-формы из кеша сервиса раз в три секунды, без фонового HTTP-опроса Tuya. Источник и время показаний, сохранение черновиков полей, отмена и защита от запоздалых ответов. Две новые frontend-проверки. Реальный отчёт второго канала выключателя принят после переключения владельцем и сохранён после перезапуска.
-- Облачные метаданные функций и readonly диапазонов показывают известные номера DP без приватного local_strategy. Добавлен CRUD ручных сопоставлений remote/zigbee_group/multi_control с ID/code/DP обеих сторон, изоляцией аккаунтов и проверкой соответствий. Эти записи не создают привязки в Smart Life и не исполняют команды.
-- React: редакторы световых JSON по схеме устройства, шагов сцен, памяти питания и стандартных Raw-расписаний Tuya v0; base64 fallback для иных форматов. Светомузыка/переход — команды без показания; диапазоны конкретной лампы имеют приоритет. Список ручных связей в обеих карточках, выбор входящего/исходящего направления и номеров кнопок/DP. Семь новых backend и 12 frontend проверок; новые runtime-зависимости не добавлены.
-
-- Страница подключений React явно показывает восстановленный Tuya-сеанс и объясняет сохранённую на сервере авторизацию. Подключённому аккаунту предлагается загрузить устройства; повторный вход остаётся отдельным действием.
-- PIR-датчики в React показывают понятное состояние движения с индикатором, readonly свойства подключения и время получения облачного снимка. Неизвестное состояние не считается отсутствием движения; legacy батарея без единицы не превращается в проценты. Четыре проверки воспроизводят реальные определения readonly PIR/батареи и обновление без команд.
-- В настройках React сохранённый ключ сервиса скрыт за сообщением и «Хочу изменить», как User Code. Пустое поле замены, отмена без запросов и автоматический ввод отдельного ключа при смене адреса API; проверенная замена по-прежнему сохраняется только после авторизации.
-- React: управление облачными устройствами обоих провайдеров и локальными устройствами/группами, фильтры здания/комнаты, поиск по имени/алиасам, generic Boolean/число/enum/HSV/String/JSON, readonly датчики и возраст показаний. Отдельный опрос после ACK, отчёт частичной команды группы, блокировка дубликатов и отсутствие автоматических повторов; 29 новых frontend-проверок, включая изоляцию инвентаря при смене сервера.
-- Облачные ответы статуса и функций дополнены readonly `status_range`: масштаб/единица датчика не превращаются в writable функцию. Добавлены две backend-проверки приватности/чтения/авторизации.
-- Для указанной ESP32-2432S028 / XXSR69 с двумя USB-разъёмами начальным профилем сборки выбран `cyd-028r-st7789`. Описаны неопределённость ревизии, альтернативный ILI9341 и прямое подключение LVGL-панели к API после отделения React UI.
-- Страница Tuya перенесена из Python в самостоятельный React + TypeScript + Vite frontend: свой запуск и сборка, настраиваемый адрес API, сохранённый доступ через скрытое поле, QR/User Code и независимый Developer-вход, список и поиск устройств.
-- API поддерживает явный список CORS origins и необязательный redirect `/cloud` к отдельному UI. Встроенная HTML-страница и её включение в Python wheel удалены; обязательных новых Python-зависимостей нет.
-- 13 новых backend-проверок границы UI/API и 20 frontend-проверок; независимая статическая сборка и API проверены в браузере с вымышленными Tuya-данными. Документация описывает два процесса и раздачу готового UI без Node.js на устройстве.
-
-## После 0.8.3 — 2026-10-07
-
-- Отдельная проверка первого подключения нового Wi-Fi устройства: новая запись Sharing API сопоставлена с UDP discovery по Device ID и времени активации; local_key доступен через аккаунт, в записанных объявлениях отсутствует. Приватные данные остаются вне Git.
-- Отдельный приёмник Tuya UDP discovery для наблюдения за переподключением: исходные пакеты и декодированные payload в приватном каталоге вне Git, список IP/version, без опроса и управления. Семь тестов декодирования и безопасной записи; отчёт реальной записи трёх Wi-Fi ламп и пульта.
-- Второй способ Tuya-подключения через Access ID / Access Secret: независимые реквизиты `0600`, выбор семи регионов, отдельное сохранение и проверка, без замены QR-сеанса. Страница скрывает сохранённые поля за «Хочу изменить».
-- REST Developer-авторизация и явный `provider=developer` для устройств, статуса, функций, команд и импорта parent/cid. Стандартный HTTPS/HMAC-клиент без нового SDK, таймауты, проверка ACK и отсутствие повторов команд. Добавлены 32 теста.
-- Страница Tuya скрывает поле сохранённого User Code; ссылка «Хочу изменить» открывает ввод нового кода. Для первого входа поле появляется после проверки ключа доступа к сервису.
-- Отдельные кнопки «Сохранить ключ доступа» и «Сохранить User Code». Проверенный ключ сохраняется в браузере, оба сохранённых поля скрыты за ссылками изменения и автоматически восстанавливают своё состояние после перезагрузки.
-- `PUT /api/v1/cloud/user-code` сохраняет код на сервере до QR-входа. Новый код используется следующим QR-сеансом; текущий аккаунт и его токены заменяются только после подтверждения входа. Старые файлы сеансов поддерживаются.
-- Сохранённый ключ доступа автоматически используется через скрытое поле; настройка ключа перенесена в свёрнутые «Настройки подключения». На обычной форме остаётся только User Code, проверка авторизации API сохраняется.
-- Уточнён отчёт Sharing SDK: два общих ключа в дочерних записях являются кандидатами на ключи двух шлюзов, хотя строки самих шлюзов не содержат ключа. Соответствие требует проверки LAN; автоматического назначения ключей/родителей нет.
+# Changelog
+
+Entries below describe the changes at the stated date; later entries can supersede earlier intermediate UI behavior.
+
+## After 0.8.3 — 2026-11-04
+
+- Added actual Polish bulb and Belarusian motion-sensor localization examples, with English documentation captions. Renamed overview headings and screenshot assets by device type rather than installation-specific rooms.
+
+- Replaced the Russian documentation with English guides and an OpenAPI-derived endpoint index. Expanded the README into seven individually visible screenshots, including Workroom bulb color controls and WC2 motion status/activity.
+- Added a project overview, setup instructions, and real-device screenshot gallery; moved the detailed API reference out of the root README.
+- `feat/themes-and-detail-header`: System, Dark, and Day palettes, persisted choice, OS updates, and cross-tab synchronization. Detail headers no longer scroll with content. Header SVG actions are consistently borderless with 44px targets; mobile toggles no longer overlap refresh controls.
+- Added `deploy/activate-dell.py`: a new random service key on every deployment, synchronized private local/Dell environment files, authorization/health checks, and key/image rollback. Keys are not printed and backups are excluded from Git.
+- `feat/localisation-be`: Belarusian localization added over Polish, with 1,002 messages at introduction, `be-BY` dates, browser detection, and persistence. Shared checks cover all four languages.
+- `feat/localisation-pl`: complete Polish catalog, browser language, dates, persistence, and cross-tab changes without losing drafts or changing command values.
+- `feat/localisation`: English/Russian header selection, browser defaults, persistence, and cross-tab updates across controls, values, cameras, wizards, network pages, and known errors. Names, aliases, identifiers, and commands retain their original values.
+- Deployed on Dell Wyse 5070 / Debian 13, migrated nine local devices and the Smart Life session, and verified LAN access, authorization, IoT interfaces, and restart preservation.
+- Added a React/Python/nginx Docker image with one web/API address, required key, persistent volume, health check, and coordinated shutdown. Compose uses port 8080; a Linux LAN override exposes real host interfaces. Secrets and runtime databases are excluded from build context.
+
+## After 0.8.3 — 2026-10-13
+
+- Removed the separate function-review screen and permission checkboxes. Save is available directly after readings arrive and includes all verified functions; unknown parameters remain read-only. Saving still confirms the write.
+- In the preceding iteration, verified functions were selected by default and optional deselection survived further sampling.
+- Added function setup for existing local records without capabilities, using actual DPS and the selected account's schema. It updates the existing record without changing identity, name, aliases, room, connection, or key. Changed connection/parent/schema invalidates stale previews.
+- Discovery results became a table with a header checkbox and partial-selection state. Removed separate select-all/clear actions and final-step search. Successful results link to local device cards.
+- Added stable card IDs and `#device/<Tuya ID>?route=local|sharing|developer` deep links, reload/history support, and explicit errors rather than route substitution.
+- Reworked local setup into a wizard: interface/reconfigure choice, 15-second LAN observation, actual discovered-device selection, key verification, separate save confirmation, and results/unconfigured items. Exact account IDs only, up to 16 connections per pass, receiver cleanup on cancel, and no automatic save retry.
+
+## After 0.8.3 — 2026-10-12
+
+- Local setup initially hid configured devices by default, with search, counts, and an explicit configured-device group. Incomplete records and cloud-key-only devices still required setup; successful saves updated the list immediately.
+- Added the separate Local connections menu/page with account, device, and real-interface selection, verification, preview, and confirmed saving. Changed selection, cancellation, or expiry invalidates previews. Zigbee clearly identifies the gateway; Network and packets stays independent of Smart Life.
+- Added generic `/api/v1/local-connections/find` and `/save`. Wi-Fi verification uses only the device's own key. Zigbee routes through an explicit/saved gateway without changing child keys or associations. Preview identifies the actual configured device.
+- Split gateway setup into `/gateways/find` and `/gateways/save` with a single-use, five-minute `finding_id` and strict Boolean `confirmed:true`. Revalidation occurs before saving; the old auto-saving `/gateways/setup` route was removed.
+- Gateways without their own DPS now explain that child cards contain the readings/controls rather than requiring meaningless gateway capabilities.
+- Added the independent Network and packets page: actual interface/subnet, Tuya/mDNS/SSDP announcements, neighbors, identity/address/service rows, events/IP changes, explicit standard discovery, and local JSON export. No cloud-derived names or guessed Zigbee links; hidden/abandoned sessions stop.
+- Added gateway-key candidates from authorized child metadata when the gateway lacks a key. Verification against one confirmed IP uses read-only TinyTuya 3.3–3.5 proof, with server-only keys and account/source invalidation. A verified gateway without DPS can be saved; sensor associations are not guessed.
+- Known cloud gateway categories now lock the wizard to Gateway; manual device setup retains a type choice.
+- Resumed TRACER FOCUS 3 setup and removed the name-based deferred-device list. The preceding WorkGtZb iteration had resumed gateway setup while TRACER remained deferred.
+- Gateway selectors include actual account gateways even when Sharing marks the gateway itself `sub=true`. Nested gateway verification/save can return to the sensor draft. Empty lists explain the missing prerequisite.
+- Renamed Add to home to Set up local connection and replaced its plus with a network icon, clarifying that cloud devices already work without local registration.
+- Removed the duplicate main-screen management heading/introduction beneath navigation.
+- Privacy buttons show their current state. Enabled/pending privacy blocks tile/detail/region video, stops playback and pending allocation, and requires confirmation of disabled privacy before manually restarting video.
+
+## After 0.8.3 — 2026-10-11
+
+- Added camera information popups for Smart Life reference settings, sensitivity, and SD functions. Clarified `humanoid_filter` as human-event filtering without claiming the model's subscription status. Popups work for disabled controls; preview collapse became an accessible arrow.
+- Privacy became a button beside Video. Reading age/refresh layout was corrected. Recording/formatting require a ready card; cached recording-on does not imply active recording. Added the rectangular detection-area editor with move/resize and draft saving.
+- Camera quick controls moved from an initial single-row layout to two aligned rows. Clicking unused device/group card space opens details while nested controls retain their own actions; navigation is blocked during commands.
+- Earlier camera changes added immediate privacy/motion/sound/siren controls, a separate confirmed formatting action, and human-detection help under an info icon.
+- The detail player shows actual resolution, buffering/playback, and segment download speed. HD/SD uses available HLS variants only; a single stream has no fabricated quality switch. Wi-Fi is shown only when a real numeric reading exists.
+- Grouped known camera settings into image, detection, and recording sections, retaining unknown functions in additional settings and preserving device codes/ranges and changed-only submission.
+- Added main-card mini live preview; collapsing, opening details, or hiding the page stops it.
+- Added explicit Tuya HLS allocation/start/stop through the selected provider, camera icons, player cleanup, and temporary URLs without database storage or secret-bearing errors.
+- Sensor tiles now show icons/values without labels; labels remain in details/tooltips.
+- Channel timer editors moved to details only; removed clock actions from main tiles.
+- Reduced vertical margins around room/status and main controls, including touch layouts. Moved tile refresh to bottom-right without overlapping adjacent actions.
+- Moved room, online state, and battery to the upper-right of the tile above main controls/readings.
+- The earlier three-row tile layout separated icon/main control, name/aliases, and room/status with compact details/setup actions while retaining both channels and transport selection.
+
+## After 0.8.3 — 2026-10-10
+
+- Effects, music, and transitions gained descriptive popup wizards with review and draft return. Close is top-right; cancel/navigation stay at the bottom. Detail connection fields moved to the header center, actions to top-right, and duplicate provider text was removed.
+- Restored the Aliases label in detail cards and made room, physical connection, selected route, and online state visible without opening the explanatory popup.
+- Removed connection-route text from main tiles while keeping rooms. Temperature/humidity labels were temporarily restored there. Connection help became a dismissible balloon. Switch labels/controls moved closer, channel aliases below labels, and clocks opened per-channel timers while preserving collapsed drafts.
+- Exposed declared lighting schedules separately from effects. Channel labels became clickable switch labels without redundant On/Off text; unknown/stale markers remained. Refresh initially moved top-right.
+- Set tile minimum width to 340px with mobile adaptation and automatic columns. Removed visible alias prefixes on compact tags and added explanatory connection information.
+- Compact tiles gained type-based icons and immediate power actions; secondary settings stayed in details. TRACER FOCUS 3 and WorkGtZb were temporarily deferred without loading quick controls.
+- Added visible-card metadata loading and cached updates without physical polling; scrolling preserved drafts. Details close became an accessible 44px icon, with an arrow when returning to a group.
+- Activity filters now match real capabilities; temperature sensors no longer show an irrelevant Motion filter.
+- Circadian/random/wake-up/sleep settings gained repetition/points/review wizards. Done returns a draft; cancel preserves original data. Boolean parameters use one switch, and precise color controls move to a row expander.
+- Added persistent device reports/command activity: motion logs open prominently, others collapsed, up to 2,000 events, filters, and earlier-event pagination. Sharing receives reports with cards closed; snapshots, reports, and command outcomes remain distinct.
+- Battery moved into upper-right details and network-status tile context. Bath2 temperature labels/icons became compact without inventing percentage units. Nine backend and ten frontend checks were added.
+- One Apply per card validates/sends changed values together; reverting removes an edit and failure retains drafts. Eight batch-apply checks were added. Precise color sliders expand from the picker row.
+- Simplified parameter rows without individual borders, aligned smaller numeric inputs over sliders, and adopted the initial dark/blue bulb appearance. Reading help starts collapsed.
+- Alias editing stays inside its tag, with accessible save/delete/cancel icons. Unicode device/channel aliases support Russian, Belarusian, and Polish with normalized duplicate checks.
+- Moved power-on state, backlight, and inching to additional settings. Combined numeric input/slider rows and removed repeated report/range labels.
+- Preserved timer, brightness, temperature, and mode targets when an old cloud cache follows a command, pending real confirmation. Manual mappings are explicitly our database records in technical data.
+- A contradictory cloud offline flag no longer blocks an explicit command. Tuya 2001 is shown as device connection failure; commands are not automatically retried.
+
+## After 0.8.3 — 2026-10-09
+
+- Added inline device alias create/edit/delete, list tags, and alias search. Registered records reuse existing storage; cloud-only devices need no inventory import. Real names and channel aliases remain separate.
+- Added per-device passive UDP discovery watches showing observed IP, last announcement, and address changes. Zigbee watches require a known parent. Close, lease loss, or 15 minutes stops reception without changing saved IPs.
+- Persisted cloud channel aliases per account/device as separate tags beneath original labels. Removing an alias does not rename Smart Life or send a command.
+- Added localized backlight, power-restoration, channel timer, and inching names/values/help while preserving source command codes.
+
+## After 0.8.3 — 2026-10-08
+
+- Unified local/Sharing/Developer device and group inventory by physical Tuya ID, using local room/alias data and explicit route choice. Connections now contains login/service settings; cloud devices need no import to display. Partial failures preserve other sources, inventory browsing does not poll LAN, and failed commands do not switch providers. Seven frontend checks added.
+- Fixed accepted brightness/temperature drafts reverting when the cloud returns only power. Two checks reproduce a six-function bulb with power-only status.
+- Kept normal bulb connection/type properties separate from technical function/DP mappings without guessing missing numbers.
+- Sharing inventory became lightweight; functions and one HTTP snapshot load for the selected device. Added MQTT reports, old-message/snapshot guards, independent DP timestamps, account-scoped persistence, logout cleanup without remote revocation, and protection against late token refresh restoring logout. Seven backend checks added.
+- Open Sharing forms read our cache every three seconds, preserving drafts and ignoring cancelled responses. Two frontend checks added. A real owner-operated second-channel report survived restart.
+- Exposed known DP metadata without private strategies and added account-scoped CRUD for manual remote/group/multi-control mappings. These do not execute commands or apply Tuya bindings.
+- Added schema-based lighting JSON/scene editors, power memory, and standard raw-v0 schedules with fallback for other formats. Music/transition fields are command-only and use device-specific ranges. Incoming/outgoing mapping views show both function/DP sides. Seven backend and 12 frontend checks added without new runtime dependencies.
+- Connection UI now explains restored server authorization; reconnect/login remains explicit. PIR states distinguish unknown from no motion, and raw battery values do not become assumed percentages. Four tests cover the real read-only PIR/battery definitions.
+- Saved API keys became hidden behind edit actions like User Code, with empty replacement fields, cancel, and separate credentials when changing servers.
+- Added generic Boolean/number/enum/HSV/string/JSON controls, sensor reading age, post-ACK reads, partial group outcomes, duplicate protection, and no automatic retries. Twenty-nine frontend checks include inventory isolation across servers.
+- Added read-only `status_range` scaling/units without making sensor functions writable; two backend privacy/read/auth checks added.
+- Provisionally selected `cyd-028r-st7789` for the reported two-USB XXSR69 board and documented hardware uncertainty/ILI9341 alternatives.
+- Split the Tuya UI into standalone React/TypeScript/Vite with independent launch/build, API address, service access, QR/User Code, Developer login, inventory, and search.
+- Added explicit CORS origins and optional `/cloud` redirect; removed embedded Python HTML/wheel assets without new required Python dependencies. Thirteen backend and 20 frontend boundary tests plus browser checks used fake Tuya data.
+
+## After 0.8.3 — 2026-10-07
+
+- Correlated a newly paired Wi-Fi device's exact Sharing ID/activation time with UDP discovery; its local key came from authorized cloud access, not discovery packets. Private data stays outside Git.
+- Added private passive UDP capture/decoding, IP/version summaries, and seven safe-write/decode tests; documented a real three-bulb/remote reconnection capture without control commands.
+- Added independent Developer credentials, seven regions, separate save/connect, mode-0600 storage, HTTPS/HMAC, timeout/ACK handling, explicit provider routing, parent/cid import, and 32 tests.
+- Hid saved User Code and service-key inputs behind empty replacement editors. Separate verified saves restore hidden state on reload. `PUT /cloud/user-code` saves for the next QR login without replacing the active account until confirmation.
+- Restored the saved key automatically through a hidden field, leaving connection settings collapsed while maintaining authorization checks.
+- Corrected gateway-key research: shared child keys are candidates requiring LAN verification, not impossible-to-obtain gateway keys or automatic parent assignments.
 
 ## 0.8.3 — 2026-10-07
 
-- Повторный QR-вход использует сохранённый на сервере User Code, если поле оставлено пустым; работает после перезапуска и при необходимости обновить авторизацию.
-- Страница подключения сообщает о сохранённом коде и объясняет его расположение в мобильном приложении; API возвращает только `has_saved_user_code`.
-- Проверки сохранения кода, повторного входа после рестарта, истечения QR, смены аккаунта после подтверждения и удаления локального сеанса.
+- Reuse the saved server-side User Code for QR relogin when no new code is supplied, including after restart.
+- Explain saved-code location/status without returning its value.
+- Cover persistence, expiry, confirmed account change, and session deletion.
 
 ## 0.8.2 — 2026-10-07
 
-- Главный экран панели показывает читаемые capabilities выбранных устройств без списка, ограниченного исходным примером.
-- Общие подписи групп устройств и ограничение длины показаний с сохранением UTF-8.
-- Документация уточняет выбор комнаты → произвольный список устройств/групп → сохранение; тест другой комнаты со шторой, вентиляторами и розеткой.
+- Panel tiles show selected readable capabilities without a fixed example-only set.
+- Added generic group labels and UTF-8-safe reading limits.
+- Document arbitrary room/device/group selection and test a room with covers, fans, and an outlet.
 
 ## 0.8.1 — 2026-10-07
 
-- Отмена выбора комнаты на панели возвращает последнюю сохранённую конфигурацию.
-- Повторное сохранение сохраняет явно заданные capability selections у оставленных плиток.
-- Проверка возврата выбора в native C++ модели.
+- Cancelled panel room selection restores the saved configuration.
+- Re-saving preserves retained widgets' explicit capability selections.
+- Added native C++ selection/back-navigation checks.
 
 ## 0.8.0 — 2026-10-07
 
-- Прошивка LVGL/LovyanGFX для пяти профилей CYD: выбор комнаты/widgets, сохранение, группы и отдельные лампы, цвет/яркость/температура, датчики и индикация неизвестного состояния.
-- Компактный список комнат с названием здания, независимая пагинация групп и устройств для MCU.
-- Native C++ проверки навигации/выбора/свежести и сборки ESP32; REST-тесты пагинации панели.
+- LVGL/LovyanGFX firmware for five CYD profiles: room/widgets, persistence, groups, lamps/color/brightness/temperature, sensors, and unknown states.
+- Added compact room/building lists and independent device/group pagination for MCUs.
+- Added native C++ navigation/selection/freshness tests, ESP32 builds, and REST pagination tests.
 
 ## 0.7.0 — 2026-10-07
 
-- Optional официальный Tuya Sharing SDK: User Code + QR, защищённое серверное хранение и refresh токенов.
-- Страница /cloud, безопасная выдача метаданных, импорт выбранных устройств и облачные команды по code.
-- Исследование бесплатного интеграционного режима, условий собственного клиента и отдельный набор SDK-тестов.
+- Optional official Sharing SDK with User Code/QR, private server storage, and token refresh.
+- Added the original `/cloud` page, safe metadata, selected-device import, and cloud-code commands.
+- Researched public integration/client terms and added separate SDK tests.
 
 ## 0.6.0 — 2026-10-07
 
-- CRUD групп ламп, общий статус on/off/mixed/unknown и отчёт каждой групповой команды.
-- Сохранённый выбор комнаты/widgets для дисплея, компактный dashboard и проверки расположения/лимитов.
-- Фоновый опрос выбранных устройств без блокировки чтения экрана.
-- Тест комнаты с тремя лампами, выключателем, датчиками температуры/влажности/движения и сохранения после рестарта.
+- Group CRUD and on/off/mixed/unknown state with per-member command results.
+- Saved display room/widgets, compact dashboard, placement/limit checks, and background polling without blocking display reads.
+- Tested a three-lamp/switch/temperature/humidity/motion room and restart persistence.
 
 ## 0.5.0 — 2026-10-07
 
-- Явные профили категорий Tuya, нормализация DPS, диапазоны, инверсия, enum и HSV v1/v2/JSON.
-- Команды нескольких capabilities с проверкой конфликтов и пакетированием нужного режима лампы.
-- Нормализованное состояние и независимые timestamps каждого DPS, без выдуманного состояния после ACK.
-- Сравнение всех трёх интеграций HA и тесты прямого/parent+cid управления вариантами устройств.
+- Explicit profiles, normalized DPS, limits, inversion, enums, and HSV v1/v2/JSON.
+- Multi-capability commands with conflicting-DP checks and required lamp-mode writes.
+- Independent observation timestamps without fabricated post-ACK state.
+- Compared three Home Assistant integrations and tested direct/parent+cid variants.
 
 ## 0.4.0 — 2026-10-07
 
-- Отдельный endpoint поиска по алиасу и автоматический алиас текущего имени.
-- Round-trip массива aliases, уточнение неоднозначных имён, сохранение старой базы.
-
+- Dedicated alias lookup and automatic current-name aliases.
+- Round-trip alias lists, scoped ambiguous-name lookup, and old-database preservation.
 
 ## 0.3.0 — 2026-10-07
 
-- Поиск зданий, комнат, типов и устройств по части названия (`q`) и точному названию (`name`), с поддержкой кириллицы и Unicode без учёта регистра.
-- Получение одного объекта через `/lookup/{resource}?name=...` с уточнением комнаты, здания, parent или типа, где применимо.
-- Обращение к зданиям, комнатам и устройствам через `name:...`, включая команды TinyTuya, hierarchy и CRUD.
-- Неоднозначное название возвращает 409 с безопасными вариантами; команда не отправляется и объект не изменяется.
-- Имена не требуют отдельного алиаса, поиск не меняет данные или схему существующей базы.
+- Unicode-aware case-insensitive substring/exact name search for buildings, rooms, types, and devices.
+- Scoped `/lookup/{resource}?name=...` and `name:...` paths for CRUD, hierarchy, and TinyTuya commands.
+- Ambiguity returns 409 with safe candidates and no mutation/command. Name search needs no added alias and changes no stored data/schema.
 
 ## 0.2.0 — 2026-10-07
 
-- Алиасы зданий, комнат и устройств: до 32 на объект, нормализация и уникальность внутри типа сущности.
-- CRUD алиасов, точный фильтр `alias` и использование алиасов во всех адресах объектов, hierarchy и командах устройств.
-- Импорт алиасов устройств с сохранением отсутствующих значений и атомарным откатом конфликтов.
-- Автоматическое добавление таблиц алиасов в базу v0.1.0 без изменения существующих записей и ключей.
-- Документация, OpenAPI и тесты обновлены; числовые ID продолжают работать.
+- Up to 32 normalized aliases per building/room/device, unique within the entity type.
+- Alias CRUD/filter/path addressing, hierarchy, and device commands.
+- Atomic alias import preserving omitted values and rolling back conflicts.
+- Automatic alias-table creation over v0.1.0 without changing records/keys; numeric IDs continue working.
+- Updated documentation, OpenAPI, and tests.
 
 ## 0.1.0 — 2026-10-07
 
-- REST API: здания, комнаты, типы и устройства, иерархия, связи gateway/child.
-- SQLite, FastAPI, SQLAlchemy и управление TinyTuya: напрямую для Wi-Fi, через parent + cid для Zigbee.
-- Карты capabilities, status/on/off/set_dps и команды brightness/color/temperature.
-- Write-only local_key, API-токен, атомарный импорт devices.json/snapshot.json и dry-run.
-- README, примеры, OpenAPI, шаблоны запуска systemd/procd и 45 проходящих тестов.
+- Building/room/type/device REST CRUD, hierarchy, and gateway/child links.
+- SQLite/FastAPI/SQLAlchemy/TinyTuya with direct Wi-Fi and parent/cid Zigbee.
+- Capability maps and status/on/off/set_dps/brightness/color/temperature commands.
+- Write-only local keys, API token, atomic devices/snapshot import, and dry run.
+- README, examples, OpenAPI, systemd/procd templates, and 45 passing tests.

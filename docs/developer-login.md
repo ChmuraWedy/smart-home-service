@@ -1,57 +1,42 @@
-# Access ID / Access Secret
+# Tuya Developer Access ID and Secret
 
-Второй способ авторизации работает независимо от QR-сеанса. В [отдельном React UI](../frontend/README.md) выберите **Access ID / Secret**, введите реквизиты проекта Tuya и его дата-центр, нажмите **Сохранить реквизиты**, затем **Проверить и подключить**. После успешной проверки доступен список устройств. Прежний `/cloud` на Python-сервисе теперь может перенаправлять к UI через `SMART_HOME_FRONTEND_URL`.
+This connection is independent of [Smart Life QR login](qr-login.md). In the [interface](../frontend/README.md), choose **Access ID / Secret**, enter the project credentials and data center, save them, then select **Check and connect**. Saving alone does not contact Tuya.
 
-Access ID / Client ID и Access Secret / Client Secret находятся в Overview облачного проекта на [Tuya Developer Platform](https://iot.tuya.com/). Привяжите Smart Life через Devices → Link Tuya App Account и авторизуйте необходимые API IoT Core и авторизации. Доступ зависит от разрешений и действующего плана проекта; сервис не создаёт проект и не покупает подписку. [Инструкция TinyTuya Wizard](https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys).
+Find Access ID/Client ID and Access Secret/Client Secret in your cloud project's overview on the [Tuya Developer Platform](https://iot.tuya.com/). Link the Smart Life account through the project's device/account settings and authorize the required APIs. Access depends on project permissions and its active service plan. This application does not create projects or purchase subscriptions.
 
-Для запуска достаточно обычного `requirements.txt`, `SMART_HOME_CLOUD_ENABLED=1` и непустого `SMART_HOME_API_TOKEN`. QR-входу по-прежнему нужен extra `.[cloud]`. Developer-клиент использует стандартную библиотеку Python и [официальную подпись HMAC-SHA256](https://developer.tuya.com/en/docs/iot/new-singnature?id=Kbw0q34cs2e5g), без нового SDK.
+## Runtime and storage
 
-Поддерживаются `eu`, `eu-w`, `us`, `us-e`, `cn`, `in`, `sg`. Выбирайте регион проекта, а не местоположение сервера. Необязательный Device ID позволяет получить UID устройства и список его аккаунта. Без Device ID используется постраничный список устройств привязанных аккаунтов проекта. Если проект ограничивает этот API, попробуйте Device ID устройства, уже видимого в проекте. Используются [список связанных устройств](https://developer.tuya.com/en/docs/archived-documents/fc19523d18?id=Kakr4p8nq5xsc) и [устройства аккаунта](https://developer.tuya.com/en/docs/cloud/device-management?id=K9g6rfntdz78a).
+The Developer client uses Python's standard library and Tuya HMAC-SHA256 request signatures. The core requirements are sufficient, with `SMART_HOME_CLOUD_ENABLED=1` and a nonempty service token. The optional Sharing SDK is needed for QR login, not for this client.
 
-Сохранение не обращается к Tuya. Поля очищаются и скрываются за **Хочу изменить**; для замены повторно введите всю пару, **Отменить изменение** возвращает прежнее состояние. Пустой Device ID очищает старое ограничение аккаунта. Успешная замена сбрасывает только Developer-подключение и кэш; ошибка записи сохраняет прежнее состояние.
+Supported region codes are `eu`, `eu-w`, `us`, `us-e`, `cn`, `in`, and `sg`. Select the project's region, not the server's location. An optional sample Device ID can identify its account when project-wide account listing is restricted. Without it, the client pages through linked account devices where permitted.
 
-Реквизиты сохраняются атомарно в JSON-файле `0600`, по умолчанию `<путь QR-сеанса>.developer.json`. Переменная `SMART_HOME_DEVELOPER_SESSION` меняет путь; он должен отличаться от `SMART_HOME_CLOUD_SESSION`. Стандартный каталог `data/` исключён из Git, другой путь нужно исключить самостоятельно. Файл содержит секреты без шифрования. Access ID/Secret не выдаются API, не подставляются в форму и не записываются в браузерное хранилище.
+Credentials are atomically saved in a mode-0600 JSON file, by default the Sharing session path plus `.developer.json`. `SMART_HOME_DEVELOPER_SESSION` can select another path, which must differ from the Sharing session. This is an unencrypted secret file. Credentials are not returned by the API or stored in browser storage; fields are hidden after saving. Replacing them requires the complete pair.
 
-Токен хранится только в памяти и получается заново перед запросом после истечения срока. После перезапуска реквизиты восстановятся; нажмите **Проверить и подключить**. `connected` означает успешную проверку в текущем процессе. Таймаут — `SMART_HOME_CLOUD_TIMEOUT`, по умолчанию 10 секунд, допустимо >0 и ≤30. HTTPS-адреса фиксированы, TLS проверяется, перенаправления запрещены. Ошибки не раскрывают исходные ответы/секреты. Команды автоматически не повторяются.
+Access tokens live in memory and are renewed when needed. After restart, saved credentials remain but the connection must be checked again. `connected` means successful validation in this process. Timeout is `SMART_HOME_CLOUD_TIMEOUT` (default 10 seconds, at most 30). Endpoints are fixed HTTPS addresses with TLS validation and no redirects. Commands are not automatically retried.
 
-Все endpoints защищены `X-API-Key`:
+## API
 
-| Метод | Endpoint `/api/v1/cloud` | Назначение |
-|---|---|---|
-| GET | `/developer/status` | configured/connected, регион и признак Device ID; без реквизитов |
-| PUT | `/developer/credentials` | Сохранить `{access_id,access_secret,region,sample_device_id?}` без сети |
-| POST | `/developer/connect` | Получить токен, проверить список, вернуть число устройств |
-| DELETE | `/developer/credentials` | Удалить локальные реквизиты/кэш, без отзыва разрешений проекта |
-| GET | `/devices?provider=developer&refresh=true` | Метаданные и has_local_key, без ключей |
-| GET | `/devices/{id}/status?provider=developer` | Прочитать статус по Tuya code |
-| GET | `/devices/{id}/functions?provider=developer` | Writable functions и допустимые значения |
-| POST | `/devices/{id}/commands?provider=developer` | Проверить команды и отправить один запрос |
-| POST | `/imports/local-inventory?provider=developer` | Импорт выбранных устройств/ключей в SQLite |
+All routes require the service `X-API-Key` and start at `/api/v1/cloud`.
 
-Без `provider` используется Sharing. В `/status` добавлено отдельное поле `developer`; прежнее `connected` относится к QR-сеансу. Developer-список не загружает функции каждого устройства: они читаются отдельно и перед командой. Developer-сценарии пока не реализованы (`scenes?provider=developer` → `501`); Sharing-список сохраняется. Удаление реквизитов не удаляет импортированные устройства из SQLite.
+| Method | Route | Purpose |
+| --- | --- | --- |
+| GET | `/developer/status` | Safe configured/connected/region indicators |
+| PUT | `/developer/credentials` | Save `access_id`, `access_secret`, `region`, optional `sample_device_id` |
+| POST | `/developer/connect` | Obtain a token and validate device access |
+| DELETE | `/developer/credentials` | Remove local credentials/cache without revoking project permissions |
+| GET | `/devices?provider=developer&refresh=true` | Authorized inventory without keys |
+| GET | `/devices/{id}/status?provider=developer` | Read code-based status |
+| GET | `/devices/{id}/functions?provider=developer` | Device definitions and writable functions |
+| POST | `/devices/{id}/commands?provider=developer` | Validate and send commands |
+| POST | `/imports/local-inventory?provider=developer` | Optional local inventory import |
 
-Примеры с демонстрационными реквизитами:
+Omitting `provider` selects Sharing. General cloud status exposes a separate Developer field. Developer scenes are not implemented and return 501; the Sharing scene list remains separate. Removing Developer credentials does not remove previously imported devices.
 
 ```sh
-curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"access_id":"example-id","access_secret":"example-secret","region":"eu","sample_device_id":null}' \
-  'http://127.0.0.1:8000/api/v1/cloud/developer/credentials'
-curl -sS -X POST -H "X-API-Key: $TOKEN" \
-  'http://127.0.0.1:8000/api/v1/cloud/developer/connect'
-curl -sS -H "X-API-Key: $TOKEN" \
-  'http://127.0.0.1:8000/api/v1/cloud/devices?provider=developer&refresh=true'
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"device_ids":["gateway-id","child-id"],"parent_map":{"child-id":"gateway-id"},"dry_run":true}' \
-  'http://127.0.0.1:8000/api/v1/cloud/imports/local-inventory?provider=developer'
-curl -sS -H "X-API-Key: $TOKEN" \
-  'http://127.0.0.1:8000/api/v1/cloud/devices/device-id/status?provider=developer'
-curl -sS -H "X-API-Key: $TOKEN" \
-  'http://127.0.0.1:8000/api/v1/cloud/devices/device-id/functions?provider=developer'
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"commands":[{"code":"switch_led","value":true}]}' \
-  'http://127.0.0.1:8000/api/v1/cloud/devices/device-id/commands?provider=developer'
+curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d '{"access_id":"example-id","access_secret":"example-secret","region":"eu","sample_device_id":null}'   'http://127.0.0.1:8000/api/v1/cloud/developer/credentials'
+curl -sS -X POST -H "X-API-Key: $TOKEN"   'http://127.0.0.1:8000/api/v1/cloud/developer/connect'
 ```
 
-Импорт использует `gateway_id`, если Tuya его возвращает; явный `parent_map` имеет приоритет. Child требует настоящий node_id/cid и родителя в импорте или инвентаре. Связи по совпадению ключей не угадываются. Ключ попадает только в SQLite, WAN IP отбрасывается, прежние LAN IP/version/aliases сохраняются. Для записи повторите с `dry_run:false`, затем настройте IP/version/capabilities. Версия протокола не угадывается.
+Import uses an explicit parent map in preference to provided gateway metadata. Shared keys do not establish parent links. Children need their actual node ID and an available parent. Use dry-run before saving; verify LAN IP, protocol, and capabilities afterward. A cloud command's code must exist in that device's writable functions. The app never automatically switches between Developer, Sharing, and local transport after a failure.
 
-`switch_led` — пример, он должен присутствовать в functions вашего устройства. ACK означает принятие запроса Tuya; статус проверяется отдельно. Локальные команды TinyTuya используют прежние числовые DPS, прямой Wi-Fi или parent gateway + cid. Автоматического переключения между Developer, Sharing и LAN нет. Реальный Developer-вход требует действующего проекта: fake API тесты не подтверждают доступ к вашему проекту.
+Sources: [Tuya signing](https://developer.tuya.com/en/docs/iot/new-singnature?id=Kbw0q34cs2e5g) and [TinyTuya setup](https://github.com/jasonacox/tinytuya#setup-wizard---getting-local-keys). Mock API tests verify application behavior, not access to an arbitrary real Developer project.

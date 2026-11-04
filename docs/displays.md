@@ -1,35 +1,23 @@
-# Выбор устройств, групп и комнаты для панели
+# Groups and room displays
 
-На дисплее сначала выбирается комната, затем отмечается произвольный список её устройств и групп для отображения. После «Сохранить выбор» главный экран содержит только выбранные элементы в сохранённом порядке. Можно выбрать устройства, группы, смешанный или пустой список; фиксированного набора ламп/выключателей/датчиков нет. Выбор каждой панели хранится отдельно и может быть изменён повторно. Показания и управление карточки определяются capabilities выбранного устройства.
+A display selects a room, then an arbitrary ordered list of devices and groups. The saved main screen contains only those widgets. Empty, mixed, and device-only selections are allowed; there is no fixed lamp/switch/sensor layout. Each display has its own persisted selection.
 
-Ниже только пример конфигурации: в комнате с тремя лампами можно создать группу `Свет`, а выключатель и датчики выбрать отдельными widgets. Группа содержит реальные устройства, а не копии; на её экране доступны индивидуальные capabilities участников. Группы текущего API объединяют устройства с writable boolean capability `switch` для общих команд питания.
+Groups reference real local devices. A group can contain 1–16 unique members with a writable Boolean `switch` capability. The small-display configuration supports up to 12 widgets and 12 distinct devices including group members. A device widget may select up to eight capabilities; an empty selection shows the first eight definitions.
 
 ```sh
-# Предполагается, что room=1, лампы=1/2/3, switch=4, датчики=5/6 уже созданы.
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Свет","room_id":1,"device_ids":[1,2,3]}' "$BASE/groups"
-curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"name":"Панель комнаты","room_id":1,"widgets":[{"kind":"group","id":1},{"kind":"device","id":4},{"kind":"device","id":5,"capabilities":["temperature","humidity"]},{"kind":"device","id":6,"capabilities":["motion"]}]}' \
-  "$BASE/displays/wall-panel"
+# Assumes room 1 and devices 1–6 already exist.
+curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d '{"name":"Lights","room_id":1,"device_ids":[1,2,3]}' "$BASE/groups"
+curl -sS -X PUT -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d '{"name":"Room panel","room_id":1,"widgets":[{"kind":"group","id":1},{"kind":"device","id":4},{"kind":"device","id":5,"capabilities":["temperature","humidity"]},{"kind":"device","id":6,"capabilities":["motion"]}]}'   "$BASE/displays/wall-panel"
 curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/displays/wall-panel/refresh"
 curl -sS -H "X-API-Key: $TOKEN" "$BASE/displays/wall-panel/dashboard"
-curl -sS -X POST -H "X-API-Key: $TOKEN" "$BASE/groups/1/commands/off"
 ```
 
-Группы: POST/GET `/groups`, GET/PATCH/DELETE `/groups/{id}`, GET `/groups/{id}/state`, POST `/groups/{id}/commands/on|off`. Фильтр списка `room_id`. У группы 1..16 уникальных members; для небольшого дисплея разрешено не более 12 различных устройств во всей конфигурации, включая members групп. В группе требуется boolean writable capability `switch`.
+`BASE` includes `/api/v1`. Groups support list/create, detail/PATCH/DELETE, `/state`, and `/commands/on|off`. Displays support list, detail/PUT/DELETE, `/rooms`, `/options`, `/dashboard`, and `/refresh`. See the [API index](api-reference.md#endpoint-index).
 
-Панели: GET `/displays`, GET/PUT/DELETE `/displays/{display_id}`, GET `/displays/{display_id}/rooms?offset=0&limit=8`, GET `/displays/{display_id}/options?room_id=...&offset=0&limit=8`, GET `/displays/{display_id}/dashboard`, POST `/displays/{display_id}/refresh`. Идентификатор панели — ASCII slug; прошивка может формировать его из MAC. `PUT` сохраняет всю конфигурацию в SQLite, переживает рестарт сервера. Устройство также хранит выбранную конфигурацию локально после успешного сохранения. [Готовая прошивка CYD и инструкция сборки](../firmware/cyd/README.md).
+`rooms` works before saving a display. `options` pages devices and groups independently with continuation flags. Display IDs are ASCII slugs, potentially derived from a display's MAC. PUT replaces the whole selection and persists it in SQLite; firmware also keeps a successful selection locally. [CYD firmware](../firmware/cyd/README.md) implements the panel UI.
 
-`rooms` работает до создания конфигурации и возвращает room id/name плюс building_name и флаг `more`. `options` независимо применяет offset/limit к devices и groups; флаги `more_devices` и `more_groups` сообщают о следующих страницах. Конфигурация имеет до 12 widgets. Для device можно явно выбрать до 8 capabilities; пустой список показывает первые 8 определений. Group виджет открывает members. Dashboard использует компактные описания возможностей без IP, local_key, сырых DPS и внутренних условий записи.
+All widgets and members must belong to the selected room. Device deletion/movement and group changes respect dependent panels; remove the selection first when required. Dashboard payloads exclude IPs, keys, raw DPS, and private write conditions.
 
-Комната всех widgets и members должна совпадать. Пока устройство состоит в группе/выбрано на дисплее, его нельзя удалить или перенести в другую комнату. Выбранную группу нельзя удалить; сначала измените конфигурацию панели. Смена members группы проверяет ограничения всех связанных панелей.
+Group state is `on`, `off`, `mixed`, or `unknown`, with member counts. Writes run sequentially and report individual failures; hardware updates are not an atomic transaction. An ACK from every member still does not confirm every observed state.
 
-Статус группы: `on` — все свежие известные switch=true; `off` — все false; `mixed` — часть включена; `unknown` — есть неактуальные/неизвестные/disabled members. В API также присутствуют on/off/unknown_count. Групповая запись отправляется по members последовательно. Ошибки физических устройств возвращаются отдельно; групповая команда не является атомарной транзакцией оборудования. ACK всех members не означает, что подтверждено наблюдаемое состояние.
-
-## Получение статуса
-
-Один фоновый collector опрашивает только выбранные устройства, объединяя одинаковые ссылки из разных групп/widgets. Период `SMART_HOME_DISPLAY_POLL_INTERVAL=30` секунд; `0` отключает периодический опрос. Явный `/refresh` возвращает 202 и ставит запрос в ограниченную очередь. Чтение dashboard не ждёт сетевых тайм-аутов; на экране должен присутствовать отдельный признак устаревших данных. Продолжительность полного обхода зависит от ответов устройств; тайм-аут не создаёт нового показания.
-
-Это локальный polling, а не гарантия gateway push. Батарейные Zigbee устройства могут спать или не раскрывать status через LAN. Тогда fresh status возможен только при получении реального события через поддерживаемый шлюз/облачный адаптер; интерфейс показывает unknown/stale. Никогда не интерпретируйте отсутствие показания движения как «движения нет».
-
-Для сервера нужен один process/worker. Конфигурация групп, панелей и timestamps хранится в новых SQLite-таблицах; существующий инвентарь не переписывается.
+One background collector polls only selected devices, deduplicating repeated references. `SMART_HOME_DISPLAY_POLL_INTERVAL=30` controls the interval; `0` disables periodic polling. Explicit refresh returns 202 and queues a bounded request. Dashboard reads do not wait for network timeouts. Sleeping Zigbee sensors may remain unknown/stale until an actual supported report arrives. Use a single process/worker.

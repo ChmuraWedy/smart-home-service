@@ -1,53 +1,56 @@
-# Камера: референс Smart Life и доступные настройки
+# Camera video and settings
 
-Референс пользователя: [Smart Life UI](https://chatgpt.com/share/6acbcaf4-425c-83ed-9cb5-7b8fb70d6327), добавлен 11 октября 2026 года. Общая ссылка показывает текстовый разбор пяти экранов Sleep Cam. При повторном чтении исходного чата «Bulb Screen Reference» стали доступны файлы вложений: просмотрены экраны общих настроек, Video Settings, Detection Alarm Settings, Activity Area, Alarm Sensitivity Level и Sound Detection. Ниже зафиксировано сравнение референса с функциями, которые выбранное подключение Sharing действительно возвращает для Sleep Cam. Состояния из референса не используются как текущие значения.
+Camera cards are generated from the selected device's real definitions. Supported categories such as `sp` and `dghsxj` receive a camera icon and Video action. Missing functions do not create invented controls.
 
-Дополнение содержит ещё четыре экрана настроек, включая Activity Area с перемещаемой прямоугольной рамкой, изменением размера и Cancel/Save. По ним реализован редактор области и пояснения к обнаружению. Раздел чувствительности использует подробный экран трёх уровней и определения Tuya: подпись об интервале тревог на общем экране не переносится на параметр чувствительности.
+## Main card and player
 
-## Реализовано
+The main card offers privacy, motion detection, sound detection, and siren controls when writable functions exist. Privacy and Video are buttons; other quick Boolean controls use switches. These actions send immediately. Video expands a small live preview; collapsing it, opening full details, or hiding the page stops loading.
 
-- Прямой эфир: раскрываемый просмотр на главной плитке и плеер в подробной карточке; звук и полноэкранный режим доступны в стандартных элементах плеера.
-- На главной плитке — переключатели движения, звука и сирены; приватность — отдельная кнопка рядом с «Видео». Отступ блока такой же, как у обычных выключателей. Только объявленные API Boolean-функции с правом записи. Команды отправляются сразу по выбранному маршруту; принятие команды не подменяет подтверждение показанием.
-- В подробном плеере — реальное разрешение кадра HD/SD, состояние воспроизведения/буферизации и скорость загрузки последнего видеосегмента. HD означает не менее 720 пикселей по короткой стороне. Скорость загрузки измерена браузером; это не уровень Wi-Fi камеры. Переключатель качества использует только варианты, объявленные HLS-манифестом; единственный вариант не создаёт искусственный выбор HD/SD.
-- Wi-Fi отображается из числового показания `wifi_signal`, `signal_strength` или `rssi` с масштабом и единицей из API, если оно есть. Без такого показания — «Нет данных». У Sleep Cam через Sharing такого показания нет.
-- Приватность в подробной карточке — кнопка рядом с «Смотреть видео», показывающая состояние «Включена» / «Выключена» (либо «Нет данных»); подсказка при наведении называет действие. Она отправляет команду сразу, сохраняя черновики остальных настроек. При известной включённой приватности запуск видео заблокирован с пояснением. Это действует также на мини-превью и видео в редакторе области. Включение приватности останавливает текущий просмотр и отменяет запрос потока; поздний ответ не запускает плеер. После команды выключения блокировка сохраняется до подтверждения показанием камеры. Выключение приватности само по себе не запускает видео.
-- «Изображение и звук»: ночное видение, переворот, дата и время на видео, устранение мерцания.
-- «Обнаружение и оповещения»: движение, чувствительность, обнаружение человека, ограничение области, звук и его чувствительность, сирена. Пояснения открываются по «i» рядом с названиями настроек и закрываются по Escape, крестику или нажатию снаружи. Для функций из референса переведены назначения и описания значений, включая три уровня движения и два уровня звука. Дополнительно описаны доступные функции карты памяти по документации Tuya; подсказки доступны и у заблокированных настроек. Окно учитывает границы экрана, длинный текст прокручивается. Открытие пояснений не меняет черновик и не отправляет команд.
-- «Запись и карта памяти»: запись камерой, режим записи, ёмкость и состояние карты, состояние форматирования. Без готовой карты вместо тумблера записи показано «Недоступна», режим и команды записи заблокированы. Сохранённый `record_switch: true` не выдаётся за фактическую запись. Проверка состояния повторяется перед отправкой общего черновика, чтобы извлечение карты не позволило отправить уже отредактированные настройки записи.
-- «Дополнительные параметры камеры»: оставшиеся доступные параметры, включая форматирование и сообщения устройства. Кнопка форматирования открывает подтверждение удаления записей; только подтверждение отправляет `sd_format: true`. Отмена не отправляет команду, повторное нажатие во время запроса блокируется. Форматирование недоступно при отсутствии карты, неизвестном состоянии и уже выполняющемся форматировании.
-- Область обнаружения расположена рядом с её включением в разделе обнаружения. Для предоставленного камерой формата `num: 1, region0: {x,y,xlen,ylen}` доступен редактор красной рамки поверх видео: перемещение, изменение размера, клавиатура и поля процентов. Видео запускается отдельно; без него отображается пустой фон. «Сохранить» меняет черновик, общая кнопка «Применить» отправляет область. Отмена ничего не меняет. Неизвестные поля исходного объекта сохраняются; несколько областей и незнакомые форматы не заменяются выдуманной рамкой.
-- Время показания и обновление у переключателей камеры находятся в отдельных колонках на одной строке, включая мобильную раскладку.
+Full details place privacy beside the video action. Privacy blocks video while enabled or pending confirmation, stops active playback, and ignores late stream responses. Turning privacy off does not automatically start video.
 
-Группы формируются из определений API конкретного устройства. Нет определения — нет кнопки; права на запись и допустимые значения сохраняются из API. Неизвестные параметры остаются доступными в дополнительном разделе. Общая кнопка «Применить» отправляет только изменённые значения через выбранное подключение; отдельные команды приватности и форматирования в неё не включаются.
+The player uses a temporary HTTPS HLS URL obtained through the selected Sharing/Developer connection. Compatible browsers use lazy-loaded hls.js; native HLS is the fallback. Audio starts muted. Stopping or closing the player stops downloads. The application does not use the microphone or record browser video.
 
-Значения режимов проверены по [стандартному набору команд камер Tuya](https://developer.tuya.com/en/docs/iot/f?id=K9gf47qbzhnj3):
+The player shows available resolution, playback state, latest-segment download speed, and a known Wi-Fi reading. HD/SD selection uses actual HLS variants; if only one exists it is unavailable. Download speed is not a Wi-Fi quality percentage. Sharing does not expose a separate camera HD/SD command or Wi-Fi query here.
 
-| Код | Подписи значений |
+`POST /api/v1/cloud/devices/{device_id}/stream?provider=sharing|developer` validates ownership/category and returns a short-lived no-store URL. It is not persisted in the database. Reconnect explicitly after expiration or playback failure. Developer streaming needs the appropriate project permissions.
+
+## Settings and explanations
+
+Information icons open full descriptions of known functions and values, including disabled settings. They close through Escape, the close icon, or an outside click and do not send commands. Ordinary edited settings use the card's shared Apply action; privacy and formatting are separate explicit actions.
+
+| Section | Examples |
 | --- | --- |
-| `basic_nightvision` | `0` авто; `1` выключено; `2` включено |
-| `basic_anti_flicker` | `0` выключено; `1` 50 Гц; `2` 60 Гц |
-| `motion_sensitivity` | `0` низкая; `1` средняя; `2` высокая |
-| `decibel_sensitivity` | `0` низкая; `1` высокая |
-| `record_mode` | `1` по событиям; `2` непрерывно |
+| Image and sound | Night vision, flip, timestamp overlay, anti-flicker |
+| Detection and alerts | Motion/sound detection and sensitivity, human filter, region, siren |
+| Recording and storage | Camera-side recording, mode, card capacity/state, format state |
+| Additional parameters | Remaining declared functions and technical data |
 
-Перевод подписей не меняет код или тип команды. Незнакомые значения не переименовываются. `sd_status` — категориальный код, а не измерение: для известных сырых кодов 1–5 используются документированные состояния, даже если схема объявляет масштаб. Неизвестные значения не считаются готовой картой. У Sleep Cam фактически получены `sd_status: 5`, `sd_storge: "0|0|0"` и одновременно `record_switch: true`; поэтому запись недоступна. Значения кодов проверены по [описанию стандартных функций IPC](https://developer.tuya.com/en/docs/iot-device-dev/ipc_basic_solution_configuration?id=Kayhjmxb2v9li).
+Known Tuya values are translated without changing the command value or type:
 
-## Проверка `humanoid_filter`
+| Code | Values |
+| --- | --- |
+| `basic_nightvision` | `0` Auto, `1` Off, `2` On |
+| `basic_anti_flicker` | `0` Off, `1` 50 Hz, `2` 60 Hz |
+| `motion_sensitivity` | `0` Low, `1` Medium, `2` High |
+| `decibel_sensitivity` | `0` Low, `1` High |
+| `record_mode` | `1` Event, `2` Continuous |
 
-На экране пользователя Human Detection (Only Human Events) описан как уведомления при обнаружении человека с исключением других движений. В [стандартной схеме IPC Tuya](https://developer.tuya.com/en/docs/iot-device-dev/ipc_basic_solution_configuration?id=Kayhjmxb2v9li) это DP 170, «фильтр человека», Boolean с чтением и записью. Обнаружение силуэта не означает установление личности или распознавание конкретного лица.
+Sources: [camera commands](https://developer.tuya.com/en/docs/iot/f?id=K9gf47qbzhnj3) and [IPC functions](https://developer.tuya.com/en/docs/iot-device-dev/ipc_basic_solution_configuration?id=Kayhjmxb2v9li). Unknown modes retain their source value.
 
-Проверен установленный Sharing SDK 0.2.15: `update_device_specification` получает определения функций от сервера, а `send_commands` отправляет переданные код и значение. Специальной реализации `humanoid_filter` и проверки подписки в нём нет. Наличие функции у Sleep Cam подтверждено её определениями, но успешная отправка команды не доказывает фактическую работу алгоритма.
+## Human detection
 
-[TuyaOS Video Detection](https://developer.tuya.com/en/docs/iot-device-dev/tuyaos-package-ipc-device?id=Kconga5qibmfx) описывает передачу YUV/RGB-кадров модулю обнаружения и тип HUMAN; конкретные возможности зависят от платформы чипа. Это подтверждает возможность обработки в устройстве, но не определяет прошивку и лицензию Sleep Cam. Отдельный [облачный Human Shape Detection API](https://developer.tuya.com/en/docs/cloud/919e3d8d46?id=Kakfh3v9dyer2) принимает изображение и возвращает координаты: он не является переключателем DP 170.
+`humanoid_filter` is the declared Boolean human-event filter (standard DP 170). It identifies human-shaped motion, not an individual person's identity. The SDK passes the device's declared function and value; it does not establish whether that camera's firmware or subscription currently enables the algorithm.
 
-В проверенных источниках нет подтверждения, что `humanoid_filter` обязательно платный или обязательно бесплатный для этой модели. Подсказка объясняет назначение фильтра и отсутствие сведений о подписке через наше подключение. Условия конкретной камеры нужно проверять в Smart Life; приложение не выдаёт наличие переключателя за активную подписку.
+Tuya documents both [device-side video detection](https://developer.tuya.com/en/docs/iot-device-dev/tuyaos-package-ipc-device?id=Kconga5qibmfx) and a separate [cloud image human-shape API](https://developer.tuya.com/en/docs/cloud/919e3d8d46?id=Kakfh3v9dyer2). The cloud API is not the DP switch. The available metadata does not prove that this specific model's feature is always free or paid. Check the model's Smart Life service terms.
 
-Кнопка сворачивания мини-превью теперь показывает стрелку вверх без текста «Свернуть»; доступное имя и всплывающая подсказка сохраняют назначение. Сворачивание по-прежнему останавливает просмотр.
+## SD card and detection region
 
-## Требует отдельной реализации или дополнительного API
+Recording and formatting require a known ready card. Absent/unknown storage disables those actions, even if a cached `record_switch` is true. Readiness is rechecked before submitting a draft. Formatting requires a deletion confirmation and is disabled while formatting is already in progress. Known raw `sd_status` codes are categorical rather than scaled measurements. The inspected Sleep Cam reported no ready card, despite a true cached recording switch.
 
-Описание референса также упоминает сохранение кадра, двусторонний разговор, запись из плеера, расписание обнаружения, Messages, Cloud и Service Hall. Эти элементы не означают, что подключённый Sharing API предоставляет соответствующий интерфейс. В этой реализации кнопки для них не добавлены. Запись на карту камерой отличается от записи видео браузером; журнал нашего приложения отличается от архива событий и записей Smart Life.
+The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A red rectangle can be moved/resized over separately started video, using pointer, keyboard, or percentage inputs. Saving updates the draft; Apply sends it. Cancellation keeps the original, unknown object fields are retained, and unsupported/multiple-region formats are not replaced by a fabricated rectangle.
 
-Sharing SDK 0.2.15 выделяет HLS-адрес только с параметром протокола. [Документация HLS Tuya](https://developer.tuya.com/en/docs/iot/hls?id=Kacseakiktp2d) также не объявляет команду выбора качества камеры. Поэтому реализация выбирает доступные уровни самого HLS-потока, не отправляя выдуманных параметров API. Отдельный [Smart App SDK](https://developer.tuya.com/en/docs/app-development/extension-device-detail?id=Kcy2jv2o65rgs) умеет запрашивать Wi-Fi, но этот SDK не является подключённым Sharing API нашего сервиса.
+## Limits
 
-Нужны отдельная проверка доступного API и реализация: управление HD/SD самой камеры через P2P, отдельный запрос сигнала Wi-Fi, двустороннее аудио, сохранение кадра/видео из плеера, поддержка дополнительных форматов и нескольких областей, расписание обнаружения и просмотр архива камеры. Облачные сервисы и подписки Smart Life не представлены как настройки устройства.
+Two-way talk, browser snapshot/video saving, detection schedules, camera archive playback, cloud subscription pages, additional region formats, and P2P camera-quality control require separate APIs and implementation. Camera SD recording differs from browser recording. The application's device log is not the Smart Life video/event archive.
+
+Historical playback testing confirmed Sleep Cam HLS at 640×360 with browser CORS. This does not establish compatibility with every Tuya camera or every Developer service plan.

@@ -1,63 +1,59 @@
-# Наблюдение за домашней сетью и запись Tuya discovery
+# LAN discovery and packet observation
 
-## Страница «Сеть и пакеты»
+The menu's **Network and packets** page works independently of Smart Life. It receives available LAN announcements, displays known network identities, and exports a local report. It does not reveal Zigbee radio traffic or automatically configure devices.
 
-Меню **☰ → Сеть и пакеты** открывает независимое наблюдение за LAN компьютера с сервисом. Страница не обращается к Smart Life или Tuya Developer, не читает облачные имена, категории и связи со шлюзами, не изменяет инвентарь. Нужен только ключ нашего API; подключённый Tuya-аккаунт не требуется. `/#network` открывает страницу напрямую.
+## Select the real network
 
-**«Сеть для наблюдения»** показывает реальные интерфейсы, IPv4 и маски компьютера с сервисом. Сеть нужно выбрать явно; **«Обновить сети»** перечитывает её после смены подключения. Приём mDNS/SSDP присоединяется к выбранному интерфейсу, результаты всех протоколов и таблицы соседей фильтруются по его фактической подсети.
+The service lists its actual IPv4 interfaces and prefixes; select the subnet where the devices live before starting. The page does not assume a fixed third octet or silently scan another network. On a Linux container, use the [host-network override](../deploy/docker.md#linux-lan-discovery) to see the target's real interfaces.
 
-**«Начать наблюдение»** открывает UDP 6666/6667/7000 для Tuya, 5353 для mDNS и 1900 для SSDP, читает доступную таблицу ARP раз в десять секунд. Наблюдение запускается вручную. **«Запросить объявления Tuya»** отдельно отправляет стандартный UDP discovery TinyTuya только через выбранный IPv4-интерфейс; TCP-пробы, проверка ключей и команды устройствам не выполняются. Этот запрос иногда нужен для устройств Tuya 3.5. Повторный запрос разрешён через десять секунд.
+Observation can receive Tuya UDP discovery on ports 6666/6667/7000, mDNS/SSDP announcements, and available neighbor-cache information. An explicit discovery action requests standard Tuya announcements. It is not a switch command, a TCP connection to every host, or a full TLS packet capture.
 
-Показываются адрес отправителя, объявленный Tuya ID и проверенная версия протокола, MAC из таблицы соседей, типы mDNS/SSDP сервисов, допустимый hostname из собственного A-record, число пакетов и последние двадцать изменений IP для того же Tuya ID. Объявленные сервисы помогают дальнейшему анализу, но не удостоверяют устройство. Сопоставление разных источников по IP относится к этому наблюдению; кеш соседей может устареть. Запись только в ARP не считается принятым пакетом или доказательством доступности. Имя и тип не угадываются.
+Rows can include the sender IP, declared Tuya ID and verified protocol version, MAC from the neighbor table, mDNS/SSDP service types, a validated host A-record name, counters, and recent IP changes. An ARP-only row is not evidence of a received packet or current reachability. Discovery is unauthenticated; it does not prove identity or justify automatically replacing inventory IPs.
 
-Zigbee не имеет IP-адреса. Приёмник может увидеть сетевой шлюз, но объявление Tuya само по себе не доказывает, что это Zigbee-шлюз. Дочерние Zigbee-устройства и радиообмен здесь не определяются. Это не полный захват трафика: видны только доступные IPv4 объявления из RFC1918-подсетей и кеш соседей. Отсутствие пакетов не означает offline.
+A Zigbee sensor has no independent Wi-Fi IP. The page may see a gateway, but a Tuya announcement alone does not prove that it is a Zigbee gateway or identify its children. Missing packets do not mean offline.
 
-API: `GET /api/v1/network/interfaces` читает доступные сети, `POST /api/v1/network/scans` с `{"interface_address":"192.168.1.10"}` создаёт сеанс для существующего интерфейса, `GET /api/v1/network/scans/{scan_id}` получает результат и продлевает аренду, `POST .../{scan_id}/discover` запрашивает объявления, `DELETE .../{scan_id}` останавливает наблюдение. Все пути требуют обычный `X-API-Key`, ответы имеют `Cache-Control: no-store`. Наблюдения используют общий приёмник с карточками устройств. Максимум четыре сетевых сеанса и 32 наблюдения суммарно; аренда 15 секунд, предел длительности 900 секунд. Интерфейс читает раз в три секунды, останавливает сеанс при скрытии вкладки, переходе на другой экран или смене подключения. Если отмена не дошла, сокеты освобождаются после истечения аренды.
+## Network page API
 
-Данные хранятся в памяти: до 256 записей и последние 200 событий. Ошибки отдельных портов и недоступность таблицы соседей видны отдельно. После остановки последний снимок остаётся на экране. **«Сохранить отчёт»** скачивает JSON для дальнейшего анализа: выбранная сеть, адреса, идентификаторы, сервисы, изменения IP, события и счётчики; без идентификатора сеанса, ключей, токенов, сырых пакетов, TXT и HTTP-содержимого. Отчёт не отправляется на внешний сервер.
+All endpoints require the service key and use no-store responses:
 
-## Наблюдение из карточки устройства
+| Method | Route under `/api/v1/network` | Purpose |
+| --- | --- | --- |
+| GET | `/interfaces` | Actual available interface addresses/prefixes |
+| POST | `/scans` | Start with `{"interface_address":"192.168.1.10"}` |
+| GET | `/scans/{scan_id}` | Read results and renew the lease |
+| POST | `/scans/{scan_id}/discover` | Explicit standard discovery request |
+| DELETE | `/scans/{scan_id}` | Stop observation |
 
-В локальной и облачной карточке доступен раздел «Устройство в домашней сети» → «Наблюдать в сети». Сервис слушает UDP 6666/6667/7000 и сопоставляет `gwId`/`devId` с точным Tuya ID выбранного устройства. IP берётся из адреса отправителя принятого пакета, а не из заявленного поля payload. Для Zigbee наблюдается известный родитель из локального инвентаря или явный `gateway_id` облака; при отсутствии связи со шлюзом возвращается сообщение, без догадок по имени, комнате или соседним пакетам.
+The selected address must belong to an existing interface. Sessions share listeners with per-device watches: at most four network scans and 32 total watches, a 15-second renewable lease, and a 900-second maximum lifetime. The UI reads every three seconds and stops when hidden, navigated away, or reconnected elsewhere. Abandoned sessions expire and release sockets.
 
-Показываются сохранённый IP (если есть), обнаруженный IP, время последнего объявления, счётчик и последние 20 изменений адреса. История относится только к текущему сеансу и хранится в памяти; ключи, токены и исходные пакеты не сохраняются. Объявления discovery не аутентифицируют устройство, поэтому не меняют IP в инвентаре и не используются для автоматической отправки команд.
+Memory holds up to 256 records, the last 200 events, and up to 20 IP changes per identity. Port and neighbor-table failures are reported independently. Stopping keeps the last UI snapshot. Export includes the selected network, addresses/IDs, services, changes, events, and counters, without session IDs, keys, tokens, raw packets, TXT records, or HTTP content. The report is downloaded locally.
 
-API требует обычный ключ сервиса: `POST /api/v1/network/devices/{tuya_id}/watch?provider=sharing|developer|local` создаёт наблюдение; `GET /api/v1/network/watches/{watch_id}` получает данные и продлевает аренду; `DELETE` по тому же пути останавливает его. Интерфейс читает раз в три секунды без параллельных запросов, останавливает наблюдение при закрытии карточки и переключении устройства. Если отмена не дошла, аренда истекает через 15 секунд после последнего чтения; предельная длительность — 900 секунд, максимум 32 одновременных наблюдения. Один общий приёмник обслуживает открытые карточки, освобождая сокеты, когда наблюдений нет. Ошибки открытия портов показываются отдельно.
+## Observation from a device card
 
-Это пассивный приём discovery в сети компьютера с сервисом: устройство может не прислать объявление, даже если оно доступно. Отсутствие пакетов не означает offline. Текущее состояние и его изменения по-прежнему читаются через существующий облачный или локальный способ управления. Этот раздел не захватывает чужой TCP/TLS-трафик, не расшифровывает облачные сеансы и не является Zigbee-радиосниффером.
+The device's home-network section starts a watch for its exact Tuya ID. A Zigbee watch uses an explicitly known local parent or cloud `gateway_id`; names, rooms, and neighboring packets do not establish that parent.
 
-## Отдельная утилита записи
+`POST /network/devices/{id}/watch?provider=sharing|developer|local` starts it. GET/DELETE `/network/watches/{watch_id}` reads/renews or stops it. The observed address comes from the packet's sender rather than an untrusted payload IP. History belongs only to this in-memory watch; it does not change saved connection settings. The same lease/lifetime behavior applies.
+
+## Standalone capture tool
 
 ```sh
 python tools/capture_tuya.py --seconds 900
 ```
 
-Запускайте из корня репозитория с установленным `requirements.txt`. Это отдельная утилита, не фоновый discovery сервиса. Она слушает UDP 6666/6667/7000, сохраняет исходные байты и расшифровывает discovery через TinyTuya. Утилита не отправляет запросы, не открывает TCP-соединения к устройствам и не меняет их состояние. Для Tuya 3.5 иногда нужен отдельный стандартный discovery-запрос: без него устройство может не объявлять себя регулярно. См. [протокол TinyTuya](https://github.com/jasonacox/tinytuya/blob/master/PROTOCOL.md) и [scanner.py](https://github.com/jasonacox/tinytuya/blob/master/tinytuya/scanner.py).
+Run from the repository root with dependencies installed. The tool passively receives and decodes Tuya UDP discovery; it does not issue commands. Duration is 1–3600 seconds, default 900, with limits of 100,000 packets/100 MiB. A new private `data/captures/<UTC timestamp>` directory holds mode-0600 output. `--output` selects a new directory without overwriting an existing one. Stop with Ctrl+C or a `stop` file in that directory.
 
-После сообщения `READY` начинайте переподключение в Smart Life. Длительность задаётся в секундах, 1..3600; по умолчанию 900. Каталог создаётся под `data/captures/<UTC timestamp>` с правами `0700`, файлы — `0600`. Можно указать новый каталог через `--output`; существующий каталог не перезаписывается. Для досрочной остановки нажмите Ctrl+C или создайте файл `stop` в каталоге записи. Дополнительный предел — 100000 пакетов / 100 MiB.
+| File | Contents |
+| --- | --- |
+| `packets.jsonl` | Times, addresses/ports, raw packet hex, decoded payload |
+| `discovery.json` | Device/IP/version, first/last seen, counters |
+| `status.json` | Active/finished state and totals |
 
-| Файл | Содержимое |
-|---|---|
-| `packets.jsonl` | Время, source IP/port, destination port, исходный пакет в hex и декодированный payload |
-| `discovery.json` | Device ID, IP, version, first/last seen и счётчик пакетов; без подстановки облачных ключей |
-| `status.json` | Active/finished, число пакетов и устройств |
+Wait for READY before the owner's pairing/reconnection actions. Some devices only announce after a standard discovery request. `productKey` is a product identifier, not `local_key`; a Boolean `token` field is not an access token. UDP discovery is not the full activation exchange and does not supply an authenticated local key. Raw captures can contain private data and belong outside Git.
 
-В stdout выводятся только номер устройства, IP, проверенная версия и счётчики. Полный payload, Device ID и токены в stdout не выводятся. Сырые файлы могут содержать приватные данные: не публикуйте их. `data/` исключён из Git; для собственного пути настройте исключение отдельно.
+Ordinary Wi-Fi clients do not necessarily see other devices' unicast traffic. Full IP capture needs a traffic observation point and appropriate permissions; capturing TLS does not decrypt it. Zigbee radio analysis needs a suitable radio sniffer.
 
-Discovery-пакет не равен сообщению регистрации. Он позволяет узнать IP/Device ID/version и признаки возможностей. Поле `productKey` обозначает идентификатор продукта, его нельзя использовать вместо `local_key`. Наличие поля `token` тоже не означает выдачу ключа: в проверенной записи трёх ламп это был Boolean, а не секретная строка. Для действующего local_key используйте авторизованное облачное чтение после переподключения.
+## Historical checks: 7 October 2026
 
-Zigbee-пульт не имеет собственного Wi-Fi IP: по IP виден шлюз. Для записи радиообмена Zigbee нужен соответствующий радиосниффер; UDP-приёмник его не заменяет. На обычном Mac в Wi-Fi нельзя рассчитывать на видимость чужого unicast/TLS-трафика между устройством и облаком. Полная IP-запись потребует точки прохождения трафика, например OpenWrt, и соответствующих прав; TLS не расшифровывается одним захватом пакетов.
+A reconnection capture contained 498 decoded packets: 496 device messages and two explicit standard discovery requests. Thirteen devices were identified; four announced passively and nine more after requests. Three reconnected bulbs used protocol 3.5/6699 frames on UDP 7000. Payloads included identity/protocol/product metadata but no local-key field. Authorized Sharing metadata provided the keys separately; no device commands or database imports were performed.
 
-## Проверка 2026-10-07
-
-Во время пользовательского переподключения трёх Wi-Fi ламп и Zigbee-пульта записаны **498 UDP-пакетов**: 496 сообщений устройств и два собственных discovery-запроса. Все декодированы, обнаружены **13 устройств**. Пассивно объявлялись четыре устройства; после двух стандартных discovery-запросов найдены ещё девять, включая три переподключённые лампы. Все три ответили по Tuya 3.5 с кадрами `6699` на UDP 7000. В их payload присутствовали `gwId`, `uuid`, `ip`, `version`, `productKey`, `encrypt`, `token`, `active`, `ablilty`, `wf_cfg`, `clientLink`, `sl`; полей `local_key`/`localKey`/`key` не было.
-
-Авторизованное чтение Sharing API сопоставило их ID и свежие времена активации, подтвердило наличие текущих локальных ключей у трёх ламп и node_id у свежей записи пульта. Ключи происходят из облачного API, не из записанных UDP-пакетов. Parent gateway пульта и LAN-соединения с устройствами ещё не проверены. На Mac во время сеанса изменилась Wi-Fi подсеть; это учтено перед discovery-запросом. Запись через tcpdump/BPF была недоступна без прав администратора. Эти данные не являются записью TLS-активации или Zigbee-радиообмена. Команд управления и импорта в SQLite не было; реальные ID/ключи/дампы не включены в Git.
-
-## Первое подключение нового устройства — 2026-10-07
-
-В отдельной записи после начала добавления нового устройства получены **216 декодированных UDP-пакетов**, обнаружено девять устройств. Среди пакетов — 163 сообщения устройств, 51 discovery-запрос другого клиента с `from=app` и два собственных стандартных REQ_DEVINFO-запроса. Пакеты другого клиента не следует считать запросами сканера.
-
-Sharing API вернул 46 устройств против 45 в предыдущем снимке. Одна новая запись категории `kg`, `sub=false`, имеет времена создания и активации после начала этой записи. Её Device ID точно совпал с ID в одном ответе UDP 7000 с кадром `6699` и версией 3.5. Тем самым сопоставлены новое устройство в аккаунте и его локальный IP, без использования названия или предположений по одному адресу.
-
-Первое подключение дало такой же набор discovery-полей, как переподключение ламп: `gwId`, `uuid`, `ip`, `version`, `productKey`, `encrypt`, `token`, `active`, `ablilty`, `wf_cfg`, `clientLink`, `sl`. Полей `local_key`/`localKey`/`key` нет; `token` имеет тип Boolean. Текущий `local_key` доступен в авторизованном Sharing API, но его значение не сохранялось в снимки метаданных или отчёт. Новое устройство обнаружено; LAN-соединение и управление им не проверялись. Полного TLS-трафика регистрации и Zigbee-радиообмена эта запись не содержит. Запись остановлена после подтверждения владельца, реальные идентификаторы и дампы остаются вне Git.
+A new-device capture contained 216 decoded packets: 163 device messages, 51 requests from another app client, and two explicit requests. One new account device's exact ID matched a UDP response and recent activation metadata. This established identity/address correlation, not verified local control. Real IDs, keys, raw captures, TLS activation, and Zigbee radio traffic are not included in Git.

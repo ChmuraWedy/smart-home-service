@@ -1,35 +1,31 @@
-# Выключатели: подписи и алиасы каналов
+# Switch channels, timers, and backlight
 
-В карточке облачного выключателя локализованы `switch_backlight`, `relay_status`, `countdown_N` и `switch_inching`. Значения `relay_status` переводятся только в контексте этой настройки: `power_off`/`off` — «Выключено», `power_on`/`on` — «Включено», `last`/`memory` — «Восстановить предыдущее состояние». Это поведение после подачи электропитания, а не текущий статус реле. При отправке команды используются исходные значения Tuya.
+The switch card translates known parameters and their values without changing Tuya codes or command payloads.
 
-`switch_inching` — автоматическое выключение через заданное время после включения. [Описание Tuya](https://developer.tuya.com/en/docs/iot/smart-switch-product-function-definition?id=K9r7gh4lbe886) приводит пример отключения света через минуту. В проверенном устройстве это String DP без описания формата; интерфейс объясняет назначение, но не угадывает кодирование строки.
+| Tuya code | Meaning |
+| --- | --- |
+| `switch_N` | Independent channel power |
+| `countdown_N` | Channel timer, in the unit declared by the device |
+| `relay_status` | State to restore after electrical power is restored |
+| `switch_backlight` | Switch button backlight |
+| `switch_inching` | Automatic turn-off after switching on |
 
-## Локальные алиасы
+`relay_status` values such as `power_off`/`off`, `power_on`/`on`, and `last`/`memory` are shown as Off, On, and Restore previous state. They describe power restoration, rather than the relay's current state.
 
-Строка «Алиасы:» внутри соответствующей карточки «Канал N» позволяет добавить подпись через «+» и изменить или удалить её карандашом прямо в строке. Подписи существующих `switch_N` сохраняются в нашей SQLite-базе. Алиасы показываются отдельными тегами под заголовками каналов и не заменяют основные подписи, названия таймеров или параметры сопоставлений. Они не выдаются за имена, полученные из Smart Life. Данные изолированы по аккаунту и провайдеру. Устройство не обязательно регистрировать в локальном инвентаре. Кнопка «Удалить» удаляет алиас, не затрагивая устройство или настройки Smart Life. Ранее сохранённые подписи используются как алиасы без потери данных.
+On the main screen, each real channel has its own power control. In details, existing alias tags sit below **Channel N**. The clock beside its label expands the corresponding timer below the channel. Power-on state, backlight, and inching are under **Additional settings**.
 
-`PUT /api/v1/cloud/devices/{device_id}/channel-labels?provider=sharing` принимает:
+Tuya describes inching as automatically turning a switch off after a configured interval, for example one minute. The inspected device exposes it as a String DP without a documented string encoding. The UI explains its purpose without inventing the format. See [Tuya switch definitions](https://developer.tuya.com/en/docs/iot/smart-switch-product-function-definition?id=K9r7gh4lbe886).
+
+## Channel aliases
+
+Channel aliases are local labels in our database, shown as tags below the original channel heading. Add with **+** and edit inline with the pencil. They do not replace channel identifiers, timer names, DP mappings, or Smart Life's names. Storage is scoped by account and provider and does not require local inventory registration.
+
+`PUT /api/v1/cloud/devices/{device_id}/channel-labels?provider=sharing` accepts:
 
 ```json
-{"labels":{"switch_1":"Свет над столом","switch_2":null}}
+{"labels":{"switch_1":"Desk light","switch_2":null}}
 ```
 
-Ответ содержит сохранённую карту `labels`. `GET .../functions` возвращает необязательный `user_label` в соответствующих функциях и диапазонах. Эти имена полей и путь API сохранены для совместимости; их значения являются локальными алиасами, а не названиями из Tuya. Алиасы не меняют код команды и номер DP. Неизвестные каналы, пустые или непечатные строки, алиасы длиннее 120 символов отклоняются. Изменение сохраняется локально, без вызова облачных команд.
+A null removes the saved label. Function definitions can include `user_label`; the API field name is retained for compatibility, but this is an application alias, not proof of a name retrieved from Tuya. Unknown channels, empty/unprintable text, and labels over 120 characters are rejected. Saving an alias does not send a cloud command.
 
-## Что проверено в Smart Life
-
-2026-10-09 для реального двухканального выключателя прочитаны Sharing specifications/detail и три JSON-ответа открытой панели Smart Life Web: информация устройства, свойства и описание компонентов DESKTOP. Sharing вернул только `switch_1`/`switch_2`, без пользовательских имён. Веб-панель вернула `dpName: Switch 1`/`Switch 2`, а не имена, заданные владельцем в мобильном приложении. Поэтому текущая реализация не объявляет локально сохранённые подписи автоматически синхронизированными из Smart Life. Приватные ответы, идентификаторы и пользовательские названия в репозиторий не добавлены.
-
-В установленном Sharing SDK 0.2.15 обработчик `dpNameUpdate` также не обновляет имена (`pass`). Полный автоматический импорт названий мобильного приложения остаётся отдельной задачей: требуется подтверждённый источник данных.
-
-## Дополнительные настройки и показания
-
-Состояние после подачи питания, подсветка выключателя и импульсный режим находятся в свёрнутом разделе «Дополнительные настройки». Управление располагается рядом с названием параметра без отдельной рамки. Маленькое редактируемое числовое поле расположено по центру над ползунком таймера; точность значения сохранена. Время отчёта показывается справа сверху в секундах; кнопка обновления запрашивает статус устройства.
-
-Одна кнопка «Применить» сверху карточки отправляет все изменённые параметры одним запросом, включая питание и дополнительные настройки. Перед отправкой проверяются все черновики; ошибка в одном поле блокирует весь запрос. Значения сравниваются с исходными при начале редактирования: возврат к исходному исключает поле из отправки. Алиасы сохраняются отдельно своими кнопками. Облачные команды режима света объединяются без повторов; явно изменённый режим имеет приоритет, иначе используется режим последней правки света. Для локального устройства отправляется общая карта `values` через существующий endpoint capabilities.
-
-По умолчанию в строке «Цвет» остаются название и выбор цвета. Кнопка «···» раскрывает точные ползунки тона, насыщенности и яркости в той же строке; на узком экране они переносятся ниже.
-
-После принятия команды выбранное значение сохраняется до нового показания. Прежний облачный кеш не сбрасывает таймер или выбранный режим. Новый отчёт может подтвердить фактическое значение, включая уже уменьшающийся таймер. Непринятая команда сохраняет все редактируемые черновики; автоматических повторов нет.
-
-«Ручные сопоставления в нашей базе» находятся в техническом разделе. Наличие этого редактора не означает, что устройство предоставляет привязки Smart Life: записи не получены из приложения и не применяются в Tuya.
+The inspected Sharing API exposes channel codes such as `switch_1` and `switch_2`, but did not expose user-defined Smart Life channel names. Existing application aliases are kept explicitly separate from that source data.

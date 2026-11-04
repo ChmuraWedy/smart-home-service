@@ -1,58 +1,47 @@
-# Проверка Smart Life Web
+# Smart Life Web research
 
-Дата проверки: 2026-10-07. Проверен реальный вход в публичный [Smart Life Web](https://eu.device.tuya.ai/login) через QR и подтверждение владельцем в мобильном приложении. После разрешения владельца прочитаны сетевые ответы отдельного окна Chrome с единственной вкладкой Tuya. Вход в браузере Tuya не авторизует автоматически Sharing SDK нашего сервиса: это разные клиенты и сеансы.
+Historical check: **7 October 2026**. The owner confirmed a QR login to [Smart Life Web](https://eu.device.tuya.ai/login), and authorized inspection of that browser's network responses. The web session and this service's Sharing SDK are different clients; one login does not automatically authorize the other.
 
-Tuya [описывает публичную веб-версию](https://www.tuya.com/vas/commodity/OEM_WEB) как бесплатную для пользователей Smart Life / Tuya Smart; отдельные расширенные функции могут потребовать подписку в будущем. Условия OEM Web — отдельный продукт.
+Tuya's [web product description](https://www.tuya.com/vas/commodity/OEM_WEB) described a public Smart Life/Tuya Smart web version. Product availability, advanced features, and subscription terms belong to Tuya and are not guaranteed by this historical check.
 
-## Что подтверждено после входа
+## Observed metadata
 
-В проверенном аккаунте список и топология показали 44 устройства, 19 online и 25 offline на момент просмотра. Топология отобразила два шлюза и суммарно 21 дочернее устройство. Эти числа описывают один снимок аккаунта, а не пределы веб-версии.
+The tested account showed 44 devices, 19 online/25 offline, and topology with two gateways and 21 children. These are snapshot counts, not product limits.
 
-| Данные | Результат проверки |
-|---|---|
-| Названия, Tuya device ID, PID, категория, online/offline | Видны в списке |
-| Дом и вложенные помещения | Видны в дереве и расположении устройств |
-| Родительский шлюз | Видны связи в топологии; в JSON дочерних устройств подтверждены `gateway_id` / `gatewayId` |
-| MAC и тип связи | Видны в Device Info проверенной Wi-Fi лампы |
-| IP | В интерфейсе замаскирован; в проверенных JSON прямого устройства и шлюза это полный публичный WAN IP. У children адрес пустой. LAN IP не получен |
-| `local_key` / `localKey` | В 41 захваченном JSON-ответе поле не найдено; среди них список и восемь ответов сведений четырёх устройств |
-| Zigbee `node_id` / `nodeId` | В обоих ответах Zigbee-датчика есть одинаковый непустой 16-значный hex ID и одинаковый родитель; ID отличается от cloud device ID. Использование как TinyTuya `cid` требует проверки через LAN |
-| LAN protocol version 3.x | Не получена. Тип связи и `firmware_version` не являются версией LAN-протокола |
-| Экспорт | Встроенная кнопка Export доступна, но её файл не проверен. Экспорт Network в HAR получен и разобран локально |
+| Data | Result |
+| --- | --- |
+| Names, device IDs, PID, category, online state | Present |
+| Homes and rooms | Present in the tree/placement |
+| Parent gateway | Visible in topology; `gateway_id`/`gatewayId` in child detail JSON |
+| MAC and connection type | Present for the inspected Wi-Fi bulb |
+| IP | Masked in UI; inspected JSON contained public WAN IPs, not usable LAN IPs |
+| `local_key` / `localKey` | Absent from all 41 captured JSON responses |
+| Zigbee node address | Matching separate `node_id`/`nodeId` fields in two sensor responses |
+| LAN protocol 3.x | Not obtained; firmware/web API versions are not LAN versions |
+| Export | UI export existed; its file was not verified. A local sanitized HAR was inspected |
 
-Важно различать два источника: `nodeId` в коде визуализации топологии строится из `device.id` и обозначает узел графа. В JSON сведений `nodeId` / `node_id` — отдельное поле, у проверенного Zigbee-датчика оно отличается от cloud device ID. ID графа нельзя автоматически переносить в TinyTuya `cid`.
+Four devices were inspected through two detail APIs each: a direct Wi-Fi/Bluetooth bulb, a gateway, a Tuya Beacon child, and a Zigbee temperature sensor. All eight detail responses succeeded. Room trees, inventory/search, and service requests made up 41 captured JSON responses.
 
-## Проверка тел ответов API
+A graph node ID derived from `device.id` is not automatically the child `cid`. In the sensor's actual detail JSON, a separate node address differed from its cloud device ID, but using it for TinyTuya still requires LAN verification. A parent or node ID alone also does not prove Zigbee: the Beacon device had both.
 
-Для четырёх устройств открыты страницы Device Details: прямая Wi-Fi/Bluetooth лампа, шлюз, дочерняя Tuya Beacon лампа и Zigbee-датчик температуры. Для каждого получены два ответа: `device/index` и `ss/industry/device/info`. Все восемь ответов вернули HTTP 200 и `success: true`. Также захвачены дерево помещений, первая страница списка из 12 устройств, результаты поиска датчика и служебные запросы — всего 41 JSON-ответ.
+Gateway flags contradicted each other across APIs. Future import must resolve that conflict rather than trust one flag. Absence of a key in these inspected routes does not prove no other Tuya route could return it.
 
-- Ни один захваченный JSON не содержит `local_key` / `localKey`. Это подтверждает отсутствие поля в проверенных ответах данного аккаунта, но не доказывает отсутствие ключей во всех возможных маршрутах Tuya.
-- У Zigbee-датчика `gateway_id` совпадает с `gatewayId`, а `node_id` с `nodeId` второго ответа. У Tuya Beacon child тоже есть родитель и отдельный node ID; одного наличия родителя недостаточно, чтобы считать устройство Zigbee.
-- Метаданные шлюза противоречат друг другу: `isGateway` в industry info равен `true`, а `is_gateway_device` в device index — `false`; второй ответ сообщает `sub`, родителя и node ID. Будущий импорт должен разрешать такие расхождения, а не безусловно доверять одному флагу.
-- Адреса прямой лампы и шлюза проверены как публичные IP. Получить адрес в локальной сети и версию Tuya LAN этим способом пока не удалось.
+## Observed web-client routes
 
-Ответы прочитаны через Network → Export HAR (sanitized) и разобраны локально. Название «sanitized» не гарантирует отсутствия секретов в JSON-телах или специальных заголовках. Сырые записи использованы во временных файлах с правами `0600`; содержимое аккаунта, реальные ID, адреса и значения секретов в Git и этот отчёт не включены. Команды устройствам не отправлялись.
+These are research observations, not a stable public API contract:
 
-## Наблюдавшиеся запросы и публичный код клиента
+- `/open-api/v1.0/m/sdf/space/trees` and `/space/home/tree`
+- `/open-api/v1.0/m/sdf/device/pag/source-query`
+- `/open-api/v1.0/m/sdf/device/capability/list`
+- `/open-api/v1.0/m/sdf/device/index/<device_id>?project_id=<project_id>`
+- `/open-api/v1.0/m/sdf/ss/industry/device/info/<project_id>/<device_id>?version=5.1`
 
-Наблюдались следующие маршруты. Они описывают внутренний веб-клиент и не являются обещанием стабильного публичного API:
+The last route's `version=5.1` is a web-client API parameter, not Tuya LAN protocol 3.5. Inspected public client bundles referenced device export/task routes and topology construction. Missing secret field names in JavaScript cannot prove their absence from all server responses.
 
-- `/open-api/v1.0/m/sdf/space/trees` и `/open-api/v1.0/m/sdf/space/home/tree` — дерево помещений.
-- `/open-api/v1.0/m/sdf/device/pag/source-query` — запрос списка устройств.
-- `/open-api/v1.0/m/sdf/device/capability/list` — каталог фильтров по типам связи.
-- `/open-api/v1.0/m/sdf/device/index/<device_id>?project_id=<project_id>` — подробные сведения.
-- `/open-api/v1.0/m/sdf/ss/industry/device/info/<project_id>/<device_id>?version=5.1` — дополнительные сведения, включая `gatewayId` и `nodeId`. Значение `version=5.1` относится к запросу веб-клиента, а не Tuya LAN 3.x.
+## Privacy and remaining work
 
-Публичный [код раздела устройств](https://static1.tuyaeu.com/static/smart2c-app-device/0.0.0-156/static/js/main.2738d81d.js) содержит запрос подробных сведений и операции экспорта `/open-api/v2.0/m/sdf/device/export` и `/open-api/v2.0/m/sdf/device/export/task`. Проверенный bundle не содержит `local_key` / `localKey`. Отсутствие строки в интерфейсном коде **не доказывает**, что сервер не возвращает такое поле.
+HAR data was kept in private temporary files. A browser's “sanitized” export can still contain secrets in JSON bodies or custom headers. No account contents, real IDs, addresses, secrets, or raw captures were committed, and no device commands were sent.
 
-Публичный [код Smart Toolkit](https://static1.tuyaeu.com/static/smart2c-app-toolbox/0.0.0-109/static/js/main.2ab6b559.js) показывает построение графа из ID устройств, дочерних списков и сведений о шлюзах. Наличие структуры топологии полезно для будущего импорта родителей.
+A second browser session caused the first tab to return to QR login, but the cause was not established. A future web adapter would need verified login/refresh behavior, permissions, pagination, and parent reconciliation. No web adapter is implemented, and web tokens are not interchangeable with Sharing `token_info`.
 
-## Что это даёт сервису и что осталось проверить
-
-Веб-версия может быть источником названий, помещений, категорий и связи child → parent, а проверенный JSON Zigbee-датчика содержит дополнительный node ID. В проверенных ответах нет ключа, поэтому одного такого импорта недостаточно для локального управления TinyTuya.
-
-После открытия второго браузерного сеанса первая вкладка вернулась на страницу QR-входа. Причина без сетевых ответов не установлена; поддержку одновременных веб-сеансов и стабильность авторизации необходимо проверить отдельно.
-
-Для автоматического веб-адаптера отдельно нужны проверенные авторизация, срок и обновление сеанса, права, пагинация и разрешение противоречий в метаданных родителей. Веб-токен нельзя считать взаимозаменяемым с `token_info` Sharing SDK. Веб-адаптер и перенос реальных устройств в БД сервиса пока не реализованы.
-
-Для локального управления после импорта по-прежнему нужны ключ, LAN IP и версия, подтверждённые в локальной сети. Zigbee child управляется через реквизиты родительского шлюза и свой `cid`. В последующей [проверке QR-режима сервиса](qr-login.md#реальный-вход-и-метаданные--2026-10-07) отдельный Sharing SDK вернул 44 устройства, из них 42 с признаком наличия ключа. У 21 дочерней записи обнаружены два общих ключа, группирующих 16 и 5 устройств: это кандидаты на ключи двух шлюзов, хотя в строках самих шлюзов ключ отсутствует. Соответствие кандидатов шлюзам и локальное управление children остаются неподтверждёнными. Этот результат не относится к JSON-ответам веб-клиента, в которых поле ключа отсутствовало.
+The later [Sharing SDK check](qr-login.md#historical-hardware-check-7-october-2026) separately exposed key-presence metadata and gateway-key candidates in child records. That does not change the absence of keys from the inspected web JSON. Local control still needs a verified LAN IP, protocol, key, and, for Zigbee, gateway/child route.

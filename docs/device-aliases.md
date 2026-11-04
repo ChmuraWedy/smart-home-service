@@ -1,11 +1,15 @@
-# Алиасы устройства в карточках
+# Device aliases
 
-В открытой карточке под названием находится строка «Алиасы:». Кнопка «+» добавляет алиас прямо в строке; карандаш у каждого тега открывает его текстовое поле внутри границы того же тега. Сохранение, удаление и отмена представлены иконками галочки, корзины и крестика с доступными названиями и подсказками. Поле подстраивается под длину текста. Отдельного окна нет. Escape отменяет только редактирование. Теги сохраняются при повторном открытии и учитываются поиском списка устройств. Основное название устройства и алиасы отдельных каналов не заменяются.
+[Interface guide](../frontend/README.md) · [Channel aliases](switch-controls.md)
 
-До 32 пользовательских алиасов, 1–64 символа, первая буква любого языка; далее буквы, комбинируемые знаки, цифры, пробелы, точка, дефис или подчёркивание. Поддерживаются русский, белорусский и польский. Unicode нормализуется в NFC, пробелы по краям удаляются, регистр приводится к нижнему. Текущее имя зарегистрированного устройства остаётся автоматическим алиасом и не показывается как редактируемый тег.
+In a full device card, the **Aliases** row appears below the device name. Use **+** to add an alias inline. Each tag has a pencil that opens an input within the same tag border. Save, delete, and cancel use accessible checkmark, trash, and close icons. Escape cancels editing. There is no separate alias management window.
 
-Локальная карточка сохраняет список через существующий `PATCH /api/v1/devices/{id}`. Облачная использует `GET` и `PUT /api/v1/cloud/devices/{tuya_id}/aliases?provider=sharing|developer`; тело записи — `{"aliases":["desk_light"]}`, пустой список удаляет пользовательские алиасы. Все запросы требуют ключ сервиса и проверяют выбранный аккаунт. Облачный список устройств включает поле `aliases`, поэтому теги и поиск не требуют отдельного запроса для каждой карточки списка.
+Aliases persist across reopening and participate in device search. They do not replace the real device name or the separate channel aliases, and they do not rename anything in Smart Life.
 
-Для устройства, уже зарегистрированного в инвентаре, облачная карточка читает существующие алиасы и обновляет тот же объект `DeviceAlias`. Для облачного устройства без локальной записи используется таблица `cloud_device_aliases`, изолированная по аккаунту и провайдеру. Новая таблица создаётся автоматически при запуске. Импорт, локальные ключи или выдуманные записи устройств не нужны. Если устройство позднее добавлено в инвентарь, облачная карточка показывает объединённые алиасы; при следующем сохранении они переходят в существующее хранилище инвентаря, а временные облачные записи текущего аккаунта удаляются. Одинаковый пользовательский алиас другого устройства отклоняется с 409; сохранённые теги остаются видны при ошибке.
+Devices support up to 32 user aliases of 1–64 characters. The first character must be a Unicode letter; subsequent characters may include letters, combining marks, digits, spaces, periods, hyphens, and underscores. Text is normalized to NFC, trimmed, and lowercased. Russian, Belarusian, Polish, and other scripts are supported. A registered device's current name remains an automatic alias rather than an editable tag.
 
-Запись меняет только алиасы в нашей базе. Она не вызывает облачных команд, не переименовывает устройство в Smart Life, не обновляет IP или ключи. Отмена и закрытие карточки прерывают незавершённый запрос интерфейса; списки обновляются после закрытия карточки.
+Local cards save through `PATCH /api/v1/devices/{id}`. Cloud cards use `GET` and `PUT /api/v1/cloud/devices/{tuya_id}/aliases?provider=sharing|developer`. A write body is `{"aliases":["desk_light"]}`; an empty list removes user aliases. Requests require the service key and validate the selected account. The device inventory includes aliases, avoiding an additional request per card.
+
+Registered devices use the inventory alias store. Cloud-only devices use an account/provider-scoped store without inventing local device records. If the device is later registered, the cloud card merges the aliases and migrates them into inventory on the next save. Conflicting aliases return 409 while preserving existing tags.
+
+Saving changes only aliases in this application's database. It does not send a device command or change network settings or keys.
