@@ -21,7 +21,7 @@ Controls depend on the functions exposed by the device and the selected connecti
 
 ## Screenshots
 
-Real views of connected lights, switches, sensors, and a camera in English. Device names, aliases, and room assignments remain as configured in the captured installation.
+Real views of connected lights, switches, sensors, and a camera in English. Device names, aliases, and room assignments remain as configured in the captured installation, except for the camera examples: their screenshot-only title is Security Camera and their location label is Main Door.
 
 ### Device overview
 
@@ -103,7 +103,7 @@ The current motion reading and filtered activity log in a scrollable detail card
 
 ### Security camera: inline preview and full player
 
-Actual live video on the main card and in the full player — Dark theme. The screenshot-only Security Camera label leaves the saved device name unchanged.
+Actual live video on the main card and in the full player — Dark theme. Security Camera and Main Door are screenshot-only display labels; the saved device name and room assignment are unchanged.
 
 ![Mobile security camera card with quick controls and live preview](docs/screenshots/mobile-camera-card-dark.png) ![Mobile security camera full player with actual live video](docs/screenshots/mobile-camera-live-dark.png)
 
