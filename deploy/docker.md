@@ -4,6 +4,26 @@ Dell 5070 — компьютер назначения. Порт веб-инте�
 Нужны Linux, Docker Engine и Docker Compose v2. Сначала проверьте `uname -m`,
 `docker version`, `docker compose version` и свободные порты 8080/8000 на самом Dell.
 
+## Установленный экземпляр
+
+Приложение развёрнуто на Dell Wyse 5070 (Debian 13):
+`http://homeassistant.dom:8080`. Home Assistant продолжает использовать порт 8123.
+
+SSH-алиас на управляющем Mac — `dell5070`; каталог установки на сервере —
+`/home/damawik/smart-home-service`. Используется готовый образ
+`smart-home-service:dell5070` и Linux LAN override.
+
+```sh
+ssh dell5070
+cd /home/damawik/smart-home-service
+sudo docker compose -f compose.yaml -f compose.lan.yaml ps
+```
+
+Для перезапуска используйте те же два Compose-файла и команду `restart`.
+При обновлении загрузите новый образ, затем выполните
+`sudo docker compose -f compose.yaml -f compose.lan.yaml up -d --no-build --wait`.
+Текущие данные находятся в постоянном volume; повторный импорт базы не требуется.
+
 ## Сборка и запуск
 
 Скопируйте репозиторий на Dell, не перенося `.venv`, `node_modules` и `.git`.
