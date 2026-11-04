@@ -4,6 +4,10 @@ Entries below describe the changes at the stated date; later entries can superse
 
 ## After 0.8.3 — 2026-11-04
 
+- `feat/immediate-controls-mobile`: removed the shared Apply action. Switches send immediately; valid slider, color, text, and wizard edits send automatically with short coalescing and no command retries. Active status sessions wait for scheduled readings instead of issuing an extra read after every command.
+- Visible local and Sharing cards check the server cache every second. Local cache heartbeats lease a bounded shared collector that reads visible devices every five seconds, expires abandoned watches, deduplicates browsers, and preserves observations on failure. Sharing continues to use Tuya MQTT reports rather than periodic remote HTTP polling.
+- Local commissioning now recognizes verified Tuya color encodings and includes the confirmed color-mode DP. Mobile details occupy the whole screen, isolate clicks, and lock background scrolling, including nested dialogs.
+
 - Added actual Polish bulb and Belarusian motion-sensor localization examples, with English documentation captions. Renamed overview headings and screenshot assets by device type rather than installation-specific rooms.
 
 - Replaced the Russian documentation with English guides and an OpenAPI-derived endpoint index. Expanded the README into seven individually visible screenshots, including Workroom bulb color controls and WC2 motion status/activity.

@@ -35,7 +35,7 @@ describe('camera storage and activity area',()=>{
     mount(1);
     expect(await screen.findByRole('switch',{name:'Запись на карту памяти'})).toBeEnabled();
   });
-  it('edits the stored rectangle, cancels without writes and saves only through the common Apply button',async()=>{
+  it('edits the stored rectangle, cancels without writes and saves automatically after confirmation',async()=>{
     const writes=mount(),user=userEvent.setup();
     const edit=await screen.findByRole('button',{name:'Изменить область'});
     await waitFor(()=>expect(edit).toBeEnabled());
@@ -46,13 +46,13 @@ describe('camera storage and activity area',()=>{
     await user.keyboard('{ArrowRight}');
     expect(within(dialog).getByRole('spinbutton',{name:'Ширина (%)'})).toHaveValue(41);
     await user.click(within(dialog).getByRole('button',{name:'Отмена'}));
-    expect(writes).toEqual([]); expect(screen.getByRole('button',{name:/Применить/})).toBeDisabled();
+    expect(writes).toEqual([]); expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     await user.click(edit); dialog=screen.getByRole('dialog',{name:'Область обнаружения'});
     expect(within(dialog).getByRole('spinbutton',{name:'Ширина (%)'})).toHaveValue(40);
     await user.click(within(dialog).getByRole('button',{name:'Переместить область'})); await user.keyboard('{ArrowRight}');
     await user.click(within(dialog).getByRole('button',{name:'Сохранить'}));
     expect(writes).toEqual([]);
-    await user.click(screen.getByRole('button',{name:/Применить/}));
+
     await waitFor(()=>expect(writes).toHaveLength(1));
     expect(writes[0]).toEqual({commands:[{code:'motion_area',value:JSON.stringify({num:1,region0:{x:11,y:20,xlen:40,ylen:30,vendor:'keep'},version:2})}]});
     expect(vi.mocked(fetch).mock.calls.some(([input])=>String(input).includes('/stream'))).toBe(false);
@@ -65,7 +65,7 @@ describe('camera storage and activity area',()=>{
     expect(parseArea('{"num":2,"region0":{"x":0,"y":0,"xlen":20,"ylen":20}}')).toBeNull();
     expect(parseArea('{"num":1,"region0":{"x":0,"y":0,"xlen":0,"ylen":20}}')).toBeNull();
   });
-  it('blocks an edited recording command if the card disappears before Apply',async()=>{
+  it('disables subsequent recording changes after a report says the card disappeared',async()=>{
     vi.useFakeTimers({shouldAdvanceTime:true});
     const writes=mount(1),user=userEvent.setup({advanceTimers:vi.advanceTimersByTime});
     try {
@@ -73,16 +73,16 @@ describe('camera storage and activity area',()=>{
       await waitFor(()=>expect(mode).toBeEnabled());
       await waitFor(()=>expect(mode).toHaveDisplayValue('По событиям'));
       await user.selectOptions(mode,'1');
-      await waitFor(()=>expect(screen.getByRole('button',{name:/Применить/})).toBeEnabled());
+      await waitFor(()=>expect(writes).toHaveLength(1));
       const originalFetch=vi.mocked(fetch).getMockImplementation()!;
       vi.mocked(fetch).mockImplementation(async(input,options)=>{
         if (options?.method!=='POST' && String(input).includes('/status')) return json({device_id:'camera',online:true,source:'cloud',status:{sd_status:5,record_switch:true,record_mode:'1',motion_area:original}});
         return originalFetch(input,options);
       });
-      await act(async()=>{await vi.advanceTimersByTimeAsync(3000);});
+      await act(async()=>{await vi.advanceTimersByTimeAsync(1000);});
       expect(mode).toBeDisabled();
-      await user.click(screen.getByRole('button',{name:/Применить/}));
-      expect(writes).toEqual([]); expect(await screen.findByRole('alert')).toHaveTextContent('Карта памяти не установлена');
+
+      expect(writes).toHaveLength(1); expect(screen.getByRole('region',{name:'Запись на карту памяти'})).toHaveTextContent('Карта памяти не установлена');
     } finally {vi.useRealTimers();}
   });
 });

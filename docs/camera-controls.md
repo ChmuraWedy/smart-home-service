@@ -16,7 +16,7 @@ The player shows available resolution, playback state, latest-segment download s
 
 ## Settings and explanations
 
-Information icons open full descriptions of known functions and values, including disabled settings. They close through Escape, the close icon, or an outside click and do not send commands. Ordinary edited settings use the card's shared Apply action; privacy and formatting are separate explicit actions.
+Information icons open full descriptions of known functions and values, including disabled settings. They close through Escape, the close icon, or an outside click and do not send commands. Ordinary settings send changes automatically. Privacy sends immediately; formatting retains explicit confirmation.
 
 | Section | Examples |
 | --- | --- |
@@ -47,7 +47,7 @@ Tuya documents both [device-side video detection](https://developer.tuya.com/en/
 
 Recording and formatting require a known ready card. Absent/unknown storage disables those actions, even if a cached `record_switch` is true. Readiness is rechecked before submitting a draft. Formatting requires a deletion confirmation and is disabled while formatting is already in progress. Known raw `sd_status` codes are categorical rather than scaled measurements. The inspected Sleep Cam reported no ready card, despite a true cached recording switch.
 
-The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A red rectangle can be moved/resized over separately started video, using pointer, keyboard, or percentage inputs. Saving updates the draft; Apply sends it. Cancellation keeps the original, unknown object fields are retained, and unsupported/multiple-region formats are not replaced by a fabricated rectangle.
+The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A red rectangle can be moved/resized over separately started video, using pointer, keyboard, or percentage inputs. Saving sends the selected area automatically. Cancellation keeps the original, unknown object fields are retained, and unsupported/multiple-region formats are not replaced by a fabricated rectangle.
 
 ## Limits
 

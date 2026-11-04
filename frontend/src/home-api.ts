@@ -84,8 +84,8 @@ export class HomeApi extends CloudApi {
     return { buildings, rooms, devices, groups };
   }
   device(id: number, signal?: AbortSignal) { return this.request<LocalDevice>(`/devices/${id}`, 'GET', undefined, signal); }
-  state(id: number, refresh = false, signal?: AbortSignal) {
-    return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60`, 'GET', undefined, signal);
+  state(id: number, refresh = false, signal?: AbortSignal, watch = false) {
+    return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60${watch ? "&watch=true" : ""}`, 'GET', undefined, signal);
   }
   setCapability(id: number, name: string, value: JsonValue) {
     return this.setCapabilities(id, { [name]: value });

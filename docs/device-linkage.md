@@ -31,9 +31,9 @@ The UI follows the selected device's actual definitions. The inspected WorkRoomL
 
 ## Color, effects, and schedules
 
-The card has one Apply action for edited values. A color-row expander shows hue, saturation, and color brightness. White brightness and temperature are distinct from the HSV value used for colored light.
+Controls send valid changed values automatically. A color-row expander shows hue, saturation, and color brightness. White brightness and temperature are distinct from the HSV value used for colored light.
 
-Popup wizards edit circadian lighting, sleep, wake-up, random schedules, lighting effects, music commands, and transitions. They explain repetition, timing, points, and review before returning a draft to the card. Cancellation does not replace the original. A final Apply sends the edited draft.
+Popup wizards edit circadian lighting, sleep, wake-up, random schedules, lighting effects, music commands, and transitions. They explain repetition, timing, points, and review before returning a draft to the card. Cancellation does not replace the original. Done sends the edited settings automatically.
 
 JSON editors follow device schemas. On the inspected bulb, music/transition saturation and brightness use 0–255, while its color function uses 0–1000. Command-only fields can be empty in status without being unsupported. `music_data` can select the declared music mode; `scene_data_v2` can select scene mode. Sending a music frame does not implement microphone capture, audio analysis, or continuous music synchronization.
 
@@ -58,3 +58,5 @@ curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d
 ```
 
 `BASE` includes `/api/v1`. GET on the same collection returns incoming/outgoing records, `origin:manual`, `applied_to_tuya:false`, and `tuya_bindings_available:false`. PUT/DELETE address `/cloud/devices/{source_device_id}/mappings/{id}`. Incoming records must still be changed via their source device. DELETE removes only our database record. UI creation/deletion and REST editing do not change actual Tuya bindings.
+
+Local bulb setup recognizes HSV16, JSON HSV v2, and legacy RGB+HSV8 only when an advertised color function, its unambiguous DP, a valid LAN payload, and an observed writable white/color mode agree. The color capability includes the confirmed mode DP, so picking a color also selects color mode. Unknown formats remain read-only; no product category supplies an assumed DP map. Previously saved raw mappings are preserved until explicitly corrected.

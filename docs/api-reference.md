@@ -207,6 +207,8 @@ This index is generated from the application's OpenAPI routes. Consult the live 
 
 ### Control
 
+`refresh=false` reads saved state. Add `watch=true` while a local card is visible to renew its three-second background collection lease; the server reads that device at a five-second interval. The HTTP response still comes from the cache. `refresh=true` explicitly performs an immediate device read.
+
 | Method | Path | Operation |
 | --- | --- | --- |
 | GET | `/api/v1/devices/{item_id}/state` | Normalized State |

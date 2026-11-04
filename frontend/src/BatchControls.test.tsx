@@ -32,114 +32,87 @@ function cloud(error = false) {
 }
 const field = (name: string) => screen.getByRole('region', { name });
 const edit = (name: string, value: string) => fireEvent.change(within(field(name)).getByRole('spinbutton'), { target: { value } });
-const apply = () => screen.getByRole('button', { name: 'Применить' });
 
-describe('one Apply for a device card', () => {
-  it('stages power and numeric edits, sends only changed values in one request, and retains targets over an old cloud snapshot', async () => {
+describe('automatic device controls', () => {
+  it('sends power immediately and coalesces numeric edits without Apply or an extra status request', async () => {
+    vi.useFakeTimers({toFake:['setInterval','clearInterval']});
     const { writes } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
     await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
-    expect(screen.getAllByRole('button', { name: 'Применить' })).toHaveLength(1);
-    edit('Яркость', '65'); edit('Цветовая температура', '40');
+    expect(screen.queryByRole('button', { name: 'Применить' })).toBeNull();
+    const reads = vi.mocked(fetch).mock.calls.filter(([,init]) => init?.method === 'GET').length;
     await user.click(screen.getByRole('switch'));
-    expect(writes).toEqual([]);
-    expect(await screen.findByText('Изменено: 3')).toBeInTheDocument();
-    await user.click(apply());
-    await screen.findByText(/Команда принята.*Статус запрошен заново/);
-    expect(writes).toEqual([{ commands: [
-      { code: 'bright_value_v2', value: 650 }, { code: 'temp_value_v2', value: 400 }, { code: 'switch_led', value: true },
-    ] }]);
+    await waitFor(() => expect(writes).toEqual([{commands:[{code:'switch_led',value:true}]}]));
+    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
+    edit('Яркость', '60'); edit('Яркость', '65'); edit('Цветовая температура', '40');
+    await waitFor(() => expect(writes).toHaveLength(2));
+    expect(writes[1]).toEqual({commands:[{code:'bright_value_v2',value:650},{code:'temp_value_v2',value:400}]});
+    expect(vi.mocked(fetch).mock.calls.filter(([,init]) => init?.method === 'GET')).toHaveLength(reads);
     expect(within(field('Яркость')).getByRole('spinbutton')).toHaveValue(65);
-    expect(within(field('Цветовая температура')).getByRole('spinbutton')).toHaveValue(40);
-    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-    expect(apply()).toBeDisabled();
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked','true');
   });
 
-  it('excludes edits returned to the initial value, including a false power value', async () => {
-    const { writes } = cloud(), user = userEvent.setup();
+  it('does not send a number returned to its original value before the edit settles', async () => {
+    const { writes } = cloud();
     await screen.findByRole('region', { name: 'Яркость' });
-    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     edit('Яркость', '65'); edit('Яркость', '50');
-    await user.click(screen.getByRole('switch'));
-    await user.click(screen.getByRole('switch'));
-    await waitFor(() => expect(apply()).toBeDisabled());
-    expect(screen.queryByText(/Изменено:/)).toBeNull();
+    await new Promise(resolve => setTimeout(resolve, 400));
     expect(writes).toEqual([]);
   });
 
-  it('validates every changed field before sending any command and includes a zero value', async () => {
-    const { writes } = cloud(), user = userEvent.setup();
+  it('sends valid fields independently, rejects invalid values, and accepts zero', async () => {
+    const { writes } = cloud();
     await screen.findByRole('region', { name: 'Яркость' });
-    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
     edit('Яркость', '65'); edit('Цветовая температура', '200');
-    expect(apply()).toBeDisabled();
     expect(within(field('Цветовая температура')).getByRole('alert')).toBeInTheDocument();
-    await user.click(apply()); expect(writes).toEqual([]);
+    await waitFor(() => expect(writes).toEqual([{commands:[{code:'bright_value_v2',value:650}]}]));
+    await waitFor(() => expect(within(field('Цветовая температура')).getByRole('spinbutton')).toBeEnabled());
     edit('Цветовая температура', '0');
-    await user.click(apply());
-    await waitFor(() => expect(writes).toHaveLength(1));
-    expect(writes).toEqual([{ commands: [{ code: 'bright_value_v2', value: 650 }, { code: 'temp_value_v2', value: 0 }] }]);
+    await waitFor(() => expect(writes[1]).toEqual({commands:[{code:'temp_value_v2',value:0}]}));
   });
 
-  it('keeps all edits after rejection and never retries automatically', async () => {
-    const { writes } = cloud(true), user = userEvent.setup();
+  it('keeps rejected edits visible and never retries when the session becomes idle', async () => {
+    const { writes } = cloud(true);
     await screen.findByRole('region', { name: 'Яркость' });
-    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
-    edit('Яркость', '65'); edit('Цветовая температура', '40');
-    await user.click(apply());
+    edit('Яркость', '65');
     await screen.findByText(/Устройство недоступно/);
-    expect(screen.getByText('Изменено: 2')).toBeInTheDocument();
     expect(within(field('Яркость')).getByRole('spinbutton')).toHaveValue(65);
-    expect(within(field('Цветовая температура')).getByRole('spinbutton')).toHaveValue(40);
-    expect(apply()).toBeEnabled();
+    await new Promise(resolve => setTimeout(resolve, 400));
     expect(writes).toHaveLength(1);
   });
 
-  it('offers only a color picker by default, expands precise controls, and gives an explicit light mode precedence without duplicate commands', async () => {
+  it('edits color with precise controls and sends its mode automatically', async () => {
     const { writes } = cloud(), user = userEvent.setup();
     await screen.findByRole('region', { name: 'Цвет' });
     expect(within(field('Цвет')).queryByRole('slider')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Точная настройка цвета' }));
     expect(within(field('Цвет')).getAllByRole('slider')).toHaveLength(3);
     fireEvent.change(screen.getByLabelText('Выбор цвета'), { target: { value: '#0000ff' } });
-    edit('Яркость', '65');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Режим' }), '1');
-    await user.click(apply());
-    await waitFor(() => expect(writes).toHaveLength(1));
-    expect(writes).toEqual([{ commands: [
-      { code: 'work_mode', value: 'colour' }, { code: 'colour_data_v2', value: { h: 240, s: 1000, v: 1000 } }, { code: 'bright_value_v2', value: 650 },
-    ] }]);
+    await waitFor(() => expect(writes).toEqual([{commands:[{code:'work_mode',value:'colour'},{code:'colour_data_v2',value:{h:240,s:1000,v:1000}}]}]));
   });
 
-  it('compares against the original value even when a refresh updates the live reading during editing', async () => {
-    const { writes, status } = cloud(), user = userEvent.setup();
+  it('cancels a queued edit when the detail view closes', async () => {
+    const { writes } = cloud();
     await screen.findByRole('region', { name: 'Яркость' });
-    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
-    edit('Яркость', '65'); status.bright_value_v2 = 700;
-    await user.click(screen.getByRole('button', { name: 'Обновить статус' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Обновить статус' })).toBeEnabled());
-    expect(within(field('Яркость')).getByRole('spinbutton')).toHaveValue(65);
-    edit('Яркость', '50');
-    expect(apply()).toBeDisabled();
+    edit('Яркость', '65');
+    // Unmounting a card must cancel its pending debounce, not send later.
+    const { cleanup } = await import('@testing-library/react');
+    cleanup();
+    await new Promise(resolve => setTimeout(resolve, 400));
     expect(writes).toEqual([]);
-    // No command is needed after reverting; the latest observed value can be shown.
-    await waitFor(() => expect(within(field('Яркость')).getByRole('spinbutton')).toHaveValue(70));
   });
 
-  it('uses the latest light edit for an implicit mode when no explicit mode was changed', async () => {
-    const { writes } = cloud(), user = userEvent.setup();
+  it('sends the latest color edit with the correct implicit mode', async () => {
+    const { writes } = cloud();
     await screen.findByRole('region', { name: 'Цвет' });
     fireEvent.change(screen.getByLabelText('Выбор цвета'), { target: { value: '#0000ff' } });
     edit('Яркость', '65');
     fireEvent.change(screen.getByLabelText('Выбор цвета'), { target: { value: '#ff0000' } });
-    await user.click(apply());
     await waitFor(() => expect(writes).toHaveLength(1));
-    expect(writes).toEqual([{ commands: [
-      { code: 'work_mode', value: 'colour' }, { code: 'bright_value_v2', value: 650 }, { code: 'colour_data_v2', value: { h: 0, s: 1000, v: 1000 } },
-    ] }]);
+    expect(writes[0]).toEqual({commands:[{code:'work_mode',value:'colour'},{code:'bright_value_v2',value:650},{code:'colour_data_v2',value:{h:0,s:1000,v:1000}}]});
   });
 
-  it('sends a local device batch through the existing capabilities endpoint', async () => {
+  it('sends a local edit through the existing capabilities endpoint', async () => {
     const local: LocalDevice = { id: 1, device_id: 'local-lamp', name: 'Локальная лампа', aliases: [], building_id: null, room_id: null,
       transport: 'wifi', parent_id: null, cid: null, enabled: true, capabilities: {
         switch: { type: 'boolean', readable: true, writable: true }, brightness: { type: 'number', readable: true, writable: true, minimum: 0, maximum: 100, unit: '%' },
@@ -153,12 +126,8 @@ describe('one Apply for a device card', () => {
       return json(local);
     });
     render(<LocalControl api={new HomeApi(connection)} device={local} onClose={vi.fn()} onAuthError={vi.fn()} />);
-    const user = userEvent.setup();
     await screen.findByRole('region', { name: 'Яркость' });
-    await waitFor(() => expect(screen.getByRole('switch')).toBeEnabled());
-    await user.click(screen.getByRole('switch')); edit('Яркость', '65');
-    expect(writes).toEqual([]);
-    await user.click(apply());
-    await waitFor(() => expect(writes).toEqual([{ path: '/api/v1/devices/1/commands/capabilities', body: { values: { switch: false, brightness: 65 } } }]));
+    edit('Яркость', '65');
+    await waitFor(() => expect(writes).toEqual([{path:'/api/v1/devices/1/commands/capabilities',body:{values:{brightness:65}}}]));
   });
 });

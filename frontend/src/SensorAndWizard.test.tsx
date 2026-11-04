@@ -65,7 +65,7 @@ describe('popup schedule wizards', () => {
     expect(vi.mocked(fetch).mock.calls.every(([,init]) => init?.method !== 'POST')).toBe(true);
   });
 
-  it('keeps wizard edits local until Done, then sends them only through the card Apply button', async () => {
+  it('keeps wizard edits local until Done, then sends them automatically', async () => {
     const original=encodeRawSchedule('rhythm_mode',defaultSchedule('rhythm_mode')), writes:unknown[]=[];
     vi.mocked(fetch).mockImplementation(async (input,init) => {
       if (init?.method==='POST') { writes.push(JSON.parse(String(init.body))); return json({acknowledged:true}); }
@@ -76,17 +76,16 @@ describe('popup schedule wizards', () => {
     expect(screen.getByRole('region',{name:'Расписания света'})).toBeVisible();
     expect(screen.queryByText('Эффекты и дополнительные параметры')).toBeNull();
     await user.click(screen.getByRole('button',{name:'Настроить'}));
-    expect(screen.getByRole('button',{name:'Применить'})).toBeDisabled();
+    expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     await user.click(screen.getByRole('button',{name:'Далее'}));
     await user.click(screen.getByRole('button',{name:'Добавить точку'}));
     expect(writes).toEqual([]);
     await user.click(screen.getByRole('button',{name:'Далее'}));
     await user.click(screen.getByRole('button',{name:'Готово'}));
     expect(screen.queryByRole('dialog',{name:/Настройка:/})).toBeNull();
-    expect(screen.getByText('Изменено: 1')).toBeInTheDocument();
     expect(writes).toEqual([]);
-    await user.click(screen.getByRole('button',{name:'Применить'}));
-    await screen.findByText(/Команда принята.*Статус запрошен заново/);
+
+    await screen.findByText(/Команда принята/);
     expect(writes).toHaveLength(1);
     expect((writes[0] as {commands:{code:string;value:string}[]}).commands[0].code).toBe('rhythm_mode');
     expect((writes[0] as {commands:{value:string}[]}).commands[0].value).not.toBe(original);

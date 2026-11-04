@@ -1286,3 +1286,15 @@ button.header-icon:hover:enabled { background:var(--hover); }
   .control-dialog-body .capability-boolean > .capability-row { grid-template-columns:minmax(0,1fr) auto auto; }
   .control-dialog-body .capability-boolean > .capability-row > .reading-meta { grid-column:3; grid-row:1; }
 }
+
+/* Details use the whole mobile viewport; only the content pane scrolls. */
+@media (max-width: 600px) {
+  .control-dialog {
+    position:fixed; inset:0; margin:0; box-sizing:border-box;
+    width:100%; max-width:none; height:100vh; height:100dvh; max-height:100dvh;
+    border:0; border-radius:0; box-shadow:none;
+    padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  }
+  .control-dialog-body { flex:1; scrollbar-gutter:auto; padding-right:0; -webkit-overflow-scrolling:touch; }
+  .control-dialog .control-header { gap:8px; padding-bottom:12px; }
+}

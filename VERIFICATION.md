@@ -1,5 +1,15 @@
 # Project verification
 
+## Automatic controls, visible-device status, and mobile details — 2026-11-04
+
+**256 frontend tests passed**, including automatic submission without Apply, coalesced edits, unchanged/invalid values, rejected commands without retries, pending targets over old cache readings, cancelled edits, one-second cache reads, hidden-view cleanup, connection/battery updates, color serialization, and nested-dialog click/scroll isolation. The complete backend run passed **541 tests**; after adding a connection-change race regression, all **45 focused commissioning/collector tests** passed. Ruff, TypeScript, production build, and `git diff --check` passed. The existing large-bundle build advisory remains.
+
+The new collector is exercised with simulated transports: cache responses do not wait on LAN I/O; visible-device leases drive five-second reads, share one watch across browsers, expire without heartbeats, avoid overlapping reads, preserve values on timeout, skip disabled devices, use saved Zigbee gateways, and discard replies from replaced configurations. Verified cloud DP metadata plus valid local HSV16/JSON HSV v2/legacy RGB+HSV8 payloads enable local color, with the observed mode DP included in writes. Unknown color formats remain read-only.
+
+An isolated touch-enabled Chromium preview used the deployed service through a proxy that blocks writes. Detail bounds were exactly 390 × 844 and 375 × 667, with no horizontal overflow. Desktop bounds were 840 × 868 at 1280 × 900; the header stayed fixed while its content scrolled. Intercepted test commands exercised actual slider and power taps; cache-read intervals were 999, 1000, and 1003 ms, underlying tile click count stayed zero, and closing restored page scrolling. These command acknowledgements and resulting readings were simulated in the isolated browser; no physical actuator command was issued.
+
+The existing WorkRoomLamp1 configuration had a read-only raw color string. Its advertised function/DP, saved LAN HSV16 value, and writable observed white/color mode were checked before explicitly correcting only that capability in the running service. A private pre-change capability backup was retained. The application branch itself has not been deployed.
+
 ## Gateway key discovery — 2026-10-12
 
 **394 Python tests and 184 frontend tests passed**; Ruff, TypeScript, production build and `git diff --check` passed. Thirty new backend checks cover candidate deduplication and real gateway categories despite `sub=true`, explicit foreign-parent exclusion, one-IP/private-address guards, protocol and time limits, failed/no-key cleanup, serialized verification, account/key/source changes, expiry/cancel, explicit review and server-only persistence. Installed TinyTuya 1.20.0 is exercised with genuine 3.4/3.5 HMAC negotiation and 3.3 AES decoding over simulated responses, including wrong keys; 3.1 is never accepted as key proof. Two new UI checks cover IP confirmation, verification without DPS/polling, explicit save and editable failures.

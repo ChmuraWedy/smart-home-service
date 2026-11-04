@@ -15,7 +15,7 @@ function Harness(){
 const api=new CloudApi({baseUrl:'http://localization-api.test',token:'fixture-key'});
 
 describe('localized device controls',()=>{
-  it('updates a loaded device without resetting the brightness draft, renaming the device, or sending a command',async()=>{
+  it('switches language and theme without resetting an edit or changing its automatic command',async()=>{
     const writes:unknown[]=[];
     const functions=[{code:'switch_led',type:'Boolean',values:'{}'},{code:'bright_value_v2',type:'Integer',values:{min:10,max:1000,step:1}}];
     vi.mocked(fetch).mockImplementation(async(input,init)=>{
@@ -25,6 +25,8 @@ describe('localized device controls',()=>{
     });
     setLocale('en');render(<Harness/>);
     const brightness=await screen.findByRole('spinbutton',{name:'Brightness (%)'});
+    await waitFor(()=>expect(brightness).toBeEnabled());
+    await waitFor(()=>expect(brightness).toHaveValue(50));
     fireEvent.change(brightness,{target:{value:'78'}});
     expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
     for (const choice of ['dark','day','system'] as const) {
@@ -41,7 +43,7 @@ describe('localized device controls',()=>{
     }
     act(()=>setLocale('en'));
     expect(screen.getByRole('spinbutton',{name:'Brightness (%)'})).toHaveValue(78);
-    fireEvent.click(screen.getByRole('button',{name:'Apply'}));
+    expect(screen.queryByRole('button',{name:'Apply'})).toBeNull();
     await waitFor(()=>expect(writes).toEqual([{commands:[{code:'bright_value_v2',value:780}]}]));
   });
 });

@@ -57,11 +57,11 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
       const controller = new AbortController(), version = epoch.current;
       pollAbort.current = controller;
       void poll(current.current,controller.signal).then(value => {
-        if (alive.current && !controller.signal.aborted && version === epoch.current && !lock.current) { setData(value); setNotice(previous => previous.text.startsWith(t("Автообновление недоступно:")) ? {text:''} : previous); }
+        if (alive.current && !controller.signal.aborted && version === epoch.current && !lock.current) { setData(value); setReadOK(true); setNotice(previous => previous.text.startsWith(t("Автообновление недоступно:")) ? {text:''} : previous); }
       }).catch(error => {
         if (alive.current && !controller.signal.aborted && version === epoch.current) { setNotice({text:t("Автообновление недоступно: ")+errorText(error),error:true}); unauthorized(error); }
       }).finally(() => { if (pollAbort.current === controller) pollAbort.current = null; });
-    },3000);
+    },1000);
     return () => { clearInterval(timer); cancelPoll(); };
   }, [poll]);
 
@@ -85,6 +85,10 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
     try {
       const receipt = await send();
       if (!alive.current) return;
+      if (poll) {
+        setNotice({...receipt, text: receipt.text + t(" Ожидаем отчёт устройства.")});
+        return true;
+      }
       setNotice({ ...receipt, text: receipt.text + t(" Запрашиваем статус…") });
       try { await read(); if (alive.current) setNotice({ ...receipt, text: receipt.text + t(" Статус запрошен заново; показания отображаются отдельно.") }); }
       catch (error) {
@@ -101,6 +105,15 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
     return true;
   }
   return { data, busy, readOK, notice, refresh, execute };
+}
+
+let bodyScrollLocks = 0, savedBodyOverflow = '';
+function lockBodyScroll() {
+  if (bodyScrollLocks++ === 0) {
+    savedBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  return () => { if (--bodyScrollLocks === 0) document.body.style.overflow = savedBodyOverflow; };
 }
 
 export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = t("Закрыть"), titleContent, connectionContent, statusContent, information, onRefresh, className = '' }: {
@@ -121,10 +134,11 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
   useEffect(() => {
     const element = dialog.current!;
     const previous = document.activeElement as HTMLElement | null;
+    const unlockBody = lockBodyScroll();
     element.showModal();
-    return () => { element.close(); previous?.focus(); };
+    return () => { element.close(); unlockBody(); previous?.focus(); };
   }, []);
-  return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} aria-busy={busy} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (infoOpen) setInfoOpen(false); else if (!busy) onClose(); }}>
+  return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} aria-busy={busy} onClick={event => event.stopPropagation()} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (infoOpen) setInfoOpen(false); else if (!busy) onClose(); }}>
     <header className={"control-header" + (connectionContent ? " device-control-header" : "")}><div className="control-header-title">{subtitle && <p className="eyebrow">{subtitle}</p>}{titleContent || <h2>{title}</h2>}</div>{connectionContent}<div className="control-header-actions"><div className="control-header-buttons">{onRefresh && <button type="button" className="header-icon control-refresh" aria-label={t("Обновить статус")} title={t("Обновить статус")} disabled={busy} onClick={() => void onRefresh()}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 1-2.4-5.7L20 9" /></svg></button>}{information && <button type="button" ref={infoButton} className="header-icon control-information" aria-label={t("О подключении устройства")} title={t("О подключении устройства")} aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="header-icon control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === t("Закрыть") ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}{information && infoOpen && <section ref={infoPanel} id={infoId} className="connection-information connection-balloon" aria-label={t("О подключении устройства")}><button type="button" className="secondary balloon-close" aria-label={t("Закрыть справку")} onClick={() => { setInfoOpen(false); infoButton.current?.focus(); }}>×</button>{information}</section>}</div></header>
     <div className="control-dialog-body">{children}</div>
   </dialog>;
@@ -165,7 +179,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     }
     // Keep a selected target when Tuya has no fresh reading.
     if (!fresh && draft !== '') return;
-    const value = fresh ? reading!.value : null;
+    const value = reading?.known ? reading.value : null;
     setDraft(value === null ? '' : spec.kind === 'enum' ? String(spec.choices?.findIndex(option => sameValue(option, value)) ?? -1) : spec.kind === 'json' ? JSON.stringify(value, null, 2) : String(value));
     if (spec.kind === 'color' && value && typeof value === 'object' && !Array.isArray(value)) setColor(value as HSV);
     setDirty(false); setError('');
@@ -258,7 +272,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
         {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
         <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
         <label>{t("Данные производителя (base64)")}<textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} /></label>
-        <p className="help">{t("Размер после декодирования: до") + " "}{spec.maximumBytes}{" " + t("байт. Изменение отправляется только кнопкой «Применить».")}</p>
+        <p className="help">{t("Размер после декодирования: до") + " "}{spec.maximumBytes}{" " + t("байт. Корректные изменения отправляются автоматически.")}</p>
       </>}
       {!stage && <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">{t("Применить")}</button>}
     </form>)}
@@ -275,11 +289,4 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, o
     {effectOpen && <LightEffectWizard spec={spec} value={draft} onClose={() => setEffectOpen(false)} onDone={value => { change(value); setEffectOpen(false); }} />}
     {scheduleOpen && <ScheduleWizard spec={spec} value={draft} onClose={() => setScheduleOpen(false)} onDone={value => { change(value); setScheduleOpen(false); }} />}
   </section>;
-}
-
-export function ControlApply({ count, invalid, disabled, onApply }: { count: number; invalid: boolean; disabled: boolean; onApply: () => void }) {
-  return <div className="control-apply">
-    {count > 0 && <span role="status">{t("Изменено:") + " "}{count}</span>}
-    <button className="compact" disabled={disabled || !count || invalid} onClick={onApply}>{t("Применить")}</button>
-  </div>;
 }

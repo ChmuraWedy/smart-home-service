@@ -25,7 +25,7 @@ function server() {
 }
 
 describe('channel timer disclosure',()=>{
-  it('preserves a collapsed timer draft and applies only that channel timer with the shared Apply',async()=>{
+  it('preserves a timer edit across collapse and sends only that channel timer automatically',async()=>{
     const writes=server(),user=userEvent.setup();
     render(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const clock=await screen.findByRole('button',{name:'Таймер канала 2'});
@@ -41,7 +41,7 @@ describe('channel timer disclosure',()=>{
     expect(screen.getByRole('spinbutton',{name:'Таймер канала 2 (с)'})).toHaveValue(120);
     expect(screen.getByRole('switch',{name:'Канал 1'})).toHaveAttribute('aria-checked','false');
     expect(screen.getByRole('switch',{name:'Канал 2'})).toHaveAttribute('aria-checked','true');
-    await user.click(screen.getByRole('button',{name:'Применить'}));
+
     await waitFor(()=>expect(writes).toEqual([{commands:[{code:'countdown_2',value:120}]}]));
   });
   it('keeps both power channels on the main card and reserves timers for the full editor',async()=>{

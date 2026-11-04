@@ -125,7 +125,7 @@ describe('main controls on device cards', () => {
     try {
       await screen.findByRole('switch',{name:'Питание'});
       await act(async () => observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
-      await act(async () => { vi.advanceTimersByTime(3000); });
+      await act(async () => { vi.advanceTimersByTime(1000); });
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('refresh=false');
       await act(async () => observers[0]([{isIntersecting:false} as IntersectionObserverEntry],{} as IntersectionObserver));
@@ -204,4 +204,21 @@ describe('card close action and relevant activity filters', () => {
     expect(screen.queryByRole('option',{name:'Движение'})).toBeNull();
     expect(screen.queryByRole('combobox',{name:'Показать'})).toBeNull();
   });
+});
+
+it('updates the tile connection status and battery from cached reports',async()=>{
+  vi.useFakeTimers({toFake:['setInterval','clearInterval']});
+  const observers:IntersectionObserverCallback[]=[];
+  vi.stubGlobal('IntersectionObserver',class {constructor(callback:IntersectionObserverCallback){observers.push(callback);}observe(){}disconnect(){}});
+  const onStatus=vi.fn();
+  const cloud={...lamp,controls:{ready:true,definitions,snapshot}};
+  vi.mocked(fetch).mockImplementation(async()=>json({...snapshot,online:false,status:{...snapshot.status,battery_percentage:42}}));
+  const view=render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{sharing:cloud}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} onStatus={onStatus}/>);
+  try {
+    await screen.findByRole('switch');
+    await waitFor(()=>expect(onStatus).toHaveBeenCalledWith(expect.objectContaining({online:true})));
+    await act(async()=>observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
+    await act(async()=>{vi.advanceTimersByTime(1000);});
+    expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}});
+  } finally {view.unmount();}
 });

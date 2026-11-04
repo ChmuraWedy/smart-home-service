@@ -26,7 +26,7 @@ Command requests and outcomes are separate events. ACK is acceptance rather than
 
 Main cards show the available power channels, compact sensor icons/values, aliases, room, online state, and battery. Unknown battery is not guessed; units and scaling come from known metadata. A raw legacy battery number without a unit is not automatically labeled as a percentage.
 
-Tile switches send an immediate single command through the selected route. Details keep drafts until the shared **Apply** button. Modes, brightness, colors, schedules, and timers live in details. Channel aliases are tags beneath their source labels.
+Tile switches send an immediate single command through the selected route. Details also send edits automatically; sliders and text wait briefly for editing to stop. Modes, brightness, colors, schedules, and timers live in details. Channel aliases are tags beneath their source labels.
 
 Cards have a minimum width of 340px when space allows and fit mobile screens without horizontal scrolling. Details close with an accessible 44px icon. Connection information explains the room, physical link, selected command route, and online state. A direct physical connection can still be controlled through the Smart Life cloud.
 

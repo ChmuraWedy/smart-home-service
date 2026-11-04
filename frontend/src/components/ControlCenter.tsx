@@ -13,6 +13,7 @@ import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
+import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { CameraLive } from './CameraLive';
 import { cameraPrivacyBlock } from '../camera-controls';
@@ -41,19 +42,25 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   useEffect(() => { if (paused) setPreviewRoute(null); }, [paused]);
   const notifyBusy = useCallback((busy:boolean) => { setQuickBusy(busy); onCommandBusy(device.id,busy); },[device.id,onCommandBusy]);
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
+  const [liveStatus,setLiveStatus] = useState<{route:DeviceRoute;status:CardStatus}>();
+  const updateStatus = useCallback((status:CardStatus)=>setLiveStatus({route,status}),[route]);
+  const live = liveStatus?.route === route ? liveStatus.status : undefined;
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const [privacyView,setPrivacyView] = useState<{route:DeviceRoute;value:boolean | null | undefined}>();
   const privacyChanged=useCallback((value:boolean | null | undefined)=>setPrivacyView({route,value}),[route]);
   const privacyBlock=cameraPrivacyBlock(privacyView?.route===route ? privacyView.value : typeof cloud?.controls?.snapshot.status.basic_private==='boolean' ? cloud.controls.snapshot.status.basic_private : undefined);
   const local = device.local;
-  const battery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
+  const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
+  const battery = live ? live.battery : initialBattery;
+  const online = live ? live.online : cloud?.online || (route === 'local' && state?.available);
+  const enabled = live?.enabled ?? local?.enabled;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   return <li id={deviceCardId(device.id)} className="device-card" aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
     <header className="device-heading device-tile-layout">
       <div className="device-card-top"><span className="device-symbol"><DeviceIcon category={cloud?.category} codes={codes} /></span>
-        <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (cloud?.online || (route === 'local' && state?.available) ? 'online' : '')}>{cloud ? (cloud.online ? t("В сети") : t("Не в сети")) : local && !local.enabled ? t("Отключено в настройках") : state?.available ? t("Доступно дома") : t("Состояние неизвестно")}</span><BatteryBadge reading={battery} /></div></div>
-        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onPrivacyStateChange={privacyChanged} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : t("▷ Видео")}</button> : undefined} />
+        <div className="device-card-context"><p className="device-location">{room}</p><div className="device-card-status"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t("В сети") : t("Не в сети")) : local && !enabled ? t("Отключено в настройках") : online ? t("Доступно дома") : t("Состояние неизвестно")}</span><BatteryBadge reading={battery} /></div></div>
+        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} onPrivacyStateChange={privacyChanged} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : t("▷ Видео")}</button> : undefined} />
       </div>
       <div className="device-card-identity"><div className="device-card-title"><h3>{device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases" role="group" aria-label={t("Алиасы устройства")}>{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}
@@ -154,8 +161,8 @@ export function ControlCenter({ api, ready, sharingReady = false, developerReady
   useEffect(() => {
     const controller = new AbortController();
     setStates({}); setGroupStates({});
-    // These endpoints read SQLite only. Browsing never polls LAN devices or
-    // requests cloud function/status details for every account device.
+    // Initial list reads use SQLite only. Visible card controls separately
+    // renew background watches; list loading never requests per-device cloud details.
     for (const entry of visible) {
       const local = entry.kind === 'device' ? entry.device.local : undefined;
       if (entry.kind === 'device' && !local) continue;
