@@ -1,12 +1,13 @@
 # Interface localization
 
-The UI supports English (`en`), Russian (`ru`) and Polish (`pl`). The header selector changes
+The UI supports English (`en`), Russian (`ru`), Polish (`pl`) and Belarusian (`be`). The header selector changes
 language without reloading React or resetting device drafts. The preference is
 stored separately from API credentials in `smart-home.ui.language.v1` and shared
 between open tabs of the same origin. First visit uses the first supported
 browser language, with English as the fallback.
 
-`en.json` and `pl.json` map source Russian message IDs to English and Polish. Russian uses the source
+`en.json`, `pl.json` and `be.json` map source Russian message IDs to English, Polish
+and Belarusian. Russian uses the source
 text, so its catalog cannot be incomplete. Use `t('message')` for text and
 accessible labels, and `t('message {0}', [value])` for interpolated messages.
 Keep a whole sentence together when its word order depends on the language.

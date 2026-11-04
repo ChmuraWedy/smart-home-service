@@ -6,6 +6,7 @@ import { cloudCommands, cloudSpec, labelFor, optionLabel } from './controls';
 import { LANGUAGE_STORAGE_KEY, LANGUAGES, dateLocale, detectLocale, getLocale, localizeMessages, savedLocale, setLocale, t } from './i18n';
 import english from './i18n/en.json';
 import polish from './i18n/pl.json';
+import belarusian from './i18n/be.json';
 import { STORAGE_KEY } from './connection';
 import { encodePowerMemory } from './lighting';
 
@@ -15,7 +16,8 @@ describe('Interface localization', () => {
   it('chooses a supported browser language, honors saved preference and falls back to English', () => {
     expect(detectLocale(['pl-PL','en-US','ru'])).toBe('pl');
     expect(detectLocale(['de-DE','PL-pl','ru'])).toBe('pl');
-    expect(detectLocale(['be-BY','ru-RU','en'])).toBe('ru');
+    expect(detectLocale(['be-BY','ru-RU','en'])).toBe('be');
+    expect(detectLocale(['de-DE','BE-by','en'])).toBe('be');
     expect(detectLocale(['de-DE'])).toBe('en');
     for (const {value} of LANGUAGES) {
       localStorage.setItem(LANGUAGE_STORAGE_KEY,value); expect(savedLocale()).toBe(value);
@@ -116,11 +118,12 @@ describe('Interface localization', () => {
     }
   });
 
-  it.each([['English',english],['Polish',polish]])('has a complete %s catalog and preserves every interpolation placeholder', (_language,messages) => {
+  it.each([['English',english],['Polish',polish],['Belarusian',belarusian]])('has a complete %s catalog and preserves every interpolation placeholder', (_language,messages) => {
     expect(Object.keys(messages).sort()).toEqual(Object.keys(english).sort());
     for(const [source,value] of Object.entries(messages)){
       expect(value.trim(),source).not.toBe('');
-      expect(value,source).not.toMatch(/[А-Яа-яЁё]/);
+      if (_language === 'Belarusian') expect(value,source).not.toMatch(/[ИиЩщЪъ]/);
+      else expect(value,source).not.toMatch(/[А-Яа-яЁё]/);
       expect([...value.matchAll(/\{\d+\}/g)].map(x=>x[0]).sort(),source).toEqual([...source.matchAll(/\{\d+\}/g)].map(x=>x[0]).sort());
     }
   });
@@ -139,30 +142,37 @@ describe('Interface localization', () => {
     }
   });
 
-  it('supports Polish preferences, dates, controls and service errors', async () => {
+  it.each([
+    {locale:'pl', language:'Polish', heading:'Połącz Tuya', address:'Adres API', key:'Klucz dostępu do usługi',
+      channel:'Kanał 2', timer:'Timer kanału 2', privacy:'Tryb prywatności', on:'Włączone', temperature:'Temperatura',
+      error:'Wybrana sieć nie jest już dostępna. Odśwież listę sieci.', date:'pl-PL'},
+    {locale:'be', language:'Belarusian', heading:'Падключыць Tuya', address:'Адрас API', key:'Ключ доступу да сэрвісу',
+      channel:'Канал 2', timer:'Таймер канала 2', privacy:'Рэжым прыватнасці', on:'Уключана', temperature:'Тэмпература',
+      error:'Выбраная сетка больш недаступная. Абнавіце спіс сетак.', date:'be-BY'},
+  ] as const)('supports $language preferences, dates, controls and service errors', async (language) => {
     render(<App/>);
-    fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://polish-api.test:8080'}});
-    fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'niezapisany-klucz'}});
-    fireEvent.change(screen.getByLabelText('Язык'),{target:{value:'pl'}});
-    expect(screen.getByRole('heading',{name:'Połącz Tuya'})).toBeInTheDocument();
-    expect(screen.getByLabelText('Adres API')).toHaveValue('http://polish-api.test:8080');
-    expect(screen.getByLabelText('Klucz dostępu do usługi')).toHaveValue('niezapisany-klucz');
-    expect(document.documentElement.lang).toBe('pl');
-    expect(dateLocale()).toBe('pl-PL');
-    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('pl');
-    expect(labelFor('switch_2')).toBe('Kanał 2');
-    expect(labelFor('countdown_2')).toBe('Timer kanału 2');
-    expect(labelFor('basic_private')).toBe('Tryb prywatności');
-    expect(optionLabel('on','relay_status')).toBe('Włączone');
-    expect(t('Температура')).toBe('Temperatura');
+    fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://localization-api.test:8080'}});
+    fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'незахаваны-Łąka'}});
+    fireEvent.change(screen.getByLabelText('Язык'),{target:{value:language.locale}});
+    expect(screen.getByRole('heading',{name:language.heading})).toBeInTheDocument();
+    expect(screen.getByLabelText(language.address)).toHaveValue('http://localization-api.test:8080');
+    expect(screen.getByLabelText(language.key)).toHaveValue('незахаваны-Łąka');
+    expect(document.documentElement.lang).toBe(language.locale);
+    expect(dateLocale()).toBe(language.date);
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe(language.locale);
+    expect(labelFor('switch_2')).toBe(language.channel);
+    expect(labelFor('countdown_2')).toBe(language.timer);
+    expect(labelFor('basic_private')).toBe(language.privacy);
+    expect(optionLabel('on','relay_status')).toBe(language.on);
+    expect(t('Температура')).toBe(language.temperature);
     expect(t('Firmware-specific response X7')).toBe('Firmware-specific response X7');
     expect(fetch).not.toHaveBeenCalled();
     const api=new CloudApi({baseUrl:'http://api.test',token:'test-token'});
     vi.mocked(fetch).mockImplementation(async()=>json({detail:'Выбранная сеть больше недоступна. Обновите список сетей.'},409));
-    await expect(api.status()).rejects.toThrow('Wybrana sieć nie jest już dostępna. Odśwież listę sieci.');
+    await expect(api.status()).rejects.toThrow(language.error);
     act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:'en'})));
-    expect(screen.getByLabelText('Service access key')).toHaveValue('niezapisany-klucz');
-    act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:'pl'})));
-    expect(screen.getByRole('heading',{name:'Połącz Tuya'})).toBeInTheDocument();
+    expect(screen.getByLabelText('Service access key')).toHaveValue('незахаваны-Łąka');
+    act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:language.locale})));
+    expect(screen.getByRole('heading',{name:language.heading})).toBeInTheDocument();
   });
 });

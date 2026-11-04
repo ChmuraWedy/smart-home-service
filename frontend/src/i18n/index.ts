@@ -1,12 +1,14 @@
 import { useSyncExternalStore } from 'react';
 import english from './en.json';
 import polish from './pl.json';
+import belarusian from './be.json';
 
-const catalogs: Record<string, Record<string, string>> = { en: english, pl: polish };
+const catalogs: Record<string, Record<string, string>> = { en: english, pl: polish, be: belarusian };
 export const LANGUAGES = [
   { value: 'en', label: 'English', dateLocale: 'en-GB' },
   { value: 'ru', label: 'Русский', dateLocale: 'ru-RU' },
   { value: 'pl', label: 'Polski', dateLocale: 'pl-PL' },
+  { value: 'be', label: 'Беларуская', dateLocale: 'be-BY' },
 ] as const;
 export type Locale = typeof LANGUAGES[number]['value'];
 const isLocale = (value: unknown): value is Locale => LANGUAGES.some(language => language.value === value);
