@@ -51,7 +51,7 @@ def replace_aliases(session: Session, item, aliases: list[str]):
     except ValidationError:
         raise HTTPException(
             422,
-            "Custom aliases require 1..64 ASCII letters/digits/._- and must start with a letter; the current name is automatic",
+            "Custom aliases require 1..64 Unicode letters/marks/digits/spaces/._- and must start with a letter; the current name is automatic",
         ) from None
     if len(aliases) > 32 or len(aliases) != len(set(aliases)):
         raise HTTPException(422, "At most 32 unique custom aliases are allowed")
@@ -208,6 +208,19 @@ def capability_values_dps(session, item, values):
 
 
 def record_observations(session, item, observed, observed_at):
+    from .activity import record_values
+    from .capabilities import decode
+
+    values = {}
+    for name, definition in effective_capabilities(session, item).items():
+        spec = Capability.model_validate(definition)
+        dp = spec.read_dp or spec.dp
+        if spec.readable and dp in observed:
+            try:
+                values[name] = decode(spec, observed[dp])
+            except (ValueError, TypeError, OverflowError):
+                pass
+    record_values(session, "local", item.device_id, values, source="local", secret=item.local_key)
     if observed:
         item.last_dps = {**(item.last_dps or {}), **observed}
     for dp, value in observed.items():

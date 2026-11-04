@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
 import { loadConnection, saveConnection } from './connection';
@@ -6,13 +6,22 @@ import { ConnectionSettings } from './components/ConnectionSettings';
 import { DeveloperForm, REGIONS, UserCodeForm } from './components/CredentialForms';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
+import { NetworkPage } from './components/NetworkPage';
+import { LocalConnectionsPage } from './components/LocalConnectionsPage';
+import { deviceHref, readDeviceLink } from './device-links';
+import type { DeviceLink } from './device-links';
 
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
+type View = 'connections' | 'control' | 'network' | 'local-connections';
 
 export function App() {
   const [connection, setConnection] = useState<Connection>(() => loadConnection());
-  const [view, setView] = useState<'connections' | 'control'>(() => connection.token ? 'control' : 'connections');
+  const [view, setView] = useState<View>(() => connection.token ? window.location.hash === '#local-connections' ? 'local-connections' : window.location.hash === '#network' ? 'network' : 'control' : 'connections');
+  const [deviceTarget, setDeviceTarget] = useState(() => readDeviceLink(window.location.hash));
+  const acceptedHash = useRef(window.location.hash);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
   const [controlOpen, setControlOpen] = useState(false);
   const [status, setStatus] = useState<CloudStatus | null>(null);
   const [provider, setProvider] = useState<Provider>('sharing');
@@ -139,13 +148,46 @@ export function App() {
     setProvider(value); setQR(null); setNotice({ text: '' });
   }
 
+  function navigate(next: View) {
+    setView(next); setDeviceTarget(null); setMenuOpen(false); setNotice({ text: '' }); setQR(null);
+    acceptedHash.current = next === 'network' || next === 'local-connections' ? '#' + next : '';
+    window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
+  }
+  const changeDeviceTarget = useCallback((target: DeviceLink | null) => {
+    const hash = target ? deviceHref(target.id, target.route) : '';
+    setDeviceTarget(target); acceptedHash.current = hash;
+    if (window.location.hash !== hash) window.history[target ? 'pushState' : 'replaceState'](null, '', window.location.pathname + window.location.search + hash);
+  }, []);
+  useEffect(() => {
+    const changed = () => {
+      const dialogs = document.querySelectorAll('dialog[open]');
+      if (busyRef.current || document.querySelector('dialog[open][aria-busy="true"]') || dialogs.length > 1 || (controlOpen && !dialogs.length)) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
+        return;
+      }
+      acceptedHash.current = window.location.hash;
+      setDeviceTarget(readDeviceLink(window.location.hash)); setMenuOpen(false); setNotice({ text: '' });
+      setView(window.location.hash === '#network' ? 'network' : window.location.hash === '#local-connections' ? 'local-connections' : 'control');
+    };
+    window.addEventListener('hashchange', changed);
+    return () => window.removeEventListener('hashchange', changed);
+  }, [controlOpen]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const outside = (event: PointerEvent) => { if (event.target instanceof Node && !menuRef.current?.contains(event.target)) setMenuOpen(false); };
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [menuOpen]);
+
   const regionName = REGIONS.find(item => item.value === developer.region)?.label;
   return <div className="app-shell">
-    <header className="app-header"><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span>Ваш дом под управлением</span></div></div>
+    <header className="app-header"><div className="app-menu" ref={menuRef} onKeyDown={event => { if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); } }}>
+      <button className="secondary app-menu-button" ref={menuButton} aria-label="Меню" aria-expanded={menuOpen} aria-controls="app-sections" disabled={locked} onClick={() => setMenuOpen(value => !value)}><span aria-hidden="true">☰</span></button>
+      {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label="Раздел приложения">{([['control', 'Управление'], ['network', 'Сеть и пакеты'], ['local-connections', 'Локальные подключения'], ['connections', 'Подключения']] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => navigate(key)}>{label}</button>)}</nav>}
+    </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span>Ваш дом под управлением</span></div></div>
       <span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? 'API подключён' : 'API не подключён'}</span></header>
     <main>
       <input id="access-token" type="hidden" value={connection.token} readOnly />
-      <nav className="app-nav" aria-label="Раздел приложения"><button className="secondary" aria-current={view === 'control' ? 'page' : undefined} disabled={locked} onClick={() => { setView('control'); setNotice({ text: '' }); }}>Управление</button><button className="secondary" aria-current={view === 'connections' ? 'page' : undefined} disabled={locked} onClick={() => { setView('connections'); setNotice({ text: '' }); }}>Подключения</button></nav>
       {view === 'connections' ? <>
       <div className="page-heading"><p className="eyebrow">Подключения</p><h1>{ready && accountConnected ? 'Tuya подключена' : 'Подключить Tuya'}</h1><p className="muted">{ready && accountConnected ? 'Сохранённое подключение готово к управлению устройствами через интернет.' : 'Свяжите аккаунт и получите доступ к устройствам. Облачное подключение требует интернета.'}</p></div>
       <div className="workspace connections-workspace">
@@ -179,7 +221,7 @@ export function App() {
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>User Code, реквизиты Tuya, токены и локальные ключи остаются на Python-сервисе.</p></div>
         </section>
       </div>
-      </> : <><div className="page-heading"><p className="eyebrow">Ваш дом</p><h1>Управление устройствами</h1><p className="muted">Выберите комнату, откройте устройство или группу и настройте доступные функции.</p></div><ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => setView('connections')} /></>}
+      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} /> : <ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />Подождите…</> : notice.text}</div>
       {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>

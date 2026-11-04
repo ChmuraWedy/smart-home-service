@@ -1,12 +1,19 @@
-import { useCallback } from 'react';
-import { displayReading, isStale, localSpec } from '../controls';
+import { useCallback, useState } from 'react';
+import { displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
-import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { CapabilityField, ControlApply, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { DeviceNetwork } from './DeviceNetwork';
+import { useControlDrafts } from '../control-drafts';
+import { DeviceAliases } from './DeviceAliases';
+import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
+import { DeviceActivity } from './DeviceActivity';
+import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 
-export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: {
-  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string;
+export function LocalControl({ api, device, onClose, onAuthError, closeLabel, room, onSetup }: {
+  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
 }) {
+  const [aliasBusy, setAliasBusy] = useState(false);
   const load = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
     const [metadata, state] = await Promise.all([api.device(device.id, signal), api.state(device.id, refresh, signal)]);
     if (metadata.id !== device.id || state.device_id !== device.id) throw new Error('Сервис вернул другое устройство.');
@@ -14,16 +21,29 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel }: 
   }, [api, device.id]);
   const session = useControlSession(load, onAuthError), now = useClock();
   const item = session.data?.metadata || device;
-  return <ControlDialog title={item.name} subtitle={item.transport === 'zigbee' ? 'Локально · через шлюз' : 'Локально · Wi-Fi'} busy={session.busy} onClose={onClose} closeLabel={closeLabel}>
-    <div className="control-toolbar"><span className="help">{item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><button className="secondary compact" disabled={session.busy} onClick={() => void session.refresh()}>Обновить статус</button></div>
+  const drafts = useControlDrafts();
+  const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
+  const primaryActivity = specs.some(spec => spec.indicator === 'motion');
+  return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />} statusContent={<BatteryBadge reading={session.data ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(session.data.state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!session.data ? 'Проверяем связь' : !session.data.state.enabled ? 'Отключено в настройках' : session.data.state.available ? 'Доступно дома' : 'Состояние неизвестно'} online={session.data?.state.enabled && session.data?.state.available} />}>
+    <div className="control-toolbar"><span className="help">{item.is_gateway ? 'Локальное подключение к шлюзу.' : item.transport === 'zigbee' ? 'Команды передаются через настроенный шлюз.' : 'Прямое подключение к устройству.'}</span><div className="control-actions">
+      {Object.values(item.capabilities).some(cap => cap.writable) && <ControlApply count={drafts.count} invalid={drafts.invalid} disabled={session.busy || aliasBusy || !session.readOK || !session.data?.state.enabled} onApply={() => void drafts.apply(changes => session.execute(async () => {
+        for (const change of changes) validateControlValue(change.spec, change.value!);
+        const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
+        if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
+        return {text:'Команда принята.'};
+      }))} />}
+    </div></div>
     <p className="help">Первое открытие читает кеш. «Обновить статус» опрашивает устройство. Команды и ключи Tuya обрабатывает сервер.</p>
     {session.data && !session.data.state.enabled && <p className="saved-summary">Устройство или его шлюз отключены в настройках сервиса.</p>}
-    <div className="capability-grid">{session.data && Object.entries(item.capabilities).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} reading={session.data!.state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
+    {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
+    <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>{session.data && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={drafts.stage} reading={session.data!.state.values[key]} now={now} local={true} onRefresh={session.refresh} disabled={session.busy || !session.readOK || !session.data!.state.enabled} onSend={value => session.execute(async () => {
       const result = await api.setCapability(item.id, key, value);
       if (result.acknowledged !== true) throw new Error('Сервис не подтвердил команду.');
       return { text: 'Команда принята.' };
     })} />)}</div>
-    {session.data && !Object.keys(item.capabilities).length && <p className="saved-summary">Возможности ещё не настроены. Задайте проверенные capabilities устройству или его типу через REST API.</p>}
+    {session.data && !Object.keys(item.capabilities).length && <div className="saved-summary">{item.is_gateway ? <p>Шлюз настроен для локального подключения дочерних устройств. Их показания и управление находятся в карточках самих устройств.</p> : <><p>Подключение сохранено. Чтобы появились переключатели и показания, сопоставьте локальные параметры устройства с функциями Tuya.</p>{onSetup && <button disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>Настроить функции</button>}</>}</div>}
+    {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
+    <DeviceNetwork api={api} deviceId={item.device_id} provider="local" onAuthError={onAuthError} />
     <ControlFeedback busy={session.busy} notice={session.notice} />
   </ControlDialog>;
 }
@@ -59,8 +79,8 @@ export function GroupControl({ api, group, onClose, onDevice, onAuthError }: {
     const failed = result.results.filter(member => !member.acknowledged).map(member => session.data?.devices.find(device => device.id === member.device_id)?.name || 'Устройство ' + member.device_id);
     return { text: `Команда принята ${accepted} из ${result.results.length} устройств.` + (failed.length ? ' Не подтверждено: ' + failed.join(', ') + '.' : ''), error: !result.all_acknowledged };
   });
-  return <ControlDialog title={group.name} subtitle="Группа · локальное управление" busy={session.busy} onClose={onClose}>
-    <div className="control-toolbar"><strong>{session.data ? groupSummary(session.data.state.members, now) : 'Загружаем состояние'}</strong><button className="secondary compact" disabled={session.busy} onClick={() => void session.refresh()}>Обновить статус</button></div>
+  return <ControlDialog onRefresh={session.refresh} title={group.name} subtitle="Группа · локальное управление" busy={session.busy} onClose={onClose}>
+    <div className="control-toolbar"><strong>{session.data ? groupSummary(session.data.state.members, now) : 'Загружаем состояние'}</strong></div>
     <div className="power-actions group-power"><button disabled={disabled} onClick={() => void send('on')}>Включить группу</button><button className="secondary" disabled={disabled} onClick={() => void send('off')}>Выключить группу</button></div>
     <p className="help">Команда отправляется участникам последовательно. Частичные ошибки показаны отдельно; подтверждение команды не заменяет показание состояния.</p>
     {!!session.data?.warnings.length && <p className="field-error" role="alert">Статус не получен: {session.data.warnings.join(', ')}. Показаны последние известные данные.</p>}

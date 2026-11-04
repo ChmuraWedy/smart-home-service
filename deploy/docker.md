@@ -1,0 +1,114 @@
+# Docker на Dell 5070
+
+Dell 5070 — компьютер назначения. Порт веб-интерфейса по умолчанию — **8080**.
+Нужны Linux, Docker Engine и Docker Compose v2. Сначала проверьте `uname -m`,
+`docker version`, `docker compose version` и свободные порты 8080/8000 на самом Dell.
+
+## Установленный экземпляр
+
+Приложение развёрнуто на Dell Wyse 5070 (Debian 13):
+`http://homeassistant.dom:8080`. Home Assistant продолжает использовать порт 8123.
+
+SSH-алиас на управляющем Mac — `dell5070`; каталог установки на сервере —
+`/home/damawik/smart-home-service`. Используется готовый образ
+`smart-home-service:dell5070` и Linux LAN override.
+
+```sh
+ssh dell5070
+cd /home/damawik/smart-home-service
+sudo docker compose -f compose.yaml -f compose.lan.yaml ps
+```
+
+Для перезапуска используйте те же два Compose-файла и команду `restart`.
+При обновлении загрузите новый образ, затем выполните
+`sudo docker compose -f compose.yaml -f compose.lan.yaml up -d --no-build --wait`.
+Текущие данные находятся в постоянном volume; повторный импорт базы не требуется.
+
+## Сборка и запуск
+
+Скопируйте репозиторий на Dell, не перенося `.venv`, `node_modules` и `.git`.
+Из корня репозитория:
+
+```sh
+cp .env.example .env
+chmod 600 .env
+```
+
+Задайте в `.env` собственный `SMART_HOME_API_TOKEN`. Для Smart Life также задайте
+`SMART_HOME_CLOUD_ENABLED=1`. Не помещайте ключ в Dockerfile или исходники интерфейса.
+Существующий ключ сервиса можно сохранить при переносе. Compose сам читает `.env`;
+сервер в контейнере использует пути внутри volume, независимо от старых путей Mac.
+
+```sh
+docker compose up -d --build --wait
+```
+
+Откройте `http://<адрес-Dell>:8080`. В настройках подключения адрес API уже совпадает
+с адресом страницы; введите существующий ключ сервиса. Ключи браузера с другого
+origin автоматически не переносятся. Внешний Python-порт не публикуется.
+
+Обычный Compose публикует `0.0.0.0:8080`. Можно задать `SMART_HOME_PORT` в `.env`,
+например `SMART_HOME_PORT=8090`, и повторить запуск. Это меняет только порт хоста.
+
+## Поиск устройств в домашней сети
+
+На Linux для страницы «Сеть и пакеты», mDNS/SSDP и Tuya UDP discovery используйте:
+
+```sh
+docker compose -f compose.yaml -f compose.lan.yaml up -d --build --wait
+```
+
+Этот override использует сетевой стек Dell: видны его реальные интерфейсы и
+LAN-объявления. В этом режиме nginx слушает **8080** непосредственно на Dell;
+`SMART_HOME_PORT` не применяется. Внутренний API слушает только `127.0.0.1:8000`.
+Привилегированный контейнер не требуется. Перед запуском проверьте оба порта.
+Bridge-режим показывает интерфейсы контейнера, поэтому не заменяет наблюдение
+реальной домашней сети.
+
+Семантика host networking и сброса публикации портов:
+[Docker host networking](https://docs.docker.com/engine/network/drivers/host/),
+[Compose merge/reset](https://docs.docker.com/reference/compose-file/merge/#reset-value).
+На Docker Desktop host networking имеет ограничения и не даёт прямого доступа
+к физическим интерфейсам Mac; эта конфигурация предназначена для Linux на Dell.
+
+## Данные и перенос
+
+Постоянный volume `smart-home-service_smart-home-data` содержит базу, сессии Tuya
+и отчёты. Он не включён в образ и сохраняется при пересоздании контейнера.
+Обычный `docker compose down` сохраняет данные; `down -v` удаляет их.
+
+Существующую базу переносите через SQLite backup либо после остановки старого
+сервера, вместе с файлами сессий. В контейнере используются:
+
+- `/app/data/smarthome.db`;
+- `/app/data/tuya-cloud.json`;
+- `/app/data/tuya-cloud.json.developer.json`.
+
+Если старые файлы назывались иначе, переименуйте их при переносе. Целевой volume
+должен быть пустым; существующие данные Dell нельзя перезаписывать без проверки.
+Владельцем файлов должен быть UID/GID `1000:1000`; каталоги 0700, файлы 0600.
+Перенос состояния не отправляет команды устройствам.
+
+Образ можно собрать на другой машине для архитектуры Dell и передать через
+`docker save` / `docker load`. Для x86-64:
+
+```sh
+docker buildx build --platform linux/amd64 --load -t smart-home-service:dell5070 .
+```
+
+После загрузки задайте `SMART_HOME_IMAGE=smart-home-service:dell5070` в `.env`
+и запускайте Compose без `--build`. Сам образ не содержит `.env` или состояние.
+
+## Проверка
+
+```sh
+docker compose ps
+curl http://127.0.0.1:8080/health
+```
+
+`/health` должен вернуть `status: ok`, а `/api/v1/devices` без `X-API-Key` — 401.
+Проверьте интерфейс и авторизованный список устройств по LAN-адресу Dell с другого
+компьютера. Нажимать переключатели для проверки развёртывания не требуется.
+Контейнер запускается от непривилегированного пользователя, перезапускается после
+сбоя и останавливает API/nginx вместе. Один worker сохраняет согласованность
+временных сессий обнаружения.

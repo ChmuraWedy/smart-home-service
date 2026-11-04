@@ -342,7 +342,14 @@ class CloudBridge:
                 result = self._manager().customer_api.post(
                     f"/v1.1/m/thing/{id}/commands", None, {"commands": commands}
                 )
-            except Exception:
+            except Exception as error:
+                code = str(getattr(error, "error_code", ""))
+                if code == "2001":
+                    raise HTTPException(
+                        409, "Устройство не в сети по данным Tuya (код 2001). Команда отклонена."
+                    ) from None
+                if code.isascii() and code.isdecimal() and len(code) <= 12:
+                    raise HTTPException(502, f"Tuya rejected the cloud command (code {code})") from None
                 raise HTTPException(
                     502, "Tuya cloud command failed; physical outcome may be unknown"
                 ) from None

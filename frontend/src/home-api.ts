@@ -37,10 +37,31 @@ export type ObservationSession = {
   session_id: string; device_id: string; mode: 'local' | 'cloud'; expires_in: number;
   interval_seconds: number; sample_count: number; has_local_key: boolean;
   readings: ObservationReading[]; changes: ObservationChange[];
+  gateway_verification?: { ip: string; version: string; key_source: 'device' | 'child' };
 };
 export type ObservationAction = 'observe' | 'power' | 'brightness' | 'temperature' | 'color' | 'sensor' | 'button';
+export type ConnectionAction = 'created' | 'updated' | 'unchanged';
+export type ConnectionFinding = {
+  finding_id: string; expires_in: number; action: ConnectionAction; verified: true;
+  key_source: 'device' | 'child'; interface_address: string;
+  requested_device_id: string; connection_device_id: string; route: 'direct' | 'gateway';
+  device: { device_id: string; existing_id: number | null; name: string; aliases: string[];
+    building_id: number | null; room_id: number | null; ip: string; version: string;
+    changed_fields: ('ip' | 'version' | 'local_key')[]; is_gateway: boolean };
+};
+export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; verified: true;
+  key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {
+    return this.request<ObservationSession>('/commissioning/devices/' + id, 'POST', { provider: provider || null }, signal);
+  }
+  findLocalConnection(device_id: string, provider: Provider, interface_address: string, signal?: AbortSignal, discovery_seconds?: number) {
+    return this.request<ConnectionFinding>('/local-connections/find', 'POST', { device_id, provider, interface_address, ...(discovery_seconds === undefined ? {} : { discovery_seconds }) }, signal);
+  }
+  saveLocalConnection(finding_id: string) {
+    return this.request<ConnectionSaved>('/local-connections/save', 'POST', { finding_id, confirmed: true });
+  }
   topology(signal?: AbortSignal) { return this.request<Topology>('/cloud/topology', 'GET', undefined, signal); }
   syncTopology(signal?: AbortSignal) { return this.request<TopologyJob>('/cloud/topology/sync', 'POST', undefined, signal); }
   private async list<T>(path: string, signal?: AbortSignal): Promise<T[]> {
@@ -66,12 +87,18 @@ export class HomeApi extends CloudApi {
     return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60`, 'GET', undefined, signal);
   }
   setCapability(id: number, name: string, value: JsonValue) {
-    return this.request<{ acknowledged: boolean }>(`/devices/${id}/commands/capabilities`, 'POST', { values: { [name]: value } });
+    return this.setCapabilities(id, { [name]: value });
+  }
+  setCapabilities(id: number, values: Record<string, JsonValue>) {
+    return this.request<{ acknowledged: boolean }>(`/devices/${id}/commands/capabilities`, 'POST', { values });
   }
   groupState(id: number, signal?: AbortSignal) { return this.request<GroupState>(`/groups/${id}/state`, 'GET', undefined, signal); }
   groupCommand(id: number, command: 'on' | 'off') { return this.request<GroupResult>(`/groups/${id}/commands/${command}`, 'POST'); }
   beginObservation(draft: DeviceDraft, mode: 'local' | 'cloud', provider?: Provider, signal?: AbortSignal) {
     return this.request<ObservationSession>('/commissioning', 'POST', { draft, mode, provider: provider || null }, signal);
+  }
+  discoverGatewayKey(draft: DeviceDraft, provider: Provider, signal?: AbortSignal) {
+    return this.request<ObservationSession>('/commissioning', 'POST', { draft, mode: 'local', provider, discover_gateway_key: true }, signal);
   }
   observationSample(id: string, action: ObservationAction, signal?: AbortSignal) {
     return this.request<ObservationSession>(`/commissioning/${encodeURIComponent(id)}/samples`, 'POST', { action }, signal);

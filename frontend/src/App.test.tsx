@@ -21,6 +21,7 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
     const token = (options?.headers as Record<string, string> | undefined)?.['X-API-Key'];
     calls.push({ path, method: options?.method || 'GET', body, token });
     if (token !== TOKEN) return json({ detail: 'Unauthorized' }, 401);
+    if (path === '/api/v1/network/interfaces') return json([{name:'en1', address:'192.168.40.147', network:'192.168.40.0/24', broadcast:'192.168.40.255'}]);
     if (path === '/api/v1/cloud/topology') return json({ synced_at: null, warnings: 0, placements: [], job: { status: 'idle', processed: 0, total: 0, message: null } });
     if (path.endsWith('/status')) return json(status);
     if (path.endsWith('/user-code')) {
@@ -51,10 +52,25 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
   return { calls, status };
 }
 
+async function go(user: ReturnType<typeof userEvent.setup>, name: string) { await user.click(screen.getByRole('button', { name: 'Меню' })); await user.click(screen.getByRole('button', { name })); }
+
+it('opens local connections from the hamburger and restores its direct URL', async () => {
+  stored(); window.history.replaceState(null, '', '/#local-connections');
+  const backend = fakeApi(); render(<App />); await screen.findByText('API подключён');
+  expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+  await screen.findByRole('option', { name: /192.168.40.0/ });
+  expect(screen.getByRole('button', { name: 'Найти устройства' })).toBeDisabled();
+  expect(screen.queryByRole('combobox', { name: 'Устройство' })).toBeNull();
+  expect(backend.calls.some(call => call.path.endsWith('/find') || call.path.endsWith('/save'))).toBe(false);
+  await go(userEvent.setup(), 'Сеть и пакеты'); expect(window.location.hash).toBe('#network');
+  await go(userEvent.setup(), 'Локальные подключения'); expect(window.location.hash).toBe('#local-connections');
+  expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+});
+
 async function restored(connections = true) {
   stored(); const backend = fakeApi(); render(<App />);
   await screen.findByText('API подключён');
-  if (connections) await userEvent.setup().click(screen.getByRole('button', { name: 'Подключения' }));
+  if (connections) await go(userEvent.setup(), 'Подключения');
   return backend;
 }
 
@@ -62,6 +78,7 @@ describe('cloud UI journeys', () => {
   it('opens the common device list after restoring access and uses Connections only for account settings', async () => {
     const backend = await restored(false); const user = userEvent.setup();
     expect(await screen.findByRole('heading', { name: 'Лампа кухни' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Меню' }));
     expect(screen.getByRole('button', { name: 'Управление' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByText('Локальное управление')).toBeNull();
     expect(screen.queryByText(/Облачные устройства доступны на вкладке/)).toBeNull();
@@ -148,7 +165,7 @@ describe('cloud UI journeys', () => {
   it('saves User Code separately without starting login or retaining the code in browser storage', async () => {
     stored(); const backend = fakeApi({ connected: false, has_saved_user_code: false });
     render(<App />); await screen.findByText('API подключён'); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Подключения' }));
+    await go(user, 'Подключения');
     expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
     await user.type(screen.getByLabelText('User Code'), 'private-code');
     await user.click(screen.getByRole('button', { name: 'Сохранить User Code' }));
@@ -162,9 +179,9 @@ describe('cloud UI journeys', () => {
   it('creates a QR on the API host, confirms login, and releases the image URL', async () => {
     stored(); const backend = fakeApi({ connected: false }); render(<App />);
     await screen.findByText('API подключён'); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Подключения' }));
+    await go(user, 'Подключения');
     expect(screen.getByRole('heading', { name: 'Подключить Tuya' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Управлять' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Подробнее' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Получить QR-код' }));
     await screen.findByAltText('QR-код для входа в Tuya');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]) === BASE + '/api/v1/cloud/login/qr-session/qr.svg')).toBe(true);
@@ -174,13 +191,14 @@ describe('cloud UI journeys', () => {
     expect(screen.queryByAltText('QR-код для входа в Tuya')).not.toBeInTheDocument();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:qr-test');
     expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Управление' }));
+    await go(user, 'Управление');
     expect(await screen.findByRole('heading', { name: 'Лампа кухни' })).toBeInTheDocument();
   });
 
   it('expires the QR, removes the confirmation action, and allows a new login', async () => {
     vi.useFakeTimers(); stored(); fakeApi({ connected: false });
     await act(async () => { render(<App />); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Меню' })); });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Подключения' })); });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Получить QR-код' })); });
     expect(screen.getByAltText('QR-код для входа в Tuya')).toBeInTheDocument();
@@ -193,7 +211,7 @@ describe('cloud UI journeys', () => {
   it('saves Developer credentials independently and connects only on the separate action', async () => {
     stored(); const backend = fakeApi({ developer: { configured: false, connected: false } });
     render(<App />); await screen.findByText('API подключён'); const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Подключения' }));
+    await go(user, 'Подключения');
     await user.click(screen.getByRole('button', { name: 'Access ID / Secret' }));
     await user.type(screen.getByLabelText('Access ID'), 'project-id');
     await user.type(screen.getByLabelText('Access Secret'), 'private-secret');
@@ -206,10 +224,10 @@ describe('cloud UI journeys', () => {
     expect(backend.calls.find(call => call.method === 'PUT')?.body).toEqual({ access_id: 'project-id', access_secret: 'private-secret', region: 'us-e', sample_device_id: null });
     await user.click(screen.getByRole('button', { name: 'Проверить и подключить' }));
     await screen.findByText('Tuya Developer подключён. Найдено устройств: 2.');
-    await user.click(screen.getByRole('button', { name: 'Управление' }));
+    await go(user, 'Управление');
     await screen.findByText('Лампа кухни');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]).endsWith('provider=developer'))).toBe(true);
-    await user.click(screen.getByRole('button', { name: 'Подключения' }));
+    await go(user, 'Подключения');
     await user.click(screen.getByRole('button', { name: 'Smart Life / QR' }));
     expect(screen.getByText('User Code сохранён на сервере.')).toBeInTheDocument();
     expect(screen.queryByText('Лампа кухни')).not.toBeInTheDocument();
@@ -232,7 +250,7 @@ describe('cloud UI journeys', () => {
   it('handles a disabled cloud adapter while keeping connection settings available', async () => {
     stored(); fakeApi({ enabled: false }); render(<App />);
     await screen.findByText('API подключён');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Подключения' }));
+    await go(userEvent.setup(), 'Подключения');
     await screen.findByText('Облачный режим выключен на сервере.');
     expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Показать устройства' })).not.toBeInTheDocument();
@@ -253,4 +271,24 @@ describe('cloud UI journeys', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
   });
+});
+
+
+it('opens LAN observations from the menu without a connected Tuya account', async () => {
+  stored(); window.history.replaceState(null, '', '/#network');
+  const backend = fakeApi({ enabled: false, connected: false, developer: { configured: false, connected: false, region: 'eu' } });
+  render(<App />); await screen.findByText('API подключён');
+  expect(screen.getByRole('heading', { name: 'Сеть и пакеты' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Начать наблюдение' })).toBeDisabled();
+  expect(await screen.findByRole('option', { name: /192.168.40.0/ })).toBeInTheDocument();
+  expect(backend.calls.map(call => call.path)).toEqual(['/api/v1/cloud/status', '/api/v1/network/interfaces']);
+  const menu = screen.getByRole('button', { name: 'Меню' });
+  fireEvent.click(menu); expect(screen.getByRole('navigation', { name: 'Раздел приложения' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Сеть и пакеты' })).toHaveAttribute('aria-current', 'page');
+  fireEvent.keyDown(menu, { key: 'Escape' }); expect(screen.queryByRole('navigation')).toBeNull();
+  expect(menu).toHaveFocus();
+  fireEvent.click(menu); fireEvent.pointerDown(document.body); expect(screen.queryByRole('navigation')).toBeNull();
+  await go(userEvent.setup(), 'Подключения');
+  expect(screen.queryByRole('heading', { name: 'Сеть и пакеты' })).toBeNull();
+  expect(window.location.hash).toBe('');
 });

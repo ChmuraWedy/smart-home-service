@@ -2,6 +2,7 @@ import type { CloudFunction, CloudFunctions, CloudSnapshot, JsonValue } from './
 import type { Capability, Reading } from './home-api';
 import { editableSchema, rawBytes, validateObject } from './lighting';
 import type { JsonSchema } from './lighting';
+import { CAMERA_HELP, CAMERA_LABELS, CAMERA_OPTIONS } from './camera-controls';
 
 export type HSV = { h: number; s: number; v: number };
 export type ControlSpec = {
@@ -9,23 +10,28 @@ export type ControlSpec = {
   readable: boolean; writable: boolean; minimum?: number; maximum?: number; step?: number;
   integer?: boolean; choices?: JsonValue[]; unit?: string;
   factor?: number; colorScale?: { s: number; v: number }; reason?: string; help?: string; indicator?: 'motion'; advanced?: boolean;
-  schema?: JsonSchema; maximumBytes?: number;
+  schema?: JsonSchema; maximumBytes?: number; aliases?: string[];
 };
 
 const MOTION_KEYS = new Set(['motion', 'pir', 'pir_state']);
 
 const LABELS: Record<string, string> = {
+  ...CAMERA_LABELS,
   switch: 'Питание', switch_led: 'Питание', brightness: 'Яркость', bright_value: 'Яркость', bright_value_v2: 'Яркость',
   color: 'Цвет', colour_data: 'Цвет', colour_data_v2: 'Цвет', color_temperature: 'Цветовая температура',
   temp_value: 'Цветовая температура', temp_value_v2: 'Цветовая температура', target_temperature: 'Заданная температура',
   temp_set: 'Заданная температура', temp_set_f: 'Заданная температура', temperature: 'Температура', temp_current: 'Температура',
   humidity: 'Влажность', humidity_value: 'Влажность', target_humidity: 'Заданная влажность', motion: 'Движение',
+  va_temperature: 'Температура', va_humidity: 'Влажность', va_battery: 'Батарея', battery_value: 'Батарея', battery_state: 'Батарея', battery_level: 'Батарея',
+  temp_unit_convert: 'Единица температуры', temp_unit: 'Единица температуры', temp_sensitivity: 'Чувствительность температуры', humidity_sensitivity: 'Чувствительность влажности',
+  temp_calibration: 'Поправка температуры', humidity_calibration: 'Поправка влажности', max_temp: 'Верхний порог температуры', min_temp: 'Нижний порог температуры', max_humidity: 'Верхний порог влажности', min_humidity: 'Нижний порог влажности',
   pir: 'Движение', pir_state: 'Движение', presence_state: 'Присутствие', battery: 'Батарея', battery_percentage: 'Батарея',
   mode: 'Режим', work_mode: 'Режим', speed: 'Скорость', fan_speed_enum: 'Скорость', position: 'Положение',
   percent_control: 'Положение', control: 'Действие', oscillation: 'Поворот', power: 'Мощность', cur_power: 'Мощность',
   voltage: 'Напряжение', current: 'Ток', child_lock: 'Блокировка', command: 'Команда', press: 'Нажатие',
   music_data: 'Светомузыка', control_data: 'Переход света', scene_data: 'Световой эффект', scene_data_v2: 'Световой эффект',
-  countdown: 'Таймер', countdown_1: 'Таймер', rhythm_mode: 'Суточный ритм света', sleep_mode: 'Свет перед сном',
+  countdown: 'Таймер', relay_status: 'Состояние после подачи питания', switch_backlight: 'Подсветка выключателя',
+  switch_inching: 'Автовыключение (импульсный режим)', rhythm_mode: 'Суточный ритм света', sleep_mode: 'Свет перед сном',
   wakeup_mode: 'Свет для пробуждения', power_memory: 'Поведение после включения питания',
   do_not_disturb: 'Не беспокоить', remote_switch: 'Параметр пульта', random_timing: 'Случайное расписание',
 };
@@ -35,9 +41,23 @@ const LIGHT_COMMAND_HELP: Record<string, string> = {
 };
 const OPTIONS: Record<string, string> = { white: 'Белый свет', colour: 'Цветной свет', scene: 'Сцена', music: 'Музыка',
   auto: 'Авто', manual: 'Вручную', open: 'Открыть', close: 'Закрыть', stop: 'Стоп', low: 'Низкая', medium: 'Средняя', high: 'Высокая', dock: 'На базу' };
-export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? 'Канал ' + key.slice(7) : key.replaceAll('_', ' '));
-export const optionLabel = (value: JsonValue) => typeof value === 'string' ? OPTIONS[value] || value : typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : JSON.stringify(value);
+export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? 'Канал ' + key.slice(7) : /^countdown_[1-9][0-9]*$/.test(key) ? 'Таймер канала ' + key.slice(10) : /^relay_status_[1-9][0-9]*$/.test(key) ? 'Состояние канала ' + key.slice(13) + ' после подачи питания' : key.replaceAll('_', ' '));
+const RELAY_OPTIONS: Record<string, string> = { power_off: 'Выключено', off: 'Выключено', power_on: 'Включено', on: 'Включено', last: 'Восстановить предыдущее состояние', memory: 'Восстановить предыдущее состояние' };
+export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key ? CAMERA_OPTIONS[key]?.[value] : undefined) || (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : JSON.stringify(value);
+const unitLabel = (unit: string | undefined) => unit === 's' ? 'с' : unit === '℃' ? '°C' : unit === '℉' ? '°F' : unit;
+function controlHelp(key: string): string | undefined {
+  if (CAMERA_HELP[key]) return CAMERA_HELP[key];
+  if (key === 'relay_status' || /^relay_status_[1-9][0-9]*$/.test(key)) return 'Какое состояние восстановить после отключения и повторной подачи электропитания. Это настройка, а не текущий статус реле.';
+  if (key === 'switch_backlight') return 'Включение и выключение подсветки клавиш выключателя.';
+  if (/^countdown(?:_[1-9][0-9]*)?$/.test(key)) return 'Обратный отсчёт до переключения. Время задаётся в секундах.';
+  if (key === 'switch_inching') return 'После включения выключатель автоматически отключается через заданное время. Например, через минуту. Настройка передаётся строкой; её формат не описан в API этого устройства.';
+}
 export const sameValue = (left: JsonValue, right: JsonValue) => JSON.stringify(left) === JSON.stringify(right);
+export const cloudLabel = (fn: CloudFunction) => labelFor(fn.code);
+export function withChannelLabels(definitions: CloudFunctions, labels: Record<string, string>): CloudFunctions {
+  const apply = (fn: CloudFunction) => ({ ...fn, user_label: labels[fn.code] });
+  return { ...definitions, functions: definitions.functions.map(apply), status_range: definitions.status_range?.map(apply) };
+}
 
 export function limitsOf(value: unknown): Record<string, unknown> {
   try {
@@ -49,7 +69,7 @@ const finite = (value: unknown): value is number => typeof value === 'number' &&
 const rounded = (value: number) => Number(value.toPrecision(12));
 
 export function localSpec(key: string, cap: Capability): ControlSpec {
-  const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: cap.unit || undefined,
+  const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: unitLabel(cap.unit || undefined), help: controlHelp(key),
     indicator: !cap.writable && MOTION_KEYS.has(key) && cap.type === 'boolean' ? 'motion' as const : undefined };
   if (cap.enum?.length) return { ...base, kind: 'enum', choices: cap.enum };
   switch (cap.type) {
@@ -78,12 +98,13 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
   // These two documented lighting DPs are send-only, even when the cloud
   // includes an empty/echoed value in its cached status range.
   const commandHelp = ['String', 'Json'].includes(fn.type) ? LIGHT_COMMAND_HELP[fn.code] : undefined;
-  const base = { key: fn.code, label: labelFor(fn.code), readable: !commandHelp, writable,
-    advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp,
+  const base = { key: fn.code, label: cloudLabel(fn), readable: !commandHelp, writable,
+    aliases: /^switch_[1-9][0-9]*$/.test(fn.code) && fn.user_label ? [fn.user_label] : undefined,
+    advanced: Boolean(commandHelp) || fn.type === 'Raw' || fn.code === 'remote_switch', help: commandHelp || controlHelp(fn.code),
     indicator: !writable && MOTION_KEYS.has(fn.code) && ['Boolean', 'Enum'].includes(fn.type) ? 'motion' as const : undefined };
   const limits = limitsOf(fn.values);
-  const unit = typeof limits.unit === 'string' ? limits.unit : undefined;
-  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? 'Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.' : undefined };
+  const unit = typeof limits.unit === 'string' ? unitLabel(limits.unit) : undefined;
+  if (fn.type === 'Boolean') return { ...base, kind: 'boolean', help: fn.code === 'remote_switch' ? 'Связанные устройства добавляются в Smart Life. Здесь доступен параметр лампы «вкл/выкл»; управление списком привязок пока не реализовано.' : base.help };
   if (fn.type === 'Integer') {
     const scale = limits.scale ?? 0;
     const validScale = Number.isInteger(scale) && (scale as number) >= 0 && (scale as number) <= 9;
@@ -99,7 +120,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
       minimum: finite(limits.min) ? limits.min * factor : undefined,
       maximum: finite(limits.max) ? limits.max * factor : undefined,
       step: (finite(limits.step) ? limits.step : 1) * factor, unit: displayUnit,
-      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? 'Единица измерения не указана устройством.' : undefined,
+      help: !writable && ['battery', 'battery_value', 'battery_percentage'].includes(fn.code) && !displayUnit ? 'Единица измерения не указана устройством.' : base.help,
       reason: !writable || validBounds ? undefined : 'Нет корректного диапазона; управление недоступно.' };
   }
   if (fn.type === 'Enum') {
@@ -126,6 +147,10 @@ export function cloudSpecs(definitions: CloudFunctions, snapshot: CloudSnapshot)
   for (const fn of definitions.functions) result.set(fn.code, cloudSpec(fn, true));
   for (const key of Object.keys(snapshot.status)) if (!result.has(key)) result.set(key, { key, label: labelFor(key), kind: 'unsupported', readable: true, writable: false,
     indicator: MOTION_KEYS.has(key) ? 'motion' : undefined });
+  for (const fn of [...(definitions.status_range || []), ...definitions.functions]) {
+    const spec = result.get(fn.code);
+    if (spec && /^switch_[1-9][0-9]*$/.test(fn.code) && fn.user_label) spec.aliases = [fn.user_label];
+  }
   return [...result.values()];
 }
 
@@ -181,7 +206,7 @@ export function displayReading(spec: ControlSpec, reading: Reading | undefined):
   const value = reading.value;
   if (typeof value === 'boolean') return ['switch', 'switch_led'].includes(spec.key) || spec.key.startsWith('switch_') ? (value ? 'Включено' : 'Выключено') : (value ? 'Да' : 'Нет');
   if (spec.kind === 'color' && typeof value === 'object' && !Array.isArray(value)) return `Тон ${value.h}°, насыщенность ${rounded(Number(value.s) / 10)}%, яркость ${rounded(Number(value.v) / 10)}%`;
-  return (typeof value === 'number' ? String(rounded(value)) : optionLabel(value)) + (spec.unit ? ' ' + spec.unit : '');
+  return (typeof value === 'number' ? String(rounded(value)) : optionLabel(value, spec.key)) + (spec.unit ? ' ' + spec.unit : '');
 }
 
 export function validateControlValue(spec: ControlSpec, value: JsonValue): void {
@@ -226,6 +251,23 @@ export function cloudCommands(spec: ControlSpec, value: JsonValue, definitions: 
   const modes = mode ? limitsOf(mode.values).range : undefined;
   if (wanted && Array.isArray(modes) && modes.includes(wanted)) commands.unshift({ code: 'work_mode', value: wanted });
   return commands;
+}
+
+export function cloudBatchCommands(changes: { spec: ControlSpec; value: JsonValue }[], definitions: CloudFunctions, status: Record<string, JsonValue>) {
+  const commands = new Map<string, JsonValue>();
+  let inferredMode: JsonValue | undefined;
+  const explicitMode = changes.find(change => change.spec.key === 'work_mode');
+  for (const { spec, value } of changes) {
+    for (const command of cloudCommands(spec, value, definitions)) {
+      if (command.code === 'work_mode') inferredMode = command.value;
+      else commands.set(command.code, command.value);
+    }
+  }
+  const mode = explicitMode?.value ?? inferredMode;
+  const result = [...commands].map(([code, value]) => ({ code, value }));
+  if (mode !== undefined && (explicitMode || !sameValue(mode, status.work_mode ?? null))) result.unshift({ code: 'work_mode', value: mode });
+  if (result.length > 16) throw new Error('За один раз можно применить до 16 параметров.');
+  return result;
 }
 
 export function hsvToHex(hsv: HSV): string {

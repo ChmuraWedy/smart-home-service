@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ControlCenter } from './components/ControlCenter';
@@ -36,6 +36,46 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it.each(['name','surface'])('opens details from the card %s using the selected route',async target=>{
+    const calls=server(),user=userEvent.setup();
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:local.name});
+    await user.selectOptions(within(card).getByRole('combobox'),'developer');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(target==='name' ? within(card).getByRole('heading',{name:local.name}) : card);
+    expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
+    await waitFor(()=>expect(calls.some(call=>call.path.endsWith('/functions?provider=developer'))).toBe(true));
+    expect(calls.filter(call=>call.method==='POST')).toEqual([]);
+  });
+
+  it('keeps quick controls, labels and refresh separate from card navigation and blocks opening during a command',async()=>{
+    const calls=server(),original=vi.mocked(fetch).getMockImplementation()!,user=userEvent.setup();
+    let finish!:(value:Response)=>void;
+    const pending=new Promise<Response>(resolve=>{finish=resolve;});
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      const url=new URL(String(input));
+      if (url.pathname.endsWith('/cloud/devices')) return json([{...shared,controls:{ready:true,definitions:{device_id:shared.id,functions:[{code:'switch_led',type:'Boolean',values:{}}]},snapshot:{device_id:shared.id,online:true,source:'cloud',status:{switch_led:false}}}}]);
+      if (init?.method==='POST') {calls.push({path:url.pathname+url.search,method:'POST',body:JSON.parse(String(init.body))}); return pending;}
+      return original(input,init);
+    });
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:local.name}),power=await within(card).findByRole('switch',{name:'Питание'});
+    await waitFor(()=>expect(power).toBeEnabled());
+    await user.click(within(card).getByRole('button',{name:'Обновить параметры'}));
+    await waitFor(()=>expect(power).toBeEnabled());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(within(card).getByText('Питание',{exact:true}));
+    await waitFor(()=>expect(power).toBeDisabled());
+    await user.click(card);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(calls.filter(call=>call.method==='POST')).toHaveLength(1);
+    await act(async()=>finish(json({acknowledged:true})));
+    await waitFor(()=>expect(power).toBeEnabled());
+    await user.click(within(card).getByRole('heading',{name:local.name}));
+    expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
+    expect(calls.filter(call=>call.method==='POST')).toHaveLength(1);
+  });
+
   it('merges physical IDs across local and both cloud providers, never equal names or numeric record IDs', () => {
     const sameName = { ...shared, id: 'another-physical-lamp', name: local.name };
     const records = mergeDevices([local], { sharing: [shared, sameName], developer: [developer] });
@@ -55,6 +95,16 @@ describe('unified device identity and management', () => {
     const card = screen.getByRole('listitem', { name: local.name });
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     expect(within(card).getByRole('combobox')).toHaveValue('sharing');
+    const header=card.querySelector('header')!;
+    expect(header).toHaveTextContent(local.name);
+    expect(header).toHaveTextContent('Кухня');
+    expect(card.querySelector('.device-card-identity')).toHaveTextContent(local.name);
+    expect(card.querySelector('.device-card-identity')).toHaveTextContent('kitchen_light');
+    expect(card.querySelector('.device-card-context')).toHaveTextContent('Кухня');
+    expect(card.querySelector('.device-card-context')).toHaveTextContent('В сети');
+    expect(header).not.toHaveTextContent('Через шлюз');
+    expect(within(screen.getByRole('listitem',{name:'Только в аккаунте'})).queryByText('Через интернет · Smart Life')).toBeNull();
+    expect(header.querySelector('[data-device-type=\"switch\"]')).not.toBeNull();
     expect(within(card).getAllByRole('option')).toHaveLength(3);
     expect(calls.some(call => /\/functions|\/status|refresh=true&max_age/.test(call.path))).toBe(false);
     expect(calls.every(call => call.method === 'GET')).toBe(true);
@@ -67,25 +117,92 @@ describe('unified device identity and management', () => {
     expect(screen.getByRole('listitem', { name: 'Только в аккаунте' })).toBeInTheDocument();
   });
 
+  it('resumes TRACER FOCUS 3 controls and local setup without sending device commands', async () => {
+    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!, user=userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input,init) => {
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'tracer-real',name:'TRACER FOCUS 3',sub:false}]);
+      return original(input,init);
+    });
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:'TRACER FOCUS 3'});
+    expect(within(card).queryByText('Настройка отложена')).toBeNull();
+    expect(within(card).getByRole('group',{name:'Основные параметры: TRACER FOCUS 3'})).toBeInTheDocument();
+    await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
+    expect(screen.getByLabelText('Название')).toHaveValue('TRACER FOCUS 3');
+    expect(screen.getByLabelText('Tuya device ID')).toHaveValue('tracer-real');
+    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('wifi');
+    expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
+    expect(calls.every(call=>call.method==='GET')).toBe(true);
+  });
+
+  it('resumes WorkGtZb setup from its tile and treats cloud gateways as gateways even with sub=true', async () => {
+    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!, user=userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input,init) => {
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'actual-gateway',name:'WorkGtZb',category:'wg2',sub:true}]);
+      return original(input,init);
+    });
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card=await screen.findByRole('listitem',{name:'WorkGtZb'});
+    expect(within(card).queryByText('Настройка отложена')).toBeNull();
+    await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
+    expect(screen.getByLabelText('Название')).toHaveValue('WorkGtZb');
+    expect(screen.getByLabelText('Tuya device ID')).toHaveValue('actual-gateway');
+    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
+    expect(screen.getByLabelText('Подключение устройства')).toBeDisabled();
+    expect(within(screen.getByLabelText('Подключение устройства')).getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByLabelText('IP в домашней сети')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Шлюз')).toBeNull();
+    expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
+    expect(calls.every(call=>call.method==='GET')).toBe(true);
+  });
+
   it('routes commands by the chosen provider or local numeric record, without an automatic fallback', async () => {
     const calls = server({ commandFailure: true }); const user = userEvent.setup();
     render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
     await screen.findByRole('listitem', { name: local.name });
     const card = screen.getByRole('listitem', { name: local.name });
     await user.selectOptions(within(card).getByRole('combobox'), 'developer');
-    await user.click(within(card).getByRole('button', { name: 'Управлять' }));
+    await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const cloud = await screen.findByRole('dialog', { name: local.name });
-    expect(within(cloud).getByText('Tuya Developer · через интернет')).toBeInTheDocument();
-    await user.click(await within(cloud).findByRole('button', { name: 'Включить' }));
+    expect(within(cloud).queryByText('Tuya Developer · через интернет')).toBeNull();
+    const connectionSummary=within(cloud).getByRole('region',{name:'Подключение устройства'});
+    expect(connectionSummary).toBeVisible();
+    for (const text of ['Комната','Кухня','Подключение','Через шлюз','Управление','Через интернет · Tuya Developer','Состояние связи']) {
+      expect(within(connectionSummary).getByText(text,{exact:true})).toBeVisible();
+    }
+    expect(await within(connectionSummary).findByText('В сети',{exact:true})).toBeVisible();
+    const info=within(cloud).getByRole('button',{name:'О подключении устройства'});
+    expect(info).toHaveAttribute('aria-expanded','false');
+    await user.click(info);
+    const description=within(cloud).getByRole('region',{name:'О подключении устройства'});
+    expect(description).toHaveTextContent('Кухня');
+    expect(description).toHaveTextContent('Устройство подключено через шлюз');
+    expect(description).toHaveTextContent('через подключённый аккаунт Tuya Developer');
+    await user.keyboard('{Escape}');
+    expect(within(cloud).queryByRole('region',{name:'О подключении устройства'})).toBeNull();
+    expect(cloud).toBeInTheDocument();
+    await user.click(info);
+    await user.click(within(cloud).getByRole('heading',{name:local.name}));
+    expect(within(cloud).queryByRole('region',{name:'О подключении устройства'})).toBeNull();
+    await user.click(await within(cloud).findByRole('switch'));
+    await user.click(within(cloud).getByRole('button', { name: 'Применить' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('результат команды неизвестен');
     expect(calls.filter(call => call.method === 'POST')).toEqual([{ path: '/api/v1/cloud/devices/physical-lamp/commands?provider=developer', method: 'POST', body: { commands: [{ code: 'switch_led', value: true }] } }]);
     await user.click(within(cloud).getByRole('button', { name: 'Закрыть' }));
     const reloaded = await screen.findByRole('listitem', { name: local.name });
     expect(within(reloaded).getByRole('combobox')).toHaveValue('developer');
     await user.selectOptions(within(reloaded).getByRole('combobox'), 'local');
-    await user.click(within(reloaded).getByRole('button', { name: 'Управлять' }));
+    await user.click(within(reloaded).getByRole('button', { name: 'Подробнее' }));
     const home = await screen.findByRole('dialog', { name: local.name });
-    await user.click(await within(home).findByRole('button', { name: 'Включить' }));
+    const localSummary=within(home).getByRole('region',{name:'Подключение устройства'});
+    for (const text of ['Кухня','Через шлюз','В домашней сети','Состояние связи']) {
+      expect(within(localSummary).getByText(text,{exact:true})).toBeVisible();
+    }
+    expect(await within(localSummary).findByText('Доступно дома',{exact:true})).toBeVisible();
+    await user.click(within(home).getByRole('button',{name:'О подключении устройства'}));
+    expect(within(home).getByRole('region',{name:'О подключении устройства'})).toHaveTextContent('настроенному шлюзу в домашней сети');
+    await user.click(await within(home).findByRole('switch'));
+    await user.click(within(home).getByRole('button', { name: 'Применить' }));
     expect(calls.filter(call => call.method === 'POST')[1]).toEqual({ path: '/api/v1/devices/7/commands/capabilities', method: 'POST', body: { values: { switch: true } } });
     expect(calls.some(call => call.path.includes('/cloud/devices/7/'))).toBe(false);
   });

@@ -589,6 +589,10 @@ def create_app(settings: Settings | None = None, controller=None):
         from .commissioning import Observations
 
         app.state.observations = Observations()
+        app.state.gateway_findings = Observations()
+        from .network import NetworkMonitor
+
+        app.state.network = NetworkMonitor()
         from .topology import TopologySync
 
         app.state.topology = TopologySync()
@@ -605,9 +609,11 @@ def create_app(settings: Settings | None = None, controller=None):
         try:
             yield
         finally:
+            app.state.network.close()
             app.state.poller.stop()
             app.state.topology.stop()
             app.state.observations.clear()
+            app.state.gateway_findings.clear()
             app.state.cloud.close()
             engine.dispose()
 
@@ -634,9 +640,27 @@ def create_app(settings: Settings | None = None, controller=None):
     from .topology import router as cloud_router
 
     app.include_router(cloud_router)
+    from .camera_api import router as camera_router
+
+    app.include_router(camera_router)
     from .commissioning import router as commissioning_router
 
     app.include_router(commissioning_router)
+    from .network import router as network_router
+
+    app.include_router(network_router)
+    from .gateway_setup import router as gateway_setup_router
+
+    app.include_router(gateway_setup_router)
+    from .gateway_setup import connection_router
+
+    app.include_router(connection_router)
+    from .device_aliases import router as device_aliases_router
+
+    app.include_router(device_aliases_router)
+
+    from .activity import router as activity_router
+    app.include_router(activity_router)
 
     @app.get("/cloud", include_in_schema=False)
     def cloud_setup_page():

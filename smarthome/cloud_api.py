@@ -6,10 +6,12 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field, JsonValue, SecretStr, field_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .importer import import_tinytuya
+from .models import CloudChannelLabel
 from .schemas import Identifier, ImportRequest, PositiveID, Schema
 
 router = APIRouter(prefix="/api/v1/cloud", tags=["Cloud"], dependencies=[Depends(authenticate)])
@@ -33,7 +35,44 @@ class DeveloperCredentials(Schema):
 
 
 def cloud_bridge(request, provider):
-    return request.app.state.developer_cloud if provider == "developer" else request.app.state.cloud
+    bridge = request.app.state.developer_cloud if provider == "developer" else request.app.state.cloud
+    if provider == "sharing" and hasattr(bridge, "state"):
+        bridge.state.history_engine = request.app.state.engine
+    return bridge
+
+
+def audit_cloud(request, bridge, provider, device, *, commands=None, outcome=None):
+    import logging
+
+    from .activity import record_command, record_values
+    from .cloud_mappings import scope_for
+    try:
+        with Session(request.app.state.engine) as session:
+            scope = scope_for(bridge, provider)
+            if commands is not None:
+                record_command(session, scope, device.id, {row["code"]: row["value"] for row in commands}, outcome, getattr(device, "local_key", None))
+            else:
+                record_values(session, scope, device.id, {**device.status, "online": bool(device.online)}, secret=getattr(device, "local_key", None))
+            session.commit()
+    except Exception:
+        logging.getLogger(__name__).warning("Device activity persistence unavailable")
+
+
+def battery_reading(device):
+    for code in ("battery_percentage", "battery_value", "va_battery", "battery", "battery_state", "battery_level"):
+        value = device.status.get(code)
+        if value is None or value == getattr(device, "local_key", None):
+            continue
+        spec = getattr(device, "status_range", {}).get(code)
+        try:
+            limits = spec.values if isinstance(spec.values, dict) else json.loads(spec.values)
+        except (AttributeError, ValueError, TypeError):
+            limits = {}
+        scale = limits.get("scale", 0)
+        if type(value) in (int, float) and type(scale) is int and 0 <= scale <= 9:
+            value = value * 10 ** -scale
+        return {"code": code, "value": value, "unit": limits.get("unit") or ("%" if code == "battery_percentage" else None)}
+    return None
 
 
 class QRLogin(Schema):
@@ -69,6 +108,37 @@ class CloudCommands(Schema):
     commands: list[CloudCommand] = Field(min_length=1, max_length=16)
 
 
+class ChannelLabels(Schema):
+    labels: dict[
+        Annotated[str, Field(pattern=r"^switch_[1-9][0-9]*$", max_length=128)],
+        Annotated[str, Field(min_length=1, max_length=120)] | None,
+    ] = Field(min_length=1, max_length=32)
+
+    @field_validator("labels")
+    @classmethod
+    def clean_labels(cls, labels):
+        for code, label in labels.items():
+            if label is not None:
+                label = label.strip()
+                if not label or any(not c.isprintable() for c in label):
+                    raise ValueError("Channel names must be nonempty printable text")
+                labels[code] = label
+        return labels
+
+
+def channel_labels(session, bridge, provider, device_id):
+    from .cloud_mappings import scope_for
+
+    scope = scope_for(bridge, provider)
+    return {
+        row.code: row.label for row in session.scalars(
+            select(CloudChannelLabel).where(
+                CloudChannelLabel.scope == scope, CloudChannelLabel.device_id == device_id
+            )
+        )
+    }
+
+
 def safe_spec(device, spec):
     result = {key: getattr(spec, key, None) for key in ("code", "type", "values")}
     ids = set()
@@ -91,6 +161,7 @@ def safe_device(device):
     fields = ("id", "name", "category", "product_id", "online", "sub", "node_id", "support_local")
     result = {name: getattr(device, name, None) for name in fields}
     result["has_local_key"] = bool(getattr(device, "local_key", None))
+    result["battery"] = battery_reading(device)
     result["functions"] = [
         safe_spec(device, f)
         for f in getattr(device, "function", {}).values()
@@ -105,6 +176,31 @@ def safe_status_ranges(device):
         for spec in getattr(device, "status_range", {}).values()
         if getattr(spec, "code", None) not in {"local_key", "key", "access_token", "refresh_token"}
     ]
+
+
+def safe_snapshot(device, provider):
+    return {
+        "device_id": device.id,
+        "online": bool(device.online),
+        "source": "tuya_developer_cloud_snapshot"
+        if provider == "developer"
+        else "tuya_cloud_snapshot",
+        "status": {
+            code: value
+            for code, value in device.status.items()
+            if code not in {"local_key", "key", "access_token", "refresh_token"}
+            and value != getattr(device, "local_key", None)
+        },
+        "device_update_time": getattr(device, "update_time", None),
+        "snapshot_received_at": getattr(device, "snapshot_received_at", None),
+        "event_stream_connected": getattr(device, "event_stream_connected", False),
+        "status_observations": {
+            code: observation
+            for code, observation in getattr(device, "status_observations", {}).items()
+            if code not in {"local_key", "key", "access_token", "refresh_token"}
+        },
+        "status_range": safe_status_ranges(device),
+    }
 
 
 @router.get("/status")
@@ -188,10 +284,37 @@ def logout(request: Request):
 
 @router.get("/devices")
 def devices(
-    request: Request, response: Response, refresh: bool = False, provider: Provider = "sharing"
+    request: Request, response: Response, refresh: bool = False, provider: Provider = "sharing",
+    session: Session = Depends(get_session),
 ):
+    from .cloud_mappings import scope_for
+    from .device_aliases import aliases_for_devices
+
     response.headers["Cache-Control"] = "no-store"
-    return [safe_device(device) for device in cloud_bridge(request, provider).devices(refresh)]
+    bridge = cloud_bridge(request, provider)
+    with bridge.lock:
+        account_devices = bridge.devices(refresh)
+        snapshots = [bridge.state.snapshot(device) if provider == "sharing" else device for device in account_devices]
+        rows = [safe_device(device) for device in snapshots]
+        for device in snapshots:
+            audit_cloud(request, bridge, provider, device)
+        if rows:
+            aliases = aliases_for_devices(session, scope_for(bridge, provider), [row["id"] for row in rows])
+            labels = {(label.device_id, label.code): label.label for label in session.scalars(
+                select(CloudChannelLabel).where(CloudChannelLabel.scope == scope_for(bridge, provider), CloudChannelLabel.device_id.in_([row["id"] for row in rows]))
+            )}
+            for row, device in zip(rows, snapshots, strict=True):
+                row["aliases"] = aliases[row["id"]]
+                functions, ranges = row["functions"], safe_status_ranges(device)
+                for spec in functions + ranges:
+                    if (device.id, spec["code"]) in labels:
+                        spec["user_label"] = labels[(device.id, spec["code"])]
+                row["controls"] = {
+                    "ready": device.id in bridge.state.metadata if provider == "sharing" else bool(functions or ranges),
+                    "definitions": {"device_id": device.id, "functions": functions, "status_range": ranges},
+                    "snapshot": safe_snapshot(device, provider),
+                }
+    return rows
 
 
 @router.post("/imports/local-inventory")
@@ -248,44 +371,63 @@ def cloud_device_status(
     provider: Provider = "sharing",
 ):
     bridge = cloud_bridge(request, provider)
-    device = bridge.device_status(device_id, refresh)
+    with bridge.lock:
+        device = bridge.device_status(device_id, refresh)
+        audit_cloud(request, bridge, provider, device)
     response.headers["Cache-Control"] = "no-store"
-    return {
-        "device_id": device.id,
-        "online": bool(device.online),
-        "source": "tuya_developer_cloud_snapshot"
-        if provider == "developer"
-        else "tuya_cloud_snapshot",
-        "status": {
-            code: value
-            for code, value in device.status.items()
-            if code not in {"local_key", "key", "access_token", "refresh_token"}
-            and value != getattr(device, "local_key", None)
-        },
-        "device_update_time": getattr(device, "update_time", None),
-        "snapshot_received_at": getattr(device, "snapshot_received_at", None),
-        "event_stream_connected": getattr(device, "event_stream_connected", False),
-        "status_observations": {
-            code: observation
-            for code, observation in getattr(device, "status_observations", {}).items()
-            if code not in {"local_key", "key", "access_token", "refresh_token"}
-        },
-        "status_range": safe_status_ranges(device),
-    }
+    return safe_snapshot(device, provider)
 
 
 @router.get("/devices/{device_id}/functions")
 def cloud_device_functions(
-    device_id: Identifier, request: Request, response: Response, provider: Provider = "sharing"
+    device_id: Identifier, request: Request, response: Response, provider: Provider = "sharing",
+    session: Session = Depends(get_session),
 ):
     bridge = cloud_bridge(request, provider)
-    device = bridge.writable_device(device_id)
+    with bridge.lock:
+        device = bridge.writable_device(device_id)
+        labels = channel_labels(session, bridge, provider, device_id)
+        functions = safe_device(device)["functions"]
+        ranges = safe_status_ranges(device)
+        for spec in functions + ranges:
+            if spec["code"] in labels:
+                spec["user_label"] = labels[spec["code"]]
     response.headers["Cache-Control"] = "no-store"
     return {
         "device_id": device.id,
-        "functions": safe_device(device)["functions"],
-        "status_range": safe_status_ranges(device),
+        "functions": functions,
+        "status_range": ranges,
     }
+
+
+@router.put("/devices/{device_id}/channel-labels")
+def save_channel_labels(
+    device_id: Identifier, body: ChannelLabels, request: Request, response: Response,
+    provider: Provider = "sharing", session: Session = Depends(get_session),
+):
+    from .cloud_mappings import scope_for
+    from .service import commit
+
+    bridge = cloud_bridge(request, provider)
+    with bridge.lock:
+        scope = scope_for(bridge, provider)
+        device = bridge.writable_device(device_id)
+        available = set(device.function) | set(getattr(device, "status_range", {}))
+        if not set(body.labels).issubset(available):
+            raise HTTPException(422, "Channel is not available on the selected device")
+        for code, label in body.labels.items():
+            row = session.get(CloudChannelLabel, (scope, device_id, code))
+            if label is None:
+                if row is not None:
+                    session.delete(row)
+            elif row is not None:
+                row.label = label
+            else:
+                session.add(CloudChannelLabel(scope=scope, device_id=device_id, code=code, label=label))
+        commit(session)
+        labels = channel_labels(session, bridge, provider, device_id)
+    response.headers["Cache-Control"] = "no-store"
+    return {"device_id": device_id, "labels": labels}
 
 
 @router.post("/devices/{device_id}/commands")
@@ -296,7 +438,15 @@ def cloud_commands(
     with bridge.lock:
         device = bridge.writable_device(device_id)
         validate_cloud_commands(device, body.commands)
-        return bridge.send_commands(device_id, [command.model_dump() for command in body.commands])
+        commands = [command.model_dump() for command in body.commands]
+        audit_cloud(request, bridge, provider, device, commands=commands, outcome="sent")
+        try:
+            result = bridge.send_commands(device_id, commands)
+        except HTTPException as error:
+            audit_cloud(request, bridge, provider, device, commands=commands, outcome="rejected" if error.status_code in {400, 403, 404, 409, 422} else "unknown")
+            raise
+        audit_cloud(request, bridge, provider, device, commands=commands, outcome="accepted" if result.get("acknowledged") else "unknown")
+        return result
 
 
 def validate_cloud_commands(device, commands):

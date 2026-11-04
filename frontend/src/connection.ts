@@ -2,7 +2,8 @@ import { normalizeApiBase } from './api';
 import type { Connection } from './api';
 
 export const STORAGE_KEY = 'smart-home.ui.connection.v1';
-export const DEFAULT_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const configuredBase = import.meta.env.VITE_API_BASE_URL;
+export const DEFAULT_API_BASE = configuredBase === 'same-origin' ? window.location.origin : configuredBase || 'http://127.0.0.1:8000';
 
 export function loadConnection(defaultBase = DEFAULT_API_BASE): Connection {
   try {

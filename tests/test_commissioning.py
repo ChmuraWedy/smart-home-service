@@ -343,3 +343,209 @@ def test_invalid_cloud_key_is_sanitized(client, observer):
     assert result.status_code == 502
     assert "private-invalid-key" not in result.text
     assert client.app.state.observations.entries == {}
+
+
+def existing_device(client, **changes):
+    result = client.post(
+        "/api/v1/devices", json={**DRAFT, "name": "Existing lamp", "aliases": ["KeepMe"], **changes}
+    )
+    assert result.status_code == 201, result.text
+    return result.json()
+
+
+def existing_session(client, item, provider="sharing"):
+    result = client.post(f"{API}/devices/{item['id']}", json={"provider": provider})
+    assert result.status_code == 201, result.text
+    assert KEY not in result.text
+    return result.json()["session_id"]
+
+
+def test_existing_connection_functions_require_separate_review_and_preserve_metadata(
+    client, observer, factory
+):
+    item = existing_device(client)
+    factory.result = {"dps": {"1": True, "2": 400, "9": "unknown"}}
+    token = existing_session(client, item)
+    assert client.get(f"/api/v1/devices/{item['id']}").json() == item
+    rows = sample(client, token)["readings"]
+    assert next(row for row in rows if row["dp"] == "1")["can_write"] is True
+    assert next(row for row in rows if row["dp"] == "9")["can_write"] is False
+    assert client.get(f"/api/v1/devices/{item['id']}").json()["capabilities"] == {}
+    result = save(client, token, name="Do not rename", aliases=["DoNotAssign"], writable=["dp_1"])
+    assert result.status_code == 200, result.text
+    saved = result.json()
+    for name in (
+        "id",
+        "device_id",
+        "name",
+        "aliases",
+        "room_id",
+        "building_id",
+        "ip",
+        "version",
+        "has_local_key",
+    ):
+        assert saved[name] == item[name]
+    assert saved["capabilities"]["switch_led"]["writable"] is True
+    assert saved["capabilities"]["bright_value"]["writable"] is False
+    assert saved["capabilities"]["dp_9"]["writable"] is False
+    state = client.get(f"/api/v1/devices/{item['id']}/state").json()
+    assert state["values"]["switch_led"]["value"] is True
+    assert state["available"] is True
+    assert len(client.get("/api/v1/devices").json()) == 1
+    assert all(command[1] == "status" for command in factory.commands)
+    assert save(client, token).status_code == 404
+
+
+@pytest.mark.parametrize("confirmation", [False, 1, "true", None])
+def test_existing_function_save_requires_actual_confirmation(
+    client, observer, factory, confirmation
+):
+    item = existing_device(client)
+    token = existing_session(client, item)
+    factory.result = {"dps": {"1": True}}
+    sample(client, token)
+    assert (
+        client.post(
+            f"{API}/{token}/register", json={"name": item["name"], "reviewed": confirmation}
+        ).status_code
+        == 422
+    )
+    assert client.get(f"/api/v1/devices/{item['id']}").json()["capabilities"] == {}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"ip": "192.168.1.41"},
+        {"version": "3.4"},
+        {"local_key": "fedcba9876543210"},
+        {"enabled": False},
+        {"capabilities": {"other": {"dp": "8", "type": "boolean"}}},
+    ],
+)
+def test_existing_function_setup_rejects_changed_connection_or_functions(
+    client, observer, factory, change
+):
+    item = existing_device(client)
+    token = existing_session(client, item)
+    factory.result = {"dps": {"1": True}}
+    sample(client, token)
+    assert client.patch(f"/api/v1/devices/{item['id']}", json=change).status_code == 200
+    assert save(client, token, writable=["dp_1"]).status_code == 409
+    assert client.post(f"{API}/{token}/samples", json={}).status_code == 409
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"is_gateway": True},
+        {"capabilities": {"switch": {"dp": "1", "type": "boolean"}}},
+        {"ip": None},
+        {"local_key": None},
+        {"enabled": False},
+    ],
+)
+def test_existing_setup_only_accepts_enabled_unmapped_connections(client, observer, change):
+    item = existing_device(client, **change)
+    assert (
+        client.post(f"{API}/devices/{item['id']}", json={"provider": "sharing"}).status_code == 409
+    )
+
+
+def test_existing_setup_rejects_schema_changes_and_unknown_writable_parameters(
+    client, observer, factory
+):
+    _, bridge = observer
+    item = existing_device(client)
+    token = existing_session(client, item)
+    factory.result = {"dps": {"1": True, "9": False}}
+    sample(client, token)
+    assert save(client, token, writable=["dp_9"]).status_code == 422
+    bridge.device.function["switch_led"].dp_id = 7
+    assert save(client, token, writable=["dp_1"]).status_code == 409
+    assert client.get(f"/api/v1/devices/{item['id']}").json()["capabilities"] == {}
+
+
+def test_existing_setup_without_cloud_is_read_only_and_cancel_never_updates(
+    client, observer, factory
+):
+    item = existing_device(client)
+    token = existing_session(client, item, None)
+    factory.result = {"dps": {"1": True}}
+    assert sample(client, token)["readings"][0]["can_write"] is False
+    assert save(client, token, writable=["dp_1"]).status_code == 422
+    assert client.delete(f"{API}/{token}").status_code == 204
+    assert client.get(f"/api/v1/devices/{item['id']}").json() == item
+
+
+def test_existing_setup_survives_cache_and_metadata_updates_but_not_account_change(
+    client, observer, factory
+):
+    _, bridge = observer
+    item = existing_device(client)
+    token = existing_session(client, item)
+    factory.result = {"dps": {"1": True}}
+    sample(client, token)
+    assert client.get(f"/api/v1/devices/{item['id']}/state?refresh=true").status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/devices/{item['id']}",
+            json={"name": "User changed name", "aliases": ["UserAlias"]},
+        ).status_code
+        == 200
+    )
+    result = save(client, token, writable=["dp_1"])
+    assert result.status_code == 200, result.text
+    assert result.json()["name"] == "User changed name"
+    assert "useralias" in result.json()["aliases"]
+    another = existing_device(client, device_id="another-lamp", name="Another lamp", aliases=[])
+    bridge.device.id = "another-lamp"
+    token = existing_session(client, another)
+    sample(client, token)
+    bridge.auth["token_info"]["uid"] = "another-account"
+    assert save(client, token).status_code == 409
+
+
+def test_existing_setup_does_not_accept_client_connection_or_key_overrides(client, observer):
+    item = existing_device(client)
+    assert (
+        client.post(
+            f"{API}/devices/{item['id']}",
+            json={"provider": "sharing", "ip": "192.168.1.99", "local_key": KEY},
+        ).status_code
+        == 422
+    )
+    client.app.state.settings = replace(client.app.state.settings, api_token="test-token")
+    assert (
+        client.post(
+            f"{API}/devices/{item['id']}", json={}, headers={"X-API-Key": "wrong"}
+        ).status_code
+        == 401
+    )
+
+
+def test_existing_zigbee_setup_uses_saved_parent_and_rejects_parent_changes(
+    client, observer, factory
+):
+    root = existing_device(
+        client, device_id="root-gateway", name="Gateway", aliases=[], is_gateway=True
+    )
+    child = existing_device(
+        client,
+        transport="zigbee",
+        ip=None,
+        local_key=None,
+        version=None,
+        parent_id=root["id"],
+        cid="actual-node",
+    )
+    token = existing_session(client, child)
+    factory.result = {"dps": {"1": True}}
+    assert sample(client, token)["readings"][0]["can_write"] is True
+    assert (
+        client.patch(f"/api/v1/devices/{root['id']}", json={"ip": "192.168.1.50"}).status_code
+        == 200
+    )
+    assert save(client, token, writable=["dp_1"]).status_code == 409
+    assert client.get(f"/api/v1/devices/{child['id']}").json()["capabilities"] == {}

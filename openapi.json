@@ -5616,6 +5616,16 @@
               }
             }
           },
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRead"
+                }
+              }
+            },
+            "description": "OK"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -5642,6 +5652,462 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/interfaces": {
+      "get": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "List Interfaces",
+        "operationId": "list_interfaces_api_v1_network_interfaces_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/network/scans": {
+      "post": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Start Scan",
+        "operationId": "start_scan_api_v1_network_scans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartNetworkScan"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/network/scans/{scan_id}": {
+      "get": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Read Scan",
+        "operationId": "read_scan_api_v1_network_scans__scan_id__get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Stop Scan",
+        "operationId": "stop_scan_api_v1_network_scans__scan_id__delete",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scan Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/scans/{scan_id}/discover": {
+      "post": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "Discover Scan",
+        "operationId": "discover_scan_api_v1_network_scans__scan_id__discover_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scan Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gateways/find": {
+      "post": {
+        "tags": [
+          "Gateways"
+        ],
+        "summary": "Find",
+        "operationId": "find_api_v1_gateways_find_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewayFind"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewayFindResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/gateways/save": {
+      "post": {
+        "tags": [
+          "Gateways"
+        ],
+        "summary": "Save",
+        "operationId": "save_api_v1_gateways_save_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewaySave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewaySaveResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Verified gateway created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewaySaveResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/local-connections/find": {
+      "post": {
+        "tags": [
+          "Local connections"
+        ],
+        "summary": "Find Connection",
+        "operationId": "find_connection_api_v1_local_connections_find_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionFind"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionFindResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/local-connections/save": {
+      "post": {
+        "tags": [
+          "Local connections"
+        ],
+        "summary": "Save Connection",
+        "operationId": "save_connection_api_v1_local_connections_save_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GatewaySave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewaySaveResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GatewaySaveResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/commissioning/devices/{device_id}": {
+      "post": {
+        "tags": [
+          "Commissioning"
+        ],
+        "summary": "Start Existing",
+        "description": "Observe functions of a saved connection without exposing or replacing its key.",
+        "operationId": "start_existing_api_v1_commissioning_devices__device_id__post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartExistingObservation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -8038,6 +8504,11 @@
             ],
             "title": "Mode",
             "default": "local"
+          },
+          "discover_gateway_key": {
+            "type": "boolean",
+            "title": "Discover Gateway Key",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -8183,6 +8654,532 @@
           "id"
         ],
         "title": "WidgetSelection"
+      },
+      "StartNetworkScan": {
+        "properties": {
+          "interface_address": {
+            "type": "string",
+            "format": "ipvanyaddress",
+            "title": "Interface Address"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "interface_address"
+        ],
+        "title": "StartNetworkScan"
+      },
+      "GatewayFind": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Device Id"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "sharing",
+              "developer"
+            ],
+            "title": "Provider"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          },
+          "discovery_seconds": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 3.0,
+            "title": "Discovery Seconds",
+            "default": 8
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "provider",
+          "interface_address"
+        ],
+        "title": "GatewayFind"
+      },
+      "GatewayFindResult": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "title": "Finding Id"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "unchanged"
+            ],
+            "title": "Action"
+          },
+          "device": {
+            "$ref": "#/components/schemas/GatewayPreview"
+          },
+          "verified": {
+            "type": "boolean",
+            "const": true,
+            "title": "Verified",
+            "default": true
+          },
+          "key_source": {
+            "type": "string",
+            "enum": [
+              "device",
+              "child"
+            ],
+            "title": "Key Source"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "finding_id",
+          "expires_in",
+          "action",
+          "device",
+          "key_source",
+          "interface_address"
+        ],
+        "title": "GatewayFindResult"
+      },
+      "GatewayPreview": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Device Id"
+          },
+          "existing_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "building_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Id"
+          },
+          "room_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Id"
+          },
+          "ip": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Ip"
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "3.1",
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5"
+            ],
+            "title": "Version"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "ip",
+                "version",
+                "local_key"
+              ]
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "existing_id",
+          "name",
+          "aliases",
+          "building_id",
+          "room_id",
+          "ip",
+          "version",
+          "changed_fields"
+        ],
+        "title": "GatewayPreview"
+      },
+      "GatewaySave": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 32,
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "title": "Finding Id"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "title": "Confirmed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "finding_id",
+          "confirmed"
+        ],
+        "title": "GatewaySave"
+      },
+      "GatewaySaveResult": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "unchanged"
+            ],
+            "title": "Action"
+          },
+          "device": {
+            "$ref": "#/components/schemas/DeviceRead"
+          },
+          "verified": {
+            "type": "boolean",
+            "const": true,
+            "title": "Verified",
+            "default": true
+          },
+          "key_source": {
+            "type": "string",
+            "enum": [
+              "device",
+              "child"
+            ],
+            "title": "Key Source"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "device",
+          "key_source",
+          "interface_address"
+        ],
+        "title": "GatewaySaveResult"
+      },
+      "ConnectionFind": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Device Id"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "sharing",
+              "developer"
+            ],
+            "title": "Provider"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          },
+          "discovery_seconds": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 3.0,
+            "title": "Discovery Seconds",
+            "default": 8
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "provider",
+          "interface_address"
+        ],
+        "title": "ConnectionFind"
+      },
+      "ConnectionFindResult": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "title": "Finding Id"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "unchanged"
+            ],
+            "title": "Action"
+          },
+          "device": {
+            "$ref": "#/components/schemas/ConnectionPreview"
+          },
+          "verified": {
+            "type": "boolean",
+            "const": true,
+            "title": "Verified",
+            "default": true
+          },
+          "key_source": {
+            "type": "string",
+            "enum": [
+              "device",
+              "child"
+            ],
+            "title": "Key Source"
+          },
+          "interface_address": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Interface Address"
+          },
+          "requested_device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Requested Device Id"
+          },
+          "connection_device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Connection Device Id"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "gateway"
+            ],
+            "title": "Route"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "finding_id",
+          "expires_in",
+          "action",
+          "device",
+          "key_source",
+          "interface_address",
+          "requested_device_id",
+          "connection_device_id",
+          "route"
+        ],
+        "title": "ConnectionFindResult"
+      },
+      "ConnectionPreview": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Device Id"
+          },
+          "existing_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "building_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Id"
+          },
+          "room_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room Id"
+          },
+          "ip": {
+            "type": "string",
+            "format": "ipv4",
+            "title": "Ip"
+          },
+          "version": {
+            "type": "string",
+            "enum": [
+              "3.1",
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5"
+            ],
+            "title": "Version"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "ip",
+                "version",
+                "local_key"
+              ]
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          },
+          "is_gateway": {
+            "type": "boolean",
+            "title": "Is Gateway"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device_id",
+          "existing_id",
+          "name",
+          "aliases",
+          "building_id",
+          "room_id",
+          "ip",
+          "version",
+          "changed_fields",
+          "is_gateway"
+        ],
+        "title": "ConnectionPreview"
+      },
+      "StartExistingObservation": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "sharing",
+                  "developer"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StartExistingObservation"
       }
     },
     "securitySchemes": {

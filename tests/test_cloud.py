@@ -131,6 +131,37 @@ def login(client):
     return id
 
 
+def test_channel_names_persist_without_commands_and_are_scoped(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    device = bridge.device("gateway")
+    device.function["switch_1"] = SimpleNamespace(code="switch_1", type="Boolean", values="{}")
+    path = API + "/devices/gateway/channel-labels"
+    result = cloud_client.put(path, json={"labels": {"switch_1": "  Свет над столом  "}})
+    assert result.status_code == 200
+    assert result.json()["labels"] == {"switch_1": "Свет над столом"}
+    assert bridge.manager.customer_api.calls == []
+    # A fresh database session (another request) reads the stored label.
+    spec = cloud_client.get(API + "/devices/gateway/functions").json()["functions"][-1]
+    assert spec["user_label"] == "Свет над столом" and spec["code"] == "switch_1"
+    bridge.device("child").function["switch_1"] = SimpleNamespace(code="switch_1", type="Boolean", values="{}")
+    assert cloud_client.get(API + "/devices/child/functions").json()["functions"][0].get("user_label") is None
+    bridge.auth["token_info"]["uid"] = "another-account"
+    assert "user_label" not in cloud_client.get(API + "/devices/gateway/functions").json()["functions"][-1]
+    bridge.auth["token_info"]["uid"] = "user"
+    assert cloud_client.put(path, json={"labels": {"switch_1": None}}).json()["labels"] == {}
+    assert "user_label" not in cloud_client.get(API + "/devices/gateway/functions").json()["functions"][-1]
+
+
+def test_channel_names_require_auth_and_reject_invalid_or_unknown_channels(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/channel-labels"
+    for labels in [{}, {"switch_99": "Unknown"}, {"switch": "Not a channel"}, {"switch_1": " "}, {"switch_1": "x" * 121}, {"switch_1": "a\nb"}]:
+        assert cloud_client.put(path, json={"labels": labels}).status_code == 422
+    cloud_client.headers.clear()
+    assert cloud_client.put(path, json={"labels": {"switch_1": "Название"}}).status_code == 401
+
+
 def test_verified_dp_mapping_metadata_is_private_and_handles_ambiguity(cloud_client):
     login(cloud_client)
     device = cloud_client.app.state.cloud.device("gateway")
@@ -634,3 +665,81 @@ def test_local_key_metadata_cloud_does_not_override_custom_aliases(cloud_client)
     device = cloud_client.get("/api/v1/devices/stable").json()
     assert device["version"] == "3.5" and device["ip"] == "192.168.1.20"
     assert device["aliases"] == ["Gateway", "stable"]
+
+
+def test_device_aliases_persist_in_cards_without_creating_inventory_or_renaming_cloud(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    path = API + "/devices/gateway/aliases"
+    assert cloud_client.get(path).json()["aliases"] == []
+    result = cloud_client.put(path, json={"aliases": ["  Desk_Light  ", "work-lamp"]})
+    assert result.status_code == 200, result.text
+    assert result.json()["aliases"] == ["desk_light", "work-lamp"]
+    assert cloud_client.get(path).json()["aliases"] == ["desk_light", "work-lamp"]
+    rows = cloud_client.get(API + "/devices").json()
+    row = next(row for row in rows if row["id"] == "gateway")
+    assert row["aliases"] == ["desk_light", "work-lamp"] and row["name"] == "Gateway"
+    assert cloud_client.get("/api/v1/devices").json() == []
+    assert bridge.manager.customer_api.calls == []
+    conflict = cloud_client.put(API + "/devices/child/aliases", json={"aliases": ["DESK_LIGHT"]})
+    assert conflict.status_code == 409
+    bridge.auth["token_info"]["uid"] = "other"
+    assert cloud_client.get(path).json()["aliases"] == []
+    bridge.auth["token_info"]["uid"] = "user"
+    assert cloud_client.put(path, json={"aliases": []}).json()["aliases"] == []
+    for aliases in [["Bad/Alias"], ["bad\nvalue"], ["a", " A "], ["x" * 65], [f"alias{i}" for i in range(33)]]:
+        assert cloud_client.put(path, json={"aliases": aliases}).status_code == 422
+    assert cloud_client.get(API + "/devices/missing/aliases").status_code == 404
+    cloud_client.headers.clear()
+    assert cloud_client.get(path).status_code == 401
+    assert cloud_client.put(path, json={"aliases": []}).status_code == 401
+
+
+def test_cloud_card_reuses_inventory_aliases_and_preserves_other_device_settings(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/aliases"
+    assert cloud_client.put(path, json={"aliases": ["cloud_tag"]}).status_code == 200
+    response = cloud_client.post("/api/v1/devices", json={
+        "device_id": "gateway", "name": "Мой шлюз", "aliases": ["existing_tag"],
+        "ip": "192.168.1.40", "version": "3.5", "local_key": KEY,
+    })
+    assert response.status_code == 201, response.text
+    local = response.json()
+    assert cloud_client.get(path).json()["aliases"] == ["cloud_tag", "existing_tag"]
+    result = cloud_client.put(path, json={"aliases": ["cloud_tag", "existing_tag", "new_tag"]})
+    assert result.status_code == 200, result.text
+    stored = cloud_client.get(f"/api/v1/devices/{local['id']}").json()
+    assert stored["aliases"] == ["Мой шлюз", "cloud_tag", "existing_tag", "new_tag"]
+    assert stored["ip"] == local["ip"] and stored["has_local_key"]
+    assert stored["name"] == local["name"]
+    assert cloud_client.get("/api/v1/devices/new_tag").json()["id"] == local["id"]
+    assert cloud_client.put(path, json={"aliases": ["new_tag"]}).status_code == 200
+    assert cloud_client.get(f"/api/v1/devices/{local['id']}").json()["aliases"] == ["Мой шлюз", "new_tag"]
+
+
+def test_unicode_cloud_aliases_persist_and_conflict_after_normalization(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway/aliases"
+    result = cloud_client.put(path, json={"aliases": ["Свет кухни", "Святло пакоя", "Światło pokoju", "Cafe\u0301"]})
+    assert result.status_code == 200, result.text
+    assert result.json()["aliases"] == sorted(["свет кухни", "святло пакоя", "światło pokoju", "café"])
+    assert cloud_client.get(path).json() == result.json()
+    assert cloud_client.put(API + "/devices/child/aliases", json={"aliases": ["CAFÉ"]}).status_code == 409
+
+
+@pytest.mark.parametrize("code,status,detail", [("2001", 409, "не в сети"), ("2003", 502, "code 2003"), (SECRET, 502, "physical outcome may be unknown")])
+def test_upstream_command_rejection_is_safe_and_not_retried(cloud_client, monkeypatch, code, status, detail):
+    login(cloud_client)
+    cloud_client.get(API + "/devices")
+    calls = []
+    def reject(*args):
+        calls.append(args)
+        error = RuntimeError(SECRET)
+        error.error_code = code
+        raise error
+    monkeypatch.setattr(cloud_client.app.state.cloud.manager.customer_api, "post", reject)
+    response = cloud_client.post(API + "/devices/gateway/commands", json={"commands": [{"code": "switch", "value": True}]})
+    assert response.status_code == status
+    assert detail in response.json()["detail"]
+    assert SECRET not in response.text
+    assert len(calls) == 1

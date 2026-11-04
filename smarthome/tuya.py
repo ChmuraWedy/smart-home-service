@@ -23,7 +23,7 @@ class TuyaController:
         self._locks = tuple(threading.Lock() for _ in range(64))
 
     @contextmanager
-    def connection(self, device: Device, parent: Device | None):
+    def connection(self, device: Device, parent: Device | None, *, timeout=None):
         root = parent or device
         if not device.enabled or not root.enabled:
             raise HTTPException(409, "Device or parent gateway is disabled")
@@ -46,7 +46,7 @@ class TuyaController:
                 root.ip,
                 root.local_key,
                 version=float(root.version),
-                connection_timeout=self.settings.tuya_timeout,
+                connection_timeout=self.settings.tuya_timeout if timeout is None else timeout,
                 connection_retry_limit=1,
                 connection_retry_delay=0,
                 persist=True,
@@ -64,6 +64,52 @@ class TuyaController:
                     connection.close()
             finally:
                 lock.release()
+
+    def verify_gateway_key(self, device):
+        """Verify a direct device/gateway key with status only; no DPS writes.
+
+        TinyTuya 3.4/3.5 installs a session key only after checking the peer's
+        HMAC. For 3.3, accept a decrypted DPS reply or the gateway's decrypted
+        'data unvalid' response. Plaintext 3.1 status cannot prove a key.
+        """
+        if device.version not in ("3.3", "3.4", "3.5"):
+            return False
+        try:
+            with self.connection(
+                device, None, timeout=min(self.settings.tuya_timeout, 1)
+            ) as target:
+                target.disabledetect = True
+                result = target.status()
+                data = result.get("data") if isinstance(result, dict) else None
+                for reply in (result, data):
+                    if isinstance(reply, dict) and any(
+                        reply.get(name) and reply[name] != device.device_id
+                        for name in ("gwId", "devId")
+                    ):
+                        return False
+                if device.version in ("3.4", "3.5"):
+                    original = getattr(target, "real_local_key", None)
+                    return bool(original and target.local_key != original)
+                if not isinstance(result, dict):
+                    return False
+                data = data if isinstance(data, dict) else result
+                if not any(k in result or k in data for k in ("Err", "Error")):
+                    return isinstance(data.get("dps"), dict) and bool(data["dps"])
+                payload = result.get("Payload")
+                return (
+                    str(result.get("Err")) == "900"
+                    and isinstance(payload, (bytes, str))
+                    and (
+                        b"data unvalid" in payload
+                        if isinstance(payload, bytes)
+                        else "data unvalid" in payload
+                    )
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            # Exceptions and payloads can contain a candidate key.
+            return False
 
     def execute(self, device, parent, *, dps=None):
         try:
