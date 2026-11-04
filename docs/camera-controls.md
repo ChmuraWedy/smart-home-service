@@ -1,5 +1,7 @@
 # Camera video and settings
 
+[Live video screenshot](screenshots/camera-live-dark.png) · [Camera settings screenshot](screenshots/camera-controls-dark.png)
+
 Camera cards are generated from the selected device's real definitions. Supported categories such as `sp` and `dghsxj` receive a camera icon and Video action. Missing functions do not create invented controls.
 
 ## Main card and player

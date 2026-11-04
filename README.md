@@ -21,7 +21,7 @@ Controls depend on the functions exposed by the device and the selected connecti
 
 ## Screenshots
 
-Real views of connected lights, switches, and sensors in English. Device names, aliases, and room assignments remain as configured in the captured installation.
+Real views of connected lights, switches, sensors, and a camera in English. Device names, aliases, and room assignments remain as configured in the captured installation.
 
 ### Device overview
 
@@ -64,6 +64,18 @@ Sensor details show labels, units, battery information, and gateway connection c
 The motion sensor has a dedicated status and activity log, shown here with the Motion filter selected — Dark theme. Its motion reports and event history are read-only.
 
 ![Motion sensor with its current state and activity log](docs/screenshots/motion-sensor-dark.png)
+
+### Camera: live video
+
+Live camera playback with its resolution, playback state, download rate, privacy control, and Stop action — Dark theme. This capture shows an actual 640×360 stream; available quality options depend on the camera's stream.
+
+![Camera playing a live 640 by 360 video stream with playback information and Stop control](docs/screenshots/camera-live-dark.png)
+
+### Camera: privacy, video, and detection settings
+
+The camera card shows privacy and video actions, night vision, image options, motion/sound detection, siren, and memory-card readiness — Dark theme. The player is idle in this capture; live video starts explicitly.
+
+![Camera settings with privacy, video actions, detection controls, and memory-card status](docs/screenshots/camera-controls-dark.png)
 
 [Screenshot capture details and refresh instructions](docs/screenshots/README.md)
 

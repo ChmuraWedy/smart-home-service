@@ -4,6 +4,8 @@ Entries below describe the changes at the stated date; later entries can superse
 
 ## After 0.8.3 — 2026-11-04
 
+- Added real Sleep Cam live video and settings screenshots. The main camera example shows actual 640×360 playback with resolution/state/download information; a separate screenshot covers privacy, image/detection settings, siren, and SD-card readiness.
+
 - Added actual Polish bulb and Belarusian motion-sensor localization examples, with English documentation captions. Renamed overview headings and screenshot assets by device type rather than installation-specific rooms.
 
 - Replaced the Russian documentation with English guides and an OpenAPI-derived endpoint index. Expanded the README into seven individually visible screenshots, including Workroom bulb color controls and WC2 motion status/activity.
