@@ -36,3 +36,7 @@ browser detection and the selector use that registry. Previously formatted notic
 can be translated again when the language changes; source message IDs take precedence
 over reverse lookups to preserve Russian labels shared with other languages. Language selection
 must never change an API host, key, device identity, or command value.
+
+## Screenshot examples
+
+The [README localization examples](../../../README.md#localization-examples) show actual Polish bulb controls and Belarusian motion-sensor activity. These are captures of the running interface rather than translated image overlays. Device names and configured rooms remain unchanged; only interface presentation follows the chosen locale. All documentation prose remains in English.

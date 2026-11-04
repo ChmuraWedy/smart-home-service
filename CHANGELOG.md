@@ -4,6 +4,8 @@ Entries below describe the changes at the stated date; later entries can superse
 
 ## After 0.8.3 — 2026-11-04
 
+- Added actual Polish bulb and Belarusian motion-sensor localization examples, with English documentation captions. Renamed overview headings and screenshot assets by device type rather than installation-specific rooms.
+
 - Replaced the Russian documentation with English guides and an OpenAPI-derived endpoint index. Expanded the README into seven individually visible screenshots, including Workroom bulb color controls and WC2 motion status/activity.
 - Added a project overview, setup instructions, and real-device screenshot gallery; moved the detailed API reference out of the root README.
 - `feat/themes-and-detail-header`: System, Dark, and Day palettes, persisted choice, OS updates, and cross-tab synchronization. Detail headers no longer scroll with content. Header SVG actions are consistently borderless with 44px targets; mobile toggles no longer overlap refresh controls.

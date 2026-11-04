@@ -6,7 +6,7 @@ Run it on your own server with Docker, or run the Python API and React interface
 
 **English · Russian · Polish · Belarusian** | **System · Dark · Day themes**
 
-[Quick start](#quick-start) · [Screenshots](#screenshots) · [Documentation](#documentation) · [API reference](docs/api-reference.md)
+[Quick start](#quick-start) · [Screenshots](#screenshots) · [Localization examples](#localization-examples) · [Documentation](#documentation) · [API reference](docs/api-reference.md)
 
 ## What you can do
 
@@ -21,51 +21,67 @@ Controls depend on the functions exposed by the device and the selected connecti
 
 ## Screenshots
 
-Real device views captured in English, using Workroom lighting and WC2 sensors. WC2 appears as **Bathroom Second**, with device names **Bath2 temperature** and **Bath2 motion**, in this installation. Names and aliases are kept as configured.
+Real views of connected lights, switches, and sensors in English. Device names, aliases, and room assignments remain as configured in the captured installation.
 
-### Workroom: lamps and switches on the main screen
+### Device overview
 
 Main cards with power controls, independent switch channels, aliases, room, and connection status — Day theme.
 
-![Workroom device overview with lamp power controls and a two-channel switch](docs/screenshots/workroom-overview-day.png)
+![Device overview with lamp power controls and a two-channel switch](docs/screenshots/device-overview-day.png)
 
-### Workroom bulb: brightness, white temperature, and schedules
+### Bulb: brightness, white temperature, and schedules
 
-WorkRoomLamp1 exposes white/color modes, brightness, color temperature, a color picker, a timer, and lighting schedules. The main card provides immediate power control; the full card contains the lighting settings.
+The example bulb exposes white/color modes, brightness, color temperature, a color picker, a timer, and lighting schedules. The main card provides immediate power control; the full card contains the lighting settings.
 
-![WorkRoomLamp1 bulb controls in Day theme](docs/screenshots/workroom-bulb-day.png)
+![Bulb controls in Day theme](docs/screenshots/bulb-controls-day.png)
 
-### Workroom bulb: precise color controls
+### Bulb: precise color controls
 
 Expand the color row to see hue, saturation, and color brightness. Opening this panel does not change the light; edits are sent with **Apply**.
 
-![WorkRoomLamp1 with the precise color sliders expanded](docs/screenshots/workroom-bulb-color-day.png)
+![Bulb with the precise color sliders expanded](docs/screenshots/bulb-color-day.png)
 
-### Workroom two-channel switch
+### Two-channel switch
 
 Both channels have their own control and existing alias tags. A clock opens the channel timer; power-on behavior and backlight are under Additional settings — Dark theme.
 
-![WorkroomLigthSwith with two channels, aliases, timer, and additional settings](docs/screenshots/workroom-switch-dark.png)
+![Two-channel switch with aliases, timer, and additional settings](docs/screenshots/two-channel-switch-dark.png)
 
-### WC2: room overview with motion and temperature sensors
+### Room filter and sensor cards
 
-The Bathroom Second room shows the Bath2 motion sensor and its motion state alongside temperature/humidity readings, battery information, and the room's lighting controls — Day theme.
+A room filter groups motion, temperature/humidity, and lighting devices. Compact cards show readings, battery information, and main controls — Day theme.
 
-![WC2 room overview showing motion, temperature, humidity, and lighting cards](docs/screenshots/wc2-overview-day.png)
+![Room filter showing motion, temperature, humidity, and lighting cards](docs/screenshots/room-overview-day.png)
 
-### WC2 temperature and humidity
+### Temperature and humidity sensor
 
 Sensor details show labels, units, battery information, and gateway connection context — Day theme.
 
-![Bath2 temperature sensor with humidity, temperature, battery, and gateway context](docs/screenshots/wc2-temperature-day.png)
+![Temperature and humidity sensor with battery and gateway context](docs/screenshots/temperature-humidity-sensor-day.png)
 
-### WC2 motion sensor and activity log
+### Motion sensor and activity log
 
-Bath2 motion has a dedicated motion status and activity log, shown here with the Motion filter selected — Dark theme. Its motion reports and event history are read-only.
+The motion sensor has a dedicated status and activity log, shown here with the Motion filter selected — Dark theme. Its motion reports and event history are read-only.
 
-![Bath2 motion sensor with motion status and its activity log](docs/screenshots/wc2-motion-dark.png)
+![Motion sensor with its current state and activity log](docs/screenshots/motion-sensor-dark.png)
 
 [Screenshot capture details and refresh instructions](docs/screenshots/README.md)
+
+## Localization examples
+
+The interface supports English, Russian, Polish, and Belarusian. Change the language in the header; labels, help text, parameter values, and date formatting follow the selection. Device names, aliases, identifiers, and commands retain their original values. The preference is saved independently of the API key and theme.
+
+### Polish: bulb controls
+
+Power, mode, brightness, color temperature, precise color controls, and lighting schedules in Polish — Day theme.
+
+![Bulb controls in Polish with hue, saturation, and color brightness](docs/screenshots/bulb-color-polish-day.png)
+
+### Belarusian: motion sensor and activity
+
+Motion state, event filtering, dates, and connection information in Belarusian — Dark theme.
+
+![Motion sensor status and activity log in Belarusian](docs/screenshots/motion-sensor-belarusian-dark.png)
 
 ## Quick start
 
