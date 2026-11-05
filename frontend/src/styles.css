@@ -1,3 +1,8 @@
+/* Load utilities without Preflight so existing screens keep their base styles. */
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme) prefix(tw);
+@import "tailwindcss/utilities.css" layer(utilities) prefix(tw) source(".");
+
 :root {
   --page-bg:#101720;
   --surface:#1a2431;
@@ -596,37 +601,16 @@ input[type=hidden] {
   font-size:14px;
 }
 
-.device-grid {
-  padding:0;
-  margin:0;
-  list-style:none;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-}
-
 .device-card {
+  @apply tw:relative tw:min-w-0 tw:cursor-pointer tw:rounded-xl tw:px-3 tw:pt-2 tw:pb-3;
   background:var(--surface);
   border:1px solid var(--border);
-  border-radius:12px;
-  padding:16px;
-  min-width:0;
-}
-
-.device-heading {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  margin-bottom:16px;
 }
 
 .device-symbol {
   font-size:24px;
   color:var(--muted);
   background:var(--surface-soft);
-  border-radius:8px;
-  padding:1px 9px;
 }
 
 .presence {
@@ -796,9 +780,6 @@ footer {
   .setup,.devices {
     padding:18px;
   }
-  .device-grid {
-    grid-template-columns:1fr;
-  }
   .card-heading {
     align-items:flex-start;
   }
@@ -932,7 +913,6 @@ footer {
 .parameter-icon { width:20px; height:20px; flex:none; color:var(--muted); }
 .capability-heading h3 { display:flex; align-items:center; gap:8px; }
 .battery-badge { display:inline-flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; }
-.device-card-status { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
 .capability-row .power-actions .power-toggle { width:44px; min-width:44px; height:25px; padding:3px; border:0; border-radius:20px; background:var(--toggle-off); display:flex; align-items:center; }
 .power-toggle > span { flex:none; width:19px; height:19px; border-radius:50%; background:var(--toggle-thumb); transition:transform .15s; }
 .power-actions .power-toggle[aria-checked=true] { background:var(--toggle-on); }
@@ -977,25 +957,10 @@ footer {
 }
 
 .control-header-actions .control-dismiss,.control-header-actions .control-information { width:44px; height:44px; flex:none; padding:10px; display:grid; place-items:center; border-radius:50%; }
-.device-grid.local-grid { align-items:start; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); }
-/* List tiles show primary actions; the full editor stays in the dialog. */
-.device-card { padding:8px 12px 12px; cursor:pointer; }
-.device-heading { align-items:flex-start; margin-bottom:8px; gap:9px; }
-.device-symbol { flex:none; display:grid; place-items:center; padding:6px; border-radius:8px; }
 .device-type-icon { width:24px; height:24px; }
-.device-card-title { flex:1; min-width:0; }
 .device-card-title h3 { margin:0 0 3px; font-size:14px; line-height:1.3; }
 .device-location,.device-route-label { color:var(--muted); font-size:10px; line-height:1.5; margin:0; overflow-wrap:anywhere; }
-.device-card-title .device-route-select { font-size:10px; color:var(--muted); padding:2px 4px; margin:2px 0 0; width:100%; max-width:220px; }
-.device-card-status { flex:none; max-width:110px; }
 .device-card-status .presence { white-space:normal; }
-.device-card-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.device-card-footer button { font-size:11px; min-height:36px; padding:6px 9px; }
-.device-card-footer .help { margin:0; font-size:11px; }
-.card-quick-controls { margin:6px 0; }
-.card-quick-controls:empty { display:none; }
-.card-primary-controls { display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; }
-.card-primary-controls > .capability { flex:1 1 150px; padding:0; }
 .card-quick-controls .capability-row { grid-template-columns:auto minmax(0,1fr); gap:4px 8px; }
 .card-quick-controls .capability-row > .power-actions { grid-column:2; grid-row:1; justify-content:flex-end; }
 .card-quick-controls .capability-heading h3 { font-size:12px; margin:0; }
@@ -1006,7 +971,6 @@ footer {
 .card-quick-controls .pending-reading { font-size:10px; margin:3px 0; }
 .card-quick-controls .control-feedback { font-size:11px; margin:6px 0; min-height:0; }
 .card-refresh { flex:none; margin-left:auto; width:36px; height:36px; padding:5px; font-size:20px; }
-.card-sensor-values { display:flex; align-items:center; flex:1; flex-wrap:wrap; gap:8px 14px; }
 .card-sensor-value { display:inline-flex; align-items:center; gap:4px; font-size:16px; font-variant-numeric:tabular-nums; }
 .card-sensor-value .parameter-icon { width:18px; height:18px; color:var(--muted); }
 .card-sensor-value.unknown { color:var(--muted); }
@@ -1030,13 +994,10 @@ footer {
 
 /* The visible channel name labels its switch; state is conveyed by the toggle. */
 .capability-heading h3 label { font:inherit; color:inherit; margin:0; cursor:pointer; }
-.device-card { position:relative; }
 .device-card .card-refresh { position:absolute; top:10px; right:10px; margin:0; }
-.device-card:has(.card-refresh) .device-card-status { padding-top:40px; }
 .control-header-buttons .control-refresh { width:44px; height:44px; padding:0; font-size:24px; }
 .light-schedules { margin-top:20px; }
 .light-schedules > h3 { font-size:14px; }
-@media(pointer:coarse) { .device-card:has(.card-refresh) .device-card-status { padding-top:48px; } }
 @media(max-width:520px) {
   .control-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; }
   .control-header > div:first-child { display:contents; }
@@ -1053,10 +1014,8 @@ footer {
 .capability-label .capability-aliases { margin:0; }
 .capability-boolean > .capability-row { grid-template-columns:auto auto minmax(0,1fr); column-gap:12px; }
 .capability-boolean > .capability-row > .reading-meta { justify-self:end; }
-.card-primary-controls > .channel-control { flex:1 1 135px; min-width:0; }
 .card-quick-controls .capability-row > .power-actions { justify-content:flex-start; }
 .card-quick-controls .capability-boolean > .capability-row { grid-template-columns:auto auto; justify-content:start; }
-.card-sensor-values { gap:8px 16px; }
 .card-sensor-caption { font-size:12px; color:var(--muted); }
 .card-sensor-value { flex-wrap:wrap; font-size:15px; }
 .channel-timer-toggle { display:inline-grid; place-items:center; padding:0; width:28px; height:28px; min-width:28px; border:0; background:transparent; color:var(--muted); }
@@ -1076,7 +1035,6 @@ footer {
 .capability-boolean > .capability-row > .power-actions { grid-column:2; grid-row:1; }
 .capability-boolean .capability-alias-editor { grid-column:1 / 3; grid-row:2; margin:0; }
 .capability-boolean > .capability-row { row-gap:4px; }
-.card-primary-controls > .channel-control { flex-basis:145px; }
 
 .device-connection-summary { margin-top:12px; }
 .device-connection-summary dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 24px; margin:0; }
@@ -1108,36 +1066,25 @@ footer {
   .device-control-header .device-alias-heading { grid-column:auto; grid-row:auto; }
 }
 
-/* Main tiles: room and connectivity above the primary controls, identity below. */
-.device-tile-layout.device-heading { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin:0; }
-.device-card-top { display:grid; grid-template-columns:36px minmax(0,1fr); align-items:start; gap:2px 8px; min-height:44px; }
-.device-card-top .device-symbol { grid-column:1; grid-row:1 / 3; width:36px; height:36px; padding:6px; }
-.device-card-top .card-quick-controls { grid-column:2; grid-row:2; min-width:0; margin:0; }
-.device-card-top .card-primary-controls { justify-content:flex-end; gap:4px; }
+/* Compact overrides for controls shared with device details. */
 .device-card-top .capability-label-line { gap:2px; }
 .device-card-top .card-primary-controls > .channel-control { flex:0 1 auto; min-width:0; }
 .device-card-top .channel-control > .capability { padding:0; }
-.device-card-top .card-primary-controls > .capability { flex:0 1 auto; }
+.device-card-top .card-primary-controls > .capability { flex:0 1 auto; padding:0; }
 .device-card-top .capability-boolean > .capability-row { gap:4px; }
 .device-card-top .card-quick-controls .capability-heading h3 { font-size:11px; white-space:nowrap; }
 .device-card-top .capability-aliases { max-width:135px; margin:0; }
 .device-card-top .capability-aliases .alias-tag { max-width:100%; font-size:10px; padding:3px 6px; overflow-wrap:anywhere; }
 .device-card-top .single-power .capability-label-line h3 { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-.device-card-top .card-sensor-values { flex:0 1 auto; justify-content:flex-end; gap:6px 12px; }
 .device-card-top .card-sensor-value { gap:4px; font-size:16px; }
 .device-card-top .card-sensor-caption { font-size:10px; }
-.device-card-identity { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; }
-.device-card-identity .device-card-title { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
 .device-card-identity h3 { margin:0; font-size:14px; }
-.device-card-identity .capability-aliases { display:flex; flex-wrap:wrap; gap:4px; margin:0; min-width:0; max-width:100%; }
+.device-card-identity .capability-aliases { gap:4px; margin:0; }
 .device-card-identity .alias-tag { font-size:10px; padding:3px 6px; max-width:100%; overflow-wrap:anywhere; }
-.device-card-actions { display:flex; align-items:center; gap:2px; flex:none; }
 .device-card-actions .tile-icon-action { display:grid; place-items:center; width:28px; height:28px; min-height:28px; padding:0; font-size:20px; border:0; background:transparent; color:var(--muted); }
-.device-card-context { grid-column:2; grid-row:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px 8px; min-width:0; min-height:18px; }
 .device-card:has(.card-refresh) .device-card-identity,
 .device-card:has(.card-refresh) .device-card-footer { padding-right:30px; }
 .device-card-context .device-location { font-size:11px; }
-.device-card .device-card-context .device-card-status { flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:flex-end; padding-top:0; max-width:100%; gap:6px; font-size:11px; }
 .device-card-context .battery-badge { border-left:1px solid var(--border); padding-left:6px; font-size:11px; }
 .device-card .card-refresh { top:auto; bottom:10px; right:8px; width:26px; height:26px; padding:0; font-size:18px; }
 .device-card-footer .device-route-select { width:100%; font-size:10px; margin:0; padding:4px 6px; }
@@ -1164,7 +1111,6 @@ footer {
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:var(--media-bg); border-radius:10px; color:var(--media-text); font-size:30px; }
 .camera-setting-group { margin:20px 0; }
 .camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:var(--muted); }
-.device-card-top .camera-quick-controls .card-primary-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 8px; }
 .device-card-top .camera-quick-controls .capability-row { grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; }
 .device-card-top .camera-quick-controls .capability-label-line { justify-content:flex-end; text-align:right; }
 .device-card-top .camera-quick-controls .capability-heading h3 { font-size:11px; line-height:1.2; white-space:normal; overflow-wrap:anywhere; }
