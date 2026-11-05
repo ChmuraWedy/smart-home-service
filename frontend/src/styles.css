@@ -1321,7 +1321,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-device .battery-badge .parameter-icon { @apply tw:size-4; }
 .dashboard-device .battery-value { @apply tw:sr-only; }
 .dashboard-device .presence.online { @apply tw:text-(--success); }
-.dashboard-device [data-slot="switch-thumb"][data-state="checked"] { @apply tw:bg-white; }
+.dashboard-device [data-slot="switch"][data-checked] [data-slot="switch-thumb"] { @apply tw:bg-white; }
 
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device :is(.device-setup-action, .device-card-footer, .card-refresh) { @apply tw:hidden; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device .card-primary-controls { @apply tw:min-h-0 tw:pr-0; }

@@ -15,7 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@radix-ui/react-switch": "1.4.1",
+    "@headlessui/react": "2.2.10",
     "hls.js": "^1.7.3",
     "react": "19.3.0",
     "react-dom": "19.3.0"

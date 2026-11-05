@@ -151,8 +151,8 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, shadcnSwitch = false, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; shadcnSwitch?: boolean; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
@@ -257,7 +257,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">{t("Устарело")}</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
       {stage || immediatePower ? <>{booleanButton ? <button id={powerId} type="button" className="secondary compact mode-button" title={reading?.known || awaiting ? (selectedPower ? t("Выключить: ") : t("Включить: "))+spec.label : undefined} aria-label={spec.label} aria-pressed={selectedPower} disabled={disabled || (!reading?.known && !awaiting)} onClick={() => changePower(!selectedPower)}>{typeof buttonText==='function' ? buttonText(reading?.known || awaiting ? selectedPower : null) : buttonText || (selectedPower ? t("Выключить") : t("Включить"))}</button>
-        : shadcnSwitch ? <Switch id={powerId} aria-label={spec.label} checked={selectedPower} disabled={disabled} onCheckedChange={changePower} />
+        : dashboardSwitch ? <Switch id={powerId} aria-label={spec.label} checked={selectedPower} disabled={disabled} onChange={changePower} />
         : <button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => changePower(!selectedPower)}><span /></button>}{!dirty && !awaiting && !reading?.known && <span className="power-selection">{t("Нет данных")}</span>}{reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t("Устарело")}</span>}{(dirty || awaiting) && <span className="help">{dirty ? t("Изменено") : t("Ожидаем показание")}{spec.readable && <>{" " + t("· сейчас:") + " "}<span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
       {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
       <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>{t("Включить")}</button>
