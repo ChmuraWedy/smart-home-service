@@ -11,7 +11,7 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
-import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
+import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera, isLight } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
@@ -60,7 +60,11 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
     && codes.some(code => /^(humidity|va_humidity|humidity_value)$/.test(code))
     && !codes.some(code => /^switch(?:_|$)/.test(code));
-  const mobileLayout = isCamera(cloud?.category) ? undefined : channels.size === 2 ? 'channels' : climate ? 'climate' : undefined;
+  const mobileLayout = isCamera(cloud?.category) ? undefined
+    : channels.size === 2 ? 'channels'
+    : climate ? 'climate'
+    : isLight(cloud?.category, codes) ? 'light'
+    : undefined;
   return <li id={deviceCardId(device.id)} className="device-card" data-mobile-layout={mobileLayout} aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
     <header className="tw:flex tw:flex-col tw:gap-2">
       <div className="device-card-top tw:grid tw:min-h-11 tw:grid-cols-[36px_minmax(0,1fr)] tw:items-start tw:gap-x-2 tw:gap-y-0.5"><span className="device-symbol tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:grid tw:size-9 tw:place-items-center tw:rounded-lg tw:p-1.5"><DeviceIcon category={cloud?.category} codes={codes} /></span>

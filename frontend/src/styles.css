@@ -1153,13 +1153,13 @@ footer {
   .device-card[data-mobile-layout="channels"] .capability-aliases {
     @apply tw:max-w-full;
   }
-  .device-card[data-mobile-layout="climate"] :is(.device-card-title, .device-card-context) {
+  .device-card:is([data-mobile-layout="climate"], [data-mobile-layout="light"]) :is(.device-card-title, .device-card-context) {
     @apply tw:col-end-4;
   }
-  .device-card[data-mobile-layout="climate"] .device-card-actions {
+  .device-card:is([data-mobile-layout="climate"], [data-mobile-layout="light"]) .device-card-actions {
     @apply tw:row-start-3 tw:row-end-4;
   }
-  .device-card[data-mobile-layout="climate"] .card-quick-controls {
+  .device-card:is([data-mobile-layout="climate"], [data-mobile-layout="light"]) .card-quick-controls {
     @apply tw:col-end-3;
   }
   .device-card[data-mobile-layout="climate"] .card-sensor-values {
