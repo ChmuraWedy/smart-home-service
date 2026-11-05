@@ -195,11 +195,12 @@ export function App() {
           setMenuOpen(false);
           menuButton.current?.focus();
         }}>{t("Настройки панели")}</button>}
+        <div className="app-menu-appearance"><ThemeSelector /><LanguageSelector /></div>
       </nav>}
     </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span className="brand-tagline">{t("Ваш дом под управлением")}</span>
       {view === 'control' && <span className={"dashboard-connection" + (status ? " online" : "")}><i aria-hidden="true" />{status ? t("Подключено") : t("API не подключён")}</span>}
     </div></div>
-      <div className="appearance-settings"><ThemeSelector /><LanguageSelector /></div><span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t("API подключён") : t("API не подключён")}</span>
+      <span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t("API подключён") : t("API не подключён")}</span>
       {view === 'control' && status && <button className="secondary dashboard-search-button" type="button" aria-label={t("Поиск")} aria-expanded={dashboardPanel === 'search'} aria-controls="dashboard-search" disabled={locked} onClick={() => {
         setMenuOpen(false);
         setDashboardPanel(panel => panel === 'search' ? null : 'search');

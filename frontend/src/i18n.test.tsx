@@ -30,6 +30,7 @@ describe('Interface localization', () => {
     render(<App />);
     fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://another-api.test:8080'}});
     fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'unsaved-draft'}});
+    fireEvent.click(screen.getByRole('button',{name:'Меню'}));
     fireEvent.change(screen.getByLabelText('Язык'),{target:{value:'en'}});
     expect(screen.getByRole('heading',{name:'Connect Tuya'})).toBeInTheDocument();
     expect(screen.getByLabelText('API address')).toHaveValue('http://another-api.test:8080');
@@ -153,6 +154,7 @@ describe('Interface localization', () => {
     render(<App/>);
     fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://localization-api.test:8080'}});
     fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'незахаваны-Łąka'}});
+    fireEvent.click(screen.getByRole('button',{name:'Меню'}));
     fireEvent.change(screen.getByLabelText('Язык'),{target:{value:language.locale}});
     expect(screen.getByRole('heading',{name:language.heading})).toBeInTheDocument();
     expect(screen.getByLabelText(language.address)).toHaveValue('http://localization-api.test:8080');
