@@ -12,7 +12,7 @@ export function ParameterIcon({ code }: { code: string }) {
 export function BatteryBadge({ reading }: { reading?: BatteryReading | null }) {
   if (!reading || reading.value === null) return null;
   const value = typeof reading.value === 'string' ? ({low:t("Низкий заряд"),middle:t("Средний заряд"),medium:t("Средний заряд"),high:t("Высокий заряд"),full:t("Полный заряд")}[reading.value] || reading.value) : String(reading.value);
-  return <span className="battery-badge" aria-label={t("Батарея: ") + value + (reading.unit ? ' ' + reading.unit : '')} title={t("Последнее известное показание батареи")}><ParameterIcon code="battery" />{value}{reading.unit && ' ' + reading.unit}</span>;
+  return <span className="battery-badge" aria-label={t("Батарея: ") + value + (reading.unit ? ' ' + reading.unit : '')} title={t("Последнее известное показание батареи")}><ParameterIcon code="battery" /><span className="battery-value">{value}{reading.unit && ' ' + reading.unit}</span></span>;
 }
 export function batteryFromSpecs(specs: ControlSpec[], values: Record<string, JsonValue>) {
   const spec = specs.find(item => isBattery(item.key) && item.readable && values[item.key] !== undefined);

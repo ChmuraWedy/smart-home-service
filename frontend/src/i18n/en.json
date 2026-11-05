@@ -1,4 +1,8 @@
 {
+  "Настройки панели": "Dashboard settings",
+  "Подключено": "Connected",
+  "Поиск": "Search",
+  "Все": "All",
   "Не удалось подключиться.": "Could not connect.",
   "Срок QR-кода истёк. Получите новый код.": "The QR code has expired. Get a new code.",
   "Не удалось выполнить действие.": "Could not complete the action.",
