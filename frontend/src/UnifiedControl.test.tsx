@@ -36,7 +36,7 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
-  it('uses the shadcn bulb switch to send a power command from the keyboard', async () => {
+  it('uses the bulb icon button to send a power command from the keyboard', async () => {
     const calls = server({noLocal:true});
     const original = vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (input, init) => {
@@ -55,7 +55,7 @@ describe('unified device identity and management', () => {
     const toggle = await within(card).findByRole('switch',{name:'Питание'});
     await waitFor(() => expect(toggle).toBeEnabled());
     expect(card).toHaveAttribute('data-slot','card');
-    expect(toggle).toHaveAttribute('data-slot','switch');
+    expect(toggle).toHaveAttribute('data-slot','power-button');
     expect(toggle).not.toBeChecked();
     toggle.focus();
     await user.keyboard('[Space]');
@@ -78,7 +78,7 @@ describe('unified device identity and management', () => {
     expect(calls.filter(call=>call.method==='POST')).toEqual([]);
   });
 
-  it('keeps quick controls, labels and refresh separate from card navigation and blocks opening during a command',async()=>{
+  it('keeps the power button and refresh separate from details and blocks opening during a command',async()=>{
     const calls=server(),original=vi.mocked(fetch).getMockImplementation()!,user=userEvent.setup();
     let finish!:(value:Response)=>void;
     const pending=new Promise<Response>(resolve=>{finish=resolve;});
@@ -94,7 +94,7 @@ describe('unified device identity and management', () => {
     await user.click(within(card).getByRole('button',{name:'Обновить параметры'}));
     await waitFor(()=>expect(power).toBeEnabled());
     expect(screen.queryByRole('dialog')).toBeNull();
-    await user.click(within(card).getByText('Питание',{exact:true}));
+    await user.click(power);
     await waitFor(()=>expect(power).toBeDisabled());
     await user.click(card);
     expect(screen.queryByRole('dialog')).toBeNull();

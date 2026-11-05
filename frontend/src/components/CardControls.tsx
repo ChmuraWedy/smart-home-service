@@ -7,7 +7,7 @@ import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
 import { CapabilityField, ControlFeedback, useControlSession } from './DeviceControls';
-import { batteryFromSpecs, isBattery, isCamera, ParameterIcon } from './DevicePresentation';
+import { batteryFromSpecs, DeviceIcon, isBattery, isCamera, ParameterIcon } from './DevicePresentation';
 import type { BatteryReading } from './DevicePresentation';
 import { ChannelControl } from './ChannelControl';
 import { CAMERA_QUICK_LABELS } from '../camera-controls';
@@ -35,7 +35,9 @@ export function CardControls(props: CardProps) {
       setVisible(inView);
       if (inView && !props.paused) setActivated(true);
     });
-    observer.observe(container.current!);
+    const controls = container.current!;
+    // A single power button joins the card's grid, leaving its wrapper without a layout box.
+    observer.observe(controls.closest('.dashboard-device') || controls);
     return () => observer.disconnect();
   }, [props.paused]);
   const cloud = props.route !== 'local' ? props.device.cloud[props.route] : undefined;
@@ -46,10 +48,10 @@ export function CardControls(props: CardProps) {
   </div>;
 }
 
-function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execute, send, onBusy, notice, camera = false, cameraAction, onPrivacyStateChange }: {
+function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execute, send, onBusy, notice, camera = false, category, cameraAction, onPrivacyStateChange }: {
   specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; busy: boolean; readOK: boolean;
   refresh: () => Promise<void>; execute: (send: () => Promise<{text:string}>) => Promise<boolean | undefined>;
-  send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean}; camera?: boolean; cameraAction?:ReactNode; onPrivacyStateChange?:(value:boolean | null | undefined)=>void;
+  send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean}; camera?: boolean; category?: string; cameraAction?:ReactNode; onPrivacyStateChange?:(value:boolean | null | undefined)=>void;
 }) {
   const [sending,setSending] = useState(false);
   useEffect(() => { onBusy(sending); return () => onBusy(false); },[sending,onBusy]);
@@ -62,16 +64,24 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
       return {text:t("Команда принята.")};
     }) === true; } finally { setSending(false); }
   }
-  const powers = camera ? Object.entries(CAMERA_QUICK_LABELS).flatMap(([key,label]) => specs.filter(spec => spec.key === key && spec.kind === 'boolean' && spec.writable).map(spec => ({...spec,label,help:undefined}))) : specs.filter(powerControl), sensors = camera ? [] : specs.filter(sensorReading);
+  const powers = camera ? Object.entries(CAMERA_QUICK_LABELS).flatMap(([key,label]) => specs.filter(spec => spec.key === key && spec.kind === 'boolean' && spec.writable).map(spec => ({...spec,label,help:undefined}))) : specs.filter(powerControl);
+  const powerLayout = camera || !powers.length ? undefined : powers.length === 1 && !powers[0].aliases?.length ? 'single' : 'channels';
+  const brightness = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'number' && spec.unit === '%' && /^(brightness|bright_value(?:_v2)?)$/.test(spec.key)) : undefined;
+  const brightnessReading = brightness && reading(brightness);
+  const brightnessText = brightness && typeof brightnessReading?.value === 'number' && !isStale(brightnessReading, now, local)
+    ? displayReading(brightness, brightnessReading) : undefined;
+  const sensors = camera ? [] : specs.filter(spec => spec !== brightness && sensorReading(spec));
   const privacy=camera ? powers.find(spec=>spec.key==='basic_private') : undefined;
   useEffect(()=>{if (camera && readOK && !privacy) onPrivacyStateChange?.(undefined);},[camera,readOK,!!privacy,onPrivacyStateChange]);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error && !cameraAction) return null;
-  const field = (spec:ControlSpec, headingActions?:ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch booleanButton={camera && spec.key==='basic_private'} buttonText={camera && spec.key==='basic_private' ? t("Приватность") : undefined} onBooleanStateChange={camera && spec.key==='basic_private' ? onPrivacyStateChange : undefined} disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
+  const field = (spec:ControlSpec, headingActions?:ReactNode) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
+    powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : powerLayout === 'channels' ? <ParameterIcon code={spec.key} /> : undefined}
+    powerOnText={brightnessText} booleanButton={camera && spec.key==='basic_private'} buttonText={camera && spec.key==='basic_private' ? t("Приватность") : undefined} onBooleanStateChange={camera && spec.key==='basic_private' ? onPrivacyStateChange : undefined} disabled={busy || !readOK || sending} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
   const layout = camera
     ? 'camera-quick-controls tw:grid tw:grid-cols-2 tw:justify-end tw:gap-x-2 tw:gap-y-1.5'
     : 'tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1';
   return <>
-    <div className={"card-primary-controls " + layout + (powers.length === 1 && /^(switch|switch_led)$/.test(powers[0].key) ? " single-power" : "")}>{powers.filter(spec=>spec!==privacy).map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+    <div className={"card-primary-controls " + layout} data-power-layout={powerLayout}>{powers.filter(spec=>spec!==privacy).map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       {!!sensors.length && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(" · Устарело") : '');
@@ -104,7 +114,7 @@ function CloudCardControls({api,cloud,provider,now,visible,onAuthError,onBusy,ca
   useEffect(() => {
     if (session.data) onStatus?.({online:session.data.snapshot.online, battery:batteryFromSpecs(cloudSpecs(session.data.definitions,session.data.snapshot),session.data.snapshot.status)});
   },[session.data,onStatus]);
-  return <QuickFields specs={specs} camera={isCamera(cloud.category)} cameraAction={cameraAction} onPrivacyStateChange={onPrivacyStateChange} reading={spec => session.data ? cloudReading(spec,session.data.snapshot.status[spec.key],session.data.snapshot.status_observations?.[spec.key]) : undefined} now={now} local={false} busy={session.busy} readOK={session.readOK} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
+  return <QuickFields specs={specs} camera={isCamera(cloud.category)} category={cloud.category} cameraAction={cameraAction} onPrivacyStateChange={onPrivacyStateChange} reading={spec => session.data ? cloudReading(spec,session.data.snapshot.status[spec.key],session.data.snapshot.status_observations?.[spec.key]) : undefined} now={now} local={false} busy={session.busy} readOK={session.readOK} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
     const data = session.data!;
     const result = await api.sendDeviceCommands(cloud.id,provider,cloudBatchCommands(changes,data.definitions,data.snapshot.status));
     if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
@@ -129,7 +139,7 @@ function LocalCardControls({api,device,state,now,visible,onAuthError,onBusy,onSt
   useEffect(() => {
     if (session.data) onStatus?.({online:session.data.available, enabled:session.data.enabled, battery:batteryFromSpecs(Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(session.data.values).filter(([,reading])=>reading.known).map(([key,reading])=>[key,reading.value])))});
   },[session.data,onStatus,item.capabilities]);
-  return <QuickFields specs={specs} reading={spec => session.data?.values[spec.key]} now={now} local busy={session.busy} readOK={session.readOK && !!session.data?.enabled} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
+  return <QuickFields specs={specs} category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => session.data?.values[spec.key]} now={now} local busy={session.busy} readOK={session.readOK && !!session.data?.enabled} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
     const result = await api.setCapabilities(item.id,Object.fromEntries(changes.map(change => [change.spec.key,change.value])));
     if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
   }} />;

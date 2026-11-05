@@ -63,11 +63,10 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const enabled = live?.enabled ?? local?.enabled;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
-  const channels = new Set(codes.filter(code => /^switch_[1-9][0-9]*$/.test(code)));
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
     && codes.some(code => /^(humidity|va_humidity|humidity_value)$/.test(code))
     && !codes.some(code => /^switch(?:_|$)/.test(code));
-  const cardLayout = isCamera(cloud?.category) ? undefined : channels.size === 2 ? 'channels' : climate ? 'climate' : undefined;
+  const cardLayout = climate && !isCamera(cloud?.category) ? 'climate' : undefined;
   return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
     <header className="tw:flex tw:flex-col tw:gap-2">
       <div className="device-card-top tw:grid tw:min-h-11 tw:grid-cols-[36px_minmax(0,1fr)] tw:items-start tw:gap-x-2 tw:gap-y-0.5"><span className="device-symbol tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:grid tw:size-9 tw:place-items-center tw:rounded-lg tw:p-1.5"><DeviceIcon category={cloud?.category} codes={codes} /></span>

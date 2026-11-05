@@ -1,11 +1,11 @@
 import { Switch as HeadlessSwitch } from '@headlessui/react';
-import type { ComponentProps, KeyboardEvent } from 'react';
+import type { ComponentProps, KeyboardEvent, ReactNode } from 'react';
 
-export function Switch(props: ComponentProps<typeof HeadlessSwitch>) {
+export function Switch({ powerIcon, ...props }: ComponentProps<typeof HeadlessSwitch> & { powerIcon?: ReactNode }) {
   return (
     <HeadlessSwitch
-      data-slot="switch"
-      className="tw:group tw:relative tw:inline-flex tw:h-6 tw:w-11 tw:shrink-0 tw:items-center tw:rounded-full tw:max-[600px]:h-11 tw:pointer-coarse:h-11 tw:before:absolute tw:before:inset-x-0 tw:before:h-6 tw:before:rounded-full tw:before:bg-(--toggle-off) tw:data-checked:before:bg-(--accent)"
+      data-slot={powerIcon ? 'power-button' : 'switch'}
+      className={powerIcon ? 'dashboard-power-button' : 'tw:group tw:relative tw:inline-flex tw:h-6 tw:w-11 tw:shrink-0 tw:items-center tw:rounded-full tw:max-[600px]:h-11 tw:pointer-coarse:h-11 tw:before:absolute tw:before:inset-x-0 tw:before:h-6 tw:before:rounded-full tw:before:bg-(--toggle-off) tw:data-checked:before:bg-(--accent)'}
       {...props}
       onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
         // Keep Enter activation alongside the Space handling built into Headless UI.
@@ -15,11 +15,11 @@ export function Switch(props: ComponentProps<typeof HeadlessSwitch>) {
         }
       }}
     >
-      <span
+      {powerIcon || <span
         aria-hidden="true"
         data-slot="switch-thumb"
         className="tw:pointer-events-none tw:relative tw:ml-[3px] tw:block tw:size-[18px] tw:rounded-full tw:bg-(--toggle-thumb) tw:transition-transform tw:motion-reduce:transition-none tw:group-data-checked:translate-x-5 tw:group-data-checked:bg-(--on-accent)"
-      />
+      />}
     </HeadlessSwitch>
   );
 }

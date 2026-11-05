@@ -72,13 +72,16 @@ describe('main controls on device cards', () => {
     expect(screen.queryByRole('region',{name:'Состояние после подачи питания'})).toBeNull();
     expect(screen.queryByRole('button',{name:'Настроить'})).toBeNull();
     await waitFor(() => expect(power).toBeEnabled());
-    expect(screen.queryByText('Выключено')).toBeNull();
+    expect(power).toHaveAttribute('data-slot','power-button');
+    expect(screen.getByText('Выключено')).toBeInTheDocument();
+    expect(screen.queryByText('10 %')).toBeNull();
     await user.click(power);
     await waitFor(() => expect(power).toBeEnabled());
     expect(screen.queryByRole('spinbutton')).toBeNull();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     expect(writes).toEqual([{commands:[{code:'switch_led',value:true}]}]);
     expect(power).toHaveAttribute('aria-checked','true');
+    expect(screen.getByText('10 %')).toBeInTheDocument();
     expect(screen.getByText('Ожидаем новое показание')).toBeInTheDocument();
   });
 
