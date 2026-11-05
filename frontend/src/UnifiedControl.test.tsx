@@ -36,6 +36,36 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it('uses the shadcn bulb switch to send a power command from the keyboard', async () => {
+    const calls = server({noLocal:true});
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{
+        ...shared, category:'dj', controls:{
+          ready:true,
+          definitions:{device_id:shared.id, functions:[{code:'switch_led', type:'Boolean', values:'{}'}]},
+          snapshot:{device_id:shared.id, online:true, source:'cloud', status:{switch_led:false}},
+        },
+      }]);
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card = await screen.findByRole('listitem',{name:shared.name});
+    const toggle = await within(card).findByRole('switch',{name:'Питание'});
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(card).toHaveAttribute('data-slot','card');
+    expect(toggle).toHaveAttribute('data-slot','switch');
+    expect(toggle).not.toBeChecked();
+    toggle.focus();
+    await user.keyboard('[Space]');
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(calls.filter(call => call.method === 'POST').map(call => call.body)).toEqual([
+      {commands:[{code:'switch_led',value:true}]},
+    ]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it.each(['name','surface'])('opens details from the card %s using the selected route',async target=>{
     const calls=server(),user=userEvent.setup();
     render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);

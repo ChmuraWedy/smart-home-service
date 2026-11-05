@@ -603,6 +603,9 @@ input[type=hidden] {
 
 .device-card {
   @apply tw:relative tw:min-w-0 tw:cursor-pointer tw:rounded-xl tw:px-3 tw:pt-2 tw:pb-3;
+}
+
+.device-card:not([data-slot="card"]) {
   background:var(--surface);
   border:1px solid var(--border);
 }
@@ -914,6 +917,7 @@ footer {
 .capability-heading h3 { display:flex; align-items:center; gap:8px; }
 .battery-badge { display:inline-flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; }
 .capability-row .power-actions .power-toggle { width:44px; min-width:44px; height:25px; padding:3px; border:0; border-radius:20px; background:var(--toggle-off); display:flex; align-items:center; }
+.power-actions button[data-slot="switch"] { @apply tw:border-0 tw:bg-transparent tw:p-0; }
 .power-toggle > span { flex:none; width:19px; height:19px; border-radius:50%; background:var(--toggle-thumb); transition:transform .15s; }
 .power-actions .power-toggle[aria-checked=true] { background:var(--toggle-on); }
 .power-toggle[aria-checked=true] > span { transform:translateX(19px); background:var(--toggle-thumb-on); }
