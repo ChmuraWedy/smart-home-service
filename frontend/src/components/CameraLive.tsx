@@ -6,6 +6,21 @@ import type Hls from 'hls.js';
 import type { ReactNode } from 'react';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
+type SafariVideo = HTMLVideoElement & {
+  webkitPresentationMode?: string;
+  webkitSupportsPresentationMode?: (mode: 'picture-in-picture') => boolean;
+  webkitSetPresentationMode?: (mode: 'inline' | 'picture-in-picture') => void;
+};
+
+function isFloating(video: SafariVideo) {
+  return document.pictureInPictureElement === video || video.webkitPresentationMode === 'picture-in-picture';
+}
+
+async function closeFloatingVideo(video: SafariVideo) {
+  if (document.pictureInPictureElement === video) await document.exitPictureInPicture();
+  else if (video.webkitPresentationMode === 'picture-in-picture') video.webkitSetPresentationMode?.('inline');
+}
+
 function resolutionLabel(width:number, height:number) {
   return (Math.min(width,height) >= 720 ? 'HD' : 'SD') + ' · ' + width + '×' + height;
 }
@@ -13,7 +28,7 @@ function resolutionLabel(width:number, height:number) {
 export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false, networkSignal, headingActions, overlay, viewingBlocked }: {
   api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode; viewingBlocked?:string;
 }) {
-  const video = useRef<HTMLVideoElement>(null), pending = useRef<AbortController | null>(null);
+  const video = useRef<SafariVideo>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
   const [source, setSource] = useState<string | null>(null), [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(t("Видео включается только по вашему запросу."));
@@ -22,26 +37,46 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   const [resolution,setResolution] = useState(''), [speed,setSpeed] = useState<number | null>(null);
   const [playback,setPlayback] = useState(t("Подключение"));
   const [aspect,setAspect] = useState(16/9);
+  const [pipMode, setPipMode] = useState<'standard' | 'safari' | null>(null);
+  const [pipActive, setPipActive] = useState(false);
+  const [pipError, setPipError] = useState(false);
   function resetMetrics() { setLevels([]); setSelectedLevel(-1); setResolution(''); setSpeed(null); setPlayback(t("Подключение")); }
   function stop() {
     pending.current?.abort(); pending.current = null;
     setLoading(false); setSource(null); setError(false); setMessage(t("Просмотр остановлен.")); resetMetrics();
   }
   useEffect(() => {
-    const hide = () => { if (document.hidden) stop(); };
+    const hide = () => { if (document.hidden && (!video.current || !isFloating(video.current))) stop(); };
     document.addEventListener('visibilitychange', hide);
     return () => { pending.current?.abort(); pending.current = null; document.removeEventListener('visibilitychange', hide); };
   }, []);
   useEffect(() => {
     const element = video.current;
     if (viewingBlocked || !source || !element) return;
+    setPipMode(null);
+    setPipActive(false);
+    setPipError(false);
     let active = true, player: Hls | undefined;
     const fail = () => {
       if (!active) return;
       setError(true); setMessage(t("Не удалось воспроизвести видео. Попробуйте подключиться заново.")); setSource(null); resetMetrics();
     };
     const timeout = window.setTimeout(fail, 45_000);
-    const dimensions = () => { if (element.videoWidth > 0 && element.videoHeight > 0) {setResolution(resolutionLabel(element.videoWidth,element.videoHeight)); setAspect(element.videoWidth/element.videoHeight);} };
+    const dimensions = () => {
+      if (element.videoWidth <= 0 || element.videoHeight <= 0) return;
+      setResolution(resolutionLabel(element.videoWidth,element.videoHeight));
+      setAspect(element.videoWidth/element.videoHeight);
+      if (document.pictureInPictureEnabled && typeof element.requestPictureInPicture === 'function') setPipMode('standard');
+      else if (element.webkitSetPresentationMode && element.webkitSupportsPresentationMode?.('picture-in-picture')) setPipMode('safari');
+    };
+    const presentationChanged = () => {
+      const floating = isFloating(element);
+      setPipActive(floating);
+      setPipError(false);
+      if (!floating && document.hidden) stop();
+    };
+    const presentationEvents = ['enterpictureinpicture', 'leavepictureinpicture', 'webkitpresentationmodechanged'];
+    presentationEvents.forEach(event => element.addEventListener(event, presentationChanged));
     const playing = () => { window.clearTimeout(timeout); setMessage(t("Прямой эфир")); setPlayback(t("Воспроизводится")); dimensions(); };
     const waiting = () => setPlayback(t("Буферизация")), paused = () => setPlayback(t("Пауза"));
     element.addEventListener('playing', playing);
@@ -78,10 +113,26 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       element.removeEventListener('waiting',waiting); element.removeEventListener('stalled',waiting);
       element.removeEventListener('pause',paused); element.removeEventListener('ended',paused);
       element.removeEventListener('loadedmetadata',dimensions); element.removeEventListener('resize',dimensions);
+      presentationEvents.forEach(event => element.removeEventListener(event, presentationChanged));
+      void closeFloatingVideo(element).catch(() => {});
       if (hls.current === player) hls.current = null;
       player?.destroy(); element.pause(); element.removeAttribute('src'); element.load();
     };
   }, [source,viewingBlocked]);
+  async function togglePictureInPicture() {
+    const element = video.current;
+    if (!element || !pipMode || viewingBlocked) return;
+    setPipError(false);
+    try {
+      if (isFloating(element)) await closeFloatingVideo(element);
+      else if (pipMode === 'standard') await element.requestPictureInPicture();
+      else element.webkitSetPresentationMode?.('picture-in-picture');
+      // The browser may finish opening its window after the player has been removed.
+      if (video.current !== element) await closeFloatingVideo(element);
+    } catch {
+      if (video.current === element) setPipError(true);
+    }
+  }
   async function start() {
     if (viewingBlocked || pending.current || source) return;
     const controller = new AbortController(); pending.current = controller;
@@ -105,7 +156,10 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   useEffect(() => { if (autoStart) void start(); }, [autoStart]);
   return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label={t("Видео камеры")}>
     <div className="camera-live-heading"><h3>{t("Видео камеры")}</h3>
-      <div className="camera-live-actions">{headingActions}{source || loading ? <button className="secondary compact" onClick={stop}>{t("Остановить")}</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t("Подключиться заново") : t("Смотреть видео")}</button>}</div>
+      <div className="camera-live-actions">{headingActions}
+        {source && !viewingBlocked && !overlay && pipMode && <button type="button" className="secondary compact" aria-pressed={pipActive} onClick={() => void togglePictureInPicture()}>{t("Картинка в картинке")}</button>}
+        {source || loading ? <button className="secondary compact" onClick={stop}>{t("Остановить")}</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t("Подключиться заново") : t("Смотреть видео")}</button>}
+      </div>
     </div>
     {!compact && <div className="camera-stream-info" aria-label={t("Качество видео и связи")}>
       <label>HD/SD <select aria-label={t("Качество видео HD/SD")} value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
@@ -121,8 +175,9 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     </div>}
     {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
     {(!viewingBlocked && source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
-      {source && !viewingBlocked ? <video ref={video} controls={!overlay} muted autoPlay playsInline preload="none" aria-label={t("Прямой эфир камеры")} /> : <div className="camera-area-placeholder">{viewingBlocked || t("Для изображения нажмите «Смотреть видео»")}</div>}{overlay}
+      {source && !viewingBlocked ? <video ref={video} controls={!overlay} disablePictureInPicture={!!overlay} muted autoPlay playsInline preload="none" aria-label={t("Прямой эфир камеры")} /> : <div className="camera-area-placeholder">{viewingBlocked || t("Для изображения нажмите «Смотреть видео»")}</div>}{overlay}
     </div>}
     <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
+    {source && !viewingBlocked && pipError && <p className="error" role="alert">{t("Не удалось переключить режим «Картинка в картинке».")}</p>}
   </section>;
 }
