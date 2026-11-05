@@ -149,7 +149,7 @@
 .app-nav { display:flex; gap:8px; margin-top:24px; }
 .app-nav button[aria-current=page] { color:var(--success); border-color:var(--success-border); background:var(--success-bg); }
 .control-center { padding:24px; }
-.control-filters { display:grid; grid-template-columns:1fr 1fr 1.5fr; gap:16px; margin:24px 0; }
+.control-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr); gap:16px; margin:24px 0; }
 .device-route { margin:16px 0; }
 .workspace.connections-workspace { display:block; max-width:660px; }
 .group-card { border-color:var(--success-border); background:var(--success-bg); }
@@ -218,8 +218,8 @@ textarea { width:100%; margin-top:7px; resize:vertical; min-height:90px; backgro
 .group-members li { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:16px 0; border-top:1px solid var(--border); }
 .group-members h3 { font-size:15px; overflow-wrap:anywhere; }
 .group-members .help { margin:5px 0 0; }
-@media(max-width:860px) { .control-filters { grid-template-columns:1fr 1fr; } .control-filters>label:last-child { grid-column:1/-1; } }
-@media(max-width:520px) { .control-center,.control-dialog { padding:18px; } .capability-grid,.control-filters,.color-editor,.device-mappings form { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .group-members li { flex-direction:column; align-items:stretch; } }
+@media(max-width:860px) { .control-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } .control-filters>label:last-child { grid-column:1/-1; } }
+@media(max-width:520px) { .control-dialog { padding:18px; } .capability-grid,.color-editor,.device-mappings form { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .group-members li { flex-direction:column; align-items:stretch; } }
 
 * {
   box-sizing:border-box;
@@ -816,6 +816,27 @@ footer {
 .topology-summary > p { flex-basis: 100%; margin: 0; }
 .topology-summary h3 { margin-top: 0; }
 .topology-summary button { white-space: normal; }
+.dashboard-device-grid > .device-card { @apply tw:w-full tw:max-w-[420px] tw:justify-self-center; }
+.dashboard-action-icon { @apply tw:hidden; }
+@media (max-width: 760px) {
+  .control-center { @apply tw:p-3; }
+}
+@media (max-width: 600px) {
+  .control-center > .card-heading { @apply tw:items-center tw:gap-2; }
+  .control-center .dashboard-actions { @apply tw:flex-none tw:gap-1.5; }
+  .dashboard-actions button { @apply tw:grid tw:size-11 tw:place-items-center tw:p-0; }
+  .dashboard-action-icon { @apply tw:block; }
+  .dashboard-actions button span,
+  .dashboard-intro,
+  .topology-summary .topology-note { @apply tw:hidden; }
+  .control-center .topology-summary { @apply tw:my-2 tw:grid tw:grid-cols-[minmax(0,1fr)_auto] tw:gap-2 tw:px-2.5 tw:py-1; }
+  .topology-summary h3 { @apply tw:m-0 tw:text-xs; }
+  .topology-summary button { @apply tw:min-h-11 tw:max-w-[145px]; }
+  .topology-summary > p { @apply tw:col-span-full; }
+  .control-filters { @apply tw:my-2.5 tw:gap-2; }
+  .control-filters label { @apply tw:m-0 tw:min-w-0 tw:text-xs; }
+  .control-filters :is(input, select) { @apply tw:mt-1 tw:min-h-11 tw:px-2 tw:py-1 tw:text-base; }
+}
 .device-survey { max-width: 1000px; margin-inline: auto; padding: 24px; }
 .survey-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
 .survey-form-grid label, .survey-prompt label { display: flex; flex-direction: column; gap: 8px; }
@@ -1100,7 +1121,7 @@ footer {
 }
 
 /* Put the name and connection details above the controls on narrow screens. */
-@media (max-width: 600px) {
+@media (max-width: 760px) {
   .device-card[data-mobile-layout] {
     @apply tw:px-2.5 tw:pt-1.5 tw:pb-2;
   }
