@@ -20,7 +20,7 @@ export function batteryFromSpecs(specs: ControlSpec[], values: Record<string, Js
 }
 
 export const isCamera = (category?: string) => category === 'sp' || category === 'dghsxj';
-export const isLight = (category: string | undefined, codes: string[]) =>
+const isLight = (category: string | undefined, codes: string[]) =>
   category === 'dj' || codes.some(code => /^(switch_led|bright_value(?:_v2)?|colour_data(?:_v2)?)$/.test(code));
 
 // Use reported category/capability codes, never a guess from the device name.

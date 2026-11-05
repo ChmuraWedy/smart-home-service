@@ -11,7 +11,7 @@ import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
-import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera, isLight } from './DevicePresentation';
+import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
@@ -30,6 +30,12 @@ const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
 function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
   if (event.defaultPrevented || !(event.target instanceof Element) || event.target.closest('button,a,input,select,textarea,label,summary,video,audio,[role="button"],[role="switch"],[contenteditable="true"],.camera-live') || window.getSelection()?.toString()) return;
   open();
+}
+
+function CardDetailsButton({ label, disabled, onClick }: { label:string; disabled?:boolean; onClick:() => void }) {
+  return <button type="button" className="secondary tile-icon-action" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+  </button>;
 }
 
 function DeviceCard({ api, device, state, room, now, paused, onAuthError, onCommandBusy, onOpen, onAdd }: {
@@ -61,21 +67,16 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
     && codes.some(code => /^(humidity|va_humidity|humidity_value)$/.test(code))
     && !codes.some(code => /^switch(?:_|$)/.test(code));
-  const mobileLayout = isCamera(cloud?.category) ? undefined
-    : channels.size === 2 ? 'channels'
-    : climate ? 'climate'
-    : isLight(cloud?.category, codes) ? 'light'
-    : undefined;
-  const CardShell = mobileLayout === 'light' ? Card : 'li';
-  return <CardShell id={deviceCardId(device.id)} className="device-card dashboard-device" data-mobile-layout={mobileLayout} aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
+  const cardLayout = isCamera(cloud?.category) ? undefined : channels.size === 2 ? 'channels' : climate ? 'climate' : undefined;
+  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
     <header className="tw:flex tw:flex-col tw:gap-2">
       <div className="device-card-top tw:grid tw:min-h-11 tw:grid-cols-[36px_minmax(0,1fr)] tw:items-start tw:gap-x-2 tw:gap-y-0.5"><span className="device-symbol tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:grid tw:size-9 tw:place-items-center tw:rounded-lg tw:p-1.5"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context tw:col-start-2 tw:row-start-1 tw:flex tw:min-h-[18px] tw:min-w-0 tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-2 tw:gap-y-1"><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:justify-end tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t("В сети") : t("Не в сети")) : local && !enabled ? t("Отключено в настройках") : online ? t("Доступно дома") : t("Состояние неизвестно")}</span><BatteryBadge reading={battery} /></div></div>
-        <CardControls key={route} shadcnSwitch={mobileLayout === 'light' || mobileLayout === 'channels'} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} onPrivacyStateChange={privacyChanged} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : t("▷ Видео")}</button> : undefined} />
+        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} onPrivacyStateChange={privacyChanged} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : t("▷ Видео")}</button> : undefined} />
       </div>
       <div className="device-card-identity tw:flex tw:min-w-0 tw:items-center tw:justify-between tw:gap-2"><div className="device-card-title tw:flex tw:min-w-0 tw:flex-1 tw:flex-wrap tw:items-center tw:gap-x-2 tw:gap-y-1"><h3>{device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases tw:min-w-0 tw:max-w-full" role="group" aria-label={t("Алиасы устройства")}>{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}
-      </div><div className="device-card-actions tw:flex tw:flex-none tw:items-center tw:gap-0.5"><button className="secondary tile-icon-action" aria-label={t("Подробнее")} title={t("Подробнее")} disabled={quickBusy} onClick={() => onOpen(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></button>
+      </div><div className="device-card-actions tw:flex tw:flex-none tw:items-center tw:gap-0.5"><CardDetailsButton label={t("Подробнее")} disabled={quickBusy} onClick={() => onOpen(route)} />
         {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t("Настроить локальное подключение")} title={t("Настроить локальное подключение")} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}
       </div></div>
     </header>
@@ -83,12 +84,12 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
     {routes.length > 1 && <div className="device-card-footer tw:mt-2 tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-1.5">
       {routes.length > 1 && <select className="device-route-select" aria-label={t("Способ управления: ") + device.name} value={route} disabled={quickBusy} onChange={event => { setPreviewRoute(null); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>}
     </div>}
-  </CardShell>;
+  </Card>;
 
 }
 
-export function ControlCenter({ mobilePanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onLock, onConnections, deviceLink, onDeviceLinkChange }: {
-  mobilePanel?: 'search' | 'tools' | null; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
+export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onLock, onConnections, deviceLink, onDeviceLinkChange }: {
+  dashboardPanel?: 'search' | 'tools' | null; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
   onAuthError: () => void; onLock: (locked: boolean) => void; onConnections?: () => void;
   deviceLink?: DeviceLink | null; onDeviceLinkChange?: (target: DeviceLink | null) => void;
 }) {
@@ -101,12 +102,12 @@ export function ControlCenter({ mobilePanel = null, api, ready, sharingReady = f
   const [building, setBuilding] = useState(''), [room, setRoom] = useState(''), [search, setSearch] = useState('');
   const [page, setPage] = useState(0), [revision, setRevision] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
-  const previousPanel = useRef(mobilePanel);
+  const previousPanel = useRef(dashboardPanel);
   useEffect(() => {
-    if (mobilePanel === 'search') searchInput.current?.focus();
+    if (dashboardPanel === 'search') searchInput.current?.focus();
     else if (previousPanel.current === 'search') { setSearch(''); setPage(0); }
-    previousPanel.current = mobilePanel;
-  }, [mobilePanel]);
+    previousPanel.current = dashboardPanel;
+  }, [dashboardPanel]);
   function selectRoom(value: string) { setRoom(value); setPage(0); }
 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
@@ -234,9 +235,20 @@ export function ControlCenter({ mobilePanel = null, api, ready, sharingReady = f
       <div className="control-filters"><label>{t("Здание")}<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); setPage(0); }}><option value="">{t("Все здания")}</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>{t("Комната")}<select value={room} onChange={event => selectRoom(event.target.value)}><option value="">{t("Все комнаты")}</option><option value="none">{t("Без комнаты")}</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label id="dashboard-search" className="dashboard-search-field"><span>{t("Поиск по названию, алиасу или ID")}</span><input ref={searchInput} type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder={t("Найти устройство или группу")} /></label></div>
       {busy && <p role="status" className="help">{t("Загружаем список…")}</p>}{current?.errors.map(error => <p key={t(error)} role="alert" className="field-error">{t(error)}</p>)}
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? t("Ничего не найдено") : t("Устройств пока нет")}</h3><p>{devices.length || inventory?.groups.length ? t("Измените фильтры или поисковый запрос.") : sharingReady || developerReady ? t("Добавьте устройства в Smart Life и обновите список.") : t("Подключите аккаунт Tuya, чтобы увидеть свои устройства.")}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t("Настроить подключение")}</button>}</div>}
-      <ul className="dashboard-device-grid tw:m-0 tw:grid tw:list-none tw:grid-cols-[repeat(auto-fill,minmax(min(100%,264px),1fr))] tw:items-start tw:gap-3 tw:p-0 tw:max-[600px]:gap-2">{visible.map(entry => entry.kind === 'group' ? <li className="device-card group-card" key={'group-' + entry.group.id} onClick={event=>openCard(event,()=>choose(entry))}>
-        <p className="eyebrow">{t("Группа ·") + " "}{entry.group.device_ids.length}{" " + t("устройств")}</p><h3>{entry.group.name}</h3><p className="reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t("Состояние неизвестно")}</p><p className="help">{t("В домашней сети")}</p><button className="secondary compact full-width" onClick={() => choose(entry)}>{t("Открыть группу")}</button>
-      </li> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
+      <ul className="dashboard-device-grid tw:m-0 tw:grid tw:list-none tw:grid-cols-[repeat(auto-fill,minmax(min(100%,264px),1fr))] tw:items-start tw:gap-3 tw:p-0 tw:max-[600px]:gap-2">{visible.map(entry => entry.kind === 'group' ? <Card className="device-card dashboard-device" key={'group-' + entry.group.id} aria-label={entry.group.name} onClick={event=>openCard(event,()=>choose(entry))}>
+        <header>
+          <span className="device-symbol tw:grid tw:place-items-center tw:rounded-lg" aria-hidden="true">
+            <svg className="device-type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>
+          </span>
+          <div className="device-card-title tw:min-w-0"><h3>{entry.group.name}</h3></div>
+          <div className="device-card-context tw:flex tw:flex-wrap tw:items-center tw:gap-1.5">
+            <span className="device-location">{t("Группа ·")} {entry.group.device_ids.length} {t("устройств")}</span>
+            <span className="device-location">{t("В домашней сети")}</span>
+          </div>
+          <div className="device-card-actions"><CardDetailsButton label={t("Открыть группу")} onClick={() => choose(entry)} /></div>
+          <p className="dashboard-group-reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t("Состояние неизвестно")}</p>
+        </header>
+      </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t("Назад")}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>{t("Далее")}</button></div>}
     </>}
     {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl room={roomName(selected.device)} key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} onSetup={inventory ? () => {
