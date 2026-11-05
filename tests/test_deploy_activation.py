@@ -173,7 +173,8 @@ def test_remote_entrypoint_works_without_file_variable(monkeypatch):
 
 def test_local_deployment_lock_blocks_concurrent_activation(monkeypatch, tmp_path):
     args = mac_args(tmp_path)
-    monkeypatch.setattr(deployment.sys, "argv", ["activate-dell.py", "--local-env", str(args.local_env)])
+    monkeypatch.setattr(deployment.sys, "argv",
+                        ["activate-dell.py", "--legacy-monolith", "--local-env", str(args.local_env)])
     activate = Mock()
     monkeypatch.setattr(deployment, "activate_from_mac", activate)
     with (tmp_path / ".env.deploy.lock").open("w") as lock:

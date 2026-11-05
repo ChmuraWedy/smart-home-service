@@ -1,9 +1,20 @@
 name: smart-home-service
 
 services:
-  smart-home:
-    build: .
-    image: ${SMART_HOME_IMAGE:-smart-home-service:local}
+  frontend:
+    build:
+      context: .
+      target: frontend
+    image: ${SMART_HOME_FRONTEND_IMAGE:-smart-home-frontend:local}
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${SMART_HOME_PORT:-8080}:8080"
+
+  backend:
+    build:
+      context: .
+      target: backend
+    image: ${SMART_HOME_BACKEND_IMAGE:-smart-home-backend:local}
     restart: unless-stopped
     env_file: .env
     environment:
@@ -13,8 +24,6 @@ services:
       SMART_HOME_DEVELOPER_SESSION: /app/data/tuya-cloud.json.developer.json
       SMART_HOME_CORS_ORIGINS: ""
       SMART_HOME_FRONTEND_URL: ""
-    ports:
-      - "0.0.0.0:${SMART_HOME_PORT:-8080}:8080"
     volumes:
       - smart-home-data:/app/data
     stop_grace_period: 30s
