@@ -1,5 +1,12 @@
 # Linux only: observe the Dell's real LAN interfaces and discovery broadcasts.
 services:
-  smart-home:
+  frontend:
     network_mode: host
     ports: !reset []
+    environment:
+      SMART_HOME_BACKEND_HOST: 127.0.0.1
+
+  backend:
+    network_mode: host
+    environment:
+      SMART_HOME_API_HOST: 127.0.0.1

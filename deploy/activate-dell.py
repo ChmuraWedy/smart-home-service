@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Activate an already uploaded Dell image and rotate the browser API key.
+"""Activate a legacy single-container Dell image and rotate the browser API key.
 
 Run from the managing Mac. Tokens travel over SSH stdin, never command arguments
-or output. Image building/loading remains a separate deployment preparation step.
+or output. For the split stack, use Compose and keep the existing key.
 """
 
 import argparse
@@ -137,6 +137,8 @@ def main():
         remote()
         return 0
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--legacy-monolith", action="store_true", required=True,
+                        help="Use only with the old single-container Compose configuration")
     parser.add_argument("--host", default="dell5070", help="SSH host or configured alias")
     parser.add_argument("--directory", default="/home/damawik/smart-home-service")
     parser.add_argument("--local-env", type=Path, default=Path(__file__).resolve().parents[1] / ".env")

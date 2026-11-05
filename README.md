@@ -87,7 +87,7 @@ Motion state, event filtering, dates, and connection information in Belarusian â
 
 ### Docker
 
-Docker Compose builds the interface and API into a single service. From the repository root:
+Docker Compose builds separate frontend and backend images and serves them at the same browser address. From the repository root:
 
 ```sh
 cp .env.example .env
@@ -103,7 +103,7 @@ docker compose up -d --build --wait
 
 Open `http://localhost:8080` or `http://<server-address>:8080`. In **Menu â†’ Connections**, save the API address and the same service access key from `.env`. This key belongs to your own service; it is separate from Tuya account credentials and device local keys.
 
-Devices and Tuya sessions are stored in the persistent Docker volume. For LAN discovery on a Linux server, use the host-network configuration in the [deployment guide](deploy/docker.md). The guide also covers Dell 5070 deployment, backups, and access-key rotation on each deployment.
+Devices and Tuya sessions are stored in the persistent Docker volume. See the [deployment guide](deploy/docker.md) for independent image updates, backups, and Linux host networking for LAN discovery on the Dell 5070.
 
 ### Connect your devices
 
