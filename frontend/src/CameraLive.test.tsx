@@ -47,6 +47,78 @@ beforeEach(()=>{
 });
 
 describe('camera live viewing',()=>{
+  it('keeps native Picture-in-Picture playing in a hidden tab and stops when its window is closed there',async()=>{
+    mount();
+    const user=userEvent.setup();
+    await user.click(screen.getByRole('button',{name:'Смотреть видео'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
+    const video=screen.getByLabelText('Прямой эфир камеры');
+    const hidden=vi.spyOn(document,'hidden','get').mockReturnValue(false);
+    let floating:HTMLElement | null=null;
+    const request=vi.fn(async()=>{
+      floating=video;
+      fireEvent(video,new Event('enterpictureinpicture'));
+    });
+    const close=()=>{
+      floating=null;
+      fireEvent(video,new Event('leavepictureinpicture'));
+    };
+    Object.defineProperties(document,{
+      pictureInPictureEnabled:{configurable:true,value:true},
+      pictureInPictureElement:{configurable:true,get:()=>floating},
+      exitPictureInPicture:{configurable:true,value:vi.fn(async()=>close())},
+    });
+    try {
+      Object.defineProperties(video,{videoWidth:{value:640},videoHeight:{value:360},requestPictureInPicture:{value:request}});
+      expect(screen.queryByRole('button',{name:'Картинка в картинке'})).toBeNull();
+      fireEvent.loadedMetadata(video);
+      const pip=screen.getByRole('button',{name:'Картинка в картинке'});
+      await user.click(pip);
+      expect(pip).toHaveAttribute('aria-pressed','true');
+      await user.click(pip);
+      expect(pip).toHaveAttribute('aria-pressed','false');
+      expect(hls.destroy).not.toHaveBeenCalled();
+      await user.click(pip);
+      hidden.mockReturnValue(true);
+      fireEvent(document,new Event('visibilitychange'));
+      expect(hls.destroy).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledOnce();
+      act(close);
+      expect(hls.destroy).toHaveBeenCalledOnce();
+      expect(video).not.toBeInTheDocument();
+    } finally {
+      hidden.mockRestore();
+      for (const key of ['pictureInPictureEnabled','pictureInPictureElement','exitPictureInPicture']) Reflect.deleteProperty(document,key);
+    }
+  });
+  it('uses Safari presentation mode and closes the floating window when privacy is enabled',async()=>{
+    const api=new CloudApi(connection),onAuthError=vi.fn();
+    const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact />);
+    const user=userEvent.setup();
+    await user.click(screen.getByRole('button',{name:'Смотреть видео'}));
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
+    const video=screen.getByLabelText('Прямой эфир камеры');
+    let mode='inline';
+    const present=vi.fn((value:string)=>{
+      mode=value;
+      video.dispatchEvent(new Event('webkitpresentationmodechanged'));
+    });
+    Object.defineProperties(video,{
+      videoWidth:{value:640},videoHeight:{value:360},
+      webkitPresentationMode:{get:()=>mode},
+      webkitSupportsPresentationMode:{value:()=>true},
+      webkitSetPresentationMode:{value:present},
+    });
+    fireEvent.loadedMetadata(video);
+    await user.click(screen.getByRole('button',{name:'Картинка в картинке'}));
+    expect(present).toHaveBeenCalledWith('picture-in-picture');
+    expect(screen.getByRole('button',{name:'Картинка в картинке'})).toHaveAttribute('aria-pressed','true');
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact viewingBlocked="Режим приватности включён." />);
+    expect(present).toHaveBeenLastCalledWith('inline');
+    expect(hls.destroy).toHaveBeenCalledOnce();
+    expect(video).not.toBeInTheDocument();
+  });
+
   it('blocks preview allocation during privacy and keeps playback stopped when privacy is turned off',async()=>{
     const api=new CloudApi(connection),onAuthError=vi.fn(),blocked='Режим приватности включён. Выключите его для просмотра видео.';
     const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart viewingBlocked={blocked} />);
