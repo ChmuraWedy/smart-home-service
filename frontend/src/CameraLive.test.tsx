@@ -190,7 +190,7 @@ describe('camera live viewing',()=>{
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
     const privacy=await within(card).findByRole('button',{name:'Приватность'});
     await waitFor(()=>expect(privacy).toHaveAttribute('aria-pressed','true'));
-    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    await user.click(card);
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     expect(within(sheet).getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
     expect(within(sheet).getByRole('button',{name:'Выключить приватность'})).toBeEnabled();
@@ -201,7 +201,7 @@ describe('camera live viewing',()=>{
     mountTiles(); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
     expect(hls.attach).not.toHaveBeenCalled();
-    const liveView=within(card).getByRole('button',{name:'Показать видео камеры'});
+    const liveView=within(card).getByRole('button',{name:'Sleep Cam'});
     await user.click(liveView);
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
@@ -210,7 +210,7 @@ describe('camera live viewing',()=>{
     await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
     expect(hls.destroy).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
-    const restoredTrigger=within(card).getByRole('button',{name:'Показать видео камеры'});
+    const restoredTrigger=within(card).getByRole('button',{name:'Sleep Cam'});
     expect(restoredTrigger).toHaveAttribute('aria-expanded','false');
     expect(restoredTrigger).toHaveFocus();
   });
@@ -218,7 +218,7 @@ describe('camera live viewing',()=>{
     mountTiles(); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
     await user.selectOptions(within(card).getByRole('combobox'),'developer');
-    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    await user.click(card);
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     await waitFor(()=>expect(hls.attach).toHaveBeenCalledTimes(1));
     const streams=()=>vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream'));

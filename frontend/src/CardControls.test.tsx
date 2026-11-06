@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
 import { HomeApi } from './home-api';
+import type { ComponentProps } from 'react';
 import { CardControls } from './components/CardControls';
 import { ControlDialog } from './components/DeviceControls';
 import { DeviceActivity } from './components/DeviceActivity';
@@ -20,8 +21,8 @@ const snapshot:CloudSnapshot = {device_id:'lamp',online:true,source:'cloud',stat
 const lamp:CloudDevice = {id:'lamp',name:'Лампа',online:true,has_local_key:false,controls:{ready:true,definitions,snapshot}};
 const json = (value:unknown,status=200) => new Response(JSON.stringify(value),{status});
 
-function mount(cloud=lamp, route:'sharing'|'developer'='sharing') {
-  return render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
+function mount(cloud=lamp, route:'sharing'|'developer'='sharing', sheet?:ComponentProps<typeof CardControls>['sheet']) {
+  return render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} sheet={sheet} />);
 }
 
 describe('main controls on device cards', () => {
@@ -93,10 +94,10 @@ describe('main controls on device cards', () => {
       if (init?.method==='POST') { writes.push(JSON.parse(String(init.body))); return json({acknowledged:true}); }
       return json(latest);
     });
-    mount({...lamp,controls:{ready:true,definitions:{...definitions,functions},snapshot:latest}});
+    const close=vi.fn();
+    mount({...lamp,controls:{ready:true,definitions:{...definitions,functions},snapshot:latest}}, 'sharing', {open:true,close,trigger:{current:null}});
     const user=userEvent.setup();
-    await user.click(await screen.findByRole('button',{name:'Настроить свет'}));
-    const sheet=screen.getByRole('dialog',{name:'Лампа'});
+    const sheet=await screen.findByRole('dialog',{name:'Лампа'});
     const brightness=within(sheet).getByRole('slider',{name:'Яркость'});
     const temperature=within(sheet).getByRole('slider',{name:'Цветовая температура'});
     expect(brightness).toHaveValue('10');
@@ -114,7 +115,7 @@ describe('main controls on device cards', () => {
       {commands:[{code:'temp_value_v2',value:350}]},
     ]));
     await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('sends once while awaiting an acknowledgement and clears waiting after a matching report', async () => {

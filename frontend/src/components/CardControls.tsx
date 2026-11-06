@@ -23,16 +23,22 @@ function sensorReading(spec: ControlSpec) {
 
 export type CardStatus = {online:boolean;enabled?:boolean;battery?:BatteryReading};
 
-type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; state?: DeviceState; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void };
+type QuickSheet = {
+  open: boolean;
+  close: () => void;
+  trigger: RefObject<HTMLButtonElement | null>;
+  onLightAvailable?: (available: boolean) => void;
+};
+
+type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; state?: DeviceState; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void; sheet?: QuickSheet };
 
 // Only cards entering the viewport request missing metadata. Keep an activated
 // card mounted when it scrolls away so an accepted target is not discarded.
 export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
-  const cameraTrigger = useRef<HTMLButtonElement>(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  useEffect(() => { if (props.paused) setPreviewOpen(false); }, [props.paused]);
+  const sheetOpen = Boolean(props.sheet?.open && !props.paused);
+  useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
   useEffect(() => {
     if (!window.IntersectionObserver) return;
     const observer = new IntersectionObserver(entries => {
@@ -48,26 +54,19 @@ export function CardControls(props: CardProps) {
   const cloud = props.route !== 'local' ? props.device.cloud[props.route] : undefined;
   const cached = props.route === 'local' || cloud?.controls?.ready;
   const active = activated || cached;
-  const cameraAction = isCamera(cloud?.category) && <button type="button" className="secondary camera-open" ref={cameraTrigger}
-    aria-haspopup="dialog" aria-expanded={previewOpen} disabled={props.paused}
-    aria-label={t("Показать видео камеры")} onClick={() => { setActivated(true); setPreviewOpen(true); }}>
-    {t("Прямой эфир")}
-  </button>;
   return <div className="card-quick-controls tw:col-start-2 tw:row-start-2 tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t("Основные параметры: ") + props.device.name}>
-    {active ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} cameraAction={cameraAction} previewOpen={previewOpen && !props.paused} cameraTrigger={cameraTrigger} onPreviewClose={() => setPreviewOpen(false)} visible={visible && !props.paused} /> : <><button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>{t("Показать состояние")}</button>{cameraAction && <div className="camera-card-actions">{cameraAction}</div>}</>}
+    {active || sheetOpen ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={visible && !props.paused} /> : <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>{t("Показать состояние")}</button>}
   </div>;
 }
 
-type CameraPreview = Pick<ComponentProps<typeof CameraLive>, 'api' | 'deviceId' | 'provider' | 'onAuthError'> & { online?: boolean; trigger: RefObject<HTMLButtonElement | null>; close: () => void };
+type CameraPreview = Pick<ComponentProps<typeof CameraLive>, 'api' | 'deviceId' | 'provider' | 'onAuthError'> & { online?: boolean };
 
-function QuickFields({ name, paused, preview, specs, reading, now, local, busy, readOK, refresh, execute, send, onBusy, notice, camera = false, category, cameraAction }: {
-  name: string; paused: boolean; preview?: CameraPreview; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; busy: boolean; readOK: boolean;
+function QuickFields({ name, paused, sheet, preview, specs, reading, now, local, busy, readOK, refresh, execute, send, onBusy, notice, camera = false, category }: {
+  name: string; paused: boolean; sheet?:QuickSheet; preview?: CameraPreview; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; busy: boolean; readOK: boolean;
   refresh: () => Promise<void>; execute: (send: () => Promise<{text:string}>) => Promise<boolean | undefined>;
-  send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean}; camera?: boolean; category?: string; cameraAction?:ReactNode;
+  send: (changes: {spec:ControlSpec;value:JsonValue}[]) => Promise<void>; onBusy: (busy:boolean) => void; notice: {text:string;error?:boolean}; camera?: boolean; category?: string;
 }) {
   const [sending,setSending] = useState(false);
-  const [adjustOpen, setAdjustOpen] = useState(false);
-  useEffect(() => { if (paused) setAdjustOpen(false); }, [paused]);
   useEffect(() => { onBusy(sending); return () => onBusy(false); },[sending,onBusy]);
   async function toggle(spec:ControlSpec,value:JsonValue) {
     if (sending) return false;
@@ -85,6 +84,9 @@ function QuickFields({ name, paused, preview, specs, reading, now, local, busy, 
   const sliders = [brightness, temperature].filter((spec): spec is ControlSpec =>
     spec?.kind === 'number' && spec.readable && spec.writable && spec.minimum !== undefined &&
     spec.maximum !== undefined && spec.minimum < spec.maximum);
+  const hasSliders = sliders.length > 0;
+  const onLightAvailable = sheet?.onLightAvailable;
+  useEffect(() => { onLightAvailable?.(hasSliders); }, [hasSliders, onLightAvailable]);
   const brightnessReading = brightness && reading(brightness);
   const brightnessText = brightness && typeof brightnessReading?.value === 'number' && !isStale(brightnessReading, now, local)
     ? displayReading(brightness, brightnessReading) : undefined;
@@ -94,8 +96,8 @@ function QuickFields({ name, paused, preview, specs, reading, now, local, busy, 
   const reportedPrivacy = privacySpec && reading(privacySpec);
   const privacyStatus = privacySpec ? reportedPrivacy?.known && typeof reportedPrivacy.value === 'boolean' ? reportedPrivacy.value : null : undefined;
   const disabled = busy || !readOK || sending;
-  const cameraSheet = (privacyState?: boolean | null, changePrivacy?: () => void) => preview &&
-    <DashboardSheet title={name} onClose={preview.close} returnFocus={preview.trigger}>
+  const cameraSheet = (privacyState?: boolean | null, changePrivacy?: () => void) => preview && sheet?.open && !paused &&
+    <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
       <span className={'presence ' + (preview.online ? 'online' : '')}>{preview.online ? t("В сети") : t("Не в сети")}</span>
       <CameraLive api={preview.api} deviceId={preview.deviceId} provider={preview.provider} onAuthError={preview.onAuthError}
         compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyState : null)}
@@ -103,7 +105,7 @@ function QuickFields({ name, paused, preview, specs, reading, now, local, busy, 
           onClick={changePrivacy}>{privacyState ? t("Выключить приватность") : t("Включить приватность")}</button>} />
       {notice.error && <ControlFeedback busy={false} notice={notice} />}
     </DashboardSheet>;
-  if (!busy && readOK && !powers.length && !sensors.length && !notice.error && !cameraAction) return null;
+  if (!busy && readOK && !powers.length && !sensors.length && !notice.error && !preview) return null;
   const field = (spec:ControlSpec, headingActions?:ReactNode, showBrightness = true) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
     powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : powerLayout === 'channels' ? <ParameterIcon code={spec.key} /> : undefined}
     powerOnText={showBrightness ? brightnessText : undefined} booleanButton={camera && spec.key==='basic_private'} buttonText={camera && spec.key==='basic_private' ? t("Приватность") : undefined} booleanActions={spec === privacy && preview ? cameraSheet : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
@@ -119,23 +121,19 @@ function QuickFields({ name, paused, preview, specs, reading, now, local, busy, 
       })}</div>}
       <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
-    {!!sliders.length && <div className="dashboard-adjust">
-      <button type="button" className="secondary compact" aria-haspopup="dialog" aria-expanded={adjustOpen}
-        disabled={disabled || paused} onClick={() => setAdjustOpen(true)}>{t("Настроить свет")}</button>
-      {adjustOpen && !paused && <DashboardSheet title={name} onClose={() => setAdjustOpen(false)}>
+    {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
         <div className="dashboard-sheet-power">{field(powers[0],undefined,false)}</div>
         {sliders.map(spec => <CapabilityField key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local}
           immediatePower quickRange={spec === brightness ? 'brightness' : 'temperature'} disabled={disabled}
           onSend={value => toggle(spec,value)} />)}
         {notice.error && <ControlFeedback busy={false} notice={notice} />}
-      </DashboardSheet>}
-    </div>}
-    {camera && <div className="camera-card-actions">{privacy ? <div className="camera-card-privacy">{field(privacy)}</div> : cameraSheet(privacyStatus)}{cameraAction}</div>}
+    </DashboardSheet>}
+    {camera && <div className="camera-card-actions">{privacy ? <div className="camera-card-privacy">{field(privacy)}</div> : cameraSheet(privacyStatus)}</div>}
     {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
   </>;
 }
 
-function CloudCardControls({api,cloud,provider,now,visible,paused,onAuthError,onBusy,cameraAction,previewOpen,cameraTrigger,onPreviewClose,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean;cameraAction?:ReactNode;previewOpen:boolean;cameraTrigger:RefObject<HTMLButtonElement | null>;onPreviewClose:()=>void}) {
+function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
   const metadata = useMemo(() => ({value:cloud.controls?.ready ? cloud.controls.definitions : null as CloudFunctions | null}),[api,cloud.id,provider]);
   const initial = useRef(cloud.controls?.snapshot);
   const checked = (snapshot:CloudSnapshot) => {
@@ -155,15 +153,15 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,onAuthError,on
   useEffect(() => {
     if (session.data) onStatus?.({online:session.data.snapshot.online, battery:batteryFromSpecs(cloudSpecs(session.data.definitions,session.data.snapshot),session.data.snapshot.status)});
   },[session.data,onStatus]);
-  const preview = previewOpen ? {api,deviceId:cloud.id,provider,onAuthError,online:session.data?.snapshot.online ?? cloud.online,trigger:cameraTrigger,close:onPreviewClose} : undefined;
-  return <QuickFields name={cloud.name} paused={paused} preview={preview} specs={specs} camera={isCamera(cloud.category)} category={cloud.category} cameraAction={cameraAction} reading={spec => session.data ? cloudReading(spec,session.data.snapshot.status[spec.key],session.data.snapshot.status_observations?.[spec.key]) : undefined} now={now} local={false} busy={session.busy} readOK={session.readOK} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
+  const preview = isCamera(cloud.category) && sheet?.open ? {api,deviceId:cloud.id,provider,onAuthError,online:session.data?.snapshot.online ?? cloud.online} : undefined;
+  return <QuickFields name={cloud.name} paused={paused} sheet={sheet} preview={preview} specs={specs} camera={isCamera(cloud.category)} category={cloud.category} reading={spec => session.data ? cloudReading(spec,session.data.snapshot.status[spec.key],session.data.snapshot.status_observations?.[spec.key]) : undefined} now={now} local={false} busy={session.busy} readOK={session.readOK} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
     const data = session.data!;
     const result = await api.sendDeviceCommands(cloud.id,provider,cloudBatchCommands(changes,data.definitions,data.snapshot.status));
     if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
   }} />;
 }
 
-function LocalCardControls({api,device,state,now,visible,paused,onAuthError,onBusy,onStatus}: CardProps & {visible:boolean}) {
+function LocalCardControls({api,device,state,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {visible:boolean}) {
   const item = device.local!;
   const initial = useRef(state);
   const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
@@ -181,7 +179,7 @@ function LocalCardControls({api,device,state,now,visible,paused,onAuthError,onBu
   useEffect(() => {
     if (session.data) onStatus?.({online:session.data.available, enabled:session.data.enabled, battery:batteryFromSpecs(Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(session.data.values).filter(([,reading])=>reading.known).map(([key,reading])=>[key,reading.value])))});
   },[session.data,onStatus,item.capabilities]);
-  return <QuickFields name={device.name} paused={paused} specs={specs} category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => session.data?.values[spec.key]} now={now} local busy={session.busy} readOK={session.readOK && !!session.data?.enabled} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
+  return <QuickFields name={device.name} paused={paused} sheet={sheet} specs={specs} category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => session.data?.values[spec.key]} now={now} local busy={session.busy} readOK={session.readOK && !!session.data?.enabled} refresh={session.refresh} execute={session.execute} notice={session.notice} onBusy={onBusy} send={async changes => {
     const result = await api.setCapabilities(item.id,Object.fromEntries(changes.map(change => [change.spec.key,change.value])));
     if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
   }} />;

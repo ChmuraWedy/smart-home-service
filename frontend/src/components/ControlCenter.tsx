@@ -42,12 +42,19 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
   const [quickBusy,setQuickBusy] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [lightSheet, setLightSheet] = useState<{route:DeviceRoute;available:boolean}>();
+  const sheetTrigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (paused) setQuickOpen(false); }, [paused]);
   const notifyBusy = useCallback((busy:boolean) => { setQuickBusy(busy); onCommandBusy(device.id,busy); },[device.id,onCommandBusy]);
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
   const [liveStatus,setLiveStatus] = useState<{route:DeviceRoute;status:CardStatus}>();
   const updateStatus = useCallback((status:CardStatus)=>setLiveStatus({route,status}),[route]);
   const live = liveStatus?.route === route ? liveStatus.status : undefined;
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
+  const hasSheet = isCamera(cloud?.category) || (lightSheet?.route === route && lightSheet.available);
+  const onLightAvailable = useCallback((available:boolean) => setLightSheet({route,available}), [route]);
+  const showSheet = () => { if (!paused && !quickBusy && hasSheet) setQuickOpen(true); };
   const local = device.local;
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
@@ -59,20 +66,21 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
     && codes.some(code => /^(humidity|va_humidity|humidity_value)$/.test(code))
     && !codes.some(code => /^switch(?:_|$)/.test(code));
   const cardLayout = climate && !isCamera(cloud?.category) ? 'climate' : undefined;
-  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} aria-label={device.name} onClick={event=>{if (!quickBusy) openCard(event,()=>onOpen(route));}}>
+  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
     <header className="tw:flex tw:flex-col tw:gap-2">
       <div className="device-card-top tw:grid tw:min-h-11 tw:grid-cols-[36px_minmax(0,1fr)] tw:items-start tw:gap-x-2 tw:gap-y-0.5"><span className="device-symbol tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:grid tw:size-9 tw:place-items-center tw:rounded-lg tw:p-1.5"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context tw:col-start-2 tw:row-start-1 tw:flex tw:min-h-[18px] tw:min-w-0 tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-2 tw:gap-y-1"><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:justify-end tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t("В сети") : t("Не в сети")) : local && !enabled ? t("Отключено в настройках") : online ? t("Доступно дома") : t("Состояние неизвестно")}</span><BatteryBadge reading={battery} /></div></div>
-        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} />
+        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:() => setQuickOpen(false), trigger:sheetTrigger, onLightAvailable}} />
       </div>
-      <div className="device-card-identity tw:flex tw:min-w-0 tw:items-center tw:justify-between tw:gap-2"><div className="device-card-title tw:flex tw:min-w-0 tw:flex-1 tw:flex-wrap tw:items-center tw:gap-x-2 tw:gap-y-1"><h3>{device.name}</h3>
+      <div className="device-card-identity tw:flex tw:min-w-0 tw:items-center tw:justify-between tw:gap-2"><div className="device-card-title tw:flex tw:min-w-0 tw:flex-1 tw:flex-wrap tw:items-center tw:gap-x-2 tw:gap-y-1"><h3>{hasSheet ? <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
+        aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}>{device.name}</button> : device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases tw:min-w-0 tw:max-w-full" role="group" aria-label={t("Алиасы устройства")}>{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}
       </div><div className="device-card-actions tw:flex tw:flex-none tw:items-center tw:gap-0.5"><CardDetailsButton label={t("Подробнее")} disabled={quickBusy} onClick={() => onOpen(route)} />
         {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t("Настроить локальное подключение")} title={t("Настроить локальное подключение")} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}
       </div></div>
     </header>
     {routes.length > 1 && <div className="device-card-footer tw:mt-2 tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-1.5">
-      {routes.length > 1 && <select className="device-route-select" aria-label={t("Способ управления: ") + device.name} value={route} disabled={quickBusy} onChange={event => { setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>}
+      {routes.length > 1 && <select className="device-route-select" aria-label={t("Способ управления: ") + device.name} value={route} disabled={quickBusy} onChange={event => { setQuickOpen(false); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>}
     </div>}
   </Card>;
 

@@ -1278,7 +1278,11 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-room-chips button[aria-pressed="true"]:hover:enabled {
   @apply tw:border-(--accent) tw:bg-(--accent) tw:text-(--on-accent);
 }
-.dashboard-view .dashboard-device { @apply tw:px-3 tw:py-2.5; }
+.dashboard-view .dashboard-device {
+  --dashboard-card-inset:12px;
+  @apply tw:py-2.5;
+  padding-inline:var(--dashboard-card-inset);
+}
 .dashboard-device > header {
   @apply tw:grid tw:grid-cols-[28px_minmax(0,1fr)_auto_auto] tw:items-center tw:gap-x-2 tw:gap-y-0.5;
 }
@@ -1328,21 +1332,30 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:mt-2 tw:grid tw:w-full tw:grid-cols-1 tw:justify-normal tw:gap-0;
   border-top:1px solid var(--border);
 }
+.dashboard-device:has([data-power-layout="channels"]) .card-quick-controls {
+  margin-inline-start:calc(-1 * var(--dashboard-card-inset));
+}
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout="channels"]):not(:has(.card-sensor-values, .control-feedback)) {
+  @apply tw:pb-0;
+}
 .dashboard-device [data-power-layout="channels"] .channel-control + .channel-control { border-top:1px solid var(--border); }
 .dashboard-device [data-power-layout="channels"] .capability-boolean > .capability-row {
   @apply tw:grid-cols-[64px_minmax(0,1fr)] tw:items-center tw:justify-normal tw:gap-x-3 tw:gap-y-0;
 }
-.dashboard-device [data-power-layout="channels"] .capability-heading { @apply tw:col-start-2 tw:row-start-1 tw:block tw:self-end tw:pt-2; }
+.dashboard-device [data-power-layout="channels"] .capability-heading { @apply tw:col-start-2 tw:row-start-1 tw:block tw:self-end tw:pt-1; }
 .dashboard-device [data-power-layout="channels"] .capability-heading h3 { @apply tw:text-sm tw:whitespace-normal; }
 .dashboard-device [data-power-layout="channels"] .capability-aliases { @apply tw:max-w-full; }
 .dashboard-device [data-power-layout="channels"] .capability-aliases .alias-tag {
   @apply tw:rounded-none tw:border-0 tw:bg-transparent tw:p-0 tw:text-xs;
 }
-.dashboard-device [data-power-layout="channels"] .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-2; }
+.dashboard-device [data-power-layout="channels"] .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-1; }
 .dashboard-device [data-power-layout="channels"] .capability-boolean > .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
 }
-.dashboard-device [data-power-layout="channels"] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:8px; }
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+  [data-power-layout="channels"] .channel-control:last-of-type .power-actions { @apply tw:self-end; }
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+  [data-power-layout="channels"] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:11px; }
 
 .dashboard-device:has([data-power-layout="single"]) > header {
   @apply tw:grid-cols-[64px_minmax(0,1fr)_auto_auto] tw:gap-x-3;
@@ -1379,9 +1392,13 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-device[data-card-layout="climate"] [data-reading="va_temperature"],
 .dashboard-device[data-card-layout="climate"] [data-reading="temp_current"] { @apply tw:order-first; }
 
-.dashboard-adjust { @apply tw:col-span-full tw:row-start-5 tw:justify-self-end; }
-.dashboard-adjust > button { @apply tw:min-h-11; }
-.dashboard-device:has(.dashboard-adjust) .control-feedback { @apply tw:row-start-6; }
+.dashboard-device[id]:not([data-quick-sheet]) { @apply tw:cursor-default; }
+.device-card-sheet-trigger,
+.device-card-sheet-trigger:hover:enabled {
+  @apply tw:cursor-pointer tw:rounded-sm tw:border-0 tw:bg-transparent tw:p-0 tw:text-start tw:text-inherit;
+  font:inherit;
+  overflow-wrap:anywhere;
+}
 .dashboard-sheet {
   @apply tw:fixed tw:inset-x-0 tw:top-auto tw:bottom-0 tw:m-0 tw:w-full tw:max-w-none tw:overflow-y-auto tw:rounded-t-2xl tw:border tw:border-(--border) tw:bg-(--dialog-bg) tw:px-4 tw:text-(--text);
   max-height:calc(100dvh - 24px);
