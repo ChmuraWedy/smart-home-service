@@ -99,7 +99,7 @@ describe('cloud readings in the dashboard and details', () => {
       ...device, name: 'Camera', category: 'sp', controls: {
         ready: true,
         definitions: { device_id: 'lamp', functions: [{ code: 'basic_private', type: 'Boolean', values: {} }] },
-        snapshot: { ...snapshot(), status: { basic_private: privacy },
+        snapshot: { ...snapshot(false), status: { basic_private: privacy },
           status_observations: { basic_private: { observed_at: time, received_at: time } } },
       },
     });
