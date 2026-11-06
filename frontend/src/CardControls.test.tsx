@@ -1,3 +1,4 @@
+import { renderWithStore } from './test/render-with-store';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -195,7 +196,7 @@ describe('main controls on device cards', () => {
       return json({device_id:7,enabled:true,available:true,values:{switch:{value:false,known:true,stale:false,observed_at:new Date().toISOString()}}});
     });
     const props={api:new HomeApi(connection),device:{id:'physical',name:local.name,local,cloud:{}},route:'local' as const,now:Date.now(),paused:false,onAuthError:vi.fn(),onBusy:vi.fn()};
-    render(<CardControls {...props} />);
+    renderWithStore(<CardControls {...props} />);
     const user=userEvent.setup(),power=await screen.findByRole('switch',{name:'Питание'});
     await waitFor(() => expect(power).toBeEnabled());
     await user.click(power);
@@ -216,10 +217,63 @@ describe('main controls on device cards', () => {
 
   it('blocks inline writes when the local device or its gateway is disabled', async () => {
     const local={id:7,device_id:'physical',name:'Локальный свет',transport:'wifi' as const,parent_id:null,cid:null,aliases:[],building_id:null,room_id:null,enabled:false,capabilities:{switch:{type:'boolean' as const,readable:true,writable:true}}};
-    render(<CardControls api={new HomeApi(connection)} device={{id:'physical',name:local.name,local,cloud:{}}} route="local" state={{device_id:7,name:local.name,enabled:false,available:false,values:{switch:{value:false,known:true,stale:false}}}} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
-    expect(await screen.findByRole('switch',{name:'Питание'})).toBeDisabled();
+    vi.mocked(fetch).mockResolvedValue(json({device_id:7,name:local.name,enabled:false,available:false,values:{switch:{value:true,known:true,stale:false}}}));
+    renderWithStore(<CardControls api={new HomeApi(connection)} device={{id:'physical',name:local.name,local,cloud:{}}} route="local" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
+    const power = await screen.findByRole('switch', {name:'Питание'});
+    await waitFor(() => expect(power).toBeChecked());
+    expect(power).toBeDisabled();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch).mock.calls.every(([,init]) => init?.method === 'GET')).toBe(true);
+  });
+
+  it('renews the local watch only while the card is visible and its dashboard is active', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let visibilityChanged!: IntersectionObserverCallback;
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback: IntersectionObserverCallback) { visibilityChanged = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const local = {id:7, device_id:'physical', name:'Локальный свет', transport:'wifi' as const, parent_id:null,
+      cid:null, aliases:[], building_id:null, room_id:null, enabled:true,
+      capabilities:{switch:{type:'boolean' as const, readable:true, writable:true}}};
+    vi.mocked(fetch).mockImplementation(async () => json({ device_id:7, enabled:true, available:true,
+      values:{switch:{value:false, known:true, stale:false}} }));
+    const props = {api:new HomeApi(connection), device:{id:'physical', name:local.name, local, cloud:{}},
+      route:'local' as const, now:Date.now(), onAuthError:vi.fn(), onBusy:vi.fn()};
+    const view = renderWithStore(<CardControls {...props} paused={false} />);
+    const tick = () => act(async () => { vi.advanceTimersByTime(1000); });
+    const intersect = (isIntersecting: boolean) =>
+      act(async () => visibilityChanged([{isIntersecting} as IntersectionObserverEntry], {} as IntersectionObserver));
+    const watches = () => vi.mocked(fetch).mock.calls.filter(([input]) => new URL(String(input)).searchParams.has('watch'));
+    try {
+      const power = await screen.findByRole('switch');
+      await waitFor(() => expect(power).toBeEnabled());
+      await tick();
+      expect(watches()).toHaveLength(0);
+      await intersect(true);
+      await tick();
+      expect(watches()).toHaveLength(1);
+      await intersect(false);
+      await tick();
+      expect(watches()).toHaveLength(1);
+      await intersect(true);
+      view.rerender(<CardControls {...props} paused />);
+      await intersect(true);
+      await tick();
+      expect(watches()).toHaveLength(1);
+      view.rerender(<CardControls {...props} paused={false} />);
+      await intersect(true);
+      await tick();
+      expect(watches()).toHaveLength(2);
+      view.unmount();
+      await tick();
+      expect(watches()).toHaveLength(2);
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 
 });

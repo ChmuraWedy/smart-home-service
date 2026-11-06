@@ -1,3 +1,4 @@
+import { renderWithStore } from './test/render-with-store';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { HomeApi, type LocalDevice } from './home-api';
@@ -19,7 +20,7 @@ function setup() {
     if(url.pathname.endsWith('/state'))return json({device_id:7,enabled:true,available:true,values:{switch:{known:true,stale:false,value:on},color:{known:true,stale:false,value:{h:120,s:1000,v:1000}}}});
     return json(device);
   });
-  const view=render(<LocalControl api={new HomeApi({baseUrl:'http://api.test',token:'fixture-key'})} device={device} onClose={vi.fn()} onAuthError={vi.fn()}/>);
+  const view=renderWithStore(<LocalControl api={new HomeApi({baseUrl:'http://api.test',token:'fixture-key'})} device={device} onClose={vi.fn()} onAuthError={vi.fn()}/>);
   return {view,requests,setOn:(value:boolean)=>{on=value;}};
 }
 

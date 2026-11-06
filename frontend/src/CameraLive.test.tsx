@@ -5,6 +5,7 @@ import { CloudApi } from './api';
 import { CameraLive } from './components/CameraLive';
 import { CloudControl } from './components/CloudControl';
 import { ControlCenter } from './components/ControlCenter';
+import { renderWithStore } from './test/render-with-store';
 import { HomeApi } from './home-api';
 
 const hls = vi.hoisted(() => ({ destroy:vi.fn(), load:vi.fn(), attach:vi.fn(), handlers:{} as Record<string, (...args:any[])=>void>, supported:true, levels:[] as {width:number;height:number;bitrate:number}[], currentLevel:-1 }));
@@ -35,7 +36,7 @@ function mountTiles(privacy?:boolean) {
     if (path.endsWith('/status')) return json(snapshot);
     return json([]);
   });
-  return render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+  return renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
 }
 beforeEach(()=>{
   hls.supported=true; hls.handlers={}; hls.levels=[]; hls.currentLevel=-1;

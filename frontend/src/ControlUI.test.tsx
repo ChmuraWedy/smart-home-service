@@ -7,6 +7,7 @@ import type { Capability, DeviceState, LocalDevice } from './home-api';
 import { CloudControl } from './components/CloudControl';
 import { DeviceMappings } from './components/DeviceMappings';
 import { ControlCenter } from './components/ControlCenter';
+import { renderWithStore } from './test/render-with-store';
 import { LocalControl, GroupControl } from './components/LocalControls';
 
 const connection = { baseUrl: 'http://api.test:8765', token: 'test-service-key' };
@@ -451,7 +452,7 @@ describe('manual device maps', () => {
 describe('local device and group controls', () => {
   it.each([light, child])('addresses $transport device by its own inventory ID without parent/key in the browser command', async device => {
     const server = localServer(); const user = userEvent.setup();
-    render(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('switch'));
 
     await screen.findByText(/Команда принята/);
@@ -461,7 +462,7 @@ describe('local device and group controls', () => {
   });
   it('applies a temperature step and typed enum while keeping measured temperature read-only', async () => {
     const server = localServer(); const user = userEvent.setup();
-    render(<LocalControl api={new HomeApi(connection)} device={thermostat} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={thermostat} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const target = await screen.findByRole('region', { name: 'Заданная температура' });
     fireEvent.change(within(target).getByRole('spinbutton'), { target: { value: '23' } });
 
@@ -476,7 +477,7 @@ describe('local device and group controls', () => {
   });
   it('shows stale humidity and unknown motion without false values or write controls', async () => {
     localServer({ stale: true });
-    render(<LocalControl api={new HomeApi(connection)} device={sensor} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={sensor} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await screen.findByText('Устарело');
     expect(within(screen.getByRole('region', { name: 'Движение' })).getByText('Нет данных')).toBeInTheDocument();
     expect(screen.queryByRole('switch')).toBeNull();
@@ -493,7 +494,7 @@ describe('local device and group controls', () => {
   });
   it('uses cached reads while filtering rooms and aliases and opening group members', async () => {
     const server = localServer(); const user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready onAuthError={vi.fn()} />);
     await screen.findByText('Лампа кухни');
     expect(server.reads.some(path => path.includes('refresh=true'))).toBe(false);
     await user.selectOptions(screen.getByLabelText('Комната'), '2');
@@ -514,26 +515,26 @@ describe('local device and group controls', () => {
     expect(server.writes).toHaveLength(0);
   });
   it('clears the previous server inventory before a replacement server responds', async () => {
-    localServer(); const onAuthError = vi.fn(), onLock = vi.fn();
-    const view = render(<ControlCenter api={new HomeApi(connection)} ready onAuthError={onAuthError} onLock={onLock} />);
+    localServer(); const onAuthError = vi.fn();
+    const view = renderWithStore(<ControlCenter api={new HomeApi(connection)} ready onAuthError={onAuthError} />);
     await screen.findByText('Лампа кухни');
     vi.mocked(fetch).mockImplementation((input, init) => {
       expect(String(input)).toContain('http://other-api.test');
       expect((init?.headers as Record<string,string>)['X-API-Key']).toBe('new-service-key');
       return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
     });
-    view.rerender(<ControlCenter api={new HomeApi({ baseUrl:'http://other-api.test',token:'new-service-key' })} ready onAuthError={onAuthError} onLock={onLock} />);
+    view.rerender(<ControlCenter api={new HomeApi({ baseUrl:'http://other-api.test',token:'new-service-key' })} ready onAuthError={onAuthError} />);
     expect(screen.queryByText('Лампа кухни')).toBeNull();
     expect(screen.queryByRole('button', { name:'Подробнее' })).toBeNull();
     expect(screen.getByText('Загружаем список…')).toBeInTheDocument();
   });
   it('disables a locally disabled device and reports a command timeout without retry', async () => {
     localServer({ disabled: true });
-    const first = render(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const first = renderWithStore(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await screen.findByText('Устройство или его шлюз отключены в настройках сервиса.');
     expect(screen.getByRole('switch')).toBeDisabled(); first.unmount();
     const server = localServer({ postError: true });
-    render(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const power = await screen.findByRole('switch');
     await waitFor(() => expect(power).toBeEnabled());
     fireEvent.click(power);

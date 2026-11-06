@@ -6,7 +6,7 @@ import { localSpec } from '../controls';
 import { deviceAliases, deviceRoutes, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
-import type { DeviceState, Group, GroupState, Inventory, LocalDevice } from '../home-api';
+import type { Group, GroupState, Inventory, LocalDevice } from '../home-api';
 import { CloudControl } from './CloudControl';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
@@ -18,6 +18,9 @@ import { CardControls } from './CardControls';
 import { Card } from './ui/card';
 import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId } from '../device-links';
+import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
+import { readLocalDevice } from '../local-device-cache';
+import { useLocalDeviceState } from '../use-local-device-state';
 import type { DeviceLink } from '../device-links';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
@@ -57,17 +60,21 @@ function DashboardCardFooter({ children }: { children: ReactNode }) {
   return <footer className="dashboard-card-footer" data-slot="card-footer">{children}</footer>;
 }
 
-function DeviceCard({ api, device, state, room, now, paused, onAuthError, onCommandBusy, onOpen, onAdd }: {
-  api: HomeApi; device: UnifiedDevice; state?: DeviceState; room: string; now: number; paused: boolean; onAuthError: () => void; onCommandBusy: (id:string,busy:boolean) => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
+function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd }: {
+  api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
 }) {
+  const state = useLocalDeviceState(api, device.local?.id);
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
-  const [quickBusy,setQuickBusy] = useState(false);
+  const dispatch = useAppDispatch();
+  const quickBusy = useAppSelector(state => selectCommandPending(state, device.id));
   const [quickOpen, setQuickOpen] = useState(false);
   const [lightSheet, setLightSheet] = useState<{route:DeviceRoute;available:boolean}>();
   const sheetTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (paused) setQuickOpen(false); }, [paused]);
-  const notifyBusy = useCallback((busy:boolean) => { setQuickBusy(busy); onCommandBusy(device.id,busy); },[device.id,onCommandBusy]);
+  const notifyBusy = useCallback((pending: boolean) => {
+    dispatch(setCommandPending({ deviceId: device.id, pending }));
+  }, [device.id, dispatch]);
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
   const [liveStatus,setLiveStatus] = useState<{route:DeviceRoute;status:CardStatus}>();
   const updateStatus = useCallback((status:CardStatus)=>setLiveStatus({route,status}),[route]);
@@ -80,7 +87,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
   const online = live ? live.online : cloud?.online || (route === 'local' && state?.available);
-  const enabled = live?.enabled ?? local?.enabled;
+  const enabled = (route === 'local' ? state?.enabled : undefined) ?? local?.enabled;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
@@ -95,7 +102,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
       actions={<><CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy} onClick={() => onOpen(route)} />
         {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)} title={t(MSG.SET_UP_LOCAL_CONNECTION)} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}</>} />
     <DashboardCardFooter>
-      <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:() => setQuickOpen(false), trigger:sheetTrigger, onLightAvailable}} />
+      <CardControls key={route} api={api} device={device} route={route} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:() => setQuickOpen(false), trigger:sheetTrigger, onLightAvailable}} />
       {routes.length > 1 && <div className="device-card-footer tw:mt-2">
         <select className="device-route-select" aria-label={t(MSG.CONTROL_METHOD) + device.name} value={route} disabled={quickBusy} onChange={event => { setQuickOpen(false); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>
       </div>}
@@ -104,9 +111,9 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
 
 }
 
-export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onLock, onConnections, deviceLink, onDeviceLinkChange }: {
+export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onConnections, deviceLink, onDeviceLinkChange }: {
   dashboardPanel?: 'search' | 'tools' | null; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
-  onAuthError: () => void; onLock: (locked: boolean) => void; onConnections?: () => void;
+  onAuthError: () => void; onConnections?: () => void;
   deviceLink?: DeviceLink | null; onDeviceLinkChange?: (target: DeviceLink | null) => void;
 }) {
   const mask = `${sharingReady}:${developerReady}`;
@@ -134,15 +141,15 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const [selection, setSelection] = useState<{ api: HomeApi; mask: string; value: Selection } | null>(null);
   const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
   const activeLink = useRef<string | null>(null);
-  const [states, setStates] = useState<Record<number, DeviceState>>({});
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
-  const [commandCards,setCommandCards] = useState(new Set<string>());
-  const onCommandBusy = useCallback((id:string,busy:boolean) => setCommandCards(previous => {
-    if (previous.has(id) === busy) return previous;
-    const next = new Set(previous); if (busy) next.add(id); else next.delete(id); return next;
-  }),[]);
+  const dispatch = useAppDispatch();
   const now = useClock();
-  useEffect(() => { onLock(Boolean(selected) || commandCards.size > 0); return () => onLock(false); }, [selected, commandCards, onLock]);
+  const detailsOpen = selected !== null;
+  useEffect(() => {
+    if (!detailsOpen) return;
+    dispatch(setDetailsOpen(true));
+    return () => { dispatch(setDetailsOpen(false)); };
+  }, [detailsOpen, dispatch]);
   useEffect(() => { setSelection(null); activeLink.current = null; }, [api, ready, mask]);
   useEffect(() => {
     if (!ready) return;
@@ -197,21 +204,21 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const visible = useMemo(() => entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [entries, page]);
   useEffect(() => {
     const controller = new AbortController();
-    setStates({}); setGroupStates({});
+    setGroupStates({});
     // Initial list reads use SQLite only. Visible card controls separately
     // renew background watches; list loading never requests per-device cloud details.
     for (const entry of visible) {
       const local = entry.kind === 'device' ? entry.device.local : undefined;
       if (entry.kind === 'device' && !local) continue;
-      const request = entry.kind === 'group' ? api.groupState(entry.group.id, controller.signal) : api.state(local!.id, false, controller.signal);
+      const request = entry.kind === 'group' ? api.groupState(entry.group.id, controller.signal)
+        : dispatch(readLocalDevice(api, local!.id, false, controller.signal));
       void request.then(value => {
         if (controller.signal.aborted) return;
-        if ('device_id' in value) setStates(current => ({ ...current, [value.device_id]: value }));
-        else setGroupStates(current => ({ ...current, [value.group_id]: value }));
+        if ('group_id' in value) setGroupStates(current => ({ ...current, [value.group_id]: value }));
       }).catch(failure => { if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError(); });
     }
     return () => controller.abort();
-  }, [api, visible]);
+  }, [api, dispatch, visible]);
   function choose(value: Selection) {
     setSelection({ api, mask, value });
     onDeviceLinkChange?.(value.kind === 'device' ? { id: value.device.id, route: value.route } : null);
@@ -260,7 +267,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
         <DashboardCardFooter>
           <p className="dashboard-group-reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t(MSG.STATUS_UNKNOWN)}</p>
         </DashboardCardFooter>
-      </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
+      </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t(MSG.BACK)}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>{t(MSG.NEXT)}</button></div>}
     </>}
     {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl room={roomName(selected.device)} key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} onSetup={inventory ? () => {
