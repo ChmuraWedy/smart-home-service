@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { localDeviceCache } from './local-device-cache';
 import { cloudDeviceCache } from './cloud-device-cache';
 import { pendingDeviceValuesReducer } from './pending-device-values';
+import { deviceMetadataReducer } from './device-metadata';
 
 type DashboardControlState = {
   detailsOpen: boolean;
@@ -34,6 +35,7 @@ export function createAppStore() {
   return configureStore({
     reducer: {
       dashboardControls: dashboardControls.reducer,
+      deviceMetadata: deviceMetadataReducer,
       pendingDeviceValues: pendingDeviceValuesReducer,
       [localDeviceCache.reducerPath]: localDeviceCache.reducer,
       [cloudDeviceCache.reducerPath]: cloudDeviceCache.reducer,

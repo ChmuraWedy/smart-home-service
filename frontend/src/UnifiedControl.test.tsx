@@ -37,6 +37,109 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it('shares an edited device alias immediately and reloads the device name from inventory', async () => {
+    server({ noLocal: true });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    let name = 'Coffee Machine';
+    let aliases = ['Stary ekspres'];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/cloud/devices')) return json([{ ...shared, name, aliases }]);
+      if (path.endsWith('/aliases') && init?.method === 'PUT') {
+        aliases = JSON.parse(String(init.body)).aliases;
+        return json({ device_id: shared.id, aliases });
+      }
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
+    const card = within(await screen.findByRole('listitem', { name }));
+    await user.click(card.getByRole('button', { name: 'Подробнее' }));
+    const details = within(await screen.findByRole('dialog', { name }));
+    const edit = details.getByRole('button', { name: 'Изменить алиас Stary ekspres' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await user.click(edit);
+    await user.clear(details.getByRole('textbox', { name: 'Изменить алиас' }));
+    await user.type(details.getByRole('textbox', { name: 'Изменить алиас' }), 'Ekspres do kawy');
+    await user.click(details.getByRole('button', { name: 'Сохранить' }));
+    expect(await card.findByText('Ekspres do kawy')).toBeInTheDocument();
+    expect(card.queryByText('Stary ekspres')).toBeNull();
+    expect(details.getByRole('heading', { name })).toBeInTheDocument();
+    await user.click(details.getByRole('button', { name: 'Закрыть' }));
+
+    name = 'Coffee Station';
+    const refresh = screen.getByRole('button', { name: 'Обновить список' });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    await user.click(refresh);
+    expect(await screen.findByRole('listitem', { name })).toHaveTextContent('Ekspres do kawy');
+  });
+
+  it.each(['sharing', 'developer'] as const)('updates and removes a saved channel alias on the %s card', async provider => {
+    server({ noLocal: true });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const snapshot = { device_id: shared.id, online: true, source: 'cloud', status: { switch_1: false, switch_2: true } };
+    const labels: Record<string, string> = { switch_1: 'Kawa', switch_2: 'Woda' };
+    const definitions = () => ({ device_id: shared.id, functions: Object.entries(snapshot.status).map(([code]) =>
+      ({ code, type: 'Boolean', values: {}, user_label: labels[code] })) });
+    const writes: unknown[] = [];
+    let inventoryReads = 0;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/channel-labels')) {
+        const body = JSON.parse(String(init?.body));
+        writes.push(body);
+        if (body.labels.switch_1 === null) delete labels.switch_1;
+        else labels.switch_1 = body.labels.switch_1;
+        return json({ device_id: shared.id, labels });
+      }
+      if (path.endsWith('/cloud/devices')) {
+        inventoryReads++;
+        const ready = provider === 'sharing';
+        return json([{ ...shared, name: 'Coffee Machine', controls: {
+          ready, definitions: ready ? definitions() : { device_id: shared.id, functions: [] }, snapshot,
+        } }]);
+      }
+      if (path.endsWith('/functions')) return json(definitions());
+      if (path.endsWith('/status')) return json(snapshot);
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady={provider === 'sharing'}
+      developerReady={provider === 'developer'} onAuthError={vi.fn()} />);
+    const card = within(await screen.findByRole('listitem', { name: 'Coffee Machine' }));
+    if (provider === 'developer') await user.click(card.getByRole('button', { name: 'Показать состояние' }));
+    expect(await card.findByText('Kawa')).toBeInTheDocument();
+    const open = async () => {
+      await user.click(card.getByRole('button', { name: 'Подробнее' }));
+      return within(await screen.findByRole('dialog', { name: 'Coffee Machine' }));
+    };
+    const close = async (details: ReturnType<typeof within>) => {
+      const before = inventoryReads;
+      await user.click(details.getByRole('button', { name: 'Закрыть' }));
+      await waitFor(() => expect(inventoryReads).toBeGreaterThan(before));
+    };
+    let details = await open();
+    await user.click(await details.findByRole('button', { name: 'Изменить алиас Kawa' }));
+    await user.clear(details.getByRole('textbox', { name: 'Изменить алиас' }));
+    await user.type(details.getByRole('textbox', { name: 'Изменить алиас' }), 'Kawa świeża');
+    await user.click(details.getByRole('button', { name: 'Сохранить' }));
+    expect(await details.findByRole('button', { name: 'Изменить алиас Kawa świeża' })).toBeInTheDocument();
+    expect(card.getByText('Kawa świeża')).toBeInTheDocument();
+    await close(details);
+    expect(await card.findByText('Kawa świeża')).toBeInTheDocument();
+    expect(card.queryByText('Kawa')).toBeNull();
+
+    details = await open();
+    await user.click(await details.findByRole('button', { name: 'Изменить алиас Kawa świeża' }));
+    await user.click(details.getByRole('button', { name: 'Удалить' }));
+    await waitFor(() => expect(details.queryByText('Kawa świeża')).toBeNull());
+    await close(details);
+    expect(card.queryByText('Kawa świeża')).toBeNull();
+    expect(card.getByText('Woda')).toBeInTheDocument();
+    expect(card.getByRole('switch', { name: 'Канал 1' })).not.toBeChecked();
+    expect(writes).toEqual([{ labels: { switch_1: 'Kawa świeża' } }, { labels: { switch_1: null } }]);
+  });
+
   it('shares an awaited cloud command and its confirmation between the card and details', async () => {
     const calls = server({ noLocal: true });
     const original = vi.mocked(fetch).getMockImplementation()!;

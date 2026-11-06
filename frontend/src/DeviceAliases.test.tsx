@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { renderWithStore } from './test/render-with-store';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { ApiError, CloudApi } from './api';
@@ -16,7 +17,7 @@ it('adds, edits and removes inline tags, keeping the real device name and comman
   const command = vi.spyOn(api, 'sendDeviceCommands');
   const props = { api, deviceId: 'lamp', name: 'Original lamp', provider: 'sharing' as const,
     disabled: false, onBusy: vi.fn(), onAuthError: vi.fn() };
-  const view = render(<DeviceAliases {...props} />);
+  const view = renderWithStore(<DeviceAliases {...props} />);
   await user.click(screen.getByRole('button', { name: 'Добавить алиас' }));
   await user.type(screen.getByLabelText('Новый алиас'), 'Свет кухни');
   await user.click(screen.getByRole('button', { name: 'Сохранить' }));
@@ -32,7 +33,7 @@ it('adds, edits and removes inline tags, keeping the real device name and comman
   await user.click(screen.getByRole('button', { name: 'Сохранить' }));
   await screen.findByRole('button', { name: 'Изменить алиас Святло пакоя' });
   expect(aliases).toEqual(['Святло пакоя']);
-  view.unmount(); render(<DeviceAliases {...props} initialAliases={aliases} />);
+  view.unmount(); renderWithStore(<DeviceAliases {...props} initialAliases={aliases} />);
   await user.click(screen.getByRole('button', { name: 'Изменить алиас Святло пакоя' }));
   await user.click(screen.getByRole('button', { name: 'Удалить' }));
   await screen.findByRole('button', { name: 'Добавить алиас' });
@@ -44,7 +45,7 @@ it('reuses inventory aliases, supports Polish and keeps the automatic name out o
   const api = new CloudApi(connection), user = userEvent.setup();
   const save = vi.spyOn(api, 'saveLocalDeviceAliases').mockImplementation(async (_id, aliases) => ({ device_id: 'lamp', aliases: ['Kitchen lamp', ...aliases] }));
   const cloudSave = vi.spyOn(api, 'saveDeviceAliases');
-  render(<DeviceAliases api={api} deviceId="lamp" name="Kitchen lamp" localId={7} initialAliases={['Kitchen lamp', 'existing_alias']} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
+  renderWithStore(<DeviceAliases api={api} deviceId="lamp" name="Kitchen lamp" localId={7} initialAliases={['Kitchen lamp', 'existing_alias']} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
   expect(screen.getByRole('group', { name: 'Алиасы' })).toHaveTextContent('existing_alias');
   expect(screen.queryByRole('button', { name: 'Изменить алиас Kitchen lamp' })).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Добавить алиас' }));
@@ -58,7 +59,7 @@ it('reuses inventory aliases, supports Polish and keeps the automatic name out o
 it('keeps saved tags and the draft on conflict, and cancels inline creation with Escape', async () => {
   const api = new CloudApi(connection), user = userEvent.setup();
   vi.spyOn(api, 'saveDeviceAliases').mockRejectedValue(new ApiError('Conflict', 409));
-  render(<DeviceAliases api={api} deviceId="lamp" name="Original lamp" initialAliases={['saved_alias']} provider="sharing" disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
+  renderWithStore(<DeviceAliases api={api} deviceId="lamp" name="Original lamp" initialAliases={['saved_alias']} provider="sharing" disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
   await user.click(screen.getByRole('button', { name: 'Добавить алиас' }));
   await user.type(screen.getByLabelText('Новый алиас'), 'taken_alias');
   await user.click(screen.getByRole('button', { name: 'Сохранить' }));

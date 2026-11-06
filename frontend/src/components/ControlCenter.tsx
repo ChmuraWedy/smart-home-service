@@ -20,6 +20,8 @@ import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId } from '../device-links';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
 import { readLocalDevice } from '../local-device-cache';
+import { cloudAccountScope } from '../cloud-account-scope';
+import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, localMetadataKey, nextDeviceMetadataRevision } from '../device-metadata';
 import { useLocalDeviceState } from '../use-local-device-state';
 import type { DeviceLink } from '../device-links';
 
@@ -143,6 +145,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const activeLink = useRef<string | null>(null);
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
   const dispatch = useAppDispatch();
+  const identity = useAppSelector(state => state.deviceMetadata.devices);
   const now = useClock();
   const detailsOpen = selected !== null;
   useEffect(() => {
@@ -156,10 +159,26 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     const controller = new AbortController(); setBusy(true); setPage(0);
     setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, errors: [] } : { api, mask, inventory: null, cloud: {}, errors: [] });
     const handle = async (label: string, read: () => Promise<Inventory | CloudDevice[]>, provider?: Provider) => {
+      const scope = provider ? cloudAccountScope(api, provider) : undefined;
+      const metadataRevision = nextDeviceMetadataRevision();
       try {
         const result = await read();
         if (controller.signal.aborted) return;
         if (provider && !Array.isArray(result)) throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_UNEXPECTED_DEVICE_LIST));
+        if (provider && scope !== undefined && Array.isArray(result)) {
+          if (scope !== cloudAccountScope(api, provider)) return;
+          const updates = result.map(device => {
+            const definitions = device.controls?.definitions;
+            const channelLabels = device.controls?.ready && definitions?.device_id === device.id && Array.isArray(definitions.functions)
+              ? labelsFromCloudDefinitions(definitions) : undefined;
+            return { key: cloudMetadataKey(scope, device.id), revision: metadataRevision, name: device.name ?? '', aliases: device.aliases, channelLabels };
+          });
+          if (updates.length) dispatch(cacheDeviceMetadata(updates));
+        } else if (!Array.isArray(result) && result.devices.length) {
+          dispatch(cacheDeviceMetadata(result.devices.map(device => ({
+            key: localMetadataKey(api, device.id), revision: metadataRevision, name: device.name, aliases: device.aliases,
+          }))));
+        }
         setRecord(previous => previous?.api === api && previous.mask === mask ? {
           ...previous, ...(provider ? { cloud: { ...previous.cloud, [provider]: result as CloudDevice[] } } : { inventory: result as Inventory }),
         } : previous);
@@ -174,8 +193,21 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     if (developerReady) requests.push(handle('Tuya Developer', () => api.devices('developer', controller.signal), 'developer'));
     void Promise.all(requests).finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
-  }, [api, ready, mask, revision]);
-  const devices = useMemo(() => mergeDevices(inventory?.devices || [], cloud), [inventory, cloud]);
+  }, [api, ready, mask, revision, dispatch]);
+  const devices = useMemo(() => {
+    function applyIdentity<T extends { name: string; aliases?: string[] }>(device: T, key: string): T {
+      const stored = identity[key];
+      return stored ? { ...device, name: stored.name?.value ?? device.name, aliases: stored.aliases?.value ?? device.aliases } : device;
+    }
+    const localDevices = (inventory?.devices ?? []).map(device => applyIdentity(device, localMetadataKey(api, device.id)));
+    const cloudDevices: typeof cloud = {};
+    for (const provider of ['sharing', 'developer'] as const) {
+      const scope = cloudAccountScope(api, provider);
+      cloudDevices[provider] = cloud[provider]?.map(device => applyIdentity(device, cloudMetadataKey(scope, device.id)));
+    }
+    return mergeDevices(localDevices, cloudDevices);
+  }, [api, inventory, cloud, identity]);
+  const detailDevice = selected?.kind === 'device' ? devices.find(device => device.id === selected.device.id) ?? selected.device : undefined;
   const linked = deviceLink ? devices.find(device => device.id === deviceLink.id) : undefined;
   const linkedRoute = linked ? deviceLink?.route || deviceRoutes(linked)[0] : undefined;
   const linkError = deviceLink && ready && current && !busy ? !linked ? t(MSG.THE_LINKED_DEVICE_WAS_NOT_FOUND_IN_THE) : linkedRoute && !deviceRoutes(linked).includes(linkedRoute) ? t(MSG.THE_CONTROL_METHOD_IN_THIS_LINK_IS_UNAVAILABLE) : '' : '';
@@ -270,11 +302,11 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
       </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
       {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t(MSG.BACK)}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>{t(MSG.NEXT)}</button></div>}
     </>}
-    {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl room={roomName(selected.device)} key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} onSetup={inventory ? () => {
-      const provider = selected.device.cloud.sharing ? 'sharing' : selected.device.cloud.developer ? 'developer' : undefined;
-      choose({ kind: 'survey', existing: selected.device.local, provider, device: provider ? selected.device.cloud[provider] : undefined });
+    {selected?.kind === 'device' && selected.route === 'local' && detailDevice?.local && <LocalControl room={roomName(detailDevice)} key={detailDevice.local.id} api={api} device={detailDevice.local} onAuthError={onAuthError} onSetup={inventory ? () => {
+      const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
+      choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
     } : undefined} closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
-    {selected?.kind === 'device' && selected.route !== 'local' && selected.device.cloud[selected.route] && <CloudControl room={roomName(selected.device)} localTransport={selected.device.local?.transport} key={selected.route + selected.device.id} api={api} device={{ ...selected.device.cloud[selected.route]!, name: selected.device.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
+    {selected?.kind === 'device' && selected.route !== 'local' && detailDevice?.cloud[selected.route] && <CloudControl room={roomName(detailDevice)} localTransport={detailDevice.local?.transport} localDeviceId={detailDevice.local?.id} key={selected.route + detailDevice.id} api={api} device={{ ...detailDevice.cloud[selected.route]!, name: detailDevice.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
     {selected?.kind === 'group' && <GroupControl key={selected.group.id} api={api} group={selected.group} onAuthError={onAuthError} onClose={close} onDevice={device => choose({ kind: 'device', device: mergeDevices([device], cloud)[0], route: 'local', parent: selected.group })} />}
   </section>;
 }
