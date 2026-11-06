@@ -37,6 +37,34 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it('puts the disabled presets dropdown in the bulb header only', async () => {
+    server({ noLocal: true });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const bulb = {
+      ...shared,
+      controls: {
+        ready: true,
+        definitions: {
+          device_id: shared.id,
+          functions: [{ code: 'switch_led', type: 'Boolean', values: '{}' }],
+          status_range: [{ code: 'bright_value_v2', type: 'Integer', values: { min: 10, max: 1000, scale: 0, step: 1 } }],
+        },
+        snapshot: { device_id: shared.id, online: true, source: 'cloud', status: { switch_led: true, bright_value_v2: 500 } },
+      },
+    };
+    vi.mocked(fetch).mockImplementation(async (input, init) => new URL(String(input)).pathname.endsWith('/cloud/devices')
+      ? json([bulb, cloudOnly]) : original(input, init));
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
+
+    const card = await screen.findByRole('listitem', { name: bulb.name });
+    const presets = await within(card).findByRole('combobox', { name: 'Пресеты' });
+    expect(presets).toBeDisabled();
+    expect(presets.closest('header')).toBe(card.querySelector('.dashboard-card-header'));
+    expect(presets.closest('footer')).toBeNull();
+    const other = await screen.findByRole('listitem', { name: cloudOnly.name });
+    expect(within(other).queryByRole('combobox', { name: 'Пресеты' })).toBeNull();
+  });
+
   it('shares an edited device alias immediately and reloads the device name from inventory', async () => {
     server({ noLocal: true });
     const original = vi.mocked(fetch).getMockImplementation()!;

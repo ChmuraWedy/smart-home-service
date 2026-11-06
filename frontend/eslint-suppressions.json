@@ -571,7 +571,7 @@
       "count": 1
     },
     "indent": {
-      "count": 12
+      "count": 11
     },
     "key-spacing": {
       "count": 9
@@ -815,10 +815,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 16
+      "count": 15
     },
     "@stylistic/max-len": {
-      "count": 22
+      "count": 21
     },
     "arrow-parens": {
       "count": 49
@@ -827,7 +827,7 @@
       "count": 6
     },
     "comma-spacing": {
-      "count": 12
+      "count": 11
     },
     "consistent-return": {
       "count": 2
@@ -842,9 +842,6 @@
       "count": 13
     },
     "jsx-a11y/label-has-associated-control": {
-      "count": 3
-    },
-    "key-spacing": {
       "count": 3
     },
     "no-confusing-arrow": {
@@ -875,7 +872,7 @@
       "count": 34
     },
     "object-curly-spacing": {
-      "count": 6
+      "count": 2
     },
     "padded-blocks": {
       "count": 1
