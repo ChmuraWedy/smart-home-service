@@ -37,7 +37,7 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
-  it('puts the disabled presets dropdown below the bulb readings only', async () => {
+  it('puts the disabled presets dropdown in a second bulb header row above the readings', async () => {
     server({ noLocal: true });
     const original = vi.mocked(fetch).getMockImplementation()!;
     const bulb = {
@@ -62,12 +62,14 @@ describe('unified device identity and management', () => {
     const card = await screen.findByRole('listitem', { name: bulb.name });
     const presets = await within(card).findByRole('combobox', { name: 'Пресеты' });
     expect(presets).toBeDisabled();
+    const header = card.querySelector('header')!;
+    const secondRow = header.querySelector('.dashboard-card-subheader');
+    expect(secondRow).toContainElement(presets);
     const footer = card.querySelector('footer')!;
     const readings = within(footer.querySelector<HTMLElement>('.dashboard-light-readings')!);
     expect(readings.getByText('Яркость')).toBeInTheDocument();
     const temperature = readings.getByText('Цветовая температура');
-    expect(footer).toContainElement(presets);
-    expect(temperature.compareDocumentPosition(presets) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(presets.compareDocumentPosition(temperature) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const other = await screen.findByRole('listitem', { name: cloudOnly.name });
     expect(within(other).queryByRole('combobox', { name: 'Пресеты' })).toBeNull();
   });
