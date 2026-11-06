@@ -1,0 +1,64 @@
+import { t } from '../i18n';
+import type { JsonValue, Provider } from '../api';
+import { CAMERA_QUICK_LABELS, cameraPrivacyBlock } from '../camera-controls';
+import type { ControlSpec } from '../controls';
+import type { HomeApi, Reading } from '../home-api';
+import { CameraLive } from './CameraLive';
+import { ChannelControl } from './ChannelControl';
+import { DashboardSheet } from './DashboardSheet';
+import type { DashboardSheetState } from './DashboardSheet';
+import { CapabilityField, ControlFeedback } from './DeviceControls';
+import type { ControlNotice } from './DeviceControls';
+
+export function CameraCardControls({
+  api, deviceId, name, provider, online, onAuthError, paused, sheet,
+  specs, reading, now, busy, readOK, sending, refresh, toggle, notice,
+}: {
+  api: HomeApi; deviceId: string; name: string; provider: Provider; online: boolean; onAuthError: () => void;
+  paused: boolean; sheet?: DashboardSheetState; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
+  now: number; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
+  toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice;
+}) {
+  const controls = Object.entries(CAMERA_QUICK_LABELS).flatMap(([key, label]) =>
+    specs.filter(spec => spec.key === key && spec.kind === 'boolean' && spec.writable)
+      .map(spec => ({ ...spec, label, help: undefined })));
+  const privacy = controls.find(spec => spec.key === 'basic_private');
+  const switches = controls.filter(spec => spec !== privacy);
+  const disabled = busy || !readOK || sending;
+
+  function renderPreview(privacyState?: boolean | null, changePrivacy?: () => void) {
+    if (!sheet?.open || paused) return null;
+    return <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
+      <span className={'presence ' + (online ? 'online' : '')}>{online ? t("В сети") : t("Не в сети")}</span>
+      <CameraLive api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError}
+        compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyState : null)}
+        headingActions={changePrivacy && <button type="button" className="secondary" disabled={disabled || privacyState === null}
+          onClick={changePrivacy}>{privacyState ? t("Выключить приватность") : t("Включить приватность")}</button>} />
+      {notice.error && <ControlFeedback busy={false} notice={notice} />}
+    </DashboardSheet>;
+  }
+
+  const privacySpec = specs.find(spec => spec.key === 'basic_private');
+  const reportedPrivacy = privacySpec && reading(privacySpec);
+  const privacyStatus = privacySpec ? reportedPrivacy?.known && typeof reportedPrivacy.value === 'boolean' ? reportedPrivacy.value : null : undefined;
+  if (!busy && readOK && !controls.length && !notice.error && !sheet?.open) return null;
+
+  const field = (spec: ControlSpec) => <CapabilityField spec={spec} reading={reading(spec)} now={now} local={false}
+    immediatePower dashboardSwitch disabled={disabled} onSend={value => toggle(spec, value)} />;
+
+  return <>
+    <div className="card-primary-controls tw:grid tw:grid-cols-1">
+      {privacy && <div className="camera-card-privacy">
+        <CapabilityField spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
+          powerIcon={<svg className="parameter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.2 3 7.5 7.5 9.5 4.5-2 7.5-5.3 7.5-9.5V6z" /></svg>}
+          booleanActions={renderPreview} disabled={disabled} onSend={value => toggle(privacy, value)} />
+      </div>}
+      {!!switches.length && <div className="camera-card-switches">
+        {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+      </div>}
+      <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
+    </div>
+    {!privacy && renderPreview(privacyStatus)}
+    {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
+  </>;
+}
