@@ -1,0 +1,435 @@
+{
+  "src/App.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 11
+    },
+    "@stylistic/max-len": {
+      "count": 16
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/api.ts": {
+    "@stylistic/max-len": {
+      "count": 4
+    }
+  },
+  "src/camera-area.ts": {
+    "@stylistic/max-len": {
+      "count": 1
+    }
+  },
+  "src/camera-controls.ts": {
+    "@stylistic/max-len": {
+      "count": 3
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/components/AliasRow.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 9
+    },
+    "@stylistic/max-len": {
+      "count": 8
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/components/CameraArea.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 5
+    },
+    "@stylistic/max-len": {
+      "count": 7
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/CameraCardControls.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 9
+    },
+    "@stylistic/max-len": {
+      "count": 2
+    },
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/components/CameraFormat.tsx": {
+    "@stylistic/max-len": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/CameraLive.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 3
+    },
+    "@stylistic/max-len": {
+      "count": 9
+    },
+    "no-nested-ternary": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/CardControls.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 11
+    },
+    "@stylistic/max-len": {
+      "count": 7
+    },
+    "no-nested-ternary": {
+      "count": 4
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/ChannelAliases.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/ChannelControl.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "@stylistic/max-len": {
+      "count": 1
+    }
+  },
+  "src/components/CloudControl.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 10
+    },
+    "@stylistic/max-len": {
+      "count": 18
+    },
+    "no-nested-ternary": {
+      "count": 10
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "src/components/ConnectionSettings.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 3
+    },
+    "@stylistic/max-len": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/ControlCenter.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 27
+    },
+    "@stylistic/max-len": {
+      "count": 32
+    },
+    "no-nested-ternary": {
+      "count": 9
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/CredentialForms.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 5
+    },
+    "@stylistic/max-len": {
+      "count": 4
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/DashboardAliases.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/components/DashboardSheet.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "@stylistic/max-len": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/DeviceActivity.tsx": {
+    "@stylistic/max-len": {
+      "count": 7
+    },
+    "no-nested-ternary": {
+      "count": 2
+    }
+  },
+  "src/components/DeviceAliases.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 1
+    },
+    "@stylistic/max-len": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/DeviceConnection.tsx": {
+    "@stylistic/max-len": {
+      "count": 3
+    },
+    "no-nested-ternary": {
+      "count": 5
+    }
+  },
+  "src/components/DeviceControls.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 24
+    },
+    "@stylistic/max-len": {
+      "count": 25
+    },
+    "no-nested-ternary": {
+      "count": 12
+    },
+    "no-restricted-syntax": {
+      "count": 18
+    }
+  },
+  "src/components/DeviceMappings.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 3
+    },
+    "@stylistic/max-len": {
+      "count": 13
+    },
+    "no-nested-ternary": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/components/DeviceNetwork.tsx": {
+    "@stylistic/max-len": {
+      "count": 5
+    },
+    "no-nested-ternary": {
+      "count": 3
+    }
+  },
+  "src/components/DevicePresentation.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "@stylistic/max-len": {
+      "count": 5
+    },
+    "no-nested-ternary": {
+      "count": 6
+    }
+  },
+  "src/components/DeviceSurvey.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 4
+    },
+    "@stylistic/max-len": {
+      "count": 22
+    },
+    "no-nested-ternary": {
+      "count": 10
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "src/components/FieldInfo.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "@stylistic/max-len": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/components/LanguageSelector.tsx": {
+    "@stylistic/max-len": {
+      "count": 1
+    }
+  },
+  "src/components/LightEffectWizard.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 3
+    },
+    "@stylistic/max-len": {
+      "count": 5
+    },
+    "no-nested-ternary": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/LightingFields.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 8
+    },
+    "@stylistic/max-len": {
+      "count": 19
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/LocalConnectionsPage.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "@stylistic/max-len": {
+      "count": 22
+    },
+    "no-nested-ternary": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 16
+    }
+  },
+  "src/components/LocalControls.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 7
+    },
+    "@stylistic/max-len": {
+      "count": 8
+    },
+    "no-nested-ternary": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/components/NetworkPage.tsx": {
+    "@stylistic/max-len": {
+      "count": 14
+    },
+    "no-nested-ternary": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/ScheduleWizard.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 4
+    },
+    "@stylistic/max-len": {
+      "count": 9
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/components/WizardDialog.tsx": {
+    "@stylistic/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "@stylistic/max-len": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/components/ui/switch.tsx": {
+    "@stylistic/max-len": {
+      "count": 2
+    }
+  },
+  "src/controls.ts": {
+    "@stylistic/max-len": {
+      "count": 10
+    },
+    "no-nested-ternary": {
+      "count": 17
+    },
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/home-api.ts": {
+    "@stylistic/max-len": {
+      "count": 1
+    }
+  },
+  "src/i18n/index.ts": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/lighting.ts": {
+    "@stylistic/max-len": {
+      "count": 4
+    },
+    "no-nested-ternary": {
+      "count": 2
+    }
+  },
+  "src/main.tsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/theme.ts": {
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/use-pending-device-value.ts": {
+    "no-nested-ternary": {
+      "count": 1
+    }
+  },
+  "src/use-topology.ts": {
+    "@stylistic/max-len": {
+      "count": 2
+    }
+  }
+}

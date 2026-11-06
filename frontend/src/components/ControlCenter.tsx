@@ -295,7 +295,38 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     if (activeSurvey) setSurvey(null); else closeOverlay();
     setRevision(value => value + 1);
   }
-  if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} existing={selected.existing} provider={selected.provider} cloudDevices={selected.provider ? cloud[selected.provider] : undefined} gatewayPlacements={Array.from(placements.values())} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={() => selected.existing ? choose({ kind: 'device', device: mergeDevices([selected.existing], cloud).find(row => row.id === selected.existing!.device_id)!, route: 'local' }) : close()} onSaved={selected.existing ? saved => { setRevision(value => value + 1); choose({ kind: 'device', device: mergeDevices([saved], cloud).find(row => row.id === saved.device_id)!, route: 'local' }); } : undefined} onAuthError={onAuthError} />;
+  if (activeSurvey && inventory) {
+    const { device, existing, provider } = activeSurvey;
+
+    function reopenLocalDevice(local: LocalDevice) {
+      const [mergedDevice] = mergeDevices([local], cloud);
+      choose({ kind: 'device', device: mergedDevice, route: 'local' });
+    }
+
+    function closeSurvey() {
+      if (existing) reopenLocalDevice(existing);
+      else close();
+    }
+
+    function saveSurvey(saved: LocalDevice) {
+      setRevision(value => value + 1);
+      reopenLocalDevice(saved);
+    }
+
+    return <DeviceSurvey
+      api={api}
+      inventory={inventory}
+      device={device}
+      existing={existing}
+      provider={provider}
+      cloudDevices={provider ? cloud[provider] : undefined}
+      gatewayPlacements={Array.from(placements.values())}
+      placement={device ? placements.get(device.id) : undefined}
+      onClose={closeSurvey}
+      onSaved={existing ? saveSurvey : undefined}
+      onAuthError={onAuthError}
+    />;
+  }
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading">
       <div><p className="eyebrow">{t(MSG.YOUR_HOME)}</p><h2 id="control-center-heading">{t(MSG.DEVICES_AND_GROUPS)}{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div>
