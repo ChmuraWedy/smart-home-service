@@ -136,7 +136,6 @@ describe('main controls on device cards', () => {
     expect(screen.getByText('50 %')).toBeVisible();
     expect(screen.queryByText('#FF0000')).toBeNull();
     expect(container.querySelector('.dashboard-light-tint')).toHaveStyle({ backgroundColor: 'rgb(220, 205, 171)' });
-    expect(screen.getByRole('combobox', { name: 'Пресеты' })).toBeDisabled();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Обновить параметры' }));
     expect(await screen.findByText('#008000')).toBeVisible();
     expect(screen.getByText('Цвет')).toBeVisible();

@@ -217,58 +217,203 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     } finally { busy.current = false; callbacks.current.onLock(false); }
   }
   const step = stage === 'start' || stage === 'search' ? 0 : stage === 'choose' || stage === 'verify' ? 1 : stage === 'confirm' || stage === 'save' ? 2 : 3;
-  return <section className="card local-connections-page" aria-labelledby="local-connections-heading">
-    <p className="eyebrow">{t(MSG.HOME_NETWORK)}</p><h1 id="local-connections-heading">{t(MSG.LOCAL_CONNECTIONS)}</h1>
-    <ol className="connection-steps" aria-label={t(MSG.SETUP_STEPS)}>{[t(MSG.NETWORK), t(MSG.DISCOVERED_DEVICES), t(MSG.CONFIRMATION), t(MSG.RESULT)].map((label, index) => <li key={label} aria-current={step === index ? 'step' : undefined}><span>{index + 1}</span>{label}</li>)}</ol>
-    {stage !== 'start' && <p className="help">{t(MSG.NETWORK_LABEL) + " "}{interfaces.find(row => row.address === address)?.network}{" " + t(MSG.SERVER_IP) + " "}{address}</p>}
-    {!sharingReady && !developerReady && <div className="saved-summary">{t(MSG.CONNECT_A_TUYA_ACCOUNT_FIRST) + " "}<button className="secondary" onClick={onConnections}>{t(MSG.OPEN_CONNECTIONS)}</button></div>}
-    {stage === 'start' && <>
-      <h2>{t(MSG.WHERE_SHOULD_WE_LOOK_FOR_DEVICES)}</h2><p className="muted">{t(MSG.COLLECT_ANNOUNCEMENTS_ON_THE_SELECTED_NETWORK_FOR_15)}</p>
-      <div className="local-connection-form connection-network-form">
-        <label>{t(MSG.ACCOUNT)}<select value={provider} disabled={!ready || loading || (!sharingReady && !developerReady)} onChange={event => setProvider(event.target.value as Provider)}><option value="sharing" disabled={!sharingReady}>Smart Life / QR</option><option value="developer" disabled={!developerReady}>Tuya Developer</option></select></label>
-        <label>{t(MSG.DEVICE_NETWORK)}<select value={address} disabled={!connected || loading} onChange={event => setAddress(event.target.value)}><option value="">{t(MSG.SELECT_A_NETWORK)}</option>{interfaces.map(row => <option key={row.address} value={row.address}>{row.name} · {row.network} · IP {row.address}</option>)}</select></label>
+  return (
+    <section className="card local-connections-page" aria-labelledby="local-connections-heading">
+      <p className="eyebrow">{t(MSG.HOME_NETWORK)}</p>
+      <h1 id="local-connections-heading">{t(MSG.LOCAL_CONNECTIONS)}</h1>
+      <ol className="connection-steps" aria-label={t(MSG.SETUP_STEPS)}>
+        {[t(MSG.NETWORK), t(MSG.DISCOVERED_DEVICES), t(MSG.CONFIRMATION), t(MSG.RESULT)].map((label, index) => (
+          <li key={label} aria-current={step === index ? 'step' : undefined}>
+            <span>{index + 1}</span>{label}
+          </li>
+))}
+      </ol>
+      {stage !== 'start' && <p className="help">{t(MSG.NETWORK_LABEL) + " "}{interfaces.find(row => row.address === address)?.network}{" " + t(MSG.SERVER_IP) + " "}{address}</p>}
+      {!sharingReady && !developerReady && (
+      <div className="saved-summary">{t(MSG.CONNECT_A_TUYA_ACCOUNT_FIRST) + " "}
+        <button className="secondary" onClick={onConnections}>{t(MSG.OPEN_CONNECTIONS)}</button>
       </div>
-      <label className="local-connection-confirm"><input type="checkbox" checked={includeConfigured} disabled={!connected || loading} onChange={event => setIncludeConfigured(event.target.checked)} />{t(MSG.INCLUDE_CONFIGURED_DEVICES_FOR_RECONFIGURATION)}</label>
-      <p className="help">{includeConfigured ? t(MSG.SEARCH_ALL_ACCOUNT_DEVICES_INCLUDING_CONFIGURED_ONES) : t(MSG.SEARCH_ONLY_DEVICES_WITHOUT_A_CONFIGURED_LOCAL_CONNECTION)}{connected && !loading && t(MSG.NEED_SETUP) + pending.length + t(MSG.CONFIGURED) + (devices.length - pending.length)}</p>
-      <div className="local-connection-actions"><button disabled={!connected || loading || !address} onClick={() => void search()}>{t(MSG.FIND_DEVICES)}</button><button className="secondary" disabled={!connected || loading} onClick={() => setRevision(value => value + 1)}>{t(MSG.REFRESH_LISTS)}</button></div>
-      {connected && !loading && !interfaces.length && <p className="help">{t(MSG.NO_PRIVATE_IPV4_NETWORKS_FOUND)}</p>}
-    </>}
-    {working && <div className="connection-progress" role="status"><span className="spinner" aria-hidden="true" /><strong>{stage === 'search' ? t(MSG.SEARCHING_FOR_DEVICES_REMAINING) + seconds + t(MSG.SECONDS_SUFFIX) : progress}</strong><p className="help">{stage === 'search' ? t(MSG.RECEIVING_ANNOUNCEMENTS_ONLY_ON_THE_SELECTED_NETWORK) : stage === 'verify' ? t(MSG.VERIFY_KEYS_BY_READING_STATUS) : t(MSG.EACH_CONFIRMED_CONNECTION_IS_SAVED_SEPARATELY)}</p>{stage !== 'save' && <button className="secondary" onClick={() => { stop(); setChecked([]); setStage(stage === 'search' ? 'start' : 'choose'); }}>{t(MSG.CANCEL)}</button>}</div>}
-    {stage === 'choose' && <>
-      <h2>{t(MSG.DEVICES_FOUND) + " "}{candidates.length}</h2><p className="help">{t(MSG.SELECT_CONNECTIONS_TO_VERIFY) + " "}{MAX_SELECTION}{" " + t(MSG.DEVICES_AT_A_TIME)}</p>
-      {!candidates.length && <p className="saved-summary">{t(MSG.NO_MATCHING_DEVICES_FOUND_ON_THIS_NETWORK)}</p>}
-      {candidates.length > 0 && <div className="connection-table-wrap"><table className="connection-device-table" aria-label={t(MSG.DISCOVERED_DEVICES)}><thead><tr><th scope="col"><input ref={selectAll} type="checkbox" aria-label={candidates.length > MAX_SELECTION ? t(MSG.SELECT_FIRST_16_DEVICES) : t(MSG.SELECT_ALL_DEVICES)} checked={allSelected} onChange={event => setSelected(event.target.checked ? candidates.slice(0, MAX_SELECTION).map(row => row.device.id) : [])} /></th><th scope="col">{t(MSG.DEVICE)}</th><th scope="col">{t(MSG.IP_ADDRESS)}</th><th scope="col">{t(MSG.CONNECTION)}</th></tr></thead><tbody>{candidates.map(row => <tr key={row.device.id}><td><input type="checkbox" aria-label={t(MSG.SELECT) + row.device.name} checked={selected.includes(row.device.id)} disabled={!selected.includes(row.device.id) && selected.length >= MAX_SELECTION} onChange={event => setSelected(current => event.target.checked ? [...current, row.device.id] : current.filter(id => id !== row.device.id))} /></td><td><strong>{row.device.name}</strong>{row.device.aliases?.length ? <small>{row.device.aliases.join(' · ')}</small> : null}</td><td>{row.observed.map(item => item.ip).join(', ')}</td><td>{row.configured ? t(MSG.ALREADY_CONFIGURED) : t(MSG.NOT_CONFIGURED_LOCALLY)}</td></tr>)}</tbody></table></div>}
-      {candidates.length > 0 && <p className="help">{t(MSG.SELECTED) + " "}{selected.length}{" " + t(MSG.OF) + " "}{candidates.length}{candidates.length > MAX_SELECTION ? t(MSG.THE_HEADER_CHECKBOX_SELECTS_THE_FIRST_16_DEVICES) : ''}</p>}
-      {excluded > 0 && <p className="help">{t(MSG.CONFIGURED_DEVICES_SKIPPED) + " "}{excluded}{t(MSG.TO_INCLUDE_THEM_CHANGE_THE_CHECKBOX_ON_THE)}</p>}
-      {unknown > 0 && <p className="help">{t(MSG.TUYA_ANNOUNCEMENTS_OUTSIDE_THE_SELECTED_ACCOUNT) + " "}{unknown}{t(MSG.THESE_ARE_NOT_OFFERED_FOR_CONFIGURATION)}</p>}
-      <div className="local-connection-actions"><button disabled={!selected.length} onClick={() => void verify()}>{t(MSG.VERIFY_SELECTED)}</button><button className="secondary" onClick={startOver}>{t(MSG.BACK_TO_NETWORK_SELECTION)}</button><button className="secondary" onClick={() => { setOutcomes([]); setStage('done'); }}>{t(MSG.FINISH_WITHOUT_SAVING)}</button></div>
-    </>}
-    {stage === 'confirm' && <>
-      <h2>{t(MSG.CONFIRM_SAVING)}</h2><p className="help">{t(MSG.CHECK_NAMES_ADDRESSES_AND_CHANGES)}</p>
-      {checked.map(row => <section className="local-connection-preview" key={row.candidate.device.id}>
-        <h3>{row.finding?.device.name || row.candidate.device.name}</h3>
-        {row.finding ? <>
-          <p><strong>{actions[row.finding.action]}</strong>{" " + t(MSG.CONNECTION_VERIFIED_BADGE)}</p>
-          {row.finding.route === 'gateway' && <p className="help">{t(MSG.SELECTED) + " "}{row.candidate.device.name}{t(MSG.THE_GATEWAY_IS_BEING_SAVED_THIS_DOES_NOT)}</p>}
-          <dl className="local-connection-facts"><div><dt>{t(MSG.DEVICE_IP)}</dt><dd>{row.finding.device.ip}</dd></div><div><dt>{t(MSG.TUYA_PROTOCOL)}</dt><dd>{row.finding.device.version}</dd></div><div><dt>{t(MSG.CONNECTION)}</dt><dd>{row.finding.device.is_gateway ? t(MSG.TUYA_GATEWAY_TYPE) : t(MSG.WIFI_DEVICE_TYPE)}</dd></div><div><dt>{t(MSG.BUILDING)}</dt><dd>{inventory?.buildings.find(building => building.id === row.finding!.device.building_id)?.name || t(MSG.NOT_ASSIGNED)}</dd></div><div><dt>{t(MSG.ROOM)}</dt><dd>{inventory?.rooms.find(room => room.id === row.finding!.device.room_id)?.name || t(MSG.NOT_ASSIGNED_FEMININE)}</dd></div><div><dt>{t(MSG.KEY)}</dt><dd>{t(MSG.VERIFIED) + " "}{row.finding.key_source === 'device' ? t(MSG.FROM_THIS_DEVICES_DATA) : t(MSG.FROM_A_GATEWAY_CHILD_DEVICES_DATA)}</dd></div></dl>
-          {row.finding.device.aliases.length > 0 && <p className="help">{row.finding.device.aliases.join(' · ')}</p>}
-          {row.finding.action === 'updated' && <p className="help">{t(MSG.CHANGES) + " "}{row.finding.device.changed_fields.map(key => changes[key]).join(', ')}{t(MSG.NAME_ALIASES_ROOM_AND_FUNCTIONS_ARE_PRESERVED)}</p>}
-          {row.finding.action === 'created' && <p className="help">{t(MSG.A_CONNECTION_WILL_BE_CREATED_WITH_THE_SHOWN)}</p>}
-          <p className="help">{row.expiresAt! > now ? t(MSG.RESULT_VALID_FOR_ANOTHER) + Math.ceil((row.expiresAt! - now) / 1000) + t(MSG.SECONDS_SUFFIX) : t(MSG.THE_RESULT_EXPIRED)}</p>
-        </> : <p className="field-error">{row.error}</p>}
-      </section>)}
-      <label className="local-connection-confirm"><input type="checkbox" checked={confirmed} disabled={!valid.length || expired} onChange={event => setConfirmed(event.target.checked)} />{t(MSG.I_CONFIRM_SAVING_THESE_CONNECTIONS)}{valid.length})</label>
-      <div className="local-connection-actions"><button disabled={!confirmed || !valid.length || expired} onClick={() => void save()}>{t(MSG.SAVE_CONNECTIONS)}</button><button className="secondary" onClick={() => { setChecked([]); setConfirmed(false); setStage('choose'); }}>{t(MSG.CHANGE_SELECTION)}</button><button className="secondary" onClick={() => { setOutcomes(checked.filter(row => row.error).map(row => ({ id: row.candidate.device.id, name: row.candidate.device.name, message: row.error!, saved: false }))); setChecked([]); setConfirmed(false); setStage('done'); }}>{t(MSG.FINISH_WITHOUT_SAVING)}</button></div>
-    </>}
-    {stage === 'done' && <>
-      <h2>{t(MSG.SETUP_RESULTS)}</h2>
-      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}>{row.saved && row.connectionId ? <Link to={deviceHref(row.connectionId, 'local')}>{row.name}</Link> : <strong>{row.name}</strong>}<span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">{t(MSG.NO_CONNECTIONS_WERE_SAVED)}</p>}
-      <h3>{t(MSG.STILL_UNCONFIGURED) + " "}{pending.length}</h3><p className="help">{t(MSG.THESE_ACCOUNT_DEVICES_LACK_COMPLETE_LOCAL_CONNECTIONS)}</p>
-      <ul className="connection-results">{pending.map(device => <li key={device.id}><strong>{device.name}</strong>{device.aliases?.length ? <span>{device.aliases.join(' · ')}</span> : null}</li>)}</ul>
-      {!pending.length && <p className="help">{t(MSG.ALL_DEVICES_HAVE_LOCAL_CONNECTIONS)}</p>}
-      <div className="local-connection-actions"><button onClick={() => { startOver(); setRevision(value => value + 1); }}>{t(MSG.NEW_SEARCH)}</button></div>
-    </>}
-    {error && <p role="alert" className="field-error">{translateText(error)}</p>}
-    {!working && <details className="network-explanation"><summary>{t(MSG.HOW_DISCOVERY_WORKS)}</summary><p>{t(MSG.ONLY_ANNOUNCEMENTS_WITH_AN_EXACT_DEVICE_ID_IN)}</p><p>{t(MSG.AFTER_SELECTION_THE_SERVER_DISCOVERS_THE_ADDRESS_AGAIN)}</p></details>}
-  </section>;
+)}
+      {stage === 'start' && (
+      <>
+        <h2>{t(MSG.WHERE_SHOULD_WE_LOOK_FOR_DEVICES)}</h2>
+        <p className="muted">{t(MSG.COLLECT_ANNOUNCEMENTS_ON_THE_SELECTED_NETWORK_FOR_15)}</p>
+        <div className="local-connection-form connection-network-form">
+          <label>{t(MSG.ACCOUNT)}
+            <select value={provider} disabled={!ready || loading || (!sharingReady && !developerReady)} onChange={event => setProvider(event.target.value as Provider)}>
+              <option value="sharing" disabled={!sharingReady}>Smart Life / QR</option>
+              <option value="developer" disabled={!developerReady}>Tuya Developer</option>
+            </select>
+          </label>
+          <label>{t(MSG.DEVICE_NETWORK)}
+            <select value={address} disabled={!connected || loading} onChange={event => setAddress(event.target.value)}>
+              <option value="">{t(MSG.SELECT_A_NETWORK)}</option>
+              {interfaces.map(row => <option key={row.address} value={row.address}>{row.name} · {row.network} · IP {row.address}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="local-connection-confirm">
+          <input type="checkbox" checked={includeConfigured} disabled={!connected || loading} onChange={event => setIncludeConfigured(event.target.checked)} />{t(MSG.INCLUDE_CONFIGURED_DEVICES_FOR_RECONFIGURATION)}
+        </label>
+        <p className="help">{includeConfigured ? t(MSG.SEARCH_ALL_ACCOUNT_DEVICES_INCLUDING_CONFIGURED_ONES) : t(MSG.SEARCH_ONLY_DEVICES_WITHOUT_A_CONFIGURED_LOCAL_CONNECTION)}{connected && !loading && t(MSG.NEED_SETUP) + pending.length + t(MSG.CONFIGURED) + (devices.length - pending.length)}</p>
+        <div className="local-connection-actions">
+          <button disabled={!connected || loading || !address} onClick={() => void search()}>{t(MSG.FIND_DEVICES)}</button>
+          <button className="secondary" disabled={!connected || loading} onClick={() => setRevision(value => value + 1)}>{t(MSG.REFRESH_LISTS)}</button>
+        </div>
+        {connected && !loading && !interfaces.length && <p className="help">{t(MSG.NO_PRIVATE_IPV4_NETWORKS_FOUND)}</p>}
+      </>
+)}
+      {working && (
+      <div className="connection-progress" role="status">
+        <span className="spinner" aria-hidden="true" />
+        <strong>{stage === 'search' ? t(MSG.SEARCHING_FOR_DEVICES_REMAINING) + seconds + t(MSG.SECONDS_SUFFIX) : progress}</strong>
+        <p className="help">{stage === 'search' ? t(MSG.RECEIVING_ANNOUNCEMENTS_ONLY_ON_THE_SELECTED_NETWORK) : stage === 'verify' ? t(MSG.VERIFY_KEYS_BY_READING_STATUS) : t(MSG.EACH_CONFIRMED_CONNECTION_IS_SAVED_SEPARATELY)}</p>
+        {stage !== 'save' && <button className="secondary" onClick={() => { stop(); setChecked([]); setStage(stage === 'search' ? 'start' : 'choose'); }}>{t(MSG.CANCEL)}</button>}
+      </div>
+)}
+      {stage === 'choose' && (
+      <>
+        <h2>{t(MSG.DEVICES_FOUND) + " "}{candidates.length}</h2>
+        <p className="help">{t(MSG.SELECT_CONNECTIONS_TO_VERIFY) + " "}{MAX_SELECTION}{" " + t(MSG.DEVICES_AT_A_TIME)}</p>
+        {!candidates.length && <p className="saved-summary">{t(MSG.NO_MATCHING_DEVICES_FOUND_ON_THIS_NETWORK)}</p>}
+        {candidates.length > 0 && (
+        <div className="connection-table-wrap">
+          <table className="connection-device-table" aria-label={t(MSG.DISCOVERED_DEVICES)}>
+            <thead>
+              <tr>
+                <th scope="col">
+              <input ref={selectAll} type="checkbox" aria-label={candidates.length > MAX_SELECTION ? t(MSG.SELECT_FIRST_16_DEVICES) : t(MSG.SELECT_ALL_DEVICES)} checked={allSelected} onChange={event => setSelected(event.target.checked ? candidates.slice(0, MAX_SELECTION).map(row => row.device.id) : [])} />
+            </th>
+                <th scope="col">{t(MSG.DEVICE)}</th>
+                <th scope="col">{t(MSG.IP_ADDRESS)}</th>
+                <th scope="col">{t(MSG.CONNECTION)}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map(row => (
+                <tr key={row.device.id}>
+              <td>
+              <input type="checkbox" aria-label={t(MSG.SELECT) + row.device.name} checked={selected.includes(row.device.id)} disabled={!selected.includes(row.device.id) && selected.length >= MAX_SELECTION} onChange={event => setSelected(current => event.target.checked ? [...current, row.device.id] : current.filter(id => id !== row.device.id))} />
+            </td>
+              <td>
+              <strong>{row.device.name}</strong>
+              {row.device.aliases?.length ? <small>{row.device.aliases.join(' · ')}</small> : null}
+            </td>
+              <td>{row.observed.map(item => item.ip).join(', ')}</td>
+              <td>{row.configured ? t(MSG.ALREADY_CONFIGURED) : t(MSG.NOT_CONFIGURED_LOCALLY)}</td>
+            </tr>
+))}
+            </tbody>
+          </table>
+        </div>
+)}
+        {candidates.length > 0 && <p className="help">{t(MSG.SELECTED) + " "}{selected.length}{" " + t(MSG.OF) + " "}{candidates.length}{candidates.length > MAX_SELECTION ? t(MSG.THE_HEADER_CHECKBOX_SELECTS_THE_FIRST_16_DEVICES) : ''}</p>}
+        {excluded > 0 && <p className="help">{t(MSG.CONFIGURED_DEVICES_SKIPPED) + " "}{excluded}{t(MSG.TO_INCLUDE_THEM_CHANGE_THE_CHECKBOX_ON_THE)}</p>}
+        {unknown > 0 && <p className="help">{t(MSG.TUYA_ANNOUNCEMENTS_OUTSIDE_THE_SELECTED_ACCOUNT) + " "}{unknown}{t(MSG.THESE_ARE_NOT_OFFERED_FOR_CONFIGURATION)}</p>}
+        <div className="local-connection-actions">
+          <button disabled={!selected.length} onClick={() => void verify()}>{t(MSG.VERIFY_SELECTED)}</button>
+          <button className="secondary" onClick={startOver}>{t(MSG.BACK_TO_NETWORK_SELECTION)}</button>
+          <button className="secondary" onClick={() => { setOutcomes([]); setStage('done'); }}>{t(MSG.FINISH_WITHOUT_SAVING)}</button>
+        </div>
+      </>
+)}
+      {stage === 'confirm' && (
+      <>
+        <h2>{t(MSG.CONFIRM_SAVING)}</h2>
+        <p className="help">{t(MSG.CHECK_NAMES_ADDRESSES_AND_CHANGES)}</p>
+        {checked.map(row => (
+          <section className="local-connection-preview" key={row.candidate.device.id}>
+            <h3>{row.finding?.device.name || row.candidate.device.name}</h3>
+            {row.finding ? (
+              <>
+                <p>
+                  <strong>{actions[row.finding.action]}</strong>{" " + t(MSG.CONNECTION_VERIFIED_BADGE)}
+                </p>
+                {row.finding.route === 'gateway' && <p className="help">{t(MSG.SELECTED) + " "}{row.candidate.device.name}{t(MSG.THE_GATEWAY_IS_BEING_SAVED_THIS_DOES_NOT)}</p>}
+                <dl className="local-connection-facts">
+                  <div>
+                <dt>{t(MSG.DEVICE_IP)}</dt>
+                <dd>{row.finding.device.ip}</dd>
+              </div>
+                  <div>
+                <dt>{t(MSG.TUYA_PROTOCOL)}</dt>
+                <dd>{row.finding.device.version}</dd>
+              </div>
+                  <div>
+                <dt>{t(MSG.CONNECTION)}</dt>
+                <dd>{row.finding.device.is_gateway ? t(MSG.TUYA_GATEWAY_TYPE) : t(MSG.WIFI_DEVICE_TYPE)}</dd>
+              </div>
+                  <div>
+                <dt>{t(MSG.BUILDING)}</dt>
+                <dd>{inventory?.buildings.find(building => building.id === row.finding!.device.building_id)?.name || t(MSG.NOT_ASSIGNED)}</dd>
+              </div>
+                  <div>
+                <dt>{t(MSG.ROOM)}</dt>
+                <dd>{inventory?.rooms.find(room => room.id === row.finding!.device.room_id)?.name || t(MSG.NOT_ASSIGNED_FEMININE)}</dd>
+              </div>
+                  <div>
+                <dt>{t(MSG.KEY)}</dt>
+                <dd>{t(MSG.VERIFIED) + " "}{row.finding.key_source === 'device' ? t(MSG.FROM_THIS_DEVICES_DATA) : t(MSG.FROM_A_GATEWAY_CHILD_DEVICES_DATA)}</dd>
+              </div>
+                </dl>
+                {row.finding.device.aliases.length > 0 && <p className="help">{row.finding.device.aliases.join(' · ')}</p>}
+                {row.finding.action === 'updated' && <p className="help">{t(MSG.CHANGES) + " "}{row.finding.device.changed_fields.map(key => changes[key]).join(', ')}{t(MSG.NAME_ALIASES_ROOM_AND_FUNCTIONS_ARE_PRESERVED)}</p>}
+                {row.finding.action === 'created' && <p className="help">{t(MSG.A_CONNECTION_WILL_BE_CREATED_WITH_THE_SHOWN)}</p>}
+                <p className="help">{row.expiresAt! > now ? t(MSG.RESULT_VALID_FOR_ANOTHER) + Math.ceil((row.expiresAt! - now) / 1000) + t(MSG.SECONDS_SUFFIX) : t(MSG.THE_RESULT_EXPIRED)}</p>
+              </>
+) :
+              <p className="field-error">{row.error}</p>}
+          </section>
+))}
+        <label className="local-connection-confirm">
+          <input type="checkbox" checked={confirmed} disabled={!valid.length || expired} onChange={event => setConfirmed(event.target.checked)} />{t(MSG.I_CONFIRM_SAVING_THESE_CONNECTIONS)}{valid.length})
+        </label>
+        <div className="local-connection-actions">
+          <button disabled={!confirmed || !valid.length || expired} onClick={() => void save()}>{t(MSG.SAVE_CONNECTIONS)}</button>
+          <button className="secondary" onClick={() => { setChecked([]); setConfirmed(false); setStage('choose'); }}>{t(MSG.CHANGE_SELECTION)}</button>
+          <button className="secondary" onClick={() => { setOutcomes(checked.filter(row => row.error).map(row => ({ id: row.candidate.device.id, name: row.candidate.device.name, message: row.error!, saved: false }))); setChecked([]); setConfirmed(false); setStage('done'); }}>{t(MSG.FINISH_WITHOUT_SAVING)}</button>
+        </div>
+      </>
+)}
+      {stage === 'done' && (
+      <>
+        <h2>{t(MSG.SETUP_RESULTS)}</h2>
+        {outcomes.length ? (
+          <ul className="connection-results">
+            {outcomes.map(row => (
+              <li key={row.id}>
+                {row.saved && row.connectionId ? <Link to={deviceHref(row.connectionId, 'local')}>{row.name}</Link> :
+                <strong>{row.name}</strong>}
+                <span className={row.saved ? 'online' : 'field-error'}>{row.message}</span>
+              </li>
+))}
+          </ul>
+) :
+          <p className="help">{t(MSG.NO_CONNECTIONS_WERE_SAVED)}</p>}
+        <h3>{t(MSG.STILL_UNCONFIGURED) + " "}{pending.length}</h3>
+        <p className="help">{t(MSG.THESE_ACCOUNT_DEVICES_LACK_COMPLETE_LOCAL_CONNECTIONS)}</p>
+        <ul className="connection-results">
+          {pending.map(device => (
+            <li key={device.id}>
+              <strong>{device.name}</strong>
+              {device.aliases?.length ? <span>{device.aliases.join(' · ')}</span> : null}
+            </li>
+))}
+        </ul>
+        {!pending.length && <p className="help">{t(MSG.ALL_DEVICES_HAVE_LOCAL_CONNECTIONS)}</p>}
+        <div className="local-connection-actions">
+          <button onClick={() => { startOver(); setRevision(value => value + 1); }}>{t(MSG.NEW_SEARCH)}</button>
+        </div>
+      </>
+)}
+      {error && <p role="alert" className="field-error">{translateText(error)}</p>}
+      {!working && (
+      <details className="network-explanation">
+        <summary>{t(MSG.HOW_DISCOVERY_WORKS)}</summary>
+        <p>{t(MSG.ONLY_ANNOUNCEMENTS_WITH_AN_EXACT_DEVICE_ID_IN)}</p>
+        <p>{t(MSG.AFTER_SELECTION_THE_SERVER_DISCOVERS_THE_ADDRESS_AGAIN)}</p>
+      </details>
+)}
+    </section>
+  );
 }

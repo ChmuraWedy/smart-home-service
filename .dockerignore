@@ -16,6 +16,9 @@ smarthome/**/__pycache__/
 !frontend/index.html
 !frontend/tsconfig.json
 !frontend/vite.config.ts
+!frontend/eslint.config.mjs
+!frontend/eslint-rules.mjs
+!frontend/eslint-suppressions.json
 !frontend/src/
 !frontend/src/**
 !frontend/public/

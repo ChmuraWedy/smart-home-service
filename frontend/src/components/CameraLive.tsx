@@ -4,6 +4,7 @@ import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
 import type Hls from 'hls.js';
 import type { ReactNode } from 'react';
+import { IconGlyph } from './ui/icon';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
 type SafariVideo = HTMLVideoElement & {
@@ -155,38 +156,64 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   useEffect(()=>{ if (viewingBlocked) stop(); },[viewingBlocked]);
   // Dashboard previews mount after the user opens live view.
   useEffect(() => { if (autoStart) void start(); }, [autoStart]);
-  return <section className={"camera-live" + (compact ? " camera-live-compact" : "") + (sheet ? " camera-live-sheet" : "")} aria-label={t(MSG.CAMERA_VIDEO)}>
-    <div className="camera-live-heading">{!sheet && <h3>{t(MSG.CAMERA_VIDEO)}</h3>}
-      <div className="camera-live-actions">{headingActions}
-        {source && !viewingBlocked && !overlay && pipMode && <button type="button" className="secondary compact" aria-pressed={pipActive} onClick={() => void togglePictureInPicture()}>{t(MSG.PICTURE_IN_PICTURE)}</button>}
-        {source || loading ? <button className="secondary compact" onClick={stop}>{t(MSG.STOP)}</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t(MSG.RECONNECT) : t(MSG.WATCH_VIDEO)}</button>}
+  return (
+    <section className={"camera-live" + (compact ? " camera-live-compact" : "") + (sheet ? " camera-live-sheet" : "")} aria-label={t(MSG.CAMERA_VIDEO)}>
+      <div className="camera-live-heading">
+        {!sheet && <h3>{t(MSG.CAMERA_VIDEO)}</h3>}
+        <div className="camera-live-actions">{headingActions}
+          {source && !viewingBlocked && !overlay && pipMode && <button type="button" className="secondary compact" aria-pressed={pipActive} onClick={() => void togglePictureInPicture()}>{t(MSG.PICTURE_IN_PICTURE)}</button>}
+          {source || loading ? <button className="secondary compact" onClick={stop}>{t(MSG.STOP)}</button> :
+          <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t(MSG.RECONNECT) : t(MSG.WATCH_VIDEO)}</button>}
+        </div>
       </div>
-    </div>
-    {!compact && <div className="camera-stream-info" aria-label={t(MSG.VIDEO_AND_CONNECTION_QUALITY)}>
-      <label>HD/SD <select aria-label={t(MSG.HD_SD_VIDEO_QUALITY)} value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
+      {!compact && (
+      <div className="camera-stream-info" aria-label={t(MSG.VIDEO_AND_CONNECTION_QUALITY)}>
+        <label>{"HD/SD "}
+          <select aria-label={t(MSG.HD_SD_VIDEO_QUALITY)} value={selectedLevel} disabled={!source || levels.length < 2} onChange={event => {
         const index = Number(event.target.value);
         if (!hls.current || (index !== -1 && !levels.some(level => level.index === index))) return;
         hls.current.currentLevel = index; setSelectedLevel(index);
-      }}><option value={-1}>{levels.length < 2 && resolution ? resolution.split(' · ')[0] : t(MSG.AUTO)}</option>{levels.length > 1 && levels.map(level => <option key={level.index} value={level.index}>{level.width && level.height ? resolutionLabel(level.width,level.height) : t(MSG.VARIANT)+(level.index+1)}{level.bitrate > 0 ? ' · '+Math.round(level.bitrate/1000)+t(MSG.KBIT_S) : ''}</option>)}</select></label>
-      <span>{resolution || t(MSG.RESOLUTION)}</span>
-      <span>{t(MSG.VIDEO_CONNECTION) + " "}{error ? t(MSG.ERROR) : loading ? t(MSG.CONNECTION) : !source ? t(MSG.PLAYBACK_OFF) : playback}</span>
-      <span title={t(MSG.DOWNLOAD_SPEED_OF_THE_MOST_RECENT_VIDEO_SEGMENT)}>{t(MSG.DOWNLOAD) + " "}{speed === null ? '—' : speed+t(MSG.KB_S)}</span>
-      <span title={networkSignal ? t(MSG.LAST_SIGNAL_READING_REPORTED_BY_THE_CAMERA) : t(MSG.THE_CONNECTION_DID_NOT_PROVIDE_A_CAMERA_SIGNAL)}>Wi-Fi: {networkSignal || t(MSG.NO_DATA)}</span>
-      <p className="help">{!source ? t(MSG.AVAILABLE_HD_SD_VARIANTS_WILL_APPEAR_AFTER_VIDEO) : levels.length < 2 ? t(MSG.HD_SD_SWITCHING_IS_UNAVAILABLE_FOR_THIS_STREAM) : t(MSG.QUALITY_IS_SELECTED_FROM_THE_VIDEO_STREAMS_AVAILABLE)}</p>
-    </div>}
-    {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">{sheet && viewingBlocked ? '▣' : '▷'}</div>}
-    {(!viewingBlocked && source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
-      {source && !viewingBlocked ? <video ref={video} controls={!overlay} disablePictureInPicture={!!overlay} muted autoPlay playsInline preload="none" aria-label={t(MSG.LIVE_CAMERA_VIDEO)} /> : <div className="camera-area-placeholder">{viewingBlocked || t(MSG.PRESS_WATCH_VIDEO_TO_SEE_THE_IMAGE)}</div>}{overlay}
-      {sheet && source && !viewingBlocked && <>
-        {playback === t(MSG.PLAYING) && <span className="camera-sheet-live-tag">{t(MSG.LIVE)}</span>}
-        {(document.fullscreenEnabled || 'webkitEnterFullscreen' in HTMLVideoElement.prototype) && <button type="button" className="camera-sheet-fullscreen" aria-label={t(MSG.FULL_SCREEN)} onClick={() => {
+      }}
+          >
+            <option value={-1}>{levels.length < 2 && resolution ? resolution.split(' · ')[0] : t(MSG.AUTO)}</option>
+            {levels.length > 1 && levels.map(level => <option key={level.index} value={level.index}>{level.width && level.height ? resolutionLabel(level.width,level.height) : t(MSG.VARIANT)+(level.index+1)}{level.bitrate > 0 ? ' · '+Math.round(level.bitrate/1000)+t(MSG.KBIT_S) : ''}</option>)}
+          </select>
+        </label>
+        <span>{resolution || t(MSG.RESOLUTION)}</span>
+        <span>{t(MSG.VIDEO_CONNECTION) + " "}{error ? t(MSG.ERROR) : loading ? t(MSG.CONNECTION) : !source ? t(MSG.PLAYBACK_OFF) : playback}</span>
+        <span title={t(MSG.DOWNLOAD_SPEED_OF_THE_MOST_RECENT_VIDEO_SEGMENT)}>{t(MSG.DOWNLOAD) + " "}{speed === null ? '—' : speed+t(MSG.KB_S)}</span>
+        <span title={networkSignal ? t(MSG.LAST_SIGNAL_READING_REPORTED_BY_THE_CAMERA) : t(MSG.THE_CONNECTION_DID_NOT_PROVIDE_A_CAMERA_SIGNAL)}>Wi-Fi: {networkSignal || t(MSG.NO_DATA)}</span>
+        <p className="help">{!source ? t(MSG.AVAILABLE_HD_SD_VARIANTS_WILL_APPEAR_AFTER_VIDEO) : levels.length < 2 ? t(MSG.HD_SD_SWITCHING_IS_UNAVAILABLE_FOR_THIS_STREAM) : t(MSG.QUALITY_IS_SELECTED_FROM_THE_VIDEO_STREAMS_AVAILABLE)}</p>
+      </div>
+)}
+      {compact && !source && !overlay && (
+      <div className="camera-preview-placeholder" aria-hidden="true">
+        <IconGlyph name={sheet && viewingBlocked ? 'video-blocked' : 'play'} />
+      </div>
+)}
+      {(!viewingBlocked && source || overlay) && (
+      <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
+        {source && !viewingBlocked ? <video ref={video} controls={!overlay} disablePictureInPicture={!!overlay} muted autoPlay playsInline preload="none" aria-label={t(MSG.LIVE_CAMERA_VIDEO)} /> :
+        <div className="camera-area-placeholder">{viewingBlocked || t(MSG.PRESS_WATCH_VIDEO_TO_SEE_THE_IMAGE)}</div>}{overlay}
+        {sheet && source && !viewingBlocked && (
+        <>
+          {playback === t(MSG.PLAYING) && <span className="camera-sheet-live-tag">{t(MSG.LIVE)}</span>}
+          {(document.fullscreenEnabled || 'webkitEnterFullscreen' in HTMLVideoElement.prototype) && (
+          <button type="button" className="camera-sheet-fullscreen" aria-label={t(MSG.FULL_SCREEN)} onClick={() => {
           const player = video.current;
           if (player?.requestFullscreen && document.fullscreenEnabled) void player.requestFullscreen().catch(() => {});
           else player?.webkitEnterFullscreen?.();
-        }}>⛶</button>}
-      </>}
-    </div>}
-    <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
-    {source && !viewingBlocked && pipError && <p className="error" role="alert">{t(MSG.COULD_NOT_SWITCH_PICTURE_IN_PICTURE_MODE)}</p>}
-  </section>;
+        }}
+          >
+            <IconGlyph name="fullscreen" />
+          </button>
+)}
+        </>
+)}
+      </div>
+)}
+      <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
+      {source && !viewingBlocked && pipError && <p className="error" role="alert">{t(MSG.COULD_NOT_SWITCH_PICTURE_IN_PICTURE_MODE)}</p>}
+    </section>
+  );
 }
