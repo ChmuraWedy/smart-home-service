@@ -1,7 +1,7 @@
 import { MSG, t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { CloudDevice, CloudFunctions, JsonValue, Provider } from '../api';
+import type { CloudDevice, JsonValue, Provider } from '../api';
 import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
@@ -137,14 +137,20 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
 
 function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
+  const inventory = cloud.controls?.ready ? cloud.controls.definitions : undefined;
+  const inventoryDefinitions = inventory?.device_id === cloud.id && Array.isArray(inventory.functions) ? inventory : undefined;
   const metadata = useMemo(() => ({
-    definitions: cloud.controls?.ready ? cloud.controls.definitions : null as CloudFunctions | null,
+    definitions: inventoryDefinitions,
     seed: cloud.controls?.snapshot,
   }), [read]);
+  useEffect(() => {
+    // Developer inventory may omit functions after a refresh. Retain the last known labels.
+    if (inventoryDefinitions) metadata.definitions = inventoryDefinitions;
+  }, [inventoryDefinitions, metadata]);
   const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
     const definitions = metadata.definitions || await api.deviceFunctions(cloud.id,provider,signal);
     if (definitions.device_id !== cloud.id || !Array.isArray(definitions.functions)) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_CAPABILITIES));
-    if (!signal?.aborted) metadata.definitions = definitions;
+    if (!signal?.aborted) metadata.definitions ??= definitions;
     await read(refresh, signal, metadata.seed);
     return metadata;
   },[api,cloud.id,provider,metadata,read]);
@@ -153,7 +159,7 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
     return current;
   },[read]);
   const session = useControlSession(load,onAuthError,provider === 'sharing' && visible ? poll : undefined);
-  const definitions = session.data === metadata ? metadata.definitions : null;
+  const definitions = session.data === metadata ? inventoryDefinitions ?? metadata.definitions : undefined;
   const specs = definitions && snapshot ? cloudSpecs(definitions,snapshot) : [];
   useEffect(() => {
     if (definitions && snapshot) onStatus?.({online:snapshot.online, battery:batteryFromSpecs(cloudSpecs(definitions,snapshot),snapshot.status)});

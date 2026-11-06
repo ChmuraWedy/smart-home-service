@@ -27,8 +27,9 @@ import { cameraStorage, isStorageSetting, cameraPrivacyBlock } from '../camera-c
 import { CameraArea } from './CameraArea';
 import { useCloudDeviceSnapshot } from '../use-cloud-device-snapshot';
 
-export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError }: {
+export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError, onChannelLabelsSaved }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; onClose: () => void; onAuthError: () => void;
+  onChannelLabelsSaved?: (provider: Provider, controls: NonNullable<CloudDevice['controls']>) => void;
 }) {
   const [mappingBusy,setMappingBusy] = useState(false);
   const [aliasBusy, setAliasBusy] = useState(false);
@@ -57,6 +58,12 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     : null;
   const now = useClock();
   const definitions = data ? labels ? withChannelLabels(data.definitions, labels) : data.definitions : null;
+  function saveLabels(saved: Record<string, string>) {
+    setLabels(saved);
+    if (data) onChannelLabelsSaved?.(provider, {
+      ready: true, definitions: withChannelLabels(data.definitions, saved), snapshot: data.snapshot,
+    });
+  }
   const specs = data && definitions ? cloudSpecs(definitions, data.snapshot) : [];
   const camera = isCamera(device.category);
   const storage = cameraStorage(data?.snapshot.status || {});
@@ -92,7 +99,7 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
     const reported = cloudReading(spec, data!.snapshot.status[spec.key], data!.snapshot.status_observations?.[spec.key]);
     const reading = camera && spec.key === 'sd_status' ? { ...reported, value: storage.label } : { ...reported, liveRequestAt };
-    return <CapabilityField pendingScope={pendingScope} headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={setLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
+    return <CapabilityField pendingScope={pendingScope} headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={saveLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
   };
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;

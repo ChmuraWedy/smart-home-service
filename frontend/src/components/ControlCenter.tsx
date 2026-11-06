@@ -224,6 +224,17 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     onDeviceLinkChange?.(value.kind === 'device' ? { id: value.device.id, route: value.route } : null);
   }
   function close() { setSelection(null); onDeviceLinkChange?.(null); setRevision(value => value + 1); }
+  function updateChannelControls(provider: Provider, controls: NonNullable<CloudDevice['controls']>) {
+    setRecord(previous => {
+      const providerDevices = previous?.cloud[provider];
+      if (previous?.api !== api || previous.mask !== mask || !providerDevices) return previous;
+      return { ...previous, cloud: { ...previous.cloud, [provider]: providerDevices.map(device =>
+        device.id === controls.definitions.device_id ? {
+          ...device, controls: { ...controls, snapshot: device.controls?.snapshot ?? controls.snapshot },
+        } : device,
+      ) } };
+    });
+  }
   if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} existing={selected.existing} provider={selected.provider} cloudDevices={selected.provider ? cloud[selected.provider] : undefined} gatewayPlacements={Array.from(placements.values())} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={() => selected.existing ? choose({ kind: 'device', device: mergeDevices([selected.existing], cloud).find(row => row.id === selected.existing!.device_id)!, route: 'local' }) : close()} onSaved={selected.existing ? saved => { setRevision(value => value + 1); choose({ kind: 'device', device: mergeDevices([saved], cloud).find(row => row.id === saved.device_id)!, route: 'local' }); } : undefined} onAuthError={onAuthError} />;
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading">
@@ -274,7 +285,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
       const provider = selected.device.cloud.sharing ? 'sharing' : selected.device.cloud.developer ? 'developer' : undefined;
       choose({ kind: 'survey', existing: selected.device.local, provider, device: provider ? selected.device.cloud[provider] : undefined });
     } : undefined} closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
-    {selected?.kind === 'device' && selected.route !== 'local' && selected.device.cloud[selected.route] && <CloudControl room={roomName(selected.device)} localTransport={selected.device.local?.transport} key={selected.route + selected.device.id} api={api} device={{ ...selected.device.cloud[selected.route]!, name: selected.device.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
+    {selected?.kind === 'device' && selected.route !== 'local' && selected.device.cloud[selected.route] && <CloudControl room={roomName(selected.device)} localTransport={selected.device.local?.transport} key={selected.route + selected.device.id} api={api} device={{ ...selected.device.cloud[selected.route]!, name: selected.device.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} onChannelLabelsSaved={updateChannelControls} />}
     {selected?.kind === 'group' && <GroupControl key={selected.group.id} api={api} group={selected.group} onAuthError={onAuthError} onClose={close} onDevice={device => choose({ kind: 'device', device: mergeDevices([device], cloud)[0], route: 'local', parent: selected.group })} />}
   </section>;
 }
