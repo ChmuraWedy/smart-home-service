@@ -2,15 +2,17 @@ import { MSG, t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { CloudDevice, JsonValue, Provider } from '../api';
-import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, localSpec, validateControlValue } from '../controls';
+import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, localSpec, validateControlValue, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
 import { readLocalDevice } from '../local-device-cache';
-import { useAppDispatch } from '../store';
+import { useAppDispatch, useAppSelector } from '../store';
 import { cloudPendingScope, localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
 import { useCloudDeviceSnapshot } from '../use-cloud-device-snapshot';
+import { cloudAccountScope } from '../cloud-account-scope';
+import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, nextDeviceMetadataRevision } from '../device-metadata';
 import { CapabilityField, ControlFeedback, useControlSession } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
 import { batteryFromSpecs, DeviceIcon, isBattery, isCamera, ParameterIcon } from './DevicePresentation';
@@ -137,6 +139,9 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
 
 function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
+  const dispatch = useAppDispatch();
+  const labelKey = cloudMetadataKey(cloudAccountScope(api, provider), cloud.id);
+  const labels = useAppSelector(state => state.deviceMetadata.channels[labelKey]?.value);
   const inventory = cloud.controls?.ready ? cloud.controls.definitions : undefined;
   const inventoryDefinitions = inventory?.device_id === cloud.id && Array.isArray(inventory.functions) ? inventory : undefined;
   const metadata = useMemo(() => ({
@@ -148,18 +153,24 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
     if (inventoryDefinitions) metadata.definitions = inventoryDefinitions;
   }, [inventoryDefinitions, metadata]);
   const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
-    const definitions = metadata.definitions || await api.deviceFunctions(cloud.id,provider,signal);
+    const cached = metadata.definitions;
+    const revision = cached ? 0 : nextDeviceMetadataRevision();
+    const definitions = cached ?? await api.deviceFunctions(cloud.id,provider,signal);
     if (definitions.device_id !== cloud.id || !Array.isArray(definitions.functions)) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_CAPABILITIES));
-    if (!signal?.aborted) metadata.definitions ??= definitions;
+    if (!signal?.aborted && !cached) {
+      metadata.definitions ??= definitions;
+      dispatch(cacheDeviceMetadata([{ key: labelKey, revision, channelLabels: labelsFromCloudDefinitions(definitions) }]));
+    }
     await read(refresh, signal, metadata.seed);
     return metadata;
-  },[api,cloud.id,provider,metadata,read]);
+  },[api,cloud.id,provider,metadata,read,dispatch,labelKey]);
   const poll = useCallback(async (current:typeof metadata,signal:AbortSignal) => {
     await read(false, signal);
     return current;
   },[read]);
   const session = useControlSession(load,onAuthError,provider === 'sharing' && visible ? poll : undefined);
-  const definitions = session.data === metadata ? inventoryDefinitions ?? metadata.definitions : undefined;
+  const baseDefinitions = session.data === metadata ? inventoryDefinitions ?? metadata.definitions : undefined;
+  const definitions = useMemo(() => baseDefinitions && labels ? withChannelLabels(baseDefinitions, labels) : baseDefinitions, [baseDefinitions, labels]);
   const specs = definitions && snapshot ? cloudSpecs(definitions,snapshot) : [];
   useEffect(() => {
     if (definitions && snapshot) onStatus?.({online:snapshot.online, battery:batteryFromSpecs(cloudSpecs(definitions,snapshot),snapshot.status)});

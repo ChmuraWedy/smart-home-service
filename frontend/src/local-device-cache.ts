@@ -1,5 +1,6 @@
 import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query';
 import { ApiError } from './api';
+import type { CloudApi } from './api';
 import type { DeviceState, HomeApi } from './home-api';
 import { MSG, t } from './i18n';
 import type { AppDispatch } from './store';
@@ -9,12 +10,12 @@ type CacheEntry = { reading: DeviceState; sequence: number };
 type ReadError = { message: string; status?: number };
 
 // Cache keys contain only an opaque connection scope and the numeric device ID.
-const scopes = new WeakMap<HomeApi, number>();
+const scopes = new WeakMap<CloudApi, number>();
 let nextScope = 0;
 let nextSequence = 0;
 const clients = new Map<number, { api: HomeApi; readers: number }>();
 
-export function localDeviceKey(api: HomeApi, deviceId: number): DeviceKey {
+export function localDeviceKey(api: CloudApi, deviceId: number): DeviceKey {
   let scope = scopes.get(api);
   if (scope === undefined) {
     scope = ++nextScope;

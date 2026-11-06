@@ -26,26 +26,36 @@ import { FieldInfo } from './FieldInfo';
 import { cameraStorage, isStorageSetting, cameraPrivacyBlock } from '../camera-controls';
 import { CameraArea } from './CameraArea';
 import { useCloudDeviceSnapshot } from '../use-cloud-device-snapshot';
+import { cloudAccountScope } from '../cloud-account-scope';
+import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, nextDeviceMetadataRevision } from '../device-metadata';
+import { useAppDispatch, useAppSelector } from '../store';
 
-export function CloudControl({ api, device, provider, devices, room, localTransport, onClose, onAuthError, onChannelLabelsSaved }: {
-  api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; onClose: () => void; onAuthError: () => void;
-  onChannelLabelsSaved?: (provider: Provider, controls: NonNullable<CloudDevice['controls']>) => void;
+export function CloudControl({ api, device, provider, devices, room, localTransport, localDeviceId, onClose, onAuthError }: {
+  api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; localDeviceId?: number; onClose: () => void; onAuthError: () => void;
 }) {
   const [mappingBusy,setMappingBusy] = useState(false);
   const [aliasBusy, setAliasBusy] = useState(false);
-  const [labelBusy, setLabelBusy] = useState(false), [labels, setLabels] = useState<Record<string, string> | null>(null);
+  const [labelBusy, setLabelBusy] = useState(false);
   const editingBusy = mappingBusy || labelBusy || aliasBusy;
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, device.id, provider);
+  const dispatch = useAppDispatch();
+  const labelKey = cloudMetadataKey(cloudAccountScope(api, provider), device.id);
+  const labels = useAppSelector(state => state.deviceMetadata.channels[labelKey]?.value);
   const metadata = useMemo(() => ({value:null as CloudFunctions|null}),[read]);
   const load = useCallback(async (_refresh: boolean, signal?: AbortSignal) => {
+    const cached = metadata.value;
+    const revision = cached ? 0 : nextDeviceMetadataRevision();
     const [definitions] = await Promise.all([
-      metadata.value ?? api.deviceFunctions(device.id, provider, signal),
+      cached ?? api.deviceFunctions(device.id, provider, signal),
       read(true, signal),
     ]);
     if (definitions.device_id !== device.id || !Array.isArray(definitions.functions)) throw new Error(t(MSG.THE_SERVICE_RETURNED_UNEXPECTED_DEVICE_DATA));
-    if (!signal?.aborted) metadata.value = definitions;
+    if (!signal?.aborted && !cached) {
+      metadata.value = definitions;
+      dispatch(cacheDeviceMetadata([{ key: labelKey, revision, channelLabels: labelsFromCloudDefinitions(definitions) }]));
+    }
     return { definitions, metadata, fetchedAt: Date.now() };
-  }, [api, device.id, provider,metadata,read]);
+  }, [api, device.id, provider, metadata, read, dispatch, labelKey]);
   type Data = Awaited<ReturnType<typeof load>>;
   const poll = useCallback(async (current:Data, signal:AbortSignal) => {
     await read(false, signal);
@@ -58,12 +68,6 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     : null;
   const now = useClock();
   const definitions = data ? labels ? withChannelLabels(data.definitions, labels) : data.definitions : null;
-  function saveLabels(saved: Record<string, string>) {
-    setLabels(saved);
-    if (data) onChannelLabelsSaved?.(provider, {
-      ready: true, definitions: withChannelLabels(data.definitions, saved), snapshot: data.snapshot,
-    });
-  }
   const specs = data && definitions ? cloudSpecs(definitions, data.snapshot) : [];
   const camera = isCamera(device.category);
   const storage = cameraStorage(data?.snapshot.status || {});
@@ -99,14 +103,14 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
     const reported = cloudReading(spec, data!.snapshot.status[spec.key], data!.snapshot.status_observations?.[spec.key]);
     const reading = camera && spec.key === 'sd_status' ? { ...reported, value: storage.label } : { ...reported, liveRequestAt };
-    return <CapabilityField pendingScope={pendingScope} headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onSaved={saveLabels} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
+    return <CapabilityField pendingScope={pendingScope} headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
   };
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
-  return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || t(MSG.TUYA_DEVICE)} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}>
+  return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || t(MSG.TUYA_DEVICE)} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} localId={localDeviceId} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}>
     {camera && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock} headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined} />}
     <div className="control-toolbar"><span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span></div>
     <details className="status-details"><summary>{t(MSG.ABOUT_READINGS)}</summary>
