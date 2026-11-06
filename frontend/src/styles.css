@@ -1384,15 +1384,14 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-device [data-power-layout] .dashboard-power-state-summary {
   @apply tw:relative tw:row-span-2 tw:row-start-1 tw:flex tw:self-stretch tw:pb-0;
 }
-.dashboard-light-readings { @apply tw:grid tw:min-w-0 tw:flex-1 tw:py-1; }
-.dashboard-light-readings-split { @apply tw:grid-cols-2; }
+.dashboard-light-readings { @apply tw:grid tw:auto-rows-fr tw:grid-cols-1 tw:min-w-0 tw:flex-1; }
 .dashboard-light-reading {
   @apply tw:relative tw:isolate tw:grid tw:min-w-0 tw:content-center tw:px-1.5 tw:py-0.5;
   overflow-wrap:anywhere;
 }
-.dashboard-light-reading + .dashboard-light-reading { border-inline-start:1px solid var(--border); }
+.dashboard-light-reading + .dashboard-light-reading { border-block-start:1px solid var(--border); }
 .dashboard-light-tint { @apply tw:absolute tw:inset-0 tw:-z-10 tw:opacity-50; }
-.dashboard-light-copy { @apply tw:grid tw:w-fit tw:max-w-full tw:gap-0.5; }
+.dashboard-light-copy { @apply tw:flex tw:w-fit tw:max-w-full tw:flex-wrap tw:items-center tw:gap-x-1.5; }
 .dashboard-light-icon, .dashboard-light-off-mark, .dashboard-light-swatch { @apply tw:hidden; }
 .dashboard-light-label { @apply tw:text-xs tw:font-medium tw:text-(--text); }
 .dashboard-light-value { @apply tw:text-sm tw:font-semibold tw:text-(--text-strong); }
@@ -1439,7 +1438,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-view[data-card-size="small"] .card-primary-controls .dashboard-power-button :is(.parameter-icon, .device-type-icon) { @apply tw:size-5; }
 .dashboard-view[data-card-size="small"] :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row { @apply tw:gap-x-1.5; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading, .dashboard-power-state) { @apply tw:py-0; }
-.dashboard-view[data-card-size="small"] .dashboard-light-readings { @apply tw:py-0.5; }
 .dashboard-view[data-card-size="small"] .dashboard-light-reading { @apply tw:px-0.5; }
 .dashboard-view[data-card-size="small"] :is(.dashboard-light-label, .dashboard-light-off-label) { @apply tw:sr-only; }
 .dashboard-view[data-card-size="small"] :is(.dashboard-light-icon, .dashboard-light-off-mark) { @apply tw:block; }

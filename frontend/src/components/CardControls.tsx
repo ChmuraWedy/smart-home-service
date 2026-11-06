@@ -143,7 +143,7 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
   const brightnessText = hsv ? hsv.v / 10 + ' %' : brightness && brightnessReading ? displayReading(brightness, brightnessReading) : undefined;
   const colorText = hsv && hsvToHex(hsv).toUpperCase();
   const summary = brightness || temperature || colorMode ? (power: boolean | null) => (
-    <span className={'dashboard-light-readings' + (colorMode || temperature ? ' dashboard-light-readings-split' : '')}>
+    <span className="dashboard-light-readings">
       <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === false ? t(MSG.OFF) : power ? brightnessText : undefined} />
       {colorMode
         ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
