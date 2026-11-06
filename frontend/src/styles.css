@@ -1316,8 +1316,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-alias-popup-header button { @apply tw:grid tw:size-8 tw:place-items-center tw:p-0 tw:text-lg; }
 .dashboard-alias-popup .alias-tag { @apply tw:max-w-full; }
 .dashboard-card-header .device-card-context { @apply tw:flex tw:min-w-0 tw:flex-wrap tw:items-center tw:gap-x-1.5; }
-.dashboard-card-header .dashboard-light-presets { @apply tw:m-0 tw:min-h-0 tw:w-auto tw:max-w-full tw:cursor-default tw:px-1.5 tw:py-0.5 tw:text-[11px]; }
-.dashboard-card-header > .device-card-context { @apply tw:col-start-2 tw:col-end-[-1] tw:gap-y-0.5; }
 .dashboard-card-header .device-card-actions { @apply tw:flex tw:flex-none tw:items-center tw:gap-0.5; }
 .dashboard-card-header .tile-icon-action { @apply tw:h-11 tw:min-h-11 tw:w-8; }
 .dashboard-card-footer { @apply tw:mt-2 tw:border-t tw:border-(--border) tw:pt-1.5; }
@@ -1376,7 +1374,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .camera-card-switches .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-2 tw:flex-col tw:items-center;
 }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback)) {
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback, .dashboard-light-presets)) {
   @apply tw:pb-0;
 }
 .dashboard-device [data-power-layout] .channel-control + .channel-control { border-top:1px solid var(--border); }
@@ -1403,27 +1401,31 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device .dashboard-power-state-summary {
   margin-inline-end:calc(-1 * var(--dashboard-card-inset));
 }
-.dashboard-light-readings { @apply tw:grid tw:auto-rows-fr tw:grid-cols-1 tw:min-w-0 tw:flex-1; }
+.dashboard-light-readings { @apply tw:grid tw:auto-cols-fr tw:grid-flow-col tw:min-w-0 tw:flex-1; }
 .dashboard-light-reading {
   @apply tw:relative tw:isolate tw:grid tw:min-w-0 tw:content-center tw:px-3 tw:py-0.5;
   overflow-wrap:anywhere;
 }
-.dashboard-light-reading + .dashboard-light-reading { border-block-start:1px solid var(--border); }
+.dashboard-light-reading + .dashboard-light-reading { border-inline-start:1px solid var(--border); }
 .dashboard-light-tint { @apply tw:absolute tw:inset-0 tw:-z-10 tw:opacity-25; }
 .dashboard-light-copy { @apply tw:flex tw:w-fit tw:max-w-full tw:flex-wrap tw:items-center tw:gap-x-1.5; }
 .dashboard-light-icon, .dashboard-light-off-mark, .dashboard-light-swatch { @apply tw:hidden; }
 .dashboard-light-label { @apply tw:text-xs tw:font-medium tw:text-(--text); }
 .dashboard-light-value { @apply tw:text-sm tw:font-semibold tw:text-(--text-strong); }
+.dashboard-light-presets {
+  @apply tw:border-t tw:border-(--border) tw:pt-1.5;
+  padding-inline:var(--dashboard-card-inset);
+  margin-inline-end:calc(-1 * var(--dashboard-card-inset));
+}
+.dashboard-light-presets select { @apply tw:m-0 tw:min-h-0 tw:w-full tw:cursor-default tw:px-2 tw:py-1 tw:text-xs; }
 .dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
 }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback, .dashboard-light-presets))
   [data-power-layout] .channel-control:last-of-type .power-actions { @apply tw:self-end; }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback, .dashboard-light-presets))
   [data-power-layout] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:11px; }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
-  .dashboard-light-reading:last-child .dashboard-light-tint { border-end-end-radius:11px; }
 
 .dashboard-device[data-card-layout="climate"] .card-sensor-values { @apply tw:grid tw:w-full tw:grid-cols-2 tw:gap-1.5; }
 .dashboard-device[data-card-layout="climate"] .card-sensor-value { @apply tw:justify-center; }
@@ -1449,7 +1451,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-view[data-card-size="small"] .dashboard-card-header .device-symbol { @apply tw:size-[22px]; }
 .dashboard-view[data-card-size="small"] .dashboard-card-header .device-type-icon { @apply tw:size-4; }
-.dashboard-view[data-card-size="small"] .dashboard-card-header > .device-card-context { @apply tw:col-span-full; }
 .dashboard-view[data-card-size="small"] .dashboard-card-actions { @apply tw:flex-col; }
 .dashboard-view[data-card-size="small"] .dashboard-card-footer { @apply tw:mt-1; }
 .dashboard-view[data-card-size="small"] .card-primary-controls { --dashboard-power-size:44px; }
@@ -1457,6 +1458,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-view[data-card-size="small"] :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row { @apply tw:gap-x-1.5; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading, .dashboard-power-state) { @apply tw:py-0; }
 .dashboard-view[data-card-size="small"] .dashboard-light-reading { @apply tw:px-1.5; }
+.dashboard-view[data-card-size="small"] .dashboard-light-presets select { @apply tw:px-1 tw:text-[11px]; }
 .dashboard-view[data-card-size="small"] :is(.dashboard-light-label, .dashboard-light-off-label) { @apply tw:sr-only; }
 .dashboard-view[data-card-size="small"] :is(.dashboard-light-icon, .dashboard-light-off-mark) { @apply tw:block; }
 .dashboard-view[data-card-size="small"] .dashboard-light-icon .parameter-icon { @apply tw:size-3.5; }

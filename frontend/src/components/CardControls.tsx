@@ -71,7 +71,7 @@ function LightCardReading({ code, label, value, tint, off }: { code: 'brightness
 export type CardStatus = {online:boolean;battery?:BatteryReading};
 
 type QuickSheet = DashboardSheetState & {
-  onLightFeatures?: (hasSliders: boolean, hasPresets: boolean) => void;
+  onLightAvailable?: (available: boolean) => void;
 };
 
 type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void; sheet?: QuickSheet };
@@ -143,15 +143,14 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
     spec?.kind === 'number' && spec.readable && spec.writable && spec.minimum !== undefined &&
     spec.maximum !== undefined && spec.minimum < spec.maximum);
   const hasSliders = sliders.length > 0;
+  const onLightAvailable = sheet?.onLightAvailable;
+  useEffect(() => { onLightAvailable?.(hasSliders); }, [hasSliders, onLightAvailable]);
   const currentReading = (spec: ControlSpec | undefined) => {
     const value = spec && reading(spec);
     return isStale(value, now, local) ? undefined : value;
   };
   const mode = currentReading(specs.find(spec => spec.key === 'work_mode' || spec.key === 'mode'))?.value;
   const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
-  const hasSummary = Boolean(brightness || temperature || colorMode);
-  const onLightFeatures = sheet?.onLightFeatures;
-  useEffect(() => { onLightFeatures?.(hasSliders, hasSummary); }, [hasSliders, hasSummary, onLightFeatures]);
   const whiteMode = mode === 'white' || mode === undefined;
   const { h, s, v } = limitsOf(colorMode ? currentReading(color)?.value : undefined);
   const hsv = typeof h === 'number' && h >= 0 && h <= 360 && typeof s === 'number' && s >= 0 && s <= 1000 &&
@@ -160,7 +159,7 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
   const temperatureReading = whiteMode ? currentReading(temperature) : undefined;
   const brightnessText = hsv ? hsv.v / 10 + ' %' : brightness && brightnessReading ? displayReading(brightness, brightnessReading) : undefined;
   const colorText = hsv && hsvToHex(hsv).toUpperCase();
-  const summary = hasSummary ? (power: boolean | null) => (
+  const summary = brightness || temperature || colorMode ? (power: boolean | null) => (
     <span className="dashboard-light-readings">
       <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === false ? t(MSG.OFF) : power ? brightnessText : undefined} />
       {colorMode
@@ -212,6 +211,13 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
           <IconGlyph name="refresh" />
         </button>
       </div>
+      {summary && (
+        <div className="dashboard-light-presets">
+          <select aria-label={t(MSG.PRESETS)} disabled>
+            <option>{t(MSG.PRESETS)}</option>
+          </select>
+        </div>
+      )}
       {powerLayout && sensorValues}
       {hasSliders && sheet?.open && !paused && (
       <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>

@@ -55,17 +55,9 @@ function CardDetailsButton({ label, disabled, onClick }: { label:string; disable
   );
 }
 
-function DashboardCardHeader({ icon, title, aliases, metadata, contextAction, actions }: {
+function DashboardCardHeader({ icon, title, aliases, metadata, actions }: {
   icon: ReactNode; title: ReactNode; aliases?: string[]; metadata: ReactNode; actions: ReactNode;
-  contextAction?: ReactNode;
 }) {
-  const context = (
-    <div className="device-card-context">
-      {metadata}
-      {contextAction}
-    </div>
-  );
-
   return (
     <header className="dashboard-card-header" data-slot="card-header">
       <span className="device-symbol" aria-hidden="true">{icon}</span>
@@ -74,10 +66,9 @@ function DashboardCardHeader({ icon, title, aliases, metadata, contextAction, ac
           <h3>{title}</h3>
           {!!aliases?.length && <DashboardAliases aliases={aliases} />}
         </div>
-        {!contextAction && context}
+        <div className="device-card-context">{metadata}</div>
       </div>
       <div className="device-card-actions">{actions}</div>
-      {contextAction && context}
     </header>
   );
 }
@@ -97,7 +88,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const dispatch = useAppDispatch();
   const quickBusy = useAppSelector(state => selectCommandPending(state, device.id));
   const quickOpen = quickRoute !== undefined;
-  const [lightFeatures, setLightFeatures] = useState<{ route: DeviceRoute; hasSliders: boolean; hasPresets: boolean }>();
+  const [lightSheet, setLightSheet] = useState<{ route: DeviceRoute; available: boolean }>();
   const sheetTrigger = useRef<HTMLButtonElement>(null);
   const notifyBusy = useCallback((pending: boolean) => {
     dispatch(setCommandPending({ deviceId: device.id, pending }));
@@ -107,10 +98,9 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const updateStatus = useCallback((status:CardStatus)=>setLiveStatus({route,status}),[route]);
   const live = liveStatus?.route === route ? liveStatus.status : undefined;
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
-  const currentLightFeatures = lightFeatures?.route === route ? lightFeatures : undefined;
-  const hasSheet = isCamera(cloud?.category) || Boolean(currentLightFeatures?.hasSliders);
-  const onLightFeatures = useCallback((hasSliders: boolean, hasPresets: boolean) => {
-    setLightFeatures({ route, hasSliders, hasPresets });
+  const hasSheet = isCamera(cloud?.category) || (lightSheet?.route === route && lightSheet.available);
+  const onLightAvailable = useCallback((available: boolean) => {
+    setLightSheet({ route, available });
   }, [route]);
   const showSheet = () => { if (!paused && !quickBusy && hasSheet && !quickOpen) onQuickOpen(route); };
   const local = device.local;
@@ -143,11 +133,6 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
             </div>
           </>
 )}
-        contextAction={currentLightFeatures?.hasPresets && (
-          <select className="dashboard-light-presets" aria-label={t(MSG.PRESETS)} disabled>
-            <option>{t(MSG.PRESETS)}</option>
-          </select>
-        )}
         actions={(
           <>
             <CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy} onClick={() => onOpen(route)} />
@@ -176,7 +161,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           onAuthError={onAuthError}
           onBusy={notifyBusy}
           onStatus={updateStatus}
-          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, onLightFeatures }}
+          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, onLightAvailable }}
         />
         {routes.length > 1 && (
         <div className="device-card-footer tw:mt-2">

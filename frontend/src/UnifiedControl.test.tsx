@@ -37,7 +37,7 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
-  it('puts the disabled presets dropdown in the bulb header only', async () => {
+  it('puts the disabled presets dropdown below the bulb readings only', async () => {
     server({ noLocal: true });
     const original = vi.mocked(fetch).getMockImplementation()!;
     const bulb = {
@@ -47,9 +47,12 @@ describe('unified device identity and management', () => {
         definitions: {
           device_id: shared.id,
           functions: [{ code: 'switch_led', type: 'Boolean', values: '{}' }],
-          status_range: [{ code: 'bright_value_v2', type: 'Integer', values: { min: 10, max: 1000, scale: 0, step: 1 } }],
+          status_range: [
+            { code: 'bright_value_v2', type: 'Integer', values: { min: 10, max: 1000, scale: 0, step: 1 } },
+            { code: 'temp_value_v2', type: 'Integer', values: { min: 0, max: 1000, scale: 0, step: 1 } },
+          ],
         },
-        snapshot: { device_id: shared.id, online: true, source: 'cloud', status: { switch_led: true, bright_value_v2: 500 } },
+        snapshot: { device_id: shared.id, online: true, source: 'cloud', status: { switch_led: true, bright_value_v2: 500, temp_value_v2: 250 } },
       },
     };
     vi.mocked(fetch).mockImplementation(async (input, init) => new URL(String(input)).pathname.endsWith('/cloud/devices')
@@ -59,8 +62,12 @@ describe('unified device identity and management', () => {
     const card = await screen.findByRole('listitem', { name: bulb.name });
     const presets = await within(card).findByRole('combobox', { name: 'Пресеты' });
     expect(presets).toBeDisabled();
-    expect(presets.closest('header')).toBe(card.querySelector('.dashboard-card-header'));
-    expect(presets.closest('footer')).toBeNull();
+    const footer = card.querySelector('footer')!;
+    const readings = within(footer.querySelector<HTMLElement>('.dashboard-light-readings')!);
+    expect(readings.getByText('Яркость')).toBeInTheDocument();
+    const temperature = readings.getByText('Цветовая температура');
+    expect(footer).toContainElement(presets);
+    expect(temperature.compareDocumentPosition(presets) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const other = await screen.findByRole('listitem', { name: cloudOnly.name });
     expect(within(other).queryByRole('combobox', { name: 'Пресеты' })).toBeNull();
   });
