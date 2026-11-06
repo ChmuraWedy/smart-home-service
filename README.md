@@ -4,16 +4,16 @@ A home dashboard and REST API for Tuya devices: control lights, read sensors, vi
 
 Run it on your own server with Docker, or run the Python API and React interface separately. Local Wi-Fi and Zigbee gateway control uses TinyTuya; optional Smart Life and Tuya Developer connections provide cloud access. Each device has one card with an explicit choice of control method when several are available.
 
-**English · Russian · Polish · Belarusian** | **System · Dark · Day themes**
+**English · Russian · Polish · Belarusian** | **System · Dark · Day themes** | **Large · Small dashboard cards**
 
 [Quick start](#quick-start) · [Screenshots](#screenshots) · [Localization examples](#localization-examples) · [Documentation](#documentation) · [API reference](docs/api-reference.md)
 
 ## What you can do
 
-- Control power and individual switch channels directly from device cards. Open details for brightness, white temperature, color, timers, and supported lighting schedules/effects.
+- Control power and individual switch channels directly from device cards. Tap a supported light card for quick brightness and white temperature controls. Open full details for color, timers, and supported lighting schedules and effects.
 - Read temperature, humidity, motion, and battery information; inspect the device activity log and the source and age of readings.
 - Search by name or alias, filter by room/building, edit device and channel aliases inline, and link directly to a device's details.
-- View compatible camera HLS streams, including a small preview on the main card, with privacy and detection controls when the device exposes them.
+- Open compatible camera HLS streams from the dashboard, with privacy and detection controls when the device exposes them.
 - Discover LAN announcements and configure local device connections with separate discovery, verification, and confirmation before saving.
 - Manage buildings, rooms, device types, groups, capabilities, and imports through the REST API.
 
@@ -25,9 +25,17 @@ Real views of connected lights, switches, and sensors in English. Device names, 
 
 ### Device overview
 
-Main cards with power controls, independent switch channels, aliases, room, and connection status — Day theme.
+Large cards in the Day theme show power controls, independent switch channels, aliases, room, and connection status.
 
 ![Device overview with lamp power controls and a two-channel switch](docs/screenshots/device-overview-day.png)
+
+### Phone dashboard
+
+Choose **Menu → Card size** to switch between Large and Small. Small fits two cards per row on a phone, with the same direct access to power controls and device details. The browser remembers your choice.
+
+| Large | Small |
+| --- | --- |
+| ![Phone dashboard with one large card per row](docs/screenshots/mobile-dashboard-large-day.png) | ![Phone dashboard with two small cards per row](docs/screenshots/mobile-dashboard-small-day.png) |
 
 ### Bulb: brightness, white temperature, and schedules
 
@@ -69,7 +77,7 @@ The motion sensor has a dedicated status and activity log, shown here with the M
 
 ## Localization examples
 
-The interface supports English, Russian, Polish, and Belarusian. Change the language in the header; labels, help text, parameter values, and date formatting follow the selection. Device names, aliases, identifiers, and commands retain their original values. The preference is saved independently of the API key and theme.
+The interface supports English, Russian, Polish, and Belarusian. Choose **Menu → Language** to change labels, help text, parameter values, and date formatting. Device names, aliases, identifiers, and commands retain their original values. The preference is saved independently of the API key and theme.
 
 ### Polish: bulb controls
 
