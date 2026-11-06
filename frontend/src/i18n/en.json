@@ -1,4 +1,10 @@
 {
+  "Настроить свет": "Adjust",
+  "Тёплый": "Warm",
+  "Холодный": "Cool",
+  "Выключить приватность": "Turn off privacy",
+  "Включить приватность": "Turn on privacy",
+  "На весь экран": "Full screen",
   "Настройки панели": "Dashboard settings",
   "Подключено": "Connected",
   "Поиск": "Search",

@@ -1378,3 +1378,45 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-device[data-card-layout="climate"] [data-reading="temperature"],
 .dashboard-device[data-card-layout="climate"] [data-reading="va_temperature"],
 .dashboard-device[data-card-layout="climate"] [data-reading="temp_current"] { @apply tw:order-first; }
+
+.dashboard-adjust { @apply tw:col-span-full tw:row-start-5 tw:justify-self-end; }
+.dashboard-adjust > button { @apply tw:min-h-11; }
+.dashboard-device:has(.dashboard-adjust) .control-feedback { @apply tw:row-start-6; }
+.dashboard-sheet {
+  @apply tw:fixed tw:inset-x-0 tw:top-auto tw:bottom-0 tw:m-0 tw:w-full tw:max-w-none tw:overflow-y-auto tw:rounded-t-2xl tw:border tw:border-(--border) tw:bg-(--dialog-bg) tw:px-4 tw:text-(--text);
+  max-height:calc(100dvh - 24px);
+  padding-bottom:max(16px, env(safe-area-inset-bottom));
+}
+.dashboard-sheet::backdrop { background:var(--backdrop); }
+@media(min-width:601px) { .dashboard-sheet { @apply tw:mx-auto tw:max-w-[520px]; } }
+.dashboard-sheet-handle { @apply tw:grid tw:h-6 tw:place-items-center tw:touch-none; }
+.dashboard-sheet-handle span { @apply tw:h-1 tw:w-10 tw:rounded-full tw:bg-(--border-strong); }
+.dashboard-sheet-heading { @apply tw:mb-3 tw:flex tw:items-center tw:justify-between tw:gap-3; }
+.dashboard-sheet-heading h2 { @apply tw:m-0 tw:text-xl; }
+.dashboard-sheet-heading > button { @apply tw:grid tw:size-11 tw:shrink-0 tw:place-items-center tw:border-0 tw:bg-transparent tw:p-0 tw:text-2xl; }
+.dashboard-sheet-power .capability-boolean > .capability-row { @apply tw:grid-cols-[64px_1fr] tw:justify-normal; }
+.dashboard-sheet-power .capability-heading { @apply tw:hidden; }
+.dashboard-sheet-power .capability-boolean > .capability-row > .power-actions { @apply tw:col-start-1 tw:row-start-1; }
+.dashboard-sheet-power .dashboard-power-state { @apply tw:col-start-2 tw:row-start-1; }
+.dashboard-sheet-range {
+  @apply tw:my-3 tw:grid tw:grid-cols-[1fr_auto] tw:items-center tw:gap-x-3 tw:text-sm tw:font-medium;
+}
+.dashboard-sheet-range input { @apply tw:col-span-full tw:m-0 tw:h-11 tw:w-full tw:cursor-pointer; accent-color:var(--toggle-on); }
+.dashboard-sheet-range-value { color:var(--muted); }
+.dashboard-sheet-temperature-labels { @apply tw:col-span-full tw:flex tw:justify-between tw:text-xs tw:font-normal tw:text-(--muted); }
+.dashboard-sheet-range input[data-temperature]::-webkit-slider-runnable-track {
+  height:8px; border-radius:99px; background:linear-gradient(to right,#ffbf56,#fff4d9,#b8daff);
+}
+.dashboard-sheet-range input[data-temperature]::-webkit-slider-thumb { margin-top:-4px; }
+.dashboard-sheet-range input[data-temperature]::-moz-range-track {
+  height:8px; border-radius:99px; background:linear-gradient(to right,#ffbf56,#fff4d9,#b8daff);
+}
+.camera-live-sheet { @apply tw:flex tw:flex-col tw:gap-2; }
+.camera-live-sheet .camera-live-heading { @apply tw:order-last tw:mb-0; }
+.camera-live-sheet .camera-live-actions { @apply tw:w-full tw:justify-start; }
+.camera-live-sheet .camera-live-actions > button { @apply tw:min-h-11 tw:px-3 tw:text-sm; }
+.camera-live-sheet :is(.camera-frame, .camera-preview-placeholder) { @apply tw:relative tw:m-0; }
+.camera-live-sheet .camera-frame video { max-height:50dvh; }
+.camera-sheet-live-tag, .camera-sheet-fullscreen { @apply tw:absolute tw:top-2 tw:z-1; }
+.camera-sheet-live-tag { @apply tw:left-2 tw:rounded tw:bg-red-700 tw:px-2 tw:py-1 tw:text-xs tw:font-semibold tw:text-white; }
+.camera-sheet-fullscreen { @apply tw:right-2 tw:grid tw:size-11 tw:place-items-center tw:bg-black/70 tw:p-0 tw:text-2xl tw:text-white; }

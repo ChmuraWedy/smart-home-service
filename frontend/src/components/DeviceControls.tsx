@@ -151,13 +151,14 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerOnText, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerOnText?:string; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerOnText, quickRange, booleanActions, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
+  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerOnText?:string; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
   const motion = motionState(spec, reading);
   const [draft, setDraft] = useState('');
+  const rangeEdit = useRef<string | null>(null);
   const initial = useRef<JsonValue | undefined>(undefined);
   const [preciseColor, setPreciseColor] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false), [effectOpen, setEffectOpen] = useState(false);
@@ -237,7 +238,10 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
       validateControlValue(spec, parsed!);
       const sentAt = Date.now();
       const accepted = await onSend(parsed!);
-      if (accepted === false) return;
+      if (accepted === false) {
+        if (quickRange) setDirty(false);
+        return;
+      }
       pendingTarget.current = { value: parsed!, baseline: reading?.value, sentAt };
       if (immediatePower) setDraft(String(parsed));
       setAwaiting(true); setDirty(false);
@@ -248,6 +252,27 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
     else change(String(checked));
   }
   const powerKnown = awaiting || (reading?.known && typeof reading.value === 'boolean');
+  if (quickRange) {
+    const minimum = spec.minimum!, maximum = spec.maximum!;
+    const value = draft !== '' && Number.isFinite(Number(draft)) ? Number(draft) : undefined;
+    const commit = () => {
+      const edited = rangeEdit.current;
+      rangeEdit.current = null;
+      if (edited !== null && Number(edited) !== initial.current && !disabled) void send(Number(edited));
+      else if (edited !== null) setDirty(false);
+    };
+    return <label className="dashboard-sheet-range">
+      <span>{spec.label}</span>
+      <span className="dashboard-sheet-range-value">{value === undefined ? t("Нет данных") : displayReading(spec, {known:true,stale:false,value})}</span>
+      <input type="range" aria-label={spec.label} min={minimum} max={maximum} step={spec.step ?? 'any'}
+        value={value ?? minimum} disabled={disabled || value === undefined}
+        data-temperature={quickRange === 'temperature' || undefined}
+        onChange={event => { rangeEdit.current = event.currentTarget.value; change(event.currentTarget.value); }}
+        onPointerUp={commit} onKeyUp={commit} onBlur={commit}
+        onPointerCancel={() => { rangeEdit.current = null; setDirty(false); }} />
+      {quickRange === 'temperature' && <span className="dashboard-sheet-temperature-labels"><span>{t("Тёплый")}</span><span>{t("Холодный")}</span></span>}
+    </label>;
+  }
   return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
     <div className="capability-row"><div className="capability-heading"><div className="capability-label"><div className="capability-label-line"><h3>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}</h3>{headingActions}</div>{aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}</div>
     </div>
@@ -296,6 +321,8 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
       {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{" " + t("с назад")}</span>}
       {!spec.writable ? <span className="read-only">{t("Только чтение")}</span> : !spec.readable && <span className="read-only">{t("Команда")}</span>}
     </div></div>
+    {booleanActions?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value === 'boolean' ? reading.value : null,
+      () => changePower(!selectedPower))}
     {awaiting && !powerIcon && <p className="help pending-reading">{t("Ожидаем новое показание")}</p>}
     {spec.reason && <p className="help">{spec.reason}</p>}
     {spec.help && <p className="help">{spec.help}</p>}

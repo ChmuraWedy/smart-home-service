@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
@@ -83,6 +83,38 @@ describe('main controls on device cards', () => {
     expect(power).toHaveAttribute('aria-checked','true');
     expect(screen.getByText('10 %')).toBeInTheDocument();
     expect(screen.getByText('Ожидаем новое показание')).toBeInTheDocument();
+  });
+
+  it('commits quick lighting sliders once on release, with the reported device ranges', async () => {
+    const writes:unknown[]=[];
+    const functions=[...definitions.functions, {code:'temp_value_v2',type:'Integer',values:{min:0,max:1000,scale:0,step:10}}];
+    const latest={...snapshot,status:{...snapshot.status,switch_led:true,temp_value_v2:500}};
+    vi.mocked(fetch).mockImplementation(async (_input,init) => {
+      if (init?.method==='POST') { writes.push(JSON.parse(String(init.body))); return json({acknowledged:true}); }
+      return json(latest);
+    });
+    mount({...lamp,controls:{ready:true,definitions:{...definitions,functions},snapshot:latest}});
+    const user=userEvent.setup();
+    await user.click(await screen.findByRole('button',{name:'Настроить свет'}));
+    const sheet=screen.getByRole('dialog',{name:'Лампа'});
+    const brightness=within(sheet).getByRole('slider',{name:'Яркость'});
+    const temperature=within(sheet).getByRole('slider',{name:'Цветовая температура'});
+    expect(brightness).toHaveValue('10');
+    expect(temperature).toHaveValue('50');
+    fireEvent.change(brightness,{target:{value:'55'}});
+    fireEvent.change(brightness,{target:{value:'65'}});
+    expect(writes).toEqual([]);
+    fireEvent.pointerUp(brightness);
+    await waitFor(()=>expect(brightness).toBeEnabled());
+    fireEvent.blur(brightness);
+    fireEvent.change(temperature,{target:{value:'35'}});
+    fireEvent.keyUp(temperature,{key:'ArrowLeft'});
+    await waitFor(()=>expect(writes).toEqual([
+      {commands:[{code:'bright_value_v2',value:650}]},
+      {commands:[{code:'temp_value_v2',value:350}]},
+    ]));
+    await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('sends once while awaiting an acknowledgement and clears waiting after a matching report', async () => {
