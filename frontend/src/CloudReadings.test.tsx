@@ -92,4 +92,27 @@ describe('cloud readings in the dashboard and details', () => {
       visibility.mockRestore();
     }
   });
+
+  it('blocks a remounted camera sheet when inventory has a newer privacy-on report', async () => {
+    const api = new HomeApi({ baseUrl: 'http://cloud.test', token: 'fixture-key' });
+    const camera = (privacy: boolean, time: string): CloudDevice => ({
+      ...device, name: 'Camera', category: 'sp', controls: {
+        ready: true,
+        definitions: { device_id: 'lamp', functions: [{ code: 'basic_private', type: 'Boolean', values: {} }] },
+        snapshot: { ...snapshot(), status: { basic_private: privacy },
+          status_observations: { basic_private: { observed_at: time, received_at: time } } },
+      },
+    });
+    const card = (cloud: CloudDevice, open: boolean) =>
+      <CardControls api={api} device={{ id: 'lamp', name: cloud.name, cloud: { sharing: cloud } }}
+        route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()}
+        sheet={{ open, close: vi.fn(), trigger: { current: null } }} />;
+    const view = renderWithStore(card(camera(false, '2026-11-06T10:00:00Z'), false));
+    expect(await screen.findByRole('button', { name: 'Приватность' })).toHaveAttribute('aria-pressed', 'false');
+    view.rerender(<></>);
+    view.rerender(card(camera(true, '2026-11-06T10:00:01Z'), true));
+    await screen.findByText(/Выключите его для просмотра видео/);
+    expect(screen.getByRole('button', { name: 'Смотреть видео' })).toBeDisabled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });

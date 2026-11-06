@@ -71,6 +71,29 @@ describe('shared cloud readings', () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
+  it('takes newer Sharing inventory reports without replacing a newer value for another control', async () => {
+    const store = createAppStore(), client = api();
+    const key = cloudDeviceKey(client, 'lamp', 'sharing');
+    const observation = (second: number) => ({
+      observed_at: new Date(second * 1000).toISOString(),
+      received_at: new Date((second + 10) * 1000).toISOString(),
+    });
+    const cachedReading = { ...snapshot('lamp', true),
+      status: { switch_led: true, basic_private: false },
+      status_observations: { switch_led: observation(3), basic_private: observation(1) },
+    };
+    const incoming = { ...snapshot(),
+      status: { switch_led: false, basic_private: true },
+      status_observations: { switch_led: observation(2), basic_private: observation(4) },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(json(cachedReading));
+    await store.dispatch(readCloudDevice(client, key, { refresh: true }));
+    const reconciled = await store.dispatch(readCloudDevice(client, key, { seed: incoming }));
+    expect(reconciled.status).toEqual({ switch_led: true, basic_private: true });
+    expect(reconciled.status_observations).toEqual({ switch_led: observation(3), basic_private: observation(4) });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it('isolates the account, provider and device and discards a retired account refresh', async () => {
     const store = createAppStore(), client = api();
     const oldKey = cloudDeviceKey(client, 'lamp', 'sharing');

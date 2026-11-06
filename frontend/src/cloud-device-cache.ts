@@ -64,6 +64,36 @@ function checkAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 }
 
+type Observation = NonNullable<CloudSnapshot['status_observations']>[string];
+
+function observationTime(observation?: Observation) {
+  const observedAt = Date.parse(observation?.observed_at ?? '');
+  return Number.isFinite(observedAt) ? observedAt : Date.parse(observation?.received_at ?? '');
+}
+
+function reconcileSharingInventory(current: CloudSnapshot, seed: CloudSnapshot) {
+  const newerSnapshot = Date.parse(seed.snapshot_received_at ?? '') > Date.parse(current.snapshot_received_at ?? '');
+  const currentReports = current.status_observations ?? {};
+  const seedReports = seed.status_observations ?? {};
+  const newerReports = Object.entries(seedReports).filter(([code, incoming]) => {
+    const previous = observationTime(currentReports[code]);
+    const received = observationTime(incoming);
+    return Object.hasOwn(seed.status, code) && Number.isFinite(received) && (!Number.isFinite(previous) || received > previous);
+  });
+  if (!newerSnapshot && newerReports.length === 0) return current;
+
+  const snapshotValues = newerSnapshot ? Object.entries(seed.status).filter(([code]) =>
+    !Object.hasOwn(currentReports, code) && !Object.hasOwn(seedReports, code)) : [];
+  // Inventory can carry a newer privacy report alongside older readings for other controls.
+  return {
+    ...current,
+    ...(newerSnapshot ? seed : {}),
+    status: { ...current.status, ...Object.fromEntries(snapshotValues),
+      ...Object.fromEntries(newerReports.map(([code]) => [code, seed.status[code]])) },
+    status_observations: { ...currentReports, ...Object.fromEntries(newerReports) },
+  };
+}
+
 export const readCloudDevice = (api: CloudApi, key: CloudDeviceKey, { refresh = false, signal, seed }: {
   refresh?: boolean; signal?: AbortSignal; seed?: CloudSnapshot;
 } = {}) => async (dispatch: AppDispatch, getState: () => RootState): Promise<CloudSnapshot> => {
@@ -77,9 +107,12 @@ export const readCloudDevice = (api: CloudApi, key: CloudDeviceKey, { refresh = 
     { endpointName: 'deviceSnapshot', arg: key, value },
   ]));
   if (seed && !refresh) {
-    const snapshot = select(getState()).data?.snapshot;
-    if (snapshot) return snapshot;
-    const value = { snapshot: checked(seed, key.deviceId), sequence: 0 };
+    const current = select(getState()).data?.snapshot;
+    if (current && key.provider !== 'sharing') return current;
+    const inventory = checked(seed, key.deviceId);
+    const snapshot = current ? reconcileSharingInventory(current, inventory) : inventory;
+    if (snapshot === current) return snapshot;
+    const value = { snapshot, sequence: current ? ++sequence : 0 };
     publish(value);
     return value.snapshot;
   }
