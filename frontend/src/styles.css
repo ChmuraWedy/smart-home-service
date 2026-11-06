@@ -3,6 +3,13 @@
 @import "tailwindcss/theme.css" layer(theme) prefix(tw);
 @import "tailwindcss/utilities.css" layer(utilities) prefix(tw) source(".");
 
+@custom-variant compact-dashboard {
+  &[data-card-size="small"] { @slot; }
+  @media (max-width:540px) {
+    &[data-card-size="large"] { @slot; }
+  }
+}
+
 :root {
   --page-bg:#101720;
   --surface:#1a2431;
@@ -809,7 +816,7 @@ input[type=hidden] {
 .topology-summary > p { flex-basis: 100%; margin: 0; }
 .topology-summary h3 { margin-top: 0; }
 .topology-summary button { white-space: normal; }
-.dashboard-device-grid > .device-card { @apply tw:w-full tw:max-w-[420px] tw:justify-self-center; }
+.dashboard-device-grid > .device-card { @apply tw:w-full tw:min-w-0 tw:max-w-[420px] tw:justify-self-center; }
 .ui-icon { width:1em; height:1em; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }
 .ui-icon:is([data-icon="settings"], [data-icon="clock"], [data-icon="edit"]) { stroke-width:1.7; }
 .ui-icon:is([data-icon="add"], [data-icon="clock"], [data-icon="refresh-list"], [data-icon="search"]),
@@ -1442,46 +1449,45 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-view[data-card-size="small"] .dashboard-device-grid > .device-card {
   --dashboard-card-inset:5px;
-  @apply tw:min-w-0 tw:max-w-[210px] tw:py-1.5;
+  @apply tw:max-w-[210px] tw:py-1.5;
 }
 @media (max-width:600px) {
-  .dashboard-view[data-card-size="small"] .dashboard-device-grid { @apply tw:grid-cols-2; }
+  .dashboard-view[data-card-size] .dashboard-device-grid { @apply tw:grid-cols-2; }
   .dashboard-view[data-card-size="small"] .dashboard-device-grid > .device-card { @apply tw:max-w-none; }
 }
-.dashboard-view[data-card-size="small"] .dashboard-card-header {
-  @apply tw:grid-cols-[22px_minmax(0,1fr)_auto] tw:gap-x-1;
+@media (max-width:540px) {
+  .dashboard-view[data-card-size="large"] .dashboard-device { --dashboard-card-inset:8px; }
+  .dashboard-view[data-card-size="large"] .card-primary-controls { --dashboard-power-size:48px; }
 }
-.dashboard-view[data-card-size="small"] .dashboard-card-header .device-symbol { @apply tw:size-[22px]; }
-.dashboard-view[data-card-size="small"] .dashboard-card-header .device-type-icon { @apply tw:size-4; }
-.dashboard-view[data-card-size="small"] .dashboard-card-actions { @apply tw:flex-col; }
 .dashboard-view[data-card-size="small"] :is(.dashboard-card-footer, .dashboard-card-subheader) { @apply tw:mt-1; }
 .dashboard-view[data-card-size="small"] .card-primary-controls { --dashboard-power-size:44px; }
-.dashboard-view[data-card-size="small"] .card-primary-controls .dashboard-power-button :is(.parameter-icon, .device-type-icon) { @apply tw:size-5; }
-.dashboard-view[data-card-size="small"] :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row { @apply tw:gap-x-1.5; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading, .dashboard-power-state) { @apply tw:py-0; }
-.dashboard-view[data-card-size="small"] .dashboard-light-reading { @apply tw:px-1.5; }
-.dashboard-view[data-card-size="small"] .dashboard-light-presets { @apply tw:px-1 tw:text-[11px]; }
-.dashboard-view[data-card-size="small"] :is(.dashboard-light-label, .dashboard-light-off-label) { @apply tw:sr-only; }
-.dashboard-view[data-card-size="small"] :is(.dashboard-light-icon, .dashboard-light-off-mark) { @apply tw:block; }
-.dashboard-view[data-card-size="small"] .dashboard-light-icon .parameter-icon { @apply tw:size-3.5; }
-.dashboard-view[data-card-size="small"] .dashboard-light-value { @apply tw:text-xs/tight; }
-.dashboard-view[data-card-size="small"] .dashboard-light-swatch {
-  @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong);
-}
-.dashboard-view[data-card-size="small"] .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading h3, .alias-tag, .dashboard-power-state) { line-height:1.15; }
-.dashboard-view[data-card-size="small"] :is(.device-card-title h3, .card-sensor-value, .dashboard-power-state) {
-  min-width:0;
-  overflow-wrap:anywhere;
-}
-.dashboard-view[data-card-size="small"] .camera-card-switches {
-  @apply tw:grid tw:grid-cols-[repeat(auto-fit,minmax(44px,1fr))] tw:gap-0;
-}
-.dashboard-view[data-card-size="small"][data-dashboard-panel="tools"] .dashboard-device .card-primary-controls { @apply tw:pr-0; }
-.dashboard-view[data-card-size="small"][data-dashboard-panel="tools"] .dashboard-device .card-refresh {
-  position:static;
-  margin-inline-start:auto;
-  transform:none;
+.dashboard-view {
+  @variant compact-dashboard {
+    .dashboard-card-header { @apply tw:grid-cols-[22px_minmax(0,1fr)_auto] tw:gap-x-1; }
+    .dashboard-card-header .device-symbol { @apply tw:size-[22px]; }
+    .dashboard-card-header .device-type-icon { @apply tw:size-4; }
+    .dashboard-card-actions { @apply tw:flex-col; }
+    .card-primary-controls .dashboard-power-button :is(.parameter-icon, .device-type-icon) { @apply tw:size-5; }
+    :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row { @apply tw:gap-x-1.5; }
+    .dashboard-light-reading { @apply tw:px-1.5; }
+    .dashboard-light-presets { @apply tw:px-1 tw:text-[11px]; }
+    :is(.dashboard-light-label, .dashboard-light-off-label) { @apply tw:sr-only; }
+    :is(.dashboard-light-icon, .dashboard-light-off-mark) { @apply tw:block; }
+    .dashboard-light-icon .parameter-icon { @apply tw:size-3.5; }
+    .dashboard-light-value { @apply tw:text-xs/tight; }
+    .dashboard-light-swatch { @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong); }
+    .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
+    :is(.device-card-title h3, .card-sensor-value, .dashboard-power-state) { @apply tw:min-w-0 tw:wrap-anywhere; }
+    .camera-card-switches { @apply tw:grid tw:grid-cols-[repeat(auto-fit,minmax(44px,1fr))] tw:gap-0; }
+    &[data-dashboard-panel="tools"] .dashboard-device .card-primary-controls { @apply tw:pr-0; }
+    &[data-dashboard-panel="tools"] .dashboard-device .card-refresh {
+      position:static;
+      margin-inline-start:auto;
+      transform:none;
+    }
+  }
 }
 
 .dashboard-device[id]:not([data-quick-sheet]) { @apply tw:cursor-default; }
