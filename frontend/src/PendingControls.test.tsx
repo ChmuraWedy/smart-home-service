@@ -1,3 +1,4 @@
+import { renderWithStore } from './test/render-with-store';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
@@ -47,7 +48,7 @@ it('puts switch configuration in collapsed additional settings and shows relativ
   const snapshot={device_id:'switch',online:true,status:{switch_1:true,relay_status:'last',switch_backlight:true,switch_inching:''},status_observations:{switch_1:{received_at:new Date(Date.now()-5000).toISOString()}}};
   const functions=[{code:'switch_1',type:'Boolean',values:'{}'},{code:'relay_status',type:'Enum',values:{range:['on','off','last']}},{code:'switch_backlight',type:'Boolean',values:'{}'},{code:'switch_inching',type:'String',values:'{}'}];
   vi.mocked(fetch).mockImplementation(async input=>new Response(JSON.stringify(String(input).includes('/functions')?{device_id:'switch',functions}:snapshot),{status:200}));
-  render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'key'})} device={{id:'switch',name:'Switch',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()}/>);
+  renderWithStore(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'key'})} device={{id:'switch',name:'Switch',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()}/>);
   const channel=await screen.findByRole('region',{name:'Канал 1'});
   expect(within(channel).getByText(/\d+ с назад/)).toBeInTheDocument();
   expect(within(channel).getByRole('button',{name:'Добавить алиас'})).toBeInTheDocument();

@@ -1,7 +1,7 @@
 import { MSG, t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { CloudDevice, CloudFunctions, CloudSnapshot, JsonValue, Provider } from '../api';
+import type { CloudDevice, CloudFunctions, JsonValue, Provider } from '../api';
 import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
@@ -9,6 +9,7 @@ import type { DeviceState, HomeApi, Reading } from '../home-api';
 import { readLocalDevice } from '../local-device-cache';
 import { useAppDispatch } from '../store';
 import { useLocalDeviceState } from '../use-local-device-state';
+import { useCloudDeviceSnapshot } from '../use-cloud-device-snapshot';
 import { CapabilityField, ControlFeedback, useControlSession } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
 import { batteryFromSpecs, DeviceIcon, isBattery, isCamera, ParameterIcon } from './DevicePresentation';
@@ -134,38 +135,40 @@ function StandardCardControls({ name, paused, sheet, specs, reading, now, local,
 }
 
 function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
-  const metadata = useMemo(() => ({value:cloud.controls?.ready ? cloud.controls.definitions : null as CloudFunctions | null}),[api,cloud.id,provider]);
-  const initial = useRef(cloud.controls?.snapshot);
-  const checked = (snapshot:CloudSnapshot) => {
-    if (snapshot.device_id !== cloud.id || !snapshot.status || typeof snapshot.status !== 'object' || Array.isArray(snapshot.status)) throw new Error(t(MSG.THE_SERVICE_RETURNED_UNEXPECTED_DEVICE_DATA));
-    return snapshot;
-  };
+  const { snapshot, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
+  const metadata = useMemo(() => ({
+    definitions: cloud.controls?.ready ? cloud.controls.definitions : null as CloudFunctions | null,
+    seed: cloud.controls?.snapshot,
+  }), [read]);
   const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
-    const definitions = metadata.value || await api.deviceFunctions(cloud.id,provider,signal);
+    const definitions = metadata.definitions || await api.deviceFunctions(cloud.id,provider,signal);
     if (definitions.device_id !== cloud.id || !Array.isArray(definitions.functions)) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_CAPABILITIES));
-    if (!signal?.aborted) metadata.value = definitions;
-    const snapshot = !refresh && initial.current ? initial.current : await api.deviceSnapshot(cloud.id,provider,signal,refresh);
-    return {definitions,snapshot:checked(snapshot)};
-  },[api,cloud.id,provider,metadata]);
-  const poll = useCallback(async (current:{definitions:CloudFunctions;snapshot:CloudSnapshot},signal:AbortSignal) => ({...current,snapshot:checked(await api.deviceSnapshot(cloud.id,provider,signal,false))}),[api,cloud.id,provider]);
+    if (!signal?.aborted) metadata.definitions = definitions;
+    await read(refresh, signal, metadata.seed);
+    return metadata;
+  },[api,cloud.id,provider,metadata,read]);
+  const poll = useCallback(async (current:typeof metadata,signal:AbortSignal) => {
+    await read(false, signal);
+    return current;
+  },[read]);
   const session = useControlSession(load,onAuthError,provider === 'sharing' && visible ? poll : undefined);
-  const specs = session.data ? cloudSpecs(session.data.definitions,session.data.snapshot) : [];
+  const definitions = session.data === metadata ? metadata.definitions : null;
+  const specs = definitions && snapshot ? cloudSpecs(definitions,snapshot) : [];
   useEffect(() => {
-    if (session.data) onStatus?.({online:session.data.snapshot.online, battery:batteryFromSpecs(cloudSpecs(session.data.definitions,session.data.snapshot),session.data.snapshot.status)});
-  },[session.data,onStatus]);
+    if (definitions && snapshot) onStatus?.({online:snapshot.online, battery:batteryFromSpecs(cloudSpecs(definitions,snapshot),snapshot.status)});
+  },[definitions,snapshot,onStatus]);
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
-    const data = session.data!;
-    const result = await api.sendDeviceCommands(cloud.id, provider, cloudBatchCommands([{spec,value}], data.definitions, data.snapshot.status));
+    const result = await api.sendDeviceCommands(cloud.id, provider, cloudBatchCommands([{spec,value}], definitions!, snapshot!.status));
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
-  const reading = (spec: ControlSpec) => session.data
-    ? cloudReading(spec, session.data.snapshot.status[spec.key], session.data.snapshot.status_observations?.[spec.key])
+  const reading = (spec: ControlSpec) => snapshot
+    ? cloudReading(spec, snapshot.status[spec.key], snapshot.status_observations?.[spec.key])
     : undefined;
-  const controls = {name:cloud.name, paused, sheet, specs, reading, now, busy:session.busy, readOK:session.readOK,
+  const controls = {name:cloud.name, paused, sheet, specs, reading, now, busy:session.busy, readOK:session.readOK && !!definitions && !!snapshot,
     refresh:session.refresh, notice:session.notice, ...commands};
   return isCamera(cloud.category)
     ? <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
-        online={session.data?.snapshot.online ?? cloud.online} />
+        online={snapshot?.online ?? cloud.online} />
     : <StandardCardControls {...controls} local={false} category={cloud.category} />;
 }
 

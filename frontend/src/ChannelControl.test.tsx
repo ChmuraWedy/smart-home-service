@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderWithStore } from './test/render-with-store';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi, type CloudDevice, type CloudSnapshot, type CloudFunctions } from './api';
@@ -27,7 +28,7 @@ function server() {
 describe('channel timer disclosure',()=>{
   it('preserves a timer edit across collapse and sends only that channel timer automatically',async()=>{
     const writes=server(),user=userEvent.setup();
-    render(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const clock=await screen.findByRole('button',{name:'Таймер канала 2'});
     expect(screen.queryByRole('spinbutton',{name:'Таймер канала 2 (с)'})).toBeNull();
     await user.click(clock);
@@ -46,7 +47,7 @@ describe('channel timer disclosure',()=>{
   });
   it('keeps both power channels on the main card and reserves timers for the full editor',async()=>{
     const writes=server();
-    render(<CardControls api={new HomeApi(connection)} device={{id:device.id,name:device.name,cloud:{sharing:device}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
+    renderWithStore(<CardControls api={new HomeApi(connection)} device={{id:device.id,name:device.name,cloud:{sharing:device}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
     expect(await screen.findByRole('switch',{name:'Канал 1'})).toHaveAttribute('aria-checked','false');
     expect(screen.getByRole('switch',{name:'Канал 2'})).toHaveAttribute('aria-checked','true');
     expect(screen.queryByRole('button',{name:/Таймер канала/})).toBeNull();

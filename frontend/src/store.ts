@@ -2,6 +2,7 @@ import { configureStore, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { localDeviceCache } from './local-device-cache';
+import { cloudDeviceCache } from './cloud-device-cache';
 
 type DashboardControlState = {
   detailsOpen: boolean;
@@ -33,14 +34,15 @@ export function createAppStore() {
     reducer: {
       dashboardControls: dashboardControls.reducer,
       [localDeviceCache.reducerPath]: localDeviceCache.reducer,
+      [cloudDeviceCache.reducerPath]: cloudDeviceCache.reducer,
     },
-    middleware: defaults => defaults().concat(localDeviceCache.middleware),
+    middleware: defaults => defaults().concat(localDeviceCache.middleware, cloudDeviceCache.middleware),
     devTools: import.meta.env.DEV,
   });
 }
 
 type AppStore = ReturnType<typeof createAppStore>;
-type RootState = ReturnType<AppStore['getState']>;
+export type RootState = ReturnType<AppStore['getState']>;
 export type AppDispatch = AppStore['dispatch'];
 export const useAppDispatch = useDispatch.withTypes<AppDispatch>();
 export const useAppSelector = useSelector.withTypes<RootState>();
