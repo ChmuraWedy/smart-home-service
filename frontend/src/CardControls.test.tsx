@@ -119,6 +119,33 @@ describe('main controls on device cards', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it('shows two bulb readings, switching from white temperature to the reported active color', async () => {
+    const functions = [...definitions.functions,
+      { code: 'work_mode', type: 'Enum', values: { range: ['white', 'colour', 'scene'] } },
+      { code: 'temp_value_v2', type: 'Integer', values: { min: 0, max: 1000, scale: 0, step: 10 } },
+    ];
+    const white = { ...snapshot, status: { ...snapshot.status, switch_led: true, temp_value_v2: 500, work_mode: 'white' } };
+    const color = { ...white, status: { ...white.status, work_mode: 'colour', colour_data_v2: { h: 120, s: 1000, v: 500 } } };
+    vi.mocked(fetch).mockResolvedValueOnce(json(color));
+    const { container } = mount({ ...lamp, controls: { ready: true, definitions: { ...definitions, functions }, snapshot: white } });
+    const power = await screen.findByRole('switch', { name: 'Питание' });
+    expect(power).toBeChecked();
+    expect(screen.getByText('Яркость')).toBeVisible();
+    expect(screen.getByText('Цветовая температура')).toBeVisible();
+    expect(screen.getByText('10 %')).toBeVisible();
+    expect(screen.getByText('50 %')).toBeVisible();
+    expect(screen.queryByText('#FF0000')).toBeNull();
+    expect(container.querySelector('.dashboard-light-tint')).toHaveStyle({ backgroundColor: 'rgb(220, 205, 171)' });
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Обновить параметры' }));
+    expect(await screen.findByText('#008000')).toBeVisible();
+    expect(screen.getByText('Цвет')).toBeVisible();
+    expect(screen.getByText('50 %')).toBeVisible();
+    expect(screen.queryByText('Цветовая температура')).toBeNull();
+    expect(screen.queryByText('10 %')).toBeNull();
+    expect(container.querySelector('.dashboard-light-tint')).toHaveStyle({ backgroundColor: '#008000' });
+    expect(power).toBeChecked();
+  });
+
   it('sends once while awaiting an acknowledgement and clears waiting after a matching report', async () => {
     let accept!:() => void;
     const ack=new Promise<Response>(resolve => {accept=() => resolve(json({acknowledged:true}));});

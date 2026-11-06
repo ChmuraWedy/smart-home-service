@@ -156,8 +156,8 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerOnText, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
-  pendingScope: string; spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerOnText?:string; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerSummary, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
+  pendingScope: string; spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerSummary?:(power:boolean|null)=>ReactNode; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
@@ -267,10 +267,10 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
     </label>;
   }
   return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-row"><div className="capability-heading"><div className="capability-label"><div className="capability-label-line"><h3>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}</h3>{headingActions}</div>{aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}</div>
+    <div className="capability-row"><div className="capability-heading"><div className="capability-label"><div className="capability-label-line"><h3 className={powerSummary ? "sr-only" : undefined}>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}</h3>{headingActions}</div>{aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}</div>
     </div>
-    {powerIcon && <span className="dashboard-power-state">
-      {powerKnown ? selectedPower ? powerOnText || t(MSG.ON) : t(MSG.OFF) : t(MSG.NO_DATA)}
+    {powerIcon && <span className={'dashboard-power-state' + (powerSummary ? ' dashboard-power-state-summary' : '')}>
+      {powerSummary ? powerSummary(powerKnown ? selectedPower : null) : powerKnown ? t(selectedPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
       {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
       <span role="status" className="dashboard-power-pending" title={awaiting ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
         {awaiting && <><span className="spinner" aria-hidden="true" /><span className="sr-only">{t(MSG.WAITING_FOR_A_NEW_READING)}</span></>}

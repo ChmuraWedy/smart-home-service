@@ -2,7 +2,7 @@ import { MSG, t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { CloudDevice, JsonValue, Provider } from '../api';
-import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, localSpec, validateControlValue, withChannelLabels } from '../controls';
+import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, hsvToHex, isStale, limitsOf, localSpec, validateControlValue, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
@@ -27,6 +27,30 @@ function powerControl(spec: ControlSpec) {
 }
 function sensorReading(spec: ControlSpec) {
   return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key) && ['number','boolean','enum','text'].includes(spec.kind);
+}
+
+function temperatureTint(spec: ControlSpec, value: JsonValue | undefined) {
+  const { minimum, maximum } = spec;
+  if (typeof value !== 'number' || minimum === undefined || maximum === undefined || maximum <= minimum) return;
+  const cool = Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)));
+  const warm = [255, 191, 86], cold = [184, 218, 255];
+  return 'rgb(' + warm.map((channel, index) => Math.round(channel + (cold[index] - channel) * cool)).join(', ') + ')';
+}
+
+function LightCardReading({ code, label, value, tint, off }: { code: 'brightness' | 'color_temperature' | 'color'; label: string; value?: string; tint?: string; off?: boolean }) {
+  return <span className="dashboard-light-reading" title={value ? label + ' · ' + value : label}>
+    {tint && <span className="dashboard-light-tint" style={{ backgroundColor: tint }} aria-hidden="true" />}
+    <span className="dashboard-light-copy">
+      <span className="dashboard-light-icon"><ParameterIcon code={code} /></span>
+      <span className="dashboard-light-label">{label}</span>
+      <span className="dashboard-light-value">
+        {off ? <><span className="dashboard-light-off-label">{value}</span><span className="dashboard-light-off-mark" aria-hidden="true">—</span></>
+          : value ? <span className="dashboard-light-value-text">{value}</span>
+            : <><span aria-hidden="true">—</span><span className="sr-only">{t(MSG.NO_DATA)}</span></>}
+        {code === 'color' && tint && <span className="dashboard-light-swatch" style={{ backgroundColor: tint }} aria-hidden="true" />}
+      </span>
+    </span>
+  </span>;
 }
 
 export type CardStatus = {online:boolean;battery?:BatteryReading};
@@ -96,22 +120,44 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
   const powers = specs.filter(powerControl);
   const powerLayout = !powers.length ? undefined : powers.length === 1 && !powers[0].aliases?.length ? 'single' : 'channels';
   const brightness = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'number' && spec.unit === '%' && /^(brightness|bright_value(?:_v2)?)$/.test(spec.key)) : undefined;
-  const temperature = powerLayout === 'single' ? specs.find(spec => /^(temp_value(?:_v2)?|color_temperature)$/.test(spec.key)) : undefined;
+  const temperature = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'number' && /^(temp_value(?:_v2)?|color_temperature)$/.test(spec.key)) : undefined;
+  const color = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'color' && /^(color|colour_data(?:_v2)?)$/.test(spec.key)) : undefined;
   const sliders = [brightness, temperature].filter((spec): spec is ControlSpec =>
     spec?.kind === 'number' && spec.readable && spec.writable && spec.minimum !== undefined &&
     spec.maximum !== undefined && spec.minimum < spec.maximum);
   const hasSliders = sliders.length > 0;
   const onLightAvailable = sheet?.onLightAvailable;
   useEffect(() => { onLightAvailable?.(hasSliders); }, [hasSliders, onLightAvailable]);
-  const brightnessReading = brightness && reading(brightness);
-  const brightnessText = brightness && typeof brightnessReading?.value === 'number' && !isStale(brightnessReading, now, local)
-    ? displayReading(brightness, brightnessReading) : undefined;
-  const sensors = specs.filter(spec => spec !== brightness && sensorReading(spec));
+  const currentReading = (spec: ControlSpec | undefined) => {
+    const value = spec && reading(spec);
+    return isStale(value, now, local) ? undefined : value;
+  };
+  const mode = currentReading(specs.find(spec => spec.key === 'work_mode' || spec.key === 'mode'))?.value;
+  const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
+  const whiteMode = mode === 'white' || mode === undefined;
+  const { h, s, v } = limitsOf(colorMode ? currentReading(color)?.value : undefined);
+  const hsv = typeof h === 'number' && h >= 0 && h <= 360 && typeof s === 'number' && s >= 0 && s <= 1000 &&
+    typeof v === 'number' && v >= 0 && v <= 1000 ? { h, s, v } : undefined;
+  const brightnessReading = whiteMode ? currentReading(brightness) : undefined;
+  const temperatureReading = whiteMode ? currentReading(temperature) : undefined;
+  const brightnessText = hsv ? hsv.v / 10 + ' %' : brightness && brightnessReading ? displayReading(brightness, brightnessReading) : undefined;
+  const colorText = hsv && hsvToHex(hsv).toUpperCase();
+  const summary = brightness || temperature || colorMode ? (power: boolean | null) => (
+    <span className={'dashboard-light-readings' + (colorMode || temperature ? ' dashboard-light-readings-split' : '')}>
+      <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === false ? t(MSG.OFF) : power ? brightnessText : undefined} />
+      {colorMode
+        ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
+        : temperature && <LightCardReading code="color_temperature" label={temperature.label}
+          value={power && temperatureReading ? displayReading(temperature, temperatureReading) : undefined}
+          tint={power ? temperatureTint(temperature, temperatureReading?.value) : undefined} />}
+    </span>
+  ) : undefined;
+  const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
   const disabled = busy || !readOK || sending;
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
-  const field = (spec:ControlSpec, headingActions?:ReactNode, showBrightness = true) => <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
+  const field = (spec:ControlSpec, headingActions?:ReactNode, showSummary = true) => <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
     powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : <ParameterIcon code={spec.key} />}
-    powerOnText={showBrightness ? brightnessText : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
+    powerSummary={showSummary ? summary : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
   const sensorValues = sensors.length > 0 && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
     {sensors.map(spec => {
       const value = reading(spec), stale = !!value?.known && isStale(value,now,local);

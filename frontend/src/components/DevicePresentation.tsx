@@ -6,7 +6,9 @@ export const batteryKeys = ['battery_percentage', 'battery_value', 'va_battery',
 export const isBattery = (key: string) => batteryKeys.includes(key);
 export type BatteryReading = { code: string; value: JsonValue; unit?: string | null };
 export function ParameterIcon({ code }: { code: string }) {
-  const path = /temperature|temp_/.test(code) ? 'M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0M12 8v10' : /humidity/.test(code) ? 'M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12M9 16a3 3 0 0 0 3 3' : isBattery(code) ? 'M3 7h16v10H3zM21 10v4M6 10v4M9 10v4M12 10v4' : /motion|pir|presence/.test(code) ? 'M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4M7 10l4-3 4 3 4 1M11 7l-2 7 4 3-1 5M9 14l-4 5' : /switch[1-9][0-9]*_value/.test(code) ? 'M6 4h12v16H6zM9 8h6v8H9z' : 'M12 3v8M7 6a8 8 0 1 0 10 0';
+  const path = code === 'brightness' ? 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 3v2M12 19v2M3 12h2M19 12h2M6 6l1.4 1.4m9.2 9.2L18 18M6 18l1.4-1.4m9.2-9.2L18 6'
+    : code === 'color' ? 'M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-3.7 1.5 1.5 0 0 1 1-2.8h3a3 3 0 0 0 3-3c0-4.7-4-8.5-9-8.5zM7.5 10.5h.01M10.5 7.5h.01M15 7.5h.01M17 11h.01'
+    : /temperature|temp_/.test(code) ? 'M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0M12 8v10' : /humidity/.test(code) ? 'M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12M9 16a3 3 0 0 0 3 3' : isBattery(code) ? 'M3 7h16v10H3zM21 10v4M6 10v4M9 10v4M12 10v4' : /motion|pir|presence/.test(code) ? 'M12 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4M7 10l4-3 4 3 4 1M11 7l-2 7 4 3-1 5M9 14l-4 5' : /switch[1-9][0-9]*_value/.test(code) ? 'M6 4h12v16H6zM9 8h6v8H9z' : 'M12 3v8M7 6a8 8 0 1 0 10 0';
   return <svg className="parameter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
 }
 export function BatteryBadge({ reading }: { reading?: BatteryReading | null }) {

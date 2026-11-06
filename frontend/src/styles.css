@@ -1353,6 +1353,26 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:rounded-none tw:border-0 tw:bg-transparent tw:p-0 tw:text-xs;
 }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-1; }
+.dashboard-device [data-power-layout] .dashboard-power-state-summary {
+  @apply tw:relative tw:row-span-2 tw:row-start-1 tw:flex tw:self-stretch tw:pb-0;
+}
+.dashboard-light-readings { @apply tw:grid tw:min-w-0 tw:flex-1 tw:py-1; }
+.dashboard-light-readings-split { @apply tw:grid-cols-2; }
+.dashboard-light-reading {
+  @apply tw:relative tw:isolate tw:grid tw:min-w-0 tw:content-center tw:px-1.5 tw:py-0.5;
+  overflow-wrap:anywhere;
+}
+.dashboard-light-reading + .dashboard-light-reading { border-inline-start:1px solid var(--border); }
+.dashboard-light-tint { @apply tw:absolute tw:inset-0 tw:-z-10 tw:opacity-50; }
+.dashboard-light-copy { @apply tw:grid tw:w-fit tw:max-w-full tw:gap-0.5; }
+.dashboard-light-icon, .dashboard-light-off-mark, .dashboard-light-swatch { @apply tw:hidden; }
+.dashboard-light-label { @apply tw:text-xs tw:font-medium tw:text-(--text); }
+.dashboard-light-value { @apply tw:text-sm tw:font-semibold tw:text-(--text-strong); }
+.dashboard-light-tint ~ .dashboard-light-copy {
+  @apply tw:rounded-sm tw:px-1;
+  background:color-mix(in srgb,var(--surface) 88%,transparent);
+}
+.dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
 }
@@ -1391,6 +1411,16 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view[data-card-size="small"] .card-primary-controls .dashboard-power-button :is(.parameter-icon, .device-type-icon) { @apply tw:size-5; }
 .dashboard-view[data-card-size="small"] :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row { @apply tw:gap-x-1.5; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading, .dashboard-power-state) { @apply tw:py-0; }
+.dashboard-view[data-card-size="small"] .dashboard-light-readings { @apply tw:py-0.5; }
+.dashboard-view[data-card-size="small"] .dashboard-light-reading { @apply tw:px-0.5; }
+.dashboard-view[data-card-size="small"] :is(.dashboard-light-label, .dashboard-light-off-label) { @apply tw:sr-only; }
+.dashboard-view[data-card-size="small"] :is(.dashboard-light-icon, .dashboard-light-off-mark) { @apply tw:block; }
+.dashboard-view[data-card-size="small"] .dashboard-light-icon .parameter-icon { @apply tw:size-3.5; }
+.dashboard-view[data-card-size="small"] .dashboard-light-value { @apply tw:text-xs/tight; }
+.dashboard-view[data-card-size="small"] .dashboard-light-swatch {
+  @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong);
+}
+.dashboard-view[data-card-size="small"] .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading h3, .alias-tag, .dashboard-power-state) { line-height:1.15; }
 .dashboard-view[data-card-size="small"] :is(.device-card-title h3, .card-sensor-value, .dashboard-power-state) {
   min-width:0;
