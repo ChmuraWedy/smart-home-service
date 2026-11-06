@@ -16,6 +16,7 @@ import { useTopology } from '../use-topology';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
+import { DashboardAliases } from './DashboardAliases';
 import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId } from '../device-links';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
@@ -48,9 +49,7 @@ function DashboardCardHeader({ icon, title, aliases, metadata, actions }: {
     <span className="device-symbol" aria-hidden="true">{icon}</span>
     <div className="device-card-identity">
       <div className="device-card-title"><h3>{title}</h3>
-        {!!aliases?.length && <div className="capability-aliases" role="group" aria-label={t(MSG.DEVICE_ALIASES)}>
-          {aliases.map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}
-        </div>}
+        {!!aliases?.length && <DashboardAliases aliases={aliases} />}
       </div>
       <div className="device-card-context">{metadata}</div>
     </div>
@@ -66,6 +65,7 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
   api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
+  const aliases = useMemo(() => deviceAliases(device), [device]);
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
   const dispatch = useAppDispatch();
@@ -97,7 +97,7 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
     && !codes.some(code => /^switch(?:_|$)/.test(code));
   const cardLayout = climate && !isCamera(cloud?.category) ? 'climate' : undefined;
   return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
-    <DashboardCardHeader icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={deviceAliases(device)}
+    <DashboardCardHeader icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
       title={hasSheet ? <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
         aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}>{device.name}</button> : device.name}
       metadata={<><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : local && !enabled ? t(MSG.DISABLED_IN_SETTINGS) : online ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)}</span><BatteryBadge reading={battery} /></div></>}
