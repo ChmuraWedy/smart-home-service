@@ -1,6 +1,7 @@
 import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { MSG, t } from '../i18n';
+import { IconGlyph } from './ui/icon';
 
 export function DashboardAliases({ aliases }: { aliases: string[] }) {
   const row = useRef<HTMLDivElement>(null);
@@ -57,14 +58,14 @@ export function DashboardAliases({ aliases }: { aliases: string[] }) {
     {overflow && <Popover className="dashboard-alias-overflow">
       {({ open }) => <>
         <PopoverButton type="button" className="secondary dashboard-alias-more" aria-label={t(MSG.SHOW_ALL_ALIASES)}
-          aria-describedby={open ? undefined : tooltipId}>…</PopoverButton>
+          aria-describedby={open ? undefined : tooltipId}><IconGlyph name="more" /></PopoverButton>
         {!open && <span className="dashboard-alias-tooltip" id={tooltipId} role="tooltip">{preview}</span>}
         <PopoverPanel anchor={{ to: 'bottom end', gap: 6, padding: 8 }} focus className="dashboard-alias-popup"
           role="dialog" aria-label={t(MSG.DEVICE_ALIASES)} onClick={event => event.stopPropagation()}>
           {({ close }) => <>
             <div className="dashboard-alias-popup-header">
               <strong>{t(MSG.DEVICE_ALIASES)}</strong>
-              <button type="button" className="secondary compact" aria-label={t(MSG.CLOSE)} onClick={() => close()}>×</button>
+              <button type="button" className="secondary compact" aria-label={t(MSG.CLOSE)} onClick={() => close()}><IconGlyph name="close" /></button>
             </div>
             <ul className="capability-aliases">
               {aliases.map(alias => <li className="alias-tag" key={alias}>{alias}</li>)}

@@ -17,6 +17,7 @@ import { useTopology } from '../use-topology';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
+import { Icon } from './ui/icon';
 import { DashboardAliases } from './DashboardAliases';
 import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
@@ -39,11 +40,15 @@ function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
 }
 
 function CardDetailsButton({ label, disabled, onClick }: { label:string; disabled?:boolean; onClick:() => void }) {
-  return <button type="button" className="secondary tile-icon-action" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10 3h4l.6 2.7 1.9 1.1 2.6-.9 2 3.5-2 1.8v2.2l2 1.8-2 3.5-2.6-.9-1.9 1.1L14 21h-4l-.6-2.7-1.9-1.1-2.6.9-2-3.5 2-1.8v-2.2l-2-1.8 2-3.5 2.6.9 1.9-1.1L10 3Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
+  return <button
+    type="button"
+    className="secondary tile-icon-action"
+    aria-label={label}
+    title={label}
+    disabled={disabled}
+    onClick={onClick}
+  >
+    <Icon name="settings" />
   </button>;
 }
 
@@ -107,7 +112,17 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
         aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}>{device.name}</button> : device.name}
       metadata={<><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : local && !enabled ? t(MSG.DISABLED_IN_SETTINGS) : online ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)}</span><BatteryBadge reading={battery} /></div></>}
       actions={<><CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy} onClick={() => onOpen(route)} />
-        {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)} title={t(MSG.SET_UP_LOCAL_CONNECTION)} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}</>} />
+        {!local && <button
+          className="secondary tile-icon-action device-setup-action"
+          aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)}
+          title={t(MSG.SET_UP_LOCAL_CONNECTION)}
+          disabled={!onAdd || quickBusy}
+          onClick={() => route !== 'local' && onAdd?.(route)}
+        >
+          <Icon name="wifi" />
+        </button>}
+      </>}
+    />
     <DashboardCardFooter>
       <CardControls key={route} api={api} device={device} route={route} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:onQuickClose, trigger:sheetTrigger, onLightAvailable}} />
       {routes.length > 1 && <div className="device-card-footer tw:mt-2">
@@ -332,11 +347,11 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
       <div><p className="eyebrow">{t(MSG.YOUR_HOME)}</p><h2 id="control-center-heading">{t(MSG.DEVICES_AND_GROUPS)}{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div>
       <div className="survey-toolbar dashboard-actions">
         <button className="secondary compact" disabled={!inventory || busy} aria-label={t(MSG.SET_UP_LOCAL_DEVICE)} title={t(MSG.SET_UP_LOCAL_DEVICE)} onClick={() => choose({ kind: 'survey' })}>
-          <svg className="dashboard-action-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          <Icon name="add" className="dashboard-action-icon" />
           <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
         </button>
         <button className="secondary compact" disabled={!ready || busy} aria-label={t(MSG.REFRESH_LIST)} title={t(MSG.REFRESH_LIST)} onClick={() => setRevision(value => value + 1)}>
-          <svg className="dashboard-action-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 4v5h-5M20 9a8 8 0 1 0 0 6" /></svg>
+          <Icon name="refresh-list" className="dashboard-action-icon" />
           <span>{t(MSG.REFRESH_LIST)}</span>
         </button>
       </div>

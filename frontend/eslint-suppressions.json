@@ -1,10 +1,10 @@
 {
   "src/App.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 11
+      "count": 10
     },
     "@stylistic/max-len": {
-      "count": 16
+      "count": 15
     },
     "no-nested-ternary": {
       "count": 1
@@ -33,13 +33,10 @@
   },
   "src/components/AliasRow.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 9
+      "count": 7
     },
     "@stylistic/max-len": {
-      "count": 8
-    },
-    "no-nested-ternary": {
-      "count": 1
+      "count": 6
     },
     "no-restricted-syntax": {
       "count": 5
@@ -58,10 +55,10 @@
   },
   "src/components/CameraCardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 9
+      "count": 8
     },
     "@stylistic/max-len": {
-      "count": 2
+      "count": 1
     },
     "no-nested-ternary": {
       "count": 1
@@ -111,14 +108,6 @@
       "count": 1
     }
   },
-  "src/components/ChannelControl.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 2
-    },
-    "@stylistic/max-len": {
-      "count": 1
-    }
-  },
   "src/components/CloudControl.tsx": {
     "@stylistic/jsx-max-props-per-line": {
       "count": 10
@@ -146,10 +135,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 22
+      "count": 16
     },
     "@stylistic/max-len": {
-      "count": 31
+      "count": 28
     },
     "no-nested-ternary": {
       "count": 9
@@ -217,16 +206,16 @@
   },
   "src/components/DeviceControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 24
+      "count": 18
     },
     "@stylistic/max-len": {
-      "count": 25
+      "count": 24
     },
     "no-nested-ternary": {
       "count": 12
     },
     "no-restricted-syntax": {
-      "count": 18
+      "count": 17
     }
   },
   "src/components/DeviceMappings.tsx": {
@@ -252,11 +241,8 @@
     }
   },
   "src/components/DevicePresentation.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 1
-    },
     "@stylistic/max-len": {
-      "count": 4
+      "count": 3
     },
     "no-nested-ternary": {
       "count": 6
@@ -278,12 +264,9 @@
   },
   "src/components/FieldInfo.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 2
+      "count": 1
     },
     "@stylistic/max-len": {
-      "count": 2
-    },
-    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -368,11 +351,8 @@
     }
   },
   "src/components/WizardDialog.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 2
-    },
     "@stylistic/max-len": {
-      "count": 2
+      "count": 1
     },
     "no-restricted-syntax": {
       "count": 2

@@ -21,6 +21,7 @@ import { ChannelControl } from './ChannelControl';
 import { CameraCardControls } from './CameraCardControls';
 import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
+import { IconGlyph } from './ui/icon';
 
 function powerControl(spec: ControlSpec) {
   return spec.writable && spec.kind === 'boolean' && /^(switch|switch_led|switch_[1-9][0-9]*)$/.test(spec.key);
@@ -169,7 +170,7 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
     <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
       {powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       {!powerLayout && sensorValues}
-      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
+      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}><IconGlyph name="refresh" /></button>
     </div>
     {powerLayout && sensorValues}
     {summary && <div className="dashboard-light-presets">

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { MSG, t } from '../i18n';
+import { IconGlyph } from './ui/icon';
 
 export type DashboardSheetState = {
   open: boolean;
@@ -36,7 +37,7 @@ export function DashboardSheet({ title, onClose, returnFocus, children }: { titl
       }}><span /></div>
     <header className="dashboard-sheet-heading">
       <h2 id={titleId}>{title}</h2>
-      <button type="button" className="secondary" aria-label={t(MSG.CLOSE)} onClick={onClose}>×</button>
+      <button type="button" className="secondary" aria-label={t(MSG.CLOSE)} onClick={onClose}><IconGlyph name="close" /></button>
     </header>
     {children}
   </dialog>;

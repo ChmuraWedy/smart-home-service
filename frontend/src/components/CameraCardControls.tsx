@@ -10,6 +10,7 @@ import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
 import { CapabilityField, ControlFeedback } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
+import { Icon, IconGlyph } from './ui/icon';
 
 export function CameraCardControls({
   api, deviceId, name, pendingScope, provider, online, onAuthError, paused, sheet,
@@ -52,13 +53,13 @@ export function CameraCardControls({
     <div className="card-primary-controls tw:grid tw:grid-cols-1">
       {privacy && <div className="camera-card-privacy">
         <CapabilityField pendingScope={pendingScope} spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
-          powerIcon={<svg className="parameter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.2 3 7.5 7.5 9.5 4.5-2 7.5-5.3 7.5-9.5V6z" /></svg>}
+          powerIcon={<Icon name="shield" className="parameter-icon" />}
           booleanActions={renderPreview} disabled={disabled} onSend={value => toggle(privacy, value)} />
       </div>}
       {!!switches.length && <div className="camera-card-switches">
         {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       </div>}
-      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
+      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}><IconGlyph name="refresh" /></button>
     </div>
     {!privacy && renderPreview(privacyStatus)}
     {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}

@@ -14,6 +14,7 @@ import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWi
 import { hasLightEffectWizard, LightEffectWizard } from './LightEffectWizard';
 import { ParameterIcon } from './DevicePresentation';
 import { Switch } from './ui/switch';
+import { Icon, IconGlyph } from './ui/icon';
 
 export type ControlNotice = { text: string; error?: boolean };
 export type Receipt = ControlNotice;
@@ -129,6 +130,10 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
   const [infoOpen,setInfoOpen] = useState(false);
   const infoId = useId();
   const infoPanel = useRef<HTMLElement>(null), infoButton = useRef<HTMLButtonElement>(null);
+  function closeInformation() {
+    setInfoOpen(false);
+    infoButton.current?.focus();
+  }
   useEffect(() => {
     if (!infoOpen) return;
     const outside = (event:PointerEvent) => { if (!infoPanel.current?.contains(event.target as Node) && !infoButton.current?.contains(event.target as Node)) setInfoOpen(false); };
@@ -145,7 +150,60 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     return () => { element.close(); unlockBody(); previous?.focus(); };
   }, []);
   return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} aria-busy={busy} onClick={event => event.stopPropagation()} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (infoOpen) setInfoOpen(false); else if (!busy) onClose(); }}>
-    <header className={"control-header" + (connectionContent ? " device-control-header" : "")}><div className="control-header-title">{subtitle && <p className="eyebrow">{subtitle}</p>}{titleContent || <h2>{title}</h2>}</div>{connectionContent}<div className="control-header-actions"><div className="control-header-buttons">{onRefresh && <button type="button" className="header-icon control-refresh" aria-label={t(MSG.REFRESH_STATUS)} title={t(MSG.REFRESH_STATUS)} disabled={busy} onClick={() => void onRefresh()}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M20 7v5h-5M20 12a8 8 0 1 1-2.4-5.7L20 9" /></svg></button>}{information && <button type="button" ref={infoButton} className="header-icon control-information" aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)} title={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)} aria-expanded={infoOpen} aria-controls={infoId} onClick={() => setInfoOpen(value => !value)}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7h.01" /></svg></button>}<button className="header-icon control-dismiss" aria-label={closeLabel} title={closeLabel} disabled={busy} onClick={onClose}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">{closeLabel === t(MSG.CLOSE) ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m14 5-7 7 7 7M7 12h14" />}</svg></button></div>{statusContent}{information && infoOpen && <section ref={infoPanel} id={infoId} className="connection-information connection-balloon" aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}><button type="button" className="secondary balloon-close" aria-label={t(MSG.CLOSE_HELP)} onClick={() => { setInfoOpen(false); infoButton.current?.focus(); }}>×</button>{information}</section>}</div></header>
+    <header className={"control-header" + (connectionContent ? " device-control-header" : "")}>
+      <div className="control-header-title">
+        {subtitle && <p className="eyebrow">{subtitle}</p>}
+        {titleContent || <h2>{title}</h2>}
+      </div>
+      {connectionContent}
+      <div className="control-header-actions">
+        <div className="control-header-buttons">
+          {onRefresh && <button
+            type="button"
+            className="header-icon control-refresh"
+            aria-label={t(MSG.REFRESH_STATUS)}
+            title={t(MSG.REFRESH_STATUS)}
+            disabled={busy}
+            onClick={() => void onRefresh()}
+          >
+            <Icon name="refresh-status" />
+          </button>}
+          {information && <button
+            type="button"
+            ref={infoButton}
+            className="header-icon control-information"
+            aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
+            title={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
+            aria-expanded={infoOpen}
+            aria-controls={infoId}
+            onClick={() => setInfoOpen(value => !value)}
+          >
+            <Icon name="info" />
+          </button>}
+          <button
+            className="header-icon control-dismiss"
+            aria-label={closeLabel}
+            title={closeLabel}
+            disabled={busy}
+            onClick={onClose}
+          >
+            <Icon name={closeLabel === t(MSG.CLOSE) ? 'close' : 'back'} />
+          </button>
+        </div>
+        {statusContent}
+        {information && infoOpen && <section
+          ref={infoPanel}
+          id={infoId}
+          className="connection-information connection-balloon"
+          aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
+        >
+          <button type="button" className="secondary balloon-close" aria-label={t(MSG.CLOSE_HELP)} onClick={closeInformation}>
+            <IconGlyph name="close" />
+          </button>
+          {information}
+        </section>}
+      </div>
+    </header>
     <div className="control-dialog-body">{children}</div>
   </dialog>;
 }
@@ -278,7 +336,7 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
     </span>}
     {spec.kind === 'color' && <div className="color-tools">
       {spec.kind === 'color' && spec.writable && <input aria-label={t(MSG.COLOR_PICKER)} title={t(MSG.COLOR_PICKER)} className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
-      {spec.kind === 'color' && spec.writable && <button type="button" className="secondary color-details-toggle" aria-label={t(MSG.PRECISE_COLOR_SETTINGS)} title={t(MSG.HUE_SATURATION_AND_BRIGHTNESS)} aria-expanded={preciseColor} onClick={() => setPreciseColor(value => !value)}>···</button>}
+      {spec.kind === 'color' && spec.writable && <button type="button" className="secondary color-details-toggle" aria-label={t(MSG.PRECISE_COLOR_SETTINGS)} title={t(MSG.HUE_SATURATION_AND_BRIGHTNESS)} aria-expanded={preciseColor} onClick={() => setPreciseColor(value => !value)}><IconGlyph name="more-centered" /></button>}
     </div>}
     {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">{t(MSG.STALE)}</span>}</p>}
     {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">

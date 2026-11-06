@@ -6,6 +6,7 @@ import { encodeArea, parseArea, shiftArea, validArea } from '../camera-area';
 import type { Area } from '../camera-area';
 import { ControlDialog } from './DeviceControls';
 import { CameraLive } from './CameraLive';
+import { IconGlyph } from './ui/icon';
 
 export function CameraArea({value,disabled,onChange,api,deviceId,provider,onAuthError,viewingBlocked}:{value:string;disabled:boolean;onChange:(value:string)=>void;api:CloudApi;deviceId:string;provider:Provider;onAuthError:()=>void;viewingBlocked?:string}) {
   const [editing,setEditing]=useState<ReturnType<typeof parseArea>>(null);
@@ -41,7 +42,7 @@ function AreaDialog({initial,api,deviceId,provider,onAuthError,onClose,onSave,vi
   const overlay=<div className="camera-area-surface" ref={surface}>
     <div className="camera-area-box" style={{left:area.x+'%',top:area.y+'%',width:area.xlen+'%',height:area.ylen+'%'}}>
       <button type="button" className="camera-area-move" aria-label={t(MSG.MOVE_AREA)} onPointerDown={event=>begin(event,false)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,false)} />
-      <button type="button" className="camera-area-resize" aria-label={t(MSG.RESIZE_AREA)} onPointerDown={event=>begin(event,true)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,true)}>↘</button>
+      <button type="button" className="camera-area-resize" aria-label={t(MSG.RESIZE_AREA)} onPointerDown={event=>begin(event,true)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,true)}><IconGlyph name="resize" /></button>
     </div>
   </div>;
   return <ControlDialog title={t(MSG.DETECTION_AREA)} busy={false} onClose={onClose} className="camera-area-dialog">

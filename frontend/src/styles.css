@@ -810,7 +810,16 @@ input[type=hidden] {
 .topology-summary h3 { margin-top: 0; }
 .topology-summary button { white-space: normal; }
 .dashboard-device-grid > .device-card { @apply tw:w-full tw:max-w-[420px] tw:justify-self-center; }
-.dashboard-action-icon { @apply tw:hidden; }
+.ui-icon { width:1em; height:1em; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }
+.ui-icon:is([data-icon="settings"], [data-icon="clock"], [data-icon="edit"]) { stroke-width:1.7; }
+.ui-icon:is([data-icon="add"], [data-icon="clock"], [data-icon="refresh-list"], [data-icon="search"]),
+.alias-icon > .ui-icon { stroke-linecap:round; }
+.ui-icon:is([data-icon="settings"], [data-icon="refresh-list"]), .alias-icon > .ui-icon { stroke-linejoin:round; }
+.ui-icon:is(.parameter-icon, .device-type-icon) { stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.dashboard-action-icon { @apply tw:hidden; width:20px; height:20px; }
+.alias-icon > .ui-icon { width:14px; height:14px; }
+.tile-icon-action > .ui-icon, .channel-timer-toggle > .ui-icon { width:18px; height:18px; }
+.dashboard-search-button > .ui-icon { width:22px; height:22px; }
 @media (max-width: 760px) {
   .control-center { @apply tw:p-3; }
 }
@@ -975,15 +984,7 @@ input[type=hidden] {
 }
 
 .control-header-actions .control-dismiss,.control-header-actions .control-information { width:44px; height:44px; flex:none; padding:10px; display:grid; place-items:center; border-radius:50%; }
-.device-type-icon {
-  width:24px;
-  height:24px;
-  fill:none;
-  stroke:currentColor;
-  stroke-width:1.6;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
+.device-type-icon { width:24px; height:24px; }
 .device-card-title h3 { margin:0 0 3px; font-size:14px; line-height:1.3; }
 .device-location,.device-route-label { color:var(--muted); font-size:10px; line-height:1.5; margin:0; overflow-wrap:anywhere; }
 .device-card-status .presence { white-space:normal; }

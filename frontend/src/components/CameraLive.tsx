@@ -4,6 +4,7 @@ import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
 import type Hls from 'hls.js';
 import type { ReactNode } from 'react';
+import { IconGlyph } from './ui/icon';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
 type SafariVideo = HTMLVideoElement & {
@@ -174,7 +175,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       <span title={networkSignal ? t(MSG.LAST_SIGNAL_READING_REPORTED_BY_THE_CAMERA) : t(MSG.THE_CONNECTION_DID_NOT_PROVIDE_A_CAMERA_SIGNAL)}>Wi-Fi: {networkSignal || t(MSG.NO_DATA)}</span>
       <p className="help">{!source ? t(MSG.AVAILABLE_HD_SD_VARIANTS_WILL_APPEAR_AFTER_VIDEO) : levels.length < 2 ? t(MSG.HD_SD_SWITCHING_IS_UNAVAILABLE_FOR_THIS_STREAM) : t(MSG.QUALITY_IS_SELECTED_FROM_THE_VIDEO_STREAMS_AVAILABLE)}</p>
     </div>}
-    {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">{sheet && viewingBlocked ? '▣' : '▷'}</div>}
+    {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true"><IconGlyph name={sheet && viewingBlocked ? 'video-blocked' : 'play'} /></div>}
     {(!viewingBlocked && source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
       {source && !viewingBlocked ? <video ref={video} controls={!overlay} disablePictureInPicture={!!overlay} muted autoPlay playsInline preload="none" aria-label={t(MSG.LIVE_CAMERA_VIDEO)} /> : <div className="camera-area-placeholder">{viewingBlocked || t(MSG.PRESS_WATCH_VIDEO_TO_SEE_THE_IMAGE)}</div>}{overlay}
       {sheet && source && !viewingBlocked && <>
@@ -183,7 +184,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
           const player = video.current;
           if (player?.requestFullscreen && document.fullscreenEnabled) void player.requestFullscreen().catch(() => {});
           else player?.webkitEnterFullscreen?.();
-        }}>⛶</button>}
+        }}><IconGlyph name="fullscreen" /></button>}
       </>}
     </div>}
     <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
