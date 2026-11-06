@@ -12,20 +12,26 @@ export function WizardDialog({ title, description, children, actions, onClose }:
     element.showModal();
     return () => { element.close(); previous?.focus(); };
   }, []);
-  return <dialog ref={dialog} className="schedule-wizard control-dialog" aria-label={t(MSG.CONFIGURE_PREFIX) + title} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
-    <header className="wizard-header">
-      <h2>{title}</h2>
-      <button
-        type="button"
-        className="header-icon wizard-close"
-        aria-label={t(MSG.CLOSE_WIZARD)}
-        title={t(MSG.CLOSE)}
-        onClick={onClose}
-      >
-        <Icon name="close" />
-      </button>
-    </header>
-    <div className="wizard-body">{description && <p className="wizard-description">{description}</p>}{children}</div>
-    <footer className="wizard-actions"><button className="secondary" type="button" onClick={onClose}>{t(MSG.CANCEL)}</button>{actions}</footer>
-  </dialog>;
+  return (
+    <dialog ref={dialog} className="schedule-wizard control-dialog" aria-label={t(MSG.CONFIGURE_PREFIX) + title} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose(); }}>
+      <header className="wizard-header">
+        <h2>{title}</h2>
+        <button
+          type="button"
+          className="header-icon wizard-close"
+          aria-label={t(MSG.CLOSE_WIZARD)}
+          title={t(MSG.CLOSE)}
+          onClick={onClose}
+        >
+          <Icon name="close" />
+        </button>
+      </header>
+      <div className="wizard-body">
+        {description && <p className="wizard-description">{description}</p>}{children}
+      </div>
+      <footer className="wizard-actions">
+        <button className="secondary" type="button" onClick={onClose}>{t(MSG.CANCEL)}</button>{actions}
+      </footer>
+    </dialog>
+  );
 }

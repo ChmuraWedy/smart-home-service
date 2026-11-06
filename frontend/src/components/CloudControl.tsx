@@ -98,51 +98,130 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
     const info = camera && spec.help;
     const helpIcon = info ? <FieldInfo label={spec.label} text={info} /> : undefined;
     const disabled = editingBusy || session.busy || !session.readOK || (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready));
-    if (camera && spec.key==='record_switch' && !storage.ready) return <section className="capability camera-record-unavailable" key={spec.key} aria-label={spec.label}><div className="capability-row"><div className="capability-heading"><div className="capability-label-line"><h3>{spec.label}</h3>{helpIcon}</div></div><span>{t(MSG.UNAVAILABLE)}</span></div><p className="help">{storage.label}. {data?.snapshot.status.record_switch===true ? t(MSG.THE_SAVED_RECORDING_SETTING_IS_ON_BUT_THIS) : t(MSG.RECORDING_BECOMES_AVAILABLE_AFTER_INSERTING_A_WORKING_MEMORY)}</p></section>;
+    if (camera && spec.key==='record_switch' && !storage.ready) return (
+      <section className="capability camera-record-unavailable" key={spec.key} aria-label={spec.label}>
+        <div className="capability-row">
+          <div className="capability-heading">
+            <div className="capability-label-line">
+              <h3>{spec.label}</h3>{helpIcon}
+            </div>
+          </div>
+          <span>{t(MSG.UNAVAILABLE)}</span>
+        </div>
+        <p className="help">{storage.label}. {data?.snapshot.status.record_switch===true ? t(MSG.THE_SAVED_RECORDING_SETTING_IS_ON_BUT_THIS) : t(MSG.RECORDING_BECOMES_AVAILABLE_AFTER_INSERTING_A_WORKING_MEMORY)}</p>
+      </section>
+    );
     if (camera && spec.key === 'sd_format' && spec.writable && spec.kind === 'boolean') return <CameraFormat key={spec.key} information={helpIcon} disabled={disabled} onFormat={()=>sendValue(spec,true)} />;
     const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
     const reported = cloudReading(spec, data!.snapshot.status[spec.key], data!.snapshot.status_observations?.[spec.key]);
     const reading = camera && spec.key === 'sd_status' ? { ...reported, value: storage.label } : { ...reported, liveRequestAt };
-    return <CapabilityField pendingScope={pendingScope} headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec} valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false} aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)} />;
+    return (
+      <CapabilityField pendingScope={pendingScope}
+        headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec}
+        valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false}
+        aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)}
+      />
+    );
   };
   const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
   const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
-  return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />} statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || t(MSG.TUYA_DEVICE)} busy={session.busy || editingBusy} onClose={onClose} titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} localId={localDeviceId} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}>
-    {camera && <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock} headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined} />}
-    <div className="control-toolbar"><span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span></div>
-    <details className="status-details"><summary>{t(MSG.ABOUT_READINGS)}</summary>
-    <p className="help">{specs.some(spec => spec.writable) ? t(MSG.CLOUD_STATE_SNAPSHOT) : t(MSG.LAST_KNOWN_CLOUD_STATE)}</p>
-    {data && <p className="help">{t(MSG.SNAPSHOT_RECEIVED) + " "}{new Date(data.fetchedAt).toLocaleString(dateLocale())}</p>}
-    {provider === 'sharing' && data && <p className="help">{data.snapshot.event_stream_connected ? t(MSG.DEVICE_REPORTS_ARE_CONNECTED) : t(MSG.NO_FRESH_REPORTS_YET_OR_THE_CONNECTION_IS)}</p>}
-    </details>
-    {data && !data.snapshot.online && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
-    {primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
-    {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
-    {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.filter(spec => !pairedTimers.has(spec.key)).map(basicField)}</div>}
-    {settings.length > 0 && <details className="cloud-properties additional-settings"><summary>{t(MSG.ADDITIONAL_SETTINGS)}</summary><div className="capability-grid">{settings.map(spec => field(spec))}</div></details>}
-    {schedules.length > 0 && <section className="light-schedules" aria-label={t(MSG.LIGHTING_SCHEDULES)}><h3>{t(MSG.LIGHTING_SCHEDULES)}</h3><div className="capability-grid">{schedules.map(spec => field(spec))}</div></section>}
-    {effects.length > 0 && <section className="light-schedules" aria-label={t(MSG.LIGHTING_EFFECTS)}><h3>{t(MSG.LIGHTING_EFFECTS)}</h3><div className="capability-grid">{effects.map(spec => field(spec))}</div></section>}
-    {advanced.length > 0 && <details className="cloud-properties advanced-controls"><summary>{t(MSG.EFFECTS_AND_ADVANCED_CONTROLS)}</summary>
-      <p className="help">{t(MSG.COMPOUND_COMMANDS_AND_MANUFACTURER_PARAMETERS_REQUIRE_VALUES_IN)}</p>
-      <div className="capability-grid">{advanced.map(spec => field(spec))}</div>
-    </details>}
-    {data && !specs.length && <p className="empty-state">{t(MSG.THE_DEVICE_PROVIDED_NO_READINGS_OR_CONTROLS)}</p>}
-    {!primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} onAuthError={onAuthError} />}
-    <DeviceNetwork api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />
-    {data && <details className="cloud-properties"><summary>{t(MSG.DEVICE_PROPERTIES)}</summary><dl>
-      <div><dt>{t(MSG.DEVICE_ID)}</dt><dd><code>{device.id}</code></dd></div>
-      <div><dt>{t(MSG.TYPE)}</dt><dd>{isCamera(device.category) ? t(MSG.CAMERA) : device.category === 'pir' ? t(MSG.MOTION_SENSOR) : device.category === 'dj' ? t(MSG.LIGHT_BULB) : device.category || t(MSG.NOT_SPECIFIED)}</dd></div>
-      <div><dt>{t(MSG.CONNECTION)}</dt><dd>{connectionLabel({route:provider,throughGateway:device.sub,localTransport})}</dd></div>
-      <div><dt>{t(MSG.CONTROL)}</dt><dd>{data.definitions.functions.length ? t(MSG.VIA_TUYA) : t(MSG.READINGS_ONLY)}</dd></div>
-    </dl></details>}
-    {data && <details className="cloud-properties"><summary>{t(MSG.TECHNICAL_DATA_FOR_DEVICE_MAPPINGS)}</summary>
-      <p className="help">{t(MSG.PARAMETER_CODES_AND_KNOWN_DP_NUMBERS_FOR_DEVICE)}</p>
-      <ul>{[...data.definitions.functions,...(data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => <li key={spec.code}><strong>{specs.find(control => control.key === spec.code)?.label || spec.code}</strong> · <code>{spec.code}</code> · {spec.type}{spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : spec.dp_id ? ' · DP '+spec.dp_id : ''}</li>)}</ul>
-    {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy || aliasBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
-    </details>}
-    <ControlFeedback busy={session.busy} notice={session.notice} />
-  </ControlDialog>;
+  return (
+    <ControlDialog onRefresh={session.refresh}
+      information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
+      statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || t(MSG.TUYA_DEVICE)} busy={session.busy || editingBusy} onClose={onClose}
+      titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} localId={localDeviceId} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
+      connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
+    >
+      {camera && (
+      <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
+        headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined}
+      />
+)}
+      <div className="control-toolbar">
+        <span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span>
+      </div>
+      <details className="status-details">
+        <summary>{t(MSG.ABOUT_READINGS)}</summary>
+        <p className="help">{specs.some(spec => spec.writable) ? t(MSG.CLOUD_STATE_SNAPSHOT) : t(MSG.LAST_KNOWN_CLOUD_STATE)}</p>
+        {data && <p className="help">{t(MSG.SNAPSHOT_RECEIVED) + " "}{new Date(data.fetchedAt).toLocaleString(dateLocale())}</p>}
+        {provider === 'sharing' && data && <p className="help">{data.snapshot.event_stream_connected ? t(MSG.DEVICE_REPORTS_ARE_CONNECTED) : t(MSG.NO_FRESH_REPORTS_YET_OR_THE_CONNECTION_IS)}</p>}
+      </details>
+      {data && !data.snapshot.online && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
+      {primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
+      {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
+      {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.filter(spec => !pairedTimers.has(spec.key)).map(basicField)}</div>}
+      {settings.length > 0 && (
+      <details className="cloud-properties additional-settings">
+        <summary>{t(MSG.ADDITIONAL_SETTINGS)}</summary>
+        <div className="capability-grid">{settings.map(spec => field(spec))}</div>
+      </details>
+)}
+      {schedules.length > 0 && (
+      <section className="light-schedules" aria-label={t(MSG.LIGHTING_SCHEDULES)}>
+        <h3>{t(MSG.LIGHTING_SCHEDULES)}</h3>
+        <div className="capability-grid">{schedules.map(spec => field(spec))}</div>
+      </section>
+)}
+      {effects.length > 0 && (
+      <section className="light-schedules" aria-label={t(MSG.LIGHTING_EFFECTS)}>
+        <h3>{t(MSG.LIGHTING_EFFECTS)}</h3>
+        <div className="capability-grid">{effects.map(spec => field(spec))}</div>
+      </section>
+)}
+      {advanced.length > 0 && (
+      <details className="cloud-properties advanced-controls">
+        <summary>{t(MSG.EFFECTS_AND_ADVANCED_CONTROLS)}</summary>
+        <p className="help">{t(MSG.COMPOUND_COMMANDS_AND_MANUFACTURER_PARAMETERS_REQUIRE_VALUES_IN)}</p>
+        <div className="capability-grid">{advanced.map(spec => field(spec))}</div>
+      </details>
+)}
+      {data && !specs.length && <p className="empty-state">{t(MSG.THE_DEVICE_PROVIDED_NO_READINGS_OR_CONTROLS)}</p>}
+      {!primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} onAuthError={onAuthError} />}
+      <DeviceNetwork api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />
+      {data && (
+      <details className="cloud-properties">
+        <summary>{t(MSG.DEVICE_PROPERTIES)}</summary>
+        <dl>
+          <div>
+            <dt>{t(MSG.DEVICE_ID)}</dt>
+            <dd>
+              <code>{device.id}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>{t(MSG.TYPE)}</dt>
+            <dd>{isCamera(device.category) ? t(MSG.CAMERA) : device.category === 'pir' ? t(MSG.MOTION_SENSOR) : device.category === 'dj' ? t(MSG.LIGHT_BULB) : device.category || t(MSG.NOT_SPECIFIED)}</dd>
+          </div>
+          <div>
+            <dt>{t(MSG.CONNECTION)}</dt>
+            <dd>{connectionLabel({route:provider,throughGateway:device.sub,localTransport})}</dd>
+          </div>
+          <div>
+            <dt>{t(MSG.CONTROL)}</dt>
+            <dd>{data.definitions.functions.length ? t(MSG.VIA_TUYA) : t(MSG.READINGS_ONLY)}</dd>
+          </div>
+        </dl>
+      </details>
+)}
+      {data && (
+      <details className="cloud-properties">
+        <summary>{t(MSG.TECHNICAL_DATA_FOR_DEVICE_MAPPINGS)}</summary>
+        <p className="help">{t(MSG.PARAMETER_CODES_AND_KNOWN_DP_NUMBERS_FOR_DEVICE)}</p>
+        <ul>
+          {[...data.definitions.functions,...(data.definitions.status_range || [])].filter((spec,index,all) => all.findIndex(s => s.code === spec.code) === index).map(spec => (
+            <li key={spec.code}>
+              <strong>{specs.find(control => control.key === spec.code)?.label || spec.code}</strong>{" · "}
+              <code>{spec.code}</code> · {spec.type}{spec.dp_ids?.length ? ' · DP '+spec.dp_ids.join(', ') : spec.dp_id ? ' · DP '+spec.dp_id : ''}
+            </li>
+))}
+        </ul>
+        {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy || aliasBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
+      </details>
+)}
+      <ControlFeedback busy={session.busy} notice={session.notice} />
+    </ControlDialog>
+  );
 }

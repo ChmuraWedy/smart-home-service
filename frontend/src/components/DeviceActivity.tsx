@@ -49,13 +49,39 @@ export function DeviceActivity({ api, deviceId, provider, specs, primary = false
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
   const visible = events.filter(event => effectiveFilter === 'all' || (effectiveFilter === 'commands' ? event.kind === 'command' : specs.some(spec => spec.key === event.code && spec.indicator === 'motion')));
-  return <details className={'device-activity' + (primary ? ' primary-activity' : '')} open={open} onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>{primary ? t(MSG.ACTIVITY_LOG) : t(MSG.DEVICE_LOG)}</summary>
-    <div className="activity-toolbar">{(hasMotion || hasCommands) && <label>{t(MSG.SHOW)}<select value={effectiveFilter} onChange={event => setFilter(event.target.value)}><option value="all">{t(MSG.ALL_EVENTS)}</option>{hasMotion && <option value="motion">{t(MSG.MOTION)}</option>}{hasCommands && <option value="commands">{t(MSG.COMMANDS)}</option>}</select></label>}<span className="help">{t(MSG.LAST_2_000_EVENTS_NEW_REPORTS_APPEAR_AUTOMATICALLY)}</span></div>
-    {error && <p className="field-error" role="alert">{translateText(error)}</p>}
-    {!visible.length && <p className="help">{t(MSG.NO_EVENTS_YET)}</p>}
-    <ol className="activity-events">{visible.map(event => <li key={event.id}><ParameterIcon code={event.code} /><div><strong>{eventText(event,specs)}</strong><span>{event.kind === 'snapshot' ? t(MSG.SAVED_SNAPSHOT_RECORDED) : event.kind === 'report' ? t(MSG.DEVICE_REPORT) : event.kind === 'local' ? t(MSG.LOCAL_READING) : ''}<time dateTime={event.observed_at || event.at}>{new Date(event.observed_at || event.at).toLocaleString(dateLocale())}</time>{event.observed_at && <span title={new Date(event.at).toLocaleString(dateLocale())}>{" " + t(MSG.RECEIVED) + " "}{new Date(event.at).toLocaleTimeString(dateLocale())}</span>}</span></div></li>)}</ol>
-    {next && <button className="secondary compact" disabled={busy} onClick={() => void older()}>{t(MSG.EARLIER_EVENTS)}</button>}
-    <p className="help">{t(MSG.AN_ACCEPTED_COMMAND_DOES_NOT_CONFIRM_A_DEVICE)}</p>
-  </details>;
+  return (
+    <details className={'device-activity' + (primary ? ' primary-activity' : '')} open={open} onToggle={event => setOpen(event.currentTarget.open)}>
+      <summary>{primary ? t(MSG.ACTIVITY_LOG) : t(MSG.DEVICE_LOG)}</summary>
+      <div className="activity-toolbar">
+        {(hasMotion || hasCommands) && (
+        <label>{t(MSG.SHOW)}
+          <select value={effectiveFilter} onChange={event => setFilter(event.target.value)}>
+            <option value="all">{t(MSG.ALL_EVENTS)}</option>
+            {hasMotion && <option value="motion">{t(MSG.MOTION)}</option>}
+            {hasCommands && <option value="commands">{t(MSG.COMMANDS)}</option>}
+          </select>
+        </label>
+)}
+        <span className="help">{t(MSG.LAST_2_000_EVENTS_NEW_REPORTS_APPEAR_AUTOMATICALLY)}</span>
+      </div>
+      {error && <p className="field-error" role="alert">{translateText(error)}</p>}
+      {!visible.length && <p className="help">{t(MSG.NO_EVENTS_YET)}</p>}
+      <ol className="activity-events">
+        {visible.map(event => (
+          <li key={event.id}>
+            <ParameterIcon code={event.code} />
+            <div>
+              <strong>{eventText(event,specs)}</strong>
+              <span>{event.kind === 'snapshot' ? t(MSG.SAVED_SNAPSHOT_RECORDED) : event.kind === 'report' ? t(MSG.DEVICE_REPORT) : event.kind === 'local' ? t(MSG.LOCAL_READING) : ''}
+                <time dateTime={event.observed_at || event.at}>{new Date(event.observed_at || event.at).toLocaleString(dateLocale())}</time>
+                {event.observed_at && <span title={new Date(event.at).toLocaleString(dateLocale())}>{" " + t(MSG.RECEIVED) + " "}{new Date(event.at).toLocaleTimeString(dateLocale())}</span>}
+              </span>
+            </div>
+          </li>
+))}
+      </ol>
+      {next && <button className="secondary compact" disabled={busy} onClick={() => void older()}>{t(MSG.EARLIER_EVENTS)}</button>}
+      <p className="help">{t(MSG.AN_ACCEPTED_COMMAND_DOES_NOT_CONFIRM_A_DEVICE)}</p>
+    </details>
+  );
 }

@@ -39,19 +39,33 @@ function temperatureTint(spec: ControlSpec, value: JsonValue | undefined) {
 }
 
 function LightCardReading({ code, label, value, tint, off }: { code: 'brightness' | 'color_temperature' | 'color'; label: string; value?: string; tint?: string; off?: boolean }) {
-  return <span className="dashboard-light-reading" title={value ? label + ' · ' + value : label}>
-    {tint && <span className="dashboard-light-tint" style={{ backgroundColor: tint }} aria-hidden="true" />}
-    <span className="dashboard-light-copy">
-      <span className="dashboard-light-icon"><ParameterIcon code={code} /></span>
-      <span className="dashboard-light-label">{label}</span>
-      <span className="dashboard-light-value">
-        {off ? <><span className="dashboard-light-off-label">{value}</span><span className="dashboard-light-off-mark" aria-hidden="true">—</span></>
+  return (
+    <span className="dashboard-light-reading" title={value ? label + ' · ' + value : label}>
+      {tint && <span className="dashboard-light-tint" style={{ backgroundColor: tint }} aria-hidden="true" />}
+      <span className="dashboard-light-copy">
+        <span className="dashboard-light-icon">
+          <ParameterIcon code={code} />
+        </span>
+        <span className="dashboard-light-label">{label}</span>
+        <span className="dashboard-light-value">
+          {off ? (
+            <>
+              <span className="dashboard-light-off-label">{value}</span>
+              <span className="dashboard-light-off-mark" aria-hidden="true">—</span>
+            </>
+)
           : value ? <span className="dashboard-light-value-text">{value}</span>
-            : <><span aria-hidden="true">—</span><span className="sr-only">{t(MSG.NO_DATA)}</span></>}
-        {code === 'color' && tint && <span className="dashboard-light-swatch" style={{ backgroundColor: tint }} aria-hidden="true" />}
+            : (
+              <>
+                <span aria-hidden="true">—</span>
+                <span className="sr-only">{t(MSG.NO_DATA)}</span>
+              </>
+)}
+          {code === 'color' && tint && <span className="dashboard-light-swatch" style={{ backgroundColor: tint }} aria-hidden="true" />}
+        </span>
       </span>
     </span>
-  </span>;
+  );
 }
 
 export type CardStatus = {online:boolean;battery?:BatteryReading};
@@ -92,9 +106,11 @@ export function CardControls(props: CardProps) {
   } else if (cloud) {
     controls = <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={pollingVisible} />;
   }
-  return <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + props.device.name}>
-    {controls}
-  </div>;
+  return (
+    <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + props.device.name}>
+      {controls}
+    </div>
+  );
 }
 
 function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'], onBusy: (busy: boolean) => void,
@@ -148,43 +164,76 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
       <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === false ? t(MSG.OFF) : power ? brightnessText : undefined} />
       {colorMode
         ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
-        : temperature && <LightCardReading code="color_temperature" label={temperature.label}
+        : temperature && (
+        <LightCardReading code="color_temperature" label={temperature.label}
           value={power && temperatureReading ? displayReading(temperature, temperatureReading) : undefined}
-          tint={power ? temperatureTint(temperature, temperatureReading?.value) : undefined} />}
+          tint={power ? temperatureTint(temperature, temperatureReading?.value) : undefined}
+        />
+)}
     </span>
   ) : undefined;
   const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
   const disabled = busy || !readOK || sending || (!!summary && !online);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
-  const field = (spec:ControlSpec, headingActions?:ReactNode, showSummary = true) => <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
-    powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : <ParameterIcon code={spec.key} />}
-    powerSummary={showSummary && summary ? power => summary(online ? power : null) : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
-  const sensorValues = sensors.length > 0 && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
+  const field = (spec:ControlSpec, headingActions?:ReactNode, showSummary = true) => (
+    <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
+      powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> :
+      <ParameterIcon code={spec.key} />}
+      powerSummary={showSummary && summary ? power => summary(online ? power : null) : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? (
+        <div className="capability-aliases">
+          {spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}
+        </div>
+) : undefined}
+    />
+);
+  const sensorValues = sensors.length > 0 && (
+  <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
     {sensors.map(spec => {
       const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
       const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(MSG.STALE_SUFFIX) : '');
-      return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t(MSG.STALE)}</span>}</span>;
+      return (
+        <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}>
+          <ParameterIcon code={spec.key} />
+          <span className="sr-only">{spec.label}: </span>
+          <span>{displayReading(spec,value)}</span>
+          {stale && <span className="sr-only">{t(MSG.STALE)}</span>}
+        </span>
+      );
     })}
-  </div>;
-  return <>
-    <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
-      {powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
-      {!powerLayout && sensorValues}
-      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}><IconGlyph name="refresh" /></button>
-    </div>
-    {powerLayout && sensorValues}
-    {summary && <div className="dashboard-light-presets">
-      <select aria-label={t(MSG.PRESETS)} disabled><option>{t(MSG.PRESETS)}</option></select>
-    </div>}
-    {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
+  </div>
+);
+  return (
+    <>
+      <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
+        {powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+        {!powerLayout && sensorValues}
+        <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>
+          <IconGlyph name="refresh" />
+        </button>
+      </div>
+      {powerLayout && sensorValues}
+      {summary && (
+      <div className="dashboard-light-presets">
+        <select aria-label={t(MSG.PRESETS)} disabled>
+          <option>{t(MSG.PRESETS)}</option>
+        </select>
+      </div>
+)}
+      {hasSliders && sheet?.open && !paused && (
+      <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
         <div className="dashboard-sheet-power">{field(powers[0],undefined,false)}</div>
-        {sliders.map(spec => <CapabilityField pendingScope={pendingScope} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local}
-          immediatePower quickRange={spec === brightness ? 'brightness' : 'temperature'} disabled={disabled}
-          onSend={value => toggle(spec,value)} />)}
+        {sliders.map(spec => (
+          <CapabilityField pendingScope={pendingScope} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local}
+            immediatePower quickRange={spec === brightness ? 'brightness' : 'temperature'} disabled={disabled}
+            onSend={value => toggle(spec,value)}
+          />
+))}
         {notice.error && <ControlFeedback busy={false} notice={notice} />}
-    </DashboardSheet>}
-    {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
-  </>;
+      </DashboardSheet>
+)}
+      {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
+    </>
+  );
 }
 
 function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
@@ -236,8 +285,11 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
   const controls = {name:cloud.name, pendingScope, paused, sheet, specs, reading, now, busy:session.busy, readOK:session.readOK && !!definitions && !!snapshot,
     refresh:session.refresh, notice:session.notice, ...commands};
   return isCamera(cloud.category)
-    ? <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
-        online={snapshot?.online ?? cloud.online} />
+    ? (
+      <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
+        online={snapshot?.online ?? cloud.online}
+      />
+)
     : <StandardCardControls {...controls} local={false} online={snapshot?.online ?? cloud.online} category={cloud.category} />;
 }
 
@@ -256,8 +308,11 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
     const result = await api.setCapabilities(item.id, {[spec.key]:value});
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
-  return <StandardCardControls name={device.name} pendingScope={localPendingScope(api, item.id)} paused={paused} sheet={sheet} specs={specs}
-    category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => state?.values[spec.key]}
-    now={now} local online={!!state?.enabled && state.available} busy={session.busy} readOK={session.readOK && !!state?.enabled}
-    refresh={session.refresh} notice={session.notice} {...commands} />;
+  return (
+    <StandardCardControls name={device.name} pendingScope={localPendingScope(api, item.id)} paused={paused} sheet={sheet} specs={specs}
+      category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => state?.values[spec.key]}
+      now={now} local online={!!state?.enabled && state.available} busy={session.busy} readOK={session.readOK && !!state?.enabled}
+      refresh={session.refresh} notice={session.notice} {...commands}
+    />
+  );
 }

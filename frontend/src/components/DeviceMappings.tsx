@@ -62,30 +62,81 @@ export function DeviceMappings({ api, device, provider, definitions, devices, di
     finally { lock.current = false; if (alive.current) { setBusy(false); onBusy(false); } }
   }
   const toDP = (known:CloudFunction|undefined, text:string) => known?.dp_id ?? (text ? Number(text) : null);
-  return <details className="cloud-properties device-mappings" onToggle={e => setOpened(e.currentTarget.open)}><summary>{t(MSG.MANUAL_MAPPINGS_IN_OUR_DATABASE)}</summary>
-    <p className="help">{t(MSG.SMART_LIFE_BINDINGS_ARE_UNAVAILABLE_THROUGH_THIS_CONNECTION)}</p>
-    <p className="help">{t(MSG.CURRENT_DEVICE) + " "}<code>{device.id}</code></p>
-    {busy && <p role="status">{t(MSG.LOADING)}</p>}
-    {error && <p role="alert" className="field-error">{translateText(error)}</p>}
-    {loaded && <>
-      {entries.length ? <ul className="mapping-list">{entries.map(entry => <li key={entry.id}>
-        <div><strong>{kinds[entry.kind]}</strong><p>{choices.find(d => d.id === entry.source_device_id)?.name || t(MSG.SOURCE)} · <code>{entry.source_device_id}</code></p><p>{labelFor(entry.source_code)} · {entry.source_code}{entry.source_dp_id ? ' · DP '+entry.source_dp_id : ''} → {choices.find(d => d.id === entry.target_device_id)?.name || t(MSG.DEVICE)}</p>
-          <p><code>{entry.target_device_id}</code> · {entry.target_code}{entry.target_dp_id ? ' · DP '+entry.target_dp_id : ''}</p><span className="help">{t(MSG.MANUAL_MAPPING_NOT_APPLIED_IN_TUYA)}</span></div>
-        <button className="secondary compact" disabled={busy || disabled} onClick={() => void mutate(async () => { await api.deleteDeviceMapping(entry.source_device_id,provider,entry.id); if (alive.current) setEntries(v => v.filter(e => e.id !== entry.id)); })}>{t(MSG.DELETE_MAPPING)}</button>
-      </li>)}</ul> : <p className="help">{t(MSG.NO_SAVED_MAPPINGS_YET)}</p>}
-      <form aria-label={t(MSG.DEVICE_MAPPING)} onSubmit={e => { e.preventDefault(); if (!source || !target) return; void mutate(async () => {
+  return (
+    <details className="cloud-properties device-mappings" onToggle={e => setOpened(e.currentTarget.open)}>
+      <summary>{t(MSG.MANUAL_MAPPINGS_IN_OUR_DATABASE)}</summary>
+      <p className="help">{t(MSG.SMART_LIFE_BINDINGS_ARE_UNAVAILABLE_THROUGH_THIS_CONNECTION)}</p>
+      <p className="help">{t(MSG.CURRENT_DEVICE) + " "}
+        <code>{device.id}</code>
+      </p>
+      {busy && <p role="status">{t(MSG.LOADING)}</p>}
+      {error && <p role="alert" className="field-error">{translateText(error)}</p>}
+      {loaded && (
+      <>
+        {entries.length ? (
+          <ul className="mapping-list">
+            {entries.map(entry => (
+              <li key={entry.id}>
+                <div>
+                  <strong>{kinds[entry.kind]}</strong>
+                  <p>{choices.find(d => d.id === entry.source_device_id)?.name || t(MSG.SOURCE)}{" · "}
+                <code>{entry.source_device_id}</code>
+              </p>
+                  <p>{labelFor(entry.source_code)} · {entry.source_code}{entry.source_dp_id ? ' · DP '+entry.source_dp_id : ''} → {choices.find(d => d.id === entry.target_device_id)?.name || t(MSG.DEVICE)}</p>
+                  <p>
+                <code>{entry.target_device_id}</code> · {entry.target_code}{entry.target_dp_id ? ' · DP '+entry.target_dp_id : ''}
+              </p>
+                  <span className="help">{t(MSG.MANUAL_MAPPING_NOT_APPLIED_IN_TUYA)}</span>
+                </div>
+                <button className="secondary compact" disabled={busy || disabled} onClick={() => void mutate(async () => { await api.deleteDeviceMapping(entry.source_device_id,provider,entry.id); if (alive.current) setEntries(v => v.filter(e => e.id !== entry.id)); })}>{t(MSG.DELETE_MAPPING)}</button>
+              </li>
+))}
+          </ul>
+) :
+          <p className="help">{t(MSG.NO_SAVED_MAPPINGS_YET)}</p>}
+        <form aria-label={t(MSG.DEVICE_MAPPING)} onSubmit={e => { e.preventDefault(); if (!source || !target) return; void mutate(async () => {
         const entry = await api.saveDeviceMapping(reverse ? targetId : device.id,provider,{ kind, source_code:sourceCode, source_dp_id:toDP(source,sourceDP), target_device_id:reverse ? device.id : targetId, target_code:targetCode, target_dp_id:toDP(target,targetDP) });
         if (alive.current) setEntries(v => [...v,entry]);
-      }); }}>
-        <label>{t(MSG.LINK_TYPE)}<select value={kind} disabled={busy || disabled} onChange={e => setKind(e.target.value as MappingInput['kind'])}>{Object.entries(kinds).map(([v,label]) => <option key={v} value={v}>{label}</option>)}</select></label>
-        <label>{t(MSG.DIRECTION)}<select value={reverse ? 'incoming' : 'outgoing'} disabled={busy || disabled} onChange={e => setReverse(e.target.value === 'incoming')}><option value="outgoing">{t(MSG.THIS_DEVICE_ANOTHER)}</option><option value="incoming">{t(MSG.ANOTHER_DEVICE_THIS_ONE)}</option></select></label>
-        <label>{t(MSG.SOURCE_BUTTON_PARAMETER)}<select value={sourceCode} disabled={busy || disabled} onChange={e => { setSourceCode(e.target.value); setSourceDP(''); }}>{sourceSpecs.map(s => <option key={s.code} value={s.code}>{title(s)}</option>)}</select></label>
-        <label>{t(MSG.SOURCE_DP)}<input type="number" min={1} max={255} step={1} value={source?.dp_id ?? sourceDP} disabled={busy || disabled || Boolean(source?.dp_id)} placeholder={t(MSG.UNKNOWN_YOU_CAN_ENTER_IT_MANUALLY)} onChange={e => setSourceDP(e.target.value)} /></label>
-        <label>{reverse ? t(MSG.SOURCE_DEVICE) : t(MSG.TARGET_DEVICE)}<select required value={targetId} disabled={busy || disabled} onChange={e => setTargetId(e.target.value)}><option value="">{t(MSG.SELECT_A_DEVICE)}</option>{choices.filter(d => d.id !== device.id).map(d => <option key={d.id} value={d.id}>{d.name || t(MSG.DEVICE)} · {d.id}</option>)}</select></label>
-        <label>{t(MSG.TARGET_BUTTON_PARAMETER)}<select required value={targetCode} disabled={busy || disabled || !destinationSpecs.length} onChange={e => { setTargetCode(e.target.value); setTargetDP(''); }}><option value="">{t(MSG.SELECT_A_PARAMETER)}</option>{destinationSpecs.map(s => <option key={s.code} value={s.code}>{title(s)}</option>)}</select></label>
-        <label>{t(MSG.TARGET_DP)}<input type="number" min={1} max={255} step={1} value={target?.dp_id ?? targetDP} disabled={busy || disabled || Boolean(target?.dp_id)} placeholder={t(MSG.UNKNOWN_YOU_CAN_ENTER_IT_MANUALLY)} onChange={e => setTargetDP(e.target.value)} /></label>
-        <button className="compact" disabled={busy || disabled || !source || !target} type="submit">{t(MSG.SAVE_MAPPING)}</button>
-      </form>
-    </>}
-  </details>;
+      }); }}
+        >
+          <label>{t(MSG.LINK_TYPE)}
+            <select value={kind} disabled={busy || disabled} onChange={e => setKind(e.target.value as MappingInput['kind'])}>
+              {Object.entries(kinds).map(([v,label]) => <option key={v} value={v}>{label}</option>)}
+            </select>
+          </label>
+          <label>{t(MSG.DIRECTION)}
+            <select value={reverse ? 'incoming' : 'outgoing'} disabled={busy || disabled} onChange={e => setReverse(e.target.value === 'incoming')}>
+              <option value="outgoing">{t(MSG.THIS_DEVICE_ANOTHER)}</option>
+              <option value="incoming">{t(MSG.ANOTHER_DEVICE_THIS_ONE)}</option>
+            </select>
+          </label>
+          <label>{t(MSG.SOURCE_BUTTON_PARAMETER)}
+            <select value={sourceCode} disabled={busy || disabled} onChange={e => { setSourceCode(e.target.value); setSourceDP(''); }}>
+              {sourceSpecs.map(s => <option key={s.code} value={s.code}>{title(s)}</option>)}
+            </select>
+          </label>
+          <label>{t(MSG.SOURCE_DP)}
+            <input type="number" min={1} max={255} step={1} value={source?.dp_id ?? sourceDP} disabled={busy || disabled || Boolean(source?.dp_id)} placeholder={t(MSG.UNKNOWN_YOU_CAN_ENTER_IT_MANUALLY)} onChange={e => setSourceDP(e.target.value)} />
+          </label>
+          <label>{reverse ? t(MSG.SOURCE_DEVICE) : t(MSG.TARGET_DEVICE)}
+            <select required value={targetId} disabled={busy || disabled} onChange={e => setTargetId(e.target.value)}>
+              <option value="">{t(MSG.SELECT_A_DEVICE)}</option>
+              {choices.filter(d => d.id !== device.id).map(d => <option key={d.id} value={d.id}>{d.name || t(MSG.DEVICE)} · {d.id}</option>)}
+            </select>
+          </label>
+          <label>{t(MSG.TARGET_BUTTON_PARAMETER)}
+            <select required value={targetCode} disabled={busy || disabled || !destinationSpecs.length} onChange={e => { setTargetCode(e.target.value); setTargetDP(''); }}>
+              <option value="">{t(MSG.SELECT_A_PARAMETER)}</option>
+              {destinationSpecs.map(s => <option key={s.code} value={s.code}>{title(s)}</option>)}
+            </select>
+          </label>
+          <label>{t(MSG.TARGET_DP)}
+            <input type="number" min={1} max={255} step={1} value={target?.dp_id ?? targetDP} disabled={busy || disabled || Boolean(target?.dp_id)} placeholder={t(MSG.UNKNOWN_YOU_CAN_ENTER_IT_MANUALLY)} onChange={e => setTargetDP(e.target.value)} />
+          </label>
+          <button className="compact" disabled={busy || disabled || !source || !target} type="submit">{t(MSG.SAVE_MAPPING)}</button>
+        </form>
+      </>
+)}
+    </details>
+  );
 }

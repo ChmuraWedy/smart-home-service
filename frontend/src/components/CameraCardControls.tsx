@@ -30,14 +30,21 @@ export function CameraCardControls({
 
   function renderPreview(privacyState?: boolean | null, changePrivacy?: () => void) {
     if (!sheet?.open || paused) return null;
-    return <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
-      <span className={'presence ' + (online ? 'online' : '')}>{online ? t(MSG.ONLINE) : t(MSG.OFFLINE)}</span>
-      <CameraLive api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError}
-        compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyStatus : null)}
-        headingActions={changePrivacy && <button type="button" className="secondary" disabled={disabled || privacyState === null}
-          onClick={changePrivacy}>{privacyState ? t(MSG.TURN_OFF_PRIVACY) : t(MSG.TURN_ON_PRIVACY)}</button>} />
-      {notice.error && <ControlFeedback busy={false} notice={notice} />}
-    </DashboardSheet>;
+    return (
+      <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
+        <span className={'presence ' + (online ? 'online' : '')}>{online ? t(MSG.ONLINE) : t(MSG.OFFLINE)}</span>
+        <CameraLive api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError}
+          compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyStatus : null)}
+          headingActions={changePrivacy && (
+          <button type="button" className="secondary" disabled={disabled || privacyState === null}
+            onClick={changePrivacy}
+          >{privacyState ? t(MSG.TURN_OFF_PRIVACY) : t(MSG.TURN_ON_PRIVACY)}
+          </button>
+)}
+        />
+        {notice.error && <ControlFeedback busy={false} notice={notice} />}
+      </DashboardSheet>
+    );
   }
 
   const privacySpec = specs.find(spec => spec.key === 'basic_private');
@@ -46,22 +53,34 @@ export function CameraCardControls({
   const privacyStatus = usePendingPrivacyState(pendingScope, privacyReading);
   if (!busy && readOK && !controls.length && !notice.error && !sheet?.open) return null;
 
-  const field = (spec: ControlSpec) => <CapabilityField pendingScope={pendingScope} spec={spec} reading={reading(spec)} now={now} local={false}
-    immediatePower dashboardSwitch disabled={disabled} onSend={value => toggle(spec, value)} />;
+  const field = (spec: ControlSpec) => (
+    <CapabilityField pendingScope={pendingScope} spec={spec} reading={reading(spec)} now={now} local={false}
+      immediatePower dashboardSwitch disabled={disabled} onSend={value => toggle(spec, value)}
+    />
+);
 
-  return <>
-    <div className="card-primary-controls tw:grid tw:grid-cols-1">
-      {privacy && <div className="camera-card-privacy">
-        <CapabilityField pendingScope={pendingScope} spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
-          powerIcon={<Icon name="shield" className="parameter-icon" />}
-          booleanActions={renderPreview} disabled={disabled} onSend={value => toggle(privacy, value)} />
-      </div>}
-      {!!switches.length && <div className="camera-card-switches">
-        {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
-      </div>}
-      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}><IconGlyph name="refresh" /></button>
-    </div>
-    {!privacy && renderPreview(privacyStatus)}
-    {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
-  </>;
+  return (
+    <>
+      <div className="card-primary-controls tw:grid tw:grid-cols-1">
+        {privacy && (
+        <div className="camera-card-privacy">
+          <CapabilityField pendingScope={pendingScope} spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
+            powerIcon={<Icon name="shield" className="parameter-icon" />}
+            booleanActions={renderPreview} disabled={disabled} onSend={value => toggle(privacy, value)}
+          />
+        </div>
+)}
+        {!!switches.length && (
+        <div className="camera-card-switches">
+          {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+        </div>
+)}
+        <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>
+          <IconGlyph name="refresh" />
+        </button>
+      </div>
+      {!privacy && renderPreview(privacyStatus)}
+      {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
+    </>
+  );
 }

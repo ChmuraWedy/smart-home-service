@@ -15,11 +15,13 @@ export function Switch({ powerIcon, ...props }: ComponentProps<typeof HeadlessSw
         }
       }}
     >
-      {powerIcon || <span
+      {powerIcon || (
+      <span
         aria-hidden="true"
         data-slot="switch-thumb"
         className="tw:pointer-events-none tw:relative tw:ml-[3px] tw:block tw:size-[18px] tw:rounded-full tw:bg-(--toggle-thumb) tw:transition-transform tw:motion-reduce:transition-none tw:group-data-checked:translate-x-5 tw:group-data-checked:bg-(--on-accent)"
-      />}
+      />
+)}
     </HeadlessSwitch>
   );
 }

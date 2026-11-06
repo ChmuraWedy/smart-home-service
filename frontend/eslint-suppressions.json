@@ -4,30 +4,229 @@
       "count": 10
     },
     "@stylistic/max-len": {
-      "count": 15
+      "count": 7
+    },
+    "arrow-parens": {
+      "count": 11
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "consistent-return": {
+      "count": 3
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 27
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    },
+    "jsx-a11y/no-static-element-interactions": {
+      "count": 1
+    },
+    "no-confusing-arrow": {
+      "count": 3
     },
     "no-nested-ternary": {
       "count": 1
     },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "no-use-before-define": {
+      "count": 2
+    },
+    "no-void": {
+      "count": 7
+    },
+    "object-curly-newline": {
+      "count": 17
+    },
+    "object-property-newline": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 7
+    },
+    "quotes": {
+      "count": 11
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 8
+    },
+    "react/jsx-closing-bracket-location": {
+      "count": 1
+    },
+    "react/jsx-closing-tag-location": {
+      "count": 2
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 5
+    },
+    "react/jsx-indent": {
+      "count": 8
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 5
+    },
+    "react/jsx-no-bind": {
+      "count": 3
+    },
+    "react/jsx-no-useless-fragment": {
+      "count": 1
     }
   },
   "src/api.ts": {
     "@stylistic/max-len": {
       "count": 4
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "camelcase": {
+      "count": 64
+    },
+    "import/newline-after-import": {
+      "count": 1
+    },
+    "lines-between-class-members": {
+      "count": 28
+    },
+    "max-classes-per-file": {
+      "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 3
+    },
+    "prefer-template": {
+      "count": 27
+    },
+    "quotes": {
+      "count": 2
     }
   },
   "src/camera-area.ts": {
     "@stylistic/max-len": {
       "count": 1
+    },
+    "arrow-spacing": {
+      "count": 2
+    },
+    "block-spacing": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 28
+    },
+    "import/newline-after-import": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 9
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "object-curly-spacing": {
+      "count": 12
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 23
     }
   },
   "src/camera-controls.ts": {
     "@stylistic/max-len": {
       "count": 3
     },
+    "arrow-parens": {
+      "count": 6
+    },
+    "arrow-spacing": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 34
+    },
+    "key-spacing": {
+      "count": 33
+    },
     "no-nested-ternary": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "object-curly-spacing": {
+      "count": 6
+    },
+    "object-property-newline": {
+      "count": 16
+    },
+    "quote-props": {
+      "count": 18
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 8
+    }
+  },
+  "src/cloud-account-scope.ts": {
+    "no-plusplus": {
+      "count": 1
+    },
+    "no-return-assign": {
+      "count": 1
+    }
+  },
+  "src/cloud-device-cache.ts": {
+    "arrow-parens": {
+      "count": 1
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "implicit-arrow-linebreak": {
+      "count": 1
+    },
+    "no-plusplus": {
+      "count": 4
+    },
+    "no-restricted-globals": {
+      "count": 1
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 4
+    },
+    "object-property-newline": {
       "count": 1
     }
   },
@@ -36,10 +235,55 @@
       "count": 7
     },
     "@stylistic/max-len": {
-      "count": 6
+      "count": 4
+    },
+    "arrow-parens": {
+      "count": 3
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "import/newline-after-import": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 9
+    },
+    "jsx-a11y/no-autofocus": {
+      "count": 1
+    },
+    "no-confusing-arrow": {
+      "count": 2
     },
     "no-restricted-syntax": {
       "count": 5
+    },
+    "no-void": {
+      "count": 2
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 2
+    },
+    "one-var-declaration-per-line": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 1
     }
   },
   "src/components/CameraArea.tsx": {
@@ -47,29 +291,149 @@
       "count": 5
     },
     "@stylistic/max-len": {
+      "count": 5
+    },
+    "arrow-parens": {
       "count": 7
+    },
+    "arrow-spacing": {
+      "count": 28
+    },
+    "block-spacing": {
+      "count": 10
+    },
+    "comma-spacing": {
+      "count": 54
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 2
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 17
+    },
+    "no-mixed-operators": {
+      "count": 4
     },
     "no-restricted-syntax": {
       "count": 2
+    },
+    "no-shadow": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 14
+    },
+    "object-curly-spacing": {
+      "count": 14
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 4
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 31
     }
   },
   "src/components/CameraCardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
       "count": 8
     },
-    "@stylistic/max-len": {
+    "arrow-parens": {
+      "count": 8
+    },
+    "implicit-arrow-linebreak": {
       "count": 1
     },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 4
+    },
     "no-nested-ternary": {
+      "count": 1
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "no-void": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 4
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 7
+    },
+    "react/jsx-no-bind": {
       "count": 1
     }
   },
   "src/components/CameraFormat.tsx": {
-    "@stylistic/max-len": {
+    "arrow-spacing": {
+      "count": 8
+    },
+    "block-spacing": {
+      "count": 8
+    },
+    "brace-style": {
+      "count": 1
+    },
+    "comma-spacing": {
+      "count": 5
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
       "count": 1
     },
     "no-restricted-syntax": {
       "count": 1
+    },
+    "no-void": {
+      "count": 1
+    },
+    "object-curly-spacing": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 6
     }
   },
   "src/components/CameraLive.tsx": {
@@ -77,13 +441,105 @@
       "count": 3
     },
     "@stylistic/max-len": {
+      "count": 7
+    },
+    "arrow-parens": {
+      "count": 5
+    },
+    "arrow-spacing": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 28
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 3
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 13
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    },
+    "key-spacing": {
       "count": 9
+    },
+    "no-mixed-operators": {
+      "count": 2
     },
     "no-nested-ternary": {
       "count": 3
     },
     "no-restricted-syntax": {
       "count": 2
+    },
+    "no-void": {
+      "count": 7
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "object-curly-spacing": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 7
+    },
+    "one-var-declaration-per-line": {
+      "count": 7
+    },
+    "operator-linebreak": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 6
+    },
+    "quotes": {
+      "count": 12
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 4
+    },
+    "react/button-has-type": {
+      "count": 2
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "space-infix-ops": {
+      "count": 9
+    }
+  },
+  "src/components/CameraSettings.tsx": {
+    "arrow-parens": {
+      "count": 3
+    },
+    "comma-spacing": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 2
+    },
+    "object-curly-spacing": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
     }
   },
   "src/components/CardControls.tsx": {
@@ -91,35 +547,223 @@
       "count": 11
     },
     "@stylistic/max-len": {
-      "count": 7
+      "count": 5
+    },
+    "arrow-parens": {
+      "count": 17
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 58
+    },
+    "consistent-return": {
+      "count": 2
+    },
+    "function-paren-newline": {
+      "count": 3
+    },
+    "implicit-arrow-linebreak": {
+      "count": 3
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 12
+    },
+    "key-spacing": {
+      "count": 9
+    },
+    "no-confusing-arrow": {
+      "count": 2
     },
     "no-nested-ternary": {
       "count": 4
     },
+    "no-restricted-globals": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "no-void": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 18
+    },
+    "object-curly-spacing": {
+      "count": 14
+    },
+    "object-property-newline": {
+      "count": 10
+    },
+    "one-var": {
+      "count": 3
+    },
+    "one-var-declaration-per-line": {
+      "count": 3
+    },
+    "operator-linebreak": {
+      "count": 3
+    },
+    "prefer-template": {
+      "count": 5
+    },
+    "quotes": {
+      "count": 1
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 2
+    },
+    "react/destructuring-assignment": {
+      "count": 13
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 5
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 10
+    },
+    "react/jsx-props-no-spreading": {
+      "count": 5
     }
   },
   "src/components/ChannelAliases.tsx": {
     "@stylistic/jsx-max-props-per-line": {
       "count": 1
     },
+    "arrow-parens": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 13
+    },
     "no-restricted-syntax": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 1
+    }
+  },
+  "src/components/ChannelControl.tsx": {
+    "arrow-parens": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 4
+    },
+    "indent": {
+      "count": 1
+    },
+    "object-curly-spacing": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "prefer-template": {
       "count": 1
     }
   },
   "src/components/CloudControl.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 10
+      "count": 12
     },
     "@stylistic/max-len": {
-      "count": 18
+      "count": 16
+    },
+    "arrow-parens": {
+      "count": 25
+    },
+    "arrow-spacing": {
+      "count": 8
+    },
+    "block-spacing": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 22
+    },
+    "curly": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 2
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 8
+    },
+    "key-spacing": {
+      "count": 7
+    },
+    "no-confusing-arrow": {
+      "count": 1
     },
     "no-nested-ternary": {
       "count": 10
     },
     "no-restricted-syntax": {
       "count": 6
+    },
+    "object-curly-newline": {
+      "count": 12
+    },
+    "object-curly-spacing": {
+      "count": 10
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 3
+    },
+    "prefer-template": {
+      "count": 5
+    },
+    "quotes": {
+      "count": 6
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 3
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 5
+    },
+    "react/no-unstable-nested-components": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 10
     }
   },
   "src/components/ConnectionSettings.tsx": {
@@ -127,10 +771,46 @@
       "count": 3
     },
     "@stylistic/max-len": {
-      "count": 3
+      "count": 2
+    },
+    "arrow-parens": {
+      "count": 4
+    },
+    "brace-style": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 6
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 2
+    },
+    "jsx-a11y/no-autofocus": {
+      "count": 1
     },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "no-void": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 1
+    },
+    "quotes": {
+      "count": 2
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 2
     }
   },
   "src/components/ControlCenter.tsx": {
@@ -138,31 +818,184 @@
       "count": 16
     },
     "@stylistic/max-len": {
-      "count": 26
+      "count": 22
+    },
+    "arrow-parens": {
+      "count": 49
+    },
+    "arrow-spacing": {
+      "count": 6
+    },
+    "comma-spacing": {
+      "count": 12
+    },
+    "consistent-return": {
+      "count": 2
+    },
+    "import/order": {
+      "count": 3
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 13
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 3
+    },
+    "key-spacing": {
+      "count": 3
+    },
+    "no-confusing-arrow": {
+      "count": 5
+    },
+    "no-continue": {
+      "count": 1
     },
     "no-nested-ternary": {
       "count": 8
     },
+    "no-restricted-globals": {
+      "count": 2
+    },
     "no-restricted-syntax": {
       "count": 2
+    },
+    "no-shadow": {
+      "count": 5
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "no-void": {
+      "count": 10
+    },
+    "object-curly-newline": {
+      "count": 34
+    },
+    "object-curly-spacing": {
+      "count": 6
+    },
+    "padded-blocks": {
+      "count": 1
+    },
+    "prefer-destructuring": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 6
+    },
+    "quotes": {
+      "count": 1
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 3
+    },
+    "react/button-has-type": {
+      "count": 6
+    },
+    "react/jsx-closing-tag-location": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 3
+    },
+    "react/jsx-indent": {
+      "count": 3
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 7
+    },
+    "react/jsx-no-bind": {
+      "count": 5
     }
   },
   "src/components/CredentialForms.tsx": {
     "@stylistic/jsx-max-props-per-line": {
       "count": 5
     },
-    "@stylistic/max-len": {
-      "count": 4
+    "arrow-parens": {
+      "count": 8
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 2
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 5
+    },
+    "jsx-a11y/no-autofocus": {
+      "count": 2
     },
     "no-restricted-syntax": {
       "count": 2
+    },
+    "no-void": {
+      "count": 2
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "quotes": {
+      "count": 2
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 1
     }
   },
   "src/components/DashboardAliases.tsx": {
     "@stylistic/jsx-max-props-per-line": {
       "count": 3
     },
+    "arrow-parens": {
+      "count": 6
+    },
+    "implicit-arrow-linebreak": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 3
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
+    "no-plusplus": {
+      "count": 1
+    },
     "no-restricted-syntax": {
+      "count": 3
+    },
+    "no-shadow": {
+      "count": 2
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 2
+    },
+    "one-var-declaration-per-line": {
+      "count": 2
+    },
+    "react/jsx-closing-tag-location": {
+      "count": 3
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-indent": {
+      "count": 7
+    },
+    "react/jsx-max-props-per-line": {
       "count": 3
     }
   },
@@ -173,15 +1006,102 @@
     "@stylistic/max-len": {
       "count": 1
     },
+    "arrow-parens": {
+      "count": 4
+    },
+    "indent": {
+      "count": 3
+    },
+    "jsx-a11y/click-events-have-key-events": {
+      "count": 1
+    },
+    "jsx-a11y/no-noninteractive-element-interactions": {
+      "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 2
+    },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 2
     }
   },
   "src/components/DeviceActivity.tsx": {
     "@stylistic/max-len": {
       "count": 7
     },
+    "arrow-parens": {
+      "count": 13
+    },
+    "brace-style": {
+      "count": 3
+    },
+    "comma-spacing": {
+      "count": 25
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 2
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 7
+    },
+    "no-mixed-operators": {
+      "count": 4
+    },
     "no-nested-ternary": {
+      "count": 2
+    },
+    "no-void": {
+      "count": 3
+    },
+    "object-curly-newline": {
+      "count": 10
+    },
+    "object-curly-spacing": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 2
+    },
+    "one-var-declaration-per-line": {
+      "count": 4
+    },
+    "prefer-template": {
+      "count": 4
+    },
+    "quotes": {
+      "count": 3
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 1
+    },
+    "space-infix-ops": {
       "count": 2
     }
   },
@@ -189,11 +1109,26 @@
     "@stylistic/jsx-max-props-per-line": {
       "count": 1
     },
-    "@stylistic/max-len": {
+    "arrow-parens": {
+      "count": 5
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
       "count": 1
     },
     "no-restricted-syntax": {
       "count": 2
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "quotes": {
+      "count": 1
+    },
+    "react/jsx-no-bind": {
+      "count": 1
     }
   },
   "src/components/DeviceConnection.tsx": {
@@ -202,6 +1137,21 @@
     },
     "no-nested-ternary": {
       "count": 5
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 2
+    },
+    "react/destructuring-assignment": {
+      "count": 4
+    },
+    "react/no-unused-prop-types": {
+      "count": 2
     }
   },
   "src/components/DeviceControls.tsx": {
@@ -209,13 +1159,109 @@
       "count": 18
     },
     "@stylistic/max-len": {
+      "count": 20
+    },
+    "arrow-parens": {
       "count": 24
+    },
+    "brace-style": {
+      "count": 8
+    },
+    "comma-spacing": {
+      "count": 18
+    },
+    "consistent-return": {
+      "count": 2
+    },
+    "function-paren-newline": {
+      "count": 2
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 31
+    },
+    "jsx-a11y/click-events-have-key-events": {
+      "count": 1
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 7
+    },
+    "jsx-a11y/no-noninteractive-element-interactions": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 5
+    },
+    "no-confusing-arrow": {
+      "count": 4
     },
     "no-nested-ternary": {
       "count": 12
     },
+    "no-plusplus": {
+      "count": 5
+    },
     "no-restricted-syntax": {
       "count": 17
+    },
+    "no-shadow": {
+      "count": 10
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "no-void": {
+      "count": 8
+    },
+    "object-curly-newline": {
+      "count": 14
+    },
+    "object-curly-spacing": {
+      "count": 8
+    },
+    "object-property-newline": {
+      "count": 3
+    },
+    "one-var": {
+      "count": 9
+    },
+    "one-var-declaration-per-line": {
+      "count": 11
+    },
+    "operator-linebreak": {
+      "count": 3
+    },
+    "prefer-template": {
+      "count": 16
+    },
+    "quotes": {
+      "count": 10
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 3
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-indent": {
+      "count": 1
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 6
+    },
+    "react/jsx-no-bind": {
+      "count": 1
+    },
+    "react/no-array-index-key": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 3
     }
   },
   "src/components/DeviceMappings.tsx": {
@@ -223,29 +1269,173 @@
       "count": 3
     },
     "@stylistic/max-len": {
-      "count": 13
+      "count": 7
+    },
+    "arrow-parens": {
+      "count": 27
+    },
+    "brace-style": {
+      "count": 4
+    },
+    "comma-spacing": {
+      "count": 42
+    },
+    "consistent-return": {
+      "count": 2
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 6
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 7
+    },
+    "key-spacing": {
+      "count": 8
+    },
+    "keyword-spacing": {
+      "count": 3
     },
     "no-nested-ternary": {
       "count": 1
     },
     "no-restricted-syntax": {
       "count": 3
+    },
+    "no-void": {
+      "count": 4
+    },
+    "object-curly-newline": {
+      "count": 8
+    },
+    "one-var": {
+      "count": 8
+    },
+    "one-var-declaration-per-line": {
+      "count": 11
+    },
+    "operator-linebreak": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 5
+    },
+    "quotes": {
+      "count": 3
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 2
+    },
+    "react/button-has-type": {
+      "count": 1
+    },
+    "react/jsx-closing-tag-location": {
+      "count": 2
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-indent": {
+      "count": 4
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 4
     }
   },
   "src/components/DeviceNetwork.tsx": {
     "@stylistic/max-len": {
       "count": 5
     },
+    "arrow-parens": {
+      "count": 1
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 2
+    },
     "no-nested-ternary": {
       "count": 3
+    },
+    "no-void": {
+      "count": 3
+    },
+    "object-curly-newline": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 3
+    },
+    "react/no-array-index-key": {
+      "count": 1
     }
   },
   "src/components/DevicePresentation.tsx": {
     "@stylistic/max-len": {
-      "count": 3
+      "count": 2
+    },
+    "arrow-parens": {
+      "count": 6
+    },
+    "comma-spacing": {
+      "count": 6
+    },
+    "implicit-arrow-linebreak": {
+      "count": 1
+    },
+    "indent": {
+      "count": 2
+    },
+    "key-spacing": {
+      "count": 8
     },
     "no-nested-ternary": {
       "count": 6
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "object-curly-spacing": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "operator-linebreak": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
     }
   },
   "src/components/DeviceSurvey.tsx": {
@@ -253,13 +1443,85 @@
       "count": 4
     },
     "@stylistic/max-len": {
-      "count": 22
+      "count": 9
+    },
+    "arrow-parens": {
+      "count": 37
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "curly": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 21
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 14
+    },
+    "no-confusing-arrow": {
+      "count": 3
     },
     "no-nested-ternary": {
       "count": 10
     },
     "no-restricted-syntax": {
       "count": 6
+    },
+    "no-void": {
+      "count": 8
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "object-property-newline": {
+      "count": 8
+    },
+    "one-var": {
+      "count": 9
+    },
+    "one-var-declaration-per-line": {
+      "count": 13
+    },
+    "operator-linebreak": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 13
+    },
+    "quotes": {
+      "count": 11
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 5
+    },
+    "react/jsx-closing-tag-location": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-indent": {
+      "count": 3
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "react/no-array-index-key": {
+      "count": 1
     }
   },
   "src/components/FieldInfo.tsx": {
@@ -268,11 +1530,68 @@
     },
     "@stylistic/max-len": {
       "count": 1
+    },
+    "arrow-parens": {
+      "count": 1
+    },
+    "arrow-spacing": {
+      "count": 14
+    },
+    "block-spacing": {
+      "count": 10
+    },
+    "comma-spacing": {
+      "count": 22
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 2
+    },
+    "no-restricted-globals": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "object-curly-spacing": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 2
+    },
+    "one-var-declaration-per-line": {
+      "count": 4
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 17
     }
   },
   "src/components/LanguageSelector.tsx": {
-    "@stylistic/max-len": {
+    "arrow-parens": {
+      "count": 2
+    },
+    "import/prefer-default-export": {
       "count": 1
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
     }
   },
   "src/components/LightEffectWizard.tsx": {
@@ -280,13 +1599,49 @@
       "count": 3
     },
     "@stylistic/max-len": {
-      "count": 5
+      "count": 4
+    },
+    "arrow-parens": {
+      "count": 2
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 3
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
     },
     "no-nested-ternary": {
       "count": 2
     },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "object-curly-newline": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "operator-linebreak": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 1
     }
   },
   "src/components/LightingFields.tsx": {
@@ -294,10 +1649,82 @@
       "count": 8
     },
     "@stylistic/max-len": {
-      "count": 19
+      "count": 14
+    },
+    "arrow-parens": {
+      "count": 14
+    },
+    "brace-style": {
+      "count": 1
+    },
+    "comma-spacing": {
+      "count": 70
+    },
+    "curly": {
+      "count": 4
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 34
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 8
+    },
+    "key-spacing": {
+      "count": 44
+    },
+    "keyword-spacing": {
+      "count": 2
+    },
+    "no-bitwise": {
+      "count": 7
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
+    "no-mixed-operators": {
+      "count": 8
+    },
+    "no-param-reassign": {
+      "count": 1
     },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "object-curly-newline": {
+      "count": 14
+    },
+    "object-curly-spacing": {
+      "count": 14
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "operator-linebreak": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 5
+    },
+    "quotes": {
+      "count": 3
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 2
+    },
+    "react/no-array-index-key": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 26
     }
   },
   "src/components/LocalConnectionsPage.tsx": {
@@ -305,13 +1732,82 @@
       "count": 2
     },
     "@stylistic/max-len": {
-      "count": 22
+      "count": 13
+    },
+    "arrow-parens": {
+      "count": 42
+    },
+    "consistent-return": {
+      "count": 3
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 15
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 4
+    },
+    "no-await-in-loop": {
+      "count": 7
+    },
+    "no-confusing-arrow": {
+      "count": 3
+    },
+    "no-continue": {
+      "count": 3
     },
     "no-nested-ternary": {
       "count": 3
     },
+    "no-plusplus": {
+      "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 16
+    },
+    "no-use-before-define": {
+      "count": 3
+    },
+    "no-void": {
+      "count": 5
+    },
+    "object-curly-newline": {
+      "count": 18
+    },
+    "one-var": {
+      "count": 8
+    },
+    "one-var-declaration-per-line": {
+      "count": 13
+    },
+    "operator-linebreak": {
+      "count": 7
+    },
+    "prefer-template": {
+      "count": 16
+    },
+    "quotes": {
+      "count": 18
+    },
+    "react-hooks/exhaustive-deps": {
+      "count": 3
+    },
+    "react/button-has-type": {
+      "count": 11
+    },
+    "react/jsx-closing-tag-location": {
+      "count": 10
+    },
+    "react/jsx-indent": {
+      "count": 30
     }
   },
   "src/components/LocalControls.tsx": {
@@ -321,22 +1817,133 @@
     "@stylistic/max-len": {
       "count": 8
     },
+    "arrow-parens": {
+      "count": 18
+    },
+    "brace-style": {
+      "count": 1
+    },
+    "comma-spacing": {
+      "count": 6
+    },
+    "curly": {
+      "count": 2
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 12
+    },
+    "key-spacing": {
+      "count": 1
+    },
+    "no-await-in-loop": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 3
     },
     "no-restricted-syntax": {
       "count": 3
+    },
+    "no-void": {
+      "count": 2
+    },
+    "object-curly-newline": {
+      "count": 10
+    },
+    "object-curly-spacing": {
+      "count": 4
+    },
+    "one-var": {
+      "count": 3
+    },
+    "one-var-declaration-per-line": {
+      "count": 3
+    },
+    "prefer-template": {
+      "count": 3
+    },
+    "quotes": {
+      "count": 5
+    },
+    "react/button-has-type": {
+      "count": 4
+    },
+    "react/jsx-boolean-value": {
+      "count": 1
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 2
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 2
     }
   },
   "src/components/NetworkPage.tsx": {
     "@stylistic/max-len": {
-      "count": 14
+      "count": 10
+    },
+    "arrow-parens": {
+      "count": 16
+    },
+    "consistent-return": {
+      "count": 2
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 6
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 3
+    },
+    "no-confusing-arrow": {
+      "count": 4
     },
     "no-nested-ternary": {
       "count": 3
     },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "no-void": {
+      "count": 7
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "object-property-newline": {
+      "count": 9
+    },
+    "one-var": {
+      "count": 7
+    },
+    "one-var-declaration-per-line": {
+      "count": 7
+    },
+    "operator-linebreak": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 9
+    },
+    "quotes": {
+      "count": 8
+    },
+    "react/button-has-type": {
+      "count": 4
+    },
+    "react/jsx-indent": {
+      "count": 1
+    },
+    "react/no-array-index-key": {
+      "count": 2
     }
   },
   "src/components/ScheduleWizard.tsx": {
@@ -346,20 +1953,164 @@
     "@stylistic/max-len": {
       "count": 9
     },
+    "arrow-parens": {
+      "count": 3
+    },
+    "comma-spacing": {
+      "count": 1
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "indent": {
+      "count": 7
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 2
+    },
+    "operator-linebreak": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 7
+    },
+    "quotes": {
+      "count": 6
+    },
+    "react/jsx-first-prop-new-line": {
+      "count": 1
+    },
+    "react/jsx-max-props-per-line": {
+      "count": 1
+    },
+    "react/no-array-index-key": {
+      "count": 2
+    }
+  },
+  "src/components/ThemeSelector.tsx": {
+    "arrow-parens": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    }
+  },
+  "src/components/TopologySummary.tsx": {
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 1
+    },
+    "react/button-has-type": {
+      "count": 1
     }
   },
   "src/components/WizardDialog.tsx": {
     "@stylistic/max-len": {
       "count": 1
     },
+    "arrow-parens": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 2
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "quotes": {
+      "count": 1
+    }
+  },
+  "src/components/ui/card.tsx": {
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "react/jsx-props-no-spreading": {
+      "count": 1
+    }
+  },
+  "src/components/ui/icon.tsx": {
+    "object-curly-newline": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 1
     }
   },
   "src/components/ui/switch.tsx": {
     "@stylistic/max-len": {
+      "count": 2
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "indent": {
+      "count": 1
+    },
+    "react/jsx-props-no-spreading": {
+      "count": 1
+    }
+  },
+  "src/connection.ts": {
+    "brace-style": {
+      "count": 1
+    },
+    "quotes": {
+      "count": 1
+    }
+  },
+  "src/control-drafts.ts": {
+    "arrow-parens": {
+      "count": 5
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "no-void": {
+      "count": 1
+    },
+    "object-curly-newline": {
       "count": 2
     }
   },
@@ -367,28 +2118,249 @@
     "@stylistic/max-len": {
       "count": 10
     },
+    "arrow-parens": {
+      "count": 7
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 25
+    },
+    "consistent-return": {
+      "count": 8
+    },
+    "curly": {
+      "count": 2
+    },
+    "default-case": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 3
+    },
+    "no-confusing-arrow": {
+      "count": 2
+    },
+    "no-mixed-operators": {
+      "count": 10
+    },
     "no-nested-ternary": {
       "count": 17
     },
     "no-restricted-syntax": {
       "count": 4
+    },
+    "object-curly-newline": {
+      "count": 28
+    },
+    "object-curly-spacing": {
+      "count": 2
+    },
+    "object-property-newline": {
+      "count": 89
+    },
+    "one-var": {
+      "count": 6
+    },
+    "one-var-declaration-per-line": {
+      "count": 9
+    },
+    "operator-linebreak": {
+      "count": 3
+    },
+    "prefer-destructuring": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 6
+    }
+  },
+  "src/device-links.ts": {
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "prefer-template": {
+      "count": 3
+    }
+  },
+  "src/device-metadata.ts": {
+    "arrow-parens": {
+      "count": 2
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
+    "no-continue": {
+      "count": 2
+    },
+    "no-multi-assign": {
+      "count": 1
+    },
+    "no-param-reassign": {
+      "count": 4
+    },
+    "no-plusplus": {
+      "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 2
+    },
+    "no-shadow": {
+      "count": 2
+    },
+    "no-use-before-define": {
+      "count": 2
+    },
+    "object-curly-newline": {
+      "count": 4
+    },
+    "prefer-template": {
+      "count": 2
+    }
+  },
+  "src/devices.ts": {
+    "arrow-parens": {
+      "count": 6
+    },
+    "no-restricted-globals": {
+      "count": 1
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
     }
   },
   "src/home-api.ts": {
     "@stylistic/max-len": {
       "count": 1
+    },
+    "camelcase": {
+      "count": 58
+    },
+    "lines-between-class-members": {
+      "count": 17
+    },
+    "no-await-in-loop": {
+      "count": 1
+    },
+    "no-restricted-globals": {
+      "count": 8
+    },
+    "object-curly-newline": {
+      "count": 6
+    },
+    "prefer-template": {
+      "count": 1
+    },
+    "quotes": {
+      "count": 3
     }
   },
   "src/i18n/index.ts": {
+    "arrow-parens": {
+      "count": 11
+    },
+    "comma-spacing": {
+      "count": 1
+    },
+    "curly": {
+      "count": 1
+    },
+    "implicit-arrow-linebreak": {
+      "count": 2
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
+    "no-continue": {
+      "count": 1
+    },
     "no-restricted-syntax": {
       "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "object-curly-spacing": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 2
     }
   },
   "src/lighting.ts": {
     "@stylistic/max-len": {
       "count": 4
     },
+    "arrow-parens": {
+      "count": 4
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 11
+    },
+    "consistent-return": {
+      "count": 2
+    },
     "no-nested-ternary": {
+      "count": 2
+    },
+    "no-useless-return": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
+    },
+    "one-var": {
+      "count": 1
+    },
+    "one-var-declaration-per-line": {
+      "count": 1
+    },
+    "quotes": {
+      "count": 1
+    },
+    "space-infix-ops": {
+      "count": 2
+    }
+  },
+  "src/local-device-cache.ts": {
+    "arrow-parens": {
+      "count": 1
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "implicit-arrow-linebreak": {
+      "count": 1
+    },
+    "no-plusplus": {
+      "count": 4
+    },
+    "no-restricted-globals": {
+      "count": 1
+    },
+    "object-curly-newline": {
       "count": 2
     }
   },
@@ -397,19 +2369,190 @@
       "count": 1
     }
   },
+  "src/navigation.ts": {
+    "prefer-template": {
+      "count": 3
+    }
+  },
+  "src/pending-device-values.ts": {
+    "consistent-return": {
+      "count": 1
+    },
+    "implicit-arrow-linebreak": {
+      "count": 2
+    },
+    "no-param-reassign": {
+      "count": 2
+    },
+    "no-plusplus": {
+      "count": 1
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "operator-linebreak": {
+      "count": 2
+    }
+  },
+  "src/raw-lighting.ts": {
+    "block-spacing": {
+      "count": 8
+    },
+    "brace-style": {
+      "count": 2
+    },
+    "comma-spacing": {
+      "count": 80
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "key-spacing": {
+      "count": 51
+    },
+    "keyword-spacing": {
+      "count": 14
+    },
+    "no-bitwise": {
+      "count": 8
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
+    "no-plusplus": {
+      "count": 2
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "no-useless-return": {
+      "count": 1
+    },
+    "object-curly-newline": {
+      "count": 18
+    },
+    "object-curly-spacing": {
+      "count": 32
+    },
+    "object-property-newline": {
+      "count": 1
+    },
+    "one-var": {
+      "count": 3
+    },
+    "one-var-declaration-per-line": {
+      "count": 3
+    },
+    "quotes": {
+      "count": 1
+    },
+    "semi-spacing": {
+      "count": 10
+    },
+    "space-infix-ops": {
+      "count": 49
+    }
+  },
+  "src/store.ts": {
+    "arrow-parens": {
+      "count": 1
+    },
+    "implicit-arrow-linebreak": {
+      "count": 2
+    },
+    "no-param-reassign": {
+      "count": 3
+    },
+    "no-shadow": {
+      "count": 2
+    },
+    "prefer-template": {
+      "count": 1
+    }
+  },
   "src/theme.ts": {
+    "arrow-parens": {
+      "count": 2
+    },
+    "no-confusing-arrow": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 1
     }
   },
+  "src/use-cloud-device-snapshot.ts": {
+    "arrow-parens": {
+      "count": 1
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "implicit-arrow-linebreak": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    }
+  },
+  "src/use-local-device-state.ts": {
+    "arrow-parens": {
+      "count": 1
+    },
+    "function-paren-newline": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    }
+  },
   "src/use-pending-device-value.ts": {
+    "arrow-parens": {
+      "count": 2
+    },
+    "implicit-arrow-linebreak": {
+      "count": 1
+    },
     "no-nested-ternary": {
       "count": 1
+    },
+    "object-curly-newline": {
+      "count": 2
     }
   },
   "src/use-topology.ts": {
     "@stylistic/max-len": {
       "count": 2
+    },
+    "arrow-parens": {
+      "count": 4
+    },
+    "consistent-return": {
+      "count": 1
+    },
+    "import/order": {
+      "count": 1
+    },
+    "import/prefer-default-export": {
+      "count": 1
+    },
+    "no-use-before-define": {
+      "count": 1
+    },
+    "no-void": {
+      "count": 2
+    },
+    "object-curly-newline": {
+      "count": 8
+    },
+    "one-var": {
+      "count": 2
+    },
+    "one-var-declaration-per-line": {
+      "count": 2
+    },
+    "quotes": {
+      "count": 1
     }
   }
 }

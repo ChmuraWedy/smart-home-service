@@ -149,69 +149,79 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
     element.showModal();
     return () => { element.close(); unlockBody(); previous?.focus(); };
   }, []);
-  return <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} aria-busy={busy} onClick={event => event.stopPropagation()} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (infoOpen) setInfoOpen(false); else if (!busy) onClose(); }}>
-    <header className={"control-header" + (connectionContent ? " device-control-header" : "")}>
-      <div className="control-header-title">
-        {subtitle && <p className="eyebrow">{subtitle}</p>}
-        {titleContent || <h2>{title}</h2>}
-      </div>
-      {connectionContent}
-      <div className="control-header-actions">
-        <div className="control-header-buttons">
-          {onRefresh && <button
-            type="button"
-            className="header-icon control-refresh"
-            aria-label={t(MSG.REFRESH_STATUS)}
-            title={t(MSG.REFRESH_STATUS)}
-            disabled={busy}
-            onClick={() => void onRefresh()}
-          >
-            <Icon name="refresh-status" />
-          </button>}
-          {information && <button
-            type="button"
-            ref={infoButton}
-            className="header-icon control-information"
-            aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
-            title={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
-            aria-expanded={infoOpen}
-            aria-controls={infoId}
-            onClick={() => setInfoOpen(value => !value)}
-          >
-            <Icon name="info" />
-          </button>}
-          <button
-            className="header-icon control-dismiss"
-            aria-label={closeLabel}
-            title={closeLabel}
-            disabled={busy}
-            onClick={onClose}
-          >
-            <Icon name={closeLabel === t(MSG.CLOSE) ? 'close' : 'back'} />
-          </button>
+  return (
+    <dialog ref={dialog} className={'control-dialog ' + className} aria-label={title} aria-busy={busy} onClick={event => event.stopPropagation()} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (infoOpen) setInfoOpen(false); else if (!busy) onClose(); }}>
+      <header className={"control-header" + (connectionContent ? " device-control-header" : "")}>
+        <div className="control-header-title">
+          {subtitle && <p className="eyebrow">{subtitle}</p>}
+          {titleContent || <h2>{title}</h2>}
         </div>
-        {statusContent}
-        {information && infoOpen && <section
-          ref={infoPanel}
-          id={infoId}
-          className="connection-information connection-balloon"
-          aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
-        >
-          <button type="button" className="secondary balloon-close" aria-label={t(MSG.CLOSE_HELP)} onClick={closeInformation}>
-            <IconGlyph name="close" />
-          </button>
-          {information}
-        </section>}
-      </div>
-    </header>
-    <div className="control-dialog-body">{children}</div>
-  </dialog>;
+        {connectionContent}
+        <div className="control-header-actions">
+          <div className="control-header-buttons">
+            {onRefresh && (
+            <button
+              type="button"
+              className="header-icon control-refresh"
+              aria-label={t(MSG.REFRESH_STATUS)}
+              title={t(MSG.REFRESH_STATUS)}
+              disabled={busy}
+              onClick={() => void onRefresh()}
+            >
+              <Icon name="refresh-status" />
+            </button>
+)}
+            {information && (
+            <button
+              type="button"
+              ref={infoButton}
+              className="header-icon control-information"
+              aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
+              title={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
+              aria-expanded={infoOpen}
+              aria-controls={infoId}
+              onClick={() => setInfoOpen(value => !value)}
+            >
+              <Icon name="info" />
+            </button>
+)}
+            <button
+              className="header-icon control-dismiss"
+              aria-label={closeLabel}
+              title={closeLabel}
+              disabled={busy}
+              onClick={onClose}
+            >
+              <Icon name={closeLabel === t(MSG.CLOSE) ? 'close' : 'back'} />
+            </button>
+          </div>
+          {statusContent}
+          {information && infoOpen && (
+          <section
+            ref={infoPanel}
+            id={infoId}
+            className="connection-information connection-balloon"
+            aria-label={t(MSG.ABOUT_THIS_DEVICES_CONNECTION)}
+          >
+            <button type="button" className="secondary balloon-close" aria-label={t(MSG.CLOSE_HELP)} onClick={closeInformation}>
+              <IconGlyph name="close" />
+            </button>
+            {information}
+          </section>
+)}
+        </div>
+      </header>
+      <div className="control-dialog-body">{children}</div>
+    </dialog>
+  );
 }
 
 export function ControlFeedback({ busy, notice }: { busy: boolean; notice: ControlNotice }) {
-  return <div className={'control-feedback' + (notice.error ? ' error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">
-    {busy && <span className="spinner" aria-hidden="true" />}{translateText(notice.text) || (busy ? t(MSG.LOADING) : '')}
-  </div>;
+  return (
+    <div className={'control-feedback' + (notice.error ? ' error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">
+      {busy && <span className="spinner" aria-hidden="true" />}{translateText(notice.text) || (busy ? t(MSG.LOADING) : '')}
+    </div>
+  );
 }
 
 export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerSummary, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
@@ -312,75 +322,191 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
       if (edited !== null && Number(edited) !== initial.current && !disabled) void send(Number(edited));
       else if (edited !== null) setDirty(false);
     };
-    return <label className="dashboard-sheet-range">
-      <span>{spec.label}</span>
-      <span className="dashboard-sheet-range-value">{value === undefined ? t(MSG.NO_DATA) : displayReading(spec, {known:true,stale:false,value})}{awaiting && <span className="sr-only" role="status">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>}</span>
-      <input type="range" aria-label={spec.label} min={minimum} max={maximum} step={spec.step ?? 'any'}
-        value={value ?? minimum} disabled={disabled || value === undefined}
-        data-temperature={quickRange === 'temperature' || undefined}
-        onChange={event => { rangeEdit.current = event.currentTarget.value; change(event.currentTarget.value); }}
-        onPointerUp={commit} onKeyUp={commit} onBlur={commit}
-        onPointerCancel={() => { rangeEdit.current = null; setDirty(false); }} />
-      {quickRange === 'temperature' && <span className="dashboard-sheet-temperature-labels"><span>{t(MSG.WARM)}</span><span>{t(MSG.COOL)}</span></span>}
-    </label>;
+    return (
+      <label className="dashboard-sheet-range">
+        <span>{spec.label}</span>
+        <span className="dashboard-sheet-range-value">{value === undefined ? t(MSG.NO_DATA) : displayReading(spec, {known:true,stale:false,value})}
+          {awaiting && <span className="sr-only" role="status">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>}
+        </span>
+        <input type="range" aria-label={spec.label} min={minimum} max={maximum} step={spec.step ?? 'any'}
+          value={value ?? minimum} disabled={disabled || value === undefined}
+          data-temperature={quickRange === 'temperature' || undefined}
+          onChange={event => { rangeEdit.current = event.currentTarget.value; change(event.currentTarget.value); }}
+          onPointerUp={commit} onKeyUp={commit} onBlur={commit}
+          onPointerCancel={() => { rangeEdit.current = null; setDirty(false); }}
+        />
+        {quickRange === 'temperature' && (
+        <span className="dashboard-sheet-temperature-labels">
+          <span>{t(MSG.WARM)}</span>
+          <span>{t(MSG.COOL)}</span>
+        </span>
+)}
+      </label>
+    );
   }
-  return <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-    <div className="capability-row"><div className="capability-heading"><div className="capability-label"><div className="capability-label-line"><h3 className={powerSummary ? "sr-only" : undefined}>{!spec.writable && <ParameterIcon code={spec.key} />}{spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}</h3>{headingActions}</div>{aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}</div>
-    </div>
-    {powerIcon && <span className={'dashboard-power-state' + (powerSummary ? ' dashboard-power-state-summary' : '')}>
-      {powerSummary ? powerSummary(powerKnown ? selectedPower : null) : powerKnown ? t(selectedPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
-      {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
-      <span role="status" className="dashboard-power-pending" title={awaiting ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
-        {awaiting && <><span className="spinner" aria-hidden="true" /><span className="sr-only">{t(MSG.WAITING_FOR_A_NEW_READING)}</span></>}
-      </span>
-    </span>}
-    {spec.kind === 'color' && <div className="color-tools">
-      {spec.kind === 'color' && spec.writable && <input aria-label={t(MSG.COLOR_PICKER)} title={t(MSG.COLOR_PICKER)} className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
-      {spec.kind === 'color' && spec.writable && <button type="button" className="secondary color-details-toggle" aria-label={t(MSG.PRECISE_COLOR_SETTINGS)} title={t(MSG.HUE_SATURATION_AND_BRIGHTNESS)} aria-expanded={preciseColor} onClick={() => setPreciseColor(value => !value)}><IconGlyph name="more-centered" /></button>}
-    </div>}
-    {spec.readable && !spec.writable && <p className={'reading' + (!fresh ? ' unknown' : '')}>{motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}{reading?.known && isStale(reading, now, local) && <span className="stale-tag">{t(MSG.STALE)}</span>}</p>}
-    {spec.writable && (spec.kind === 'boolean' ? <div className="power-actions">
-      {stage || immediatePower ? <>{booleanButton ? <button id={powerId} type="button" className={powerIcon ? 'dashboard-power-button' : 'secondary compact mode-button'}
-        data-slot={powerIcon ? 'power-button' : undefined} data-checked={powerIcon && selectedPower ? '' : undefined}
-        title={reading?.known || awaiting ? (selectedPower ? t(MSG.TURN_OFF_PREFIX) : t(MSG.TURN_ON_PREFIX))+spec.label : undefined} aria-label={spec.label} aria-pressed={selectedPower} disabled={disabled || (!reading?.known && !awaiting)} onClick={() => changePower(!selectedPower)}>{powerIcon || (typeof buttonText==='function' ? buttonText(reading?.known || awaiting ? selectedPower : null) : buttonText || (selectedPower ? t(MSG.TURN_OFF) : t(MSG.TURN_ON)))}</button>
+  return (
+    <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
+      <div className="capability-row">
+        <div className="capability-heading">
+          <div className="capability-label">
+            <div className="capability-label-line">
+              <h3 className={powerSummary ? "sr-only" : undefined}>
+                {!spec.writable && <ParameterIcon code={spec.key} />}
+                {spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}
+              </h3>{headingActions}
+            </div>
+            {aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}
+          </div>
+        </div>
+        {powerIcon && (
+        <span className={'dashboard-power-state' + (powerSummary ? ' dashboard-power-state-summary' : '')}>
+          {powerSummary ? powerSummary(powerKnown ? selectedPower : null) : powerKnown ? t(selectedPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
+          {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+          <span role="status" className="dashboard-power-pending" title={awaiting ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
+            {awaiting && (
+            <>
+              <span className="spinner" aria-hidden="true" />
+              <span className="sr-only">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>
+            </>
+)}
+          </span>
+        </span>
+)}
+        {spec.kind === 'color' && (
+        <div className="color-tools">
+          {spec.kind === 'color' && spec.writable && <input aria-label={t(MSG.COLOR_PICKER)} title={t(MSG.COLOR_PICKER)} className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
+          {spec.kind === 'color' && spec.writable && (
+          <button type="button" className="secondary color-details-toggle" aria-label={t(MSG.PRECISE_COLOR_SETTINGS)} title={t(MSG.HUE_SATURATION_AND_BRIGHTNESS)} aria-expanded={preciseColor} onClick={() => setPreciseColor(value => !value)}>
+            <IconGlyph name="more-centered" />
+          </button>
+)}
+        </div>
+)}
+        {spec.readable && !spec.writable && (
+        <p className={'reading' + (!fresh ? ' unknown' : '')}>
+          {motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}
+          {reading?.known && isStale(reading, now, local) && <span className="stale-tag">{t(MSG.STALE)}</span>}
+        </p>
+)}
+        {spec.writable && (spec.kind === 'boolean' ? (
+          <div className="power-actions">
+            {stage || immediatePower ? (
+              <>
+                {booleanButton ? (
+                  <button id={powerId} type="button" className={powerIcon ? 'dashboard-power-button' : 'secondary compact mode-button'}
+                    data-slot={powerIcon ? 'power-button' : undefined} data-checked={powerIcon && selectedPower ? '' : undefined}
+                    title={reading?.known || awaiting ? (selectedPower ? t(MSG.TURN_OFF_PREFIX) : t(MSG.TURN_ON_PREFIX))+spec.label : undefined} aria-label={spec.label} aria-pressed={selectedPower} disabled={disabled || (!reading?.known && !awaiting)} onClick={() => changePower(!selectedPower)}
+                  >{powerIcon || (typeof buttonText==='function' ? buttonText(reading?.known || awaiting ? selectedPower : null) : buttonText || (selectedPower ? t(MSG.TURN_OFF) : t(MSG.TURN_ON)))}
+                  </button>
+)
         : dashboardSwitch ? <Switch id={powerId} aria-label={spec.label} powerIcon={powerIcon} checked={selectedPower} disabled={disabled} onChange={changePower} />
-        : <button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => changePower(!selectedPower)}><span /></button>}{!powerIcon && !dirty && !awaiting && !reading?.known && <span className="power-selection">{t(MSG.NO_DATA)}</span>}{!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}{(dirty || awaiting) && <span className="help">{dirty ? t(MSG.MODIFIED) : t(MSG.WAITING_FOR_A_READING)}{spec.readable && <>{" " + t(MSG.CURRENT_READING_LABEL) + " "}<span>{displayReading(spec,reading)}</span></>}</span>}</> : <>
-      {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
-      <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>{t(MSG.TURN_ON)}</button>
-      <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>{t(MSG.TURN_OFF)}</button>
-      </>}
-    </div> : <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!stage && !disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
-      {valueEditor?.(draft,change)}
-      {spec.kind === 'number' && <div className="range-input-row">
-        <label className="range-value"><span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span><input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder={t(MSG.VALUE)} />{spec.unit && <span>{spec.unit}</span>}</label>
-        {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + t(MSG.SLIDER)} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
-      </div>}
-      {spec.kind === 'enum' && <label className="enum-value"><span className="sr-only">{spec.label}</span><select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}><option value="">{t(MSG.SELECT_A_VALUE)}</option>{spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}</select></label>}
-      {spec.kind === 'color' && <div className="color-editor">
-        {preciseColor && <div className="color-sliders">{(['h', 's', 'v'] as const).map(axis => <label key={axis}>{axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)}<input aria-label={axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} /></label>)}</div>}
-      </div>}
-      {spec.kind === 'text' && !effectWizard && !valueEditor && <label>{spec.label}<input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} /></label>}
-      {spec.kind === 'json' && !effectWizard && !valueEditor && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : <label>{spec.label} — JSON<textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} /></label>)}
-      {effectWizard ? <div className="schedule-launch"><button type="button" className="secondary compact" disabled={disabled} onClick={() => setEffectOpen(true)}>{t(MSG.CONFIGURE)}</button></div> : hasScheduleWizard(spec) ? <div className="schedule-launch"><span className="help">{scheduleSummary(spec.key,draft)}</span><button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>{t(MSG.CONFIGURE)}</button></div> : spec.kind === 'raw' && <>
-        {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
-        <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
-        <label>{t(MSG.MANUFACTURER_DATA_BASE64)}<textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} /></label>
-        <p className="help">{t(MSG.DECODED_SIZE_UP_TO) + " "}{spec.maximumBytes}{" " + t(MSG.BYTES_APPLY_AUTOMATICALLY_SUFFIX)}</p>
-      </>}
-      {!stage && <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">{t(MSG.APPLY)}</button>}
-    </form>)}
-    <div className="reading-meta">
-      {spec.readable && !reading?.known && <span>{t(MSG.NO_READING)}</span>}
-      {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{" " + t(MSG.S_AGO)}</span>}
-      {!spec.writable ? <span className="read-only">{t(MSG.READ_ONLY)}</span> : !spec.readable && <span className="read-only">{t(MSG.COMMAND)}</span>}
-    </div></div>
-    {booleanActions?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value === 'boolean' ? reading.value : null,
+        : (
+          <button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => changePower(!selectedPower)}>
+            <span />
+          </button>
+)}
+                {!powerIcon && !dirty && !awaiting && !reading?.known && <span className="power-selection">{t(MSG.NO_DATA)}</span>}
+                {!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+                {(dirty || awaiting) && (
+                <span className="help">{dirty ? t(MSG.MODIFIED) : t(MSG.WAITING_FOR_A_READING)}
+                  {spec.readable && (
+                <>{" " + t(MSG.CURRENT_READING_LABEL) + " "}
+                  <span>{displayReading(spec,reading)}</span>
+                </>
+)}
+                </span>
+)}
+              </>
+) : (
+  <>
+    {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
+    <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>{t(MSG.TURN_ON)}</button>
+    <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>{t(MSG.TURN_OFF)}</button>
+  </>
+    )}
+          </div>
+) : (
+  <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!stage && !disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
+    {valueEditor?.(draft,change)}
+    {spec.kind === 'number' && (
+    <div className="range-input-row">
+      <label className="range-value">
+        <span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span>
+        <input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder={t(MSG.VALUE)} />
+        {spec.unit && <span>{spec.unit}</span>}
+      </label>
+      {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + t(MSG.SLIDER)} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
+    </div>
+)}
+    {spec.kind === 'enum' && (
+    <label className="enum-value">
+      <span className="sr-only">{spec.label}</span>
+      <select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}>
+        <option value="">{t(MSG.SELECT_A_VALUE)}</option>
+        {spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}
+      </select>
+    </label>
+)}
+    {spec.kind === 'color' && (
+    <div className="color-editor">
+      {preciseColor && (
+      <div className="color-sliders">
+        {(['h', 's', 'v'] as const).map(axis => (
+          <label key={axis}>{axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)}
+            <input aria-label={axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} />
+          </label>
+))}
+      </div>
+)}
+    </div>
+)}
+    {spec.kind === 'text' && !effectWizard && !valueEditor && (
+    <label>{spec.label}
+      <input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} />
+    </label>
+)}
+    {spec.kind === 'json' && !effectWizard && !valueEditor && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : (
+      <label>{spec.label} — JSON
+        <textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} />
+      </label>
+      ))}
+    {effectWizard ? (
+      <div className="schedule-launch">
+        <button type="button" className="secondary compact" disabled={disabled} onClick={() => setEffectOpen(true)}>{t(MSG.CONFIGURE)}</button>
+      </div>
+) : hasScheduleWizard(spec) ? (
+  <div className="schedule-launch">
+    <span className="help">{scheduleSummary(spec.key,draft)}</span>
+    <button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>{t(MSG.CONFIGURE)}</button>
+  </div>
+      ) : spec.kind === 'raw' && (
+        <>
+          {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
+          <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
+          <label>{t(MSG.MANUFACTURER_DATA_BASE64)}
+            <textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} />
+          </label>
+          <p className="help">{t(MSG.DECODED_SIZE_UP_TO) + " "}{spec.maximumBytes}{" " + t(MSG.BYTES_APPLY_AUTOMATICALLY_SUFFIX)}</p>
+        </>
+      )}
+    {!stage && <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">{t(MSG.APPLY)}</button>}
+  </form>
+    ))}
+        <div className="reading-meta">
+          {spec.readable && !reading?.known && <span>{t(MSG.NO_READING)}</span>}
+          {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{" " + t(MSG.S_AGO)}</span>}
+          {!spec.writable ? <span className="read-only">{t(MSG.READ_ONLY)}</span> : !spec.readable &&
+          <span className="read-only">{t(MSG.COMMAND)}</span>}
+        </div>
+      </div>
+      {booleanActions?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value === 'boolean' ? reading.value : null,
       () => changePower(!selectedPower))}
-    {awaiting && !powerIcon && <p className="help pending-reading">{t(MSG.WAITING_FOR_A_NEW_READING)}</p>}
-    {spec.reason && <p className="help">{spec.reason}</p>}
-    {spec.help && <p className="help">{spec.help}</p>}
-    {(error || draftError) && <p className="field-error" role="alert">{error || draftError}</p>}
-    {effectOpen && <LightEffectWizard spec={spec} value={draft} onClose={() => setEffectOpen(false)} onDone={value => { change(value); setEffectOpen(false); }} />}
-    {scheduleOpen && <ScheduleWizard spec={spec} value={draft} onClose={() => setScheduleOpen(false)} onDone={value => { change(value); setScheduleOpen(false); }} />}
-  </section>;
+      {awaiting && !powerIcon && <p className="help pending-reading">{t(MSG.WAITING_FOR_A_NEW_READING)}</p>}
+      {spec.reason && <p className="help">{spec.reason}</p>}
+      {spec.help && <p className="help">{spec.help}</p>}
+      {(error || draftError) && <p className="field-error" role="alert">{error || draftError}</p>}
+      {effectOpen && <LightEffectWizard spec={spec} value={draft} onClose={() => setEffectOpen(false)} onDone={value => { change(value); setEffectOpen(false); }} />}
+      {scheduleOpen && <ScheduleWizard spec={spec} value={draft} onClose={() => setScheduleOpen(false)} onDone={value => { change(value); setScheduleOpen(false); }} />}
+    </section>
+  );
 }

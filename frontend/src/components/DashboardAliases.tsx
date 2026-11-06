@@ -45,34 +45,48 @@ export function DashboardAliases({ aliases }: { aliases: string[] }) {
 
   const hiddenAliases = aliases.slice(visibleCount);
   const preview = (hiddenAliases.length ? hiddenAliases : aliases).join(', ');
-  return <div className="dashboard-aliases" ref={row} role="group" aria-label={t(MSG.DEVICE_ALIASES)}>
-    <div className="dashboard-alias-measure-box" aria-hidden="true">
-      <div className="dashboard-alias-measure" ref={measure}>
-        {aliases.map(alias => <span className="alias-tag" key={alias} data-alias={alias} />)}
-        <span className="dashboard-alias-more-width" />
+  return (
+    <div className="dashboard-aliases" ref={row} role="group" aria-label={t(MSG.DEVICE_ALIASES)}>
+      <div className="dashboard-alias-measure-box" aria-hidden="true">
+        <div className="dashboard-alias-measure" ref={measure}>
+          {aliases.map(alias => <span className="alias-tag" key={alias} data-alias={alias} />)}
+          <span className="dashboard-alias-more-width" />
+        </div>
       </div>
+      <div className="dashboard-alias-visible">
+        {aliases.slice(0, visibleCount).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}
+      </div>
+      {overflow && (
+      <Popover className="dashboard-alias-overflow">
+        {({ open }) => (
+          <>
+            <PopoverButton type="button" className="secondary dashboard-alias-more" aria-label={t(MSG.SHOW_ALL_ALIASES)}
+              aria-describedby={open ? undefined : tooltipId}
+            >
+              <IconGlyph name="more" />
+            </PopoverButton>
+            {!open && <span className="dashboard-alias-tooltip" id={tooltipId} role="tooltip">{preview}</span>}
+            <PopoverPanel anchor={{ to: 'bottom end', gap: 6, padding: 8 }} focus className="dashboard-alias-popup"
+              role="dialog" aria-label={t(MSG.DEVICE_ALIASES)} onClick={event => event.stopPropagation()}
+            >
+              {({ close }) => (
+                <>
+                  <div className="dashboard-alias-popup-header">
+                <strong>{t(MSG.DEVICE_ALIASES)}</strong>
+                <button type="button" className="secondary compact" aria-label={t(MSG.CLOSE)} onClick={() => close()}>
+                <IconGlyph name="close" />
+              </button>
+              </div>
+                  <ul className="capability-aliases">
+                {aliases.map(alias => <li className="alias-tag" key={alias}>{alias}</li>)}
+              </ul>
+                </>
+)}
+            </PopoverPanel>
+          </>
+)}
+      </Popover>
+)}
     </div>
-    <div className="dashboard-alias-visible">
-      {aliases.slice(0, visibleCount).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}
-    </div>
-    {overflow && <Popover className="dashboard-alias-overflow">
-      {({ open }) => <>
-        <PopoverButton type="button" className="secondary dashboard-alias-more" aria-label={t(MSG.SHOW_ALL_ALIASES)}
-          aria-describedby={open ? undefined : tooltipId}><IconGlyph name="more" /></PopoverButton>
-        {!open && <span className="dashboard-alias-tooltip" id={tooltipId} role="tooltip">{preview}</span>}
-        <PopoverPanel anchor={{ to: 'bottom end', gap: 6, padding: 8 }} focus className="dashboard-alias-popup"
-          role="dialog" aria-label={t(MSG.DEVICE_ALIASES)} onClick={event => event.stopPropagation()}>
-          {({ close }) => <>
-            <div className="dashboard-alias-popup-header">
-              <strong>{t(MSG.DEVICE_ALIASES)}</strong>
-              <button type="button" className="secondary compact" aria-label={t(MSG.CLOSE)} onClick={() => close()}><IconGlyph name="close" /></button>
-            </div>
-            <ul className="capability-aliases">
-              {aliases.map(alias => <li className="alias-tag" key={alias}>{alias}</li>)}
-            </ul>
-          </>}
-        </PopoverPanel>
-      </>}
-    </Popover>}
-  </div>;
+  );
 }

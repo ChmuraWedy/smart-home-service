@@ -14,7 +14,11 @@ pnpm test
 pnpm build
 ```
 
-The frontend build, including the Docker image build, runs ESLint before compilation. Application source is checked for long lines, crowded JSX props, nested ternaries, complex inline event handlers, and non-null assertions. The committed ESLint baseline tracks existing violations by file and rule. After fixing a recorded violation, run `pnpm exec eslint src --prune-suppressions` and include the baseline reduction with the fix.
+The frontend build, including the Docker image build, runs ESLint before compilation. The configuration extends Airbnb’s JavaScript, React, and Hooks rules through ESLint’s compatibility adapters, with overrides for TypeScript and the JSX runtime.
+
+Each JSX tag in a tree gets its own line. A leaf can keep its opening tag, text or interpolation, and closing tag together, such as `<p>{label}</p>`. This rule has no baseline exemptions.
+
+The committed ESLint baseline tracks existing violations of other rules by file and rule. After fixing a recorded violation, run `pnpm exec eslint src --prune-suppressions` and include the baseline reduction with the fix.
 
 Development serves `http://127.0.0.1:5173`. Configure the API's allowed origins accordingly. Save the API URL and service access key under connection settings. A production `VITE_API_BASE_URL=same-origin` build uses the current host; otherwise the configured base or development API default is used. The old Python `/cloud` page can redirect to this separate frontend.
 

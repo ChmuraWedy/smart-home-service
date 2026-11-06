@@ -34,22 +34,51 @@ export function DeviceNetwork({ api, deviceId, provider, onAuthError }: {
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [open, api, deviceId, provider]);
-  return <details className="cloud-properties device-network" onToggle={event => setOpen(event.currentTarget.open)}><summary>{t(MSG.DEVICE_ON_YOUR_HOME_NETWORK)}</summary>
-    <p className="help">{t(MSG.THE_SERVICE_CONTINUOUSLY_RECEIVES_TUYA_NETWORK_ANNOUNCEMENTS)}</p>
-    <p className="help">{t(MSG.THE_SHARED_RECEIVER_ALSO_RUNS_WHILE_CARDS_ARE)}</p>
-    {data && <p role="status">{data.listening ? t(MSG.LISTENING_FOR_ANNOUNCEMENTS_ON_YOUR_HOME_NETWORK) : !data.enabled ? t(MSG.GLOBAL_ANNOUNCEMENT_RECEPTION_IS_DISABLED_IN_THE_SERVICE) : data.failed_ports.length ? t(MSG.COULD_NOT_START_THE_ANNOUNCEMENT_RECEIVER) : t(MSG.STARTING_ANNOUNCEMENT_RECEIVER)}</p>}
-    {data && <>
-      <dl>
-        <div><dt>{t(MSG.MONITORING)}</dt><dd>{data.route === 'gateway' ? t(MSG.DEVICE_GATEWAY) : t(MSG.DEVICE_ITSELF)} · <code>{data.target_id}</code></dd></div>
-        <div><dt>{t(MSG.CONFIGURED_IP)}</dt><dd>{data.configured_ip || t(MSG.NOT_SET)}</dd></div>
-        <div><dt>{t(MSG.OBSERVED_IP)}</dt><dd>{data.observed_ip || t(MSG.NO_ANNOUNCEMENTS_YET)}</dd></div>
-        <div><dt>{t(MSG.LAST_ANNOUNCEMENT)}</dt><dd>{data.last_seen ? new Date(data.last_seen).toLocaleString(dateLocale()) : t(MSG.NOT_YET)}</dd></div>
-        <div><dt>{t(MSG.ANNOUNCEMENTS_RECEIVED)}</dt><dd>{data.packets}</dd></div>
-      </dl>
-      {data.configured_ip && data.observed_ip && data.configured_ip !== data.observed_ip && <p className="saved-summary">{t(MSG.THE_OBSERVED_IP_DIFFERS_FROM_THE_SAVED_CONFIGURATION)}</p>}
-      {!!data.failed_ports.length && <p role="alert">{t(MSG.SOME_RECEPTION_IS_UNAVAILABLE_UDP) + " "}{data.failed_ports.join(', ')}{t(MSG.CHECK_WHETHER_ANOTHER_APPLICATION_IS_USING_THE_PORT)}</p>}
-      {!!data.changes.length && <><h3>{t(MSG.RECENT_IP_CHANGES)}</h3><ul>{data.changes.map((change, index) => <li key={index}>{new Date(change.at).toLocaleTimeString(dateLocale())} · {change.previous_ip ? change.previous_ip + ' → ' : t(MSG.DISCOVERED)}{change.ip}</li>)}</ul></>}
-    </>}
-    {error && <p role="alert">{translateText(error)}</p>}
-  </details>;
+  return (
+    <details className="cloud-properties device-network" onToggle={event => setOpen(event.currentTarget.open)}>
+      <summary>{t(MSG.DEVICE_ON_YOUR_HOME_NETWORK)}</summary>
+      <p className="help">{t(MSG.THE_SERVICE_CONTINUOUSLY_RECEIVES_TUYA_NETWORK_ANNOUNCEMENTS)}</p>
+      <p className="help">{t(MSG.THE_SHARED_RECEIVER_ALSO_RUNS_WHILE_CARDS_ARE)}</p>
+      {data && <p role="status">{data.listening ? t(MSG.LISTENING_FOR_ANNOUNCEMENTS_ON_YOUR_HOME_NETWORK) : !data.enabled ? t(MSG.GLOBAL_ANNOUNCEMENT_RECEPTION_IS_DISABLED_IN_THE_SERVICE) : data.failed_ports.length ? t(MSG.COULD_NOT_START_THE_ANNOUNCEMENT_RECEIVER) : t(MSG.STARTING_ANNOUNCEMENT_RECEIVER)}</p>}
+      {data && (
+      <>
+        <dl>
+          <div>
+            <dt>{t(MSG.MONITORING)}</dt>
+            <dd>{data.route === 'gateway' ? t(MSG.DEVICE_GATEWAY) : t(MSG.DEVICE_ITSELF)}{" · "}
+              <code>{data.target_id}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>{t(MSG.CONFIGURED_IP)}</dt>
+            <dd>{data.configured_ip || t(MSG.NOT_SET)}</dd>
+          </div>
+          <div>
+            <dt>{t(MSG.OBSERVED_IP)}</dt>
+            <dd>{data.observed_ip || t(MSG.NO_ANNOUNCEMENTS_YET)}</dd>
+          </div>
+          <div>
+            <dt>{t(MSG.LAST_ANNOUNCEMENT)}</dt>
+            <dd>{data.last_seen ? new Date(data.last_seen).toLocaleString(dateLocale()) : t(MSG.NOT_YET)}</dd>
+          </div>
+          <div>
+            <dt>{t(MSG.ANNOUNCEMENTS_RECEIVED)}</dt>
+            <dd>{data.packets}</dd>
+          </div>
+        </dl>
+        {data.configured_ip && data.observed_ip && data.configured_ip !== data.observed_ip && <p className="saved-summary">{t(MSG.THE_OBSERVED_IP_DIFFERS_FROM_THE_SAVED_CONFIGURATION)}</p>}
+        {!!data.failed_ports.length && <p role="alert">{t(MSG.SOME_RECEPTION_IS_UNAVAILABLE_UDP) + " "}{data.failed_ports.join(', ')}{t(MSG.CHECK_WHETHER_ANOTHER_APPLICATION_IS_USING_THE_PORT)}</p>}
+        {!!data.changes.length && (
+        <>
+          <h3>{t(MSG.RECENT_IP_CHANGES)}</h3>
+          <ul>
+            {data.changes.map((change, index) => <li key={index}>{new Date(change.at).toLocaleTimeString(dateLocale())} · {change.previous_ip ? change.previous_ip + ' → ' : t(MSG.DISCOVERED)}{change.ip}</li>)}
+          </ul>
+        </>
+)}
+      </>
+)}
+      {error && <p role="alert">{translateText(error)}</p>}
+    </details>
+  );
 }

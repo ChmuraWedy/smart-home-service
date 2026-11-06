@@ -14,7 +14,8 @@ export function ChannelAliases({ api, deviceId, provider, code, alias, disabled,
   const dispatch = useAppDispatch();
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => { pending.current?.abort(); onBusy(false); }, [onBusy]);
-  return <AliasRow aliases={alias ? [alias] : []} maxAliases={1} maxLength={120} disabled={disabled} onSave={async values => {
+  return (
+    <AliasRow aliases={alias ? [alias] : []} maxAliases={1} maxLength={120} disabled={disabled} onSave={async values => {
     const key = cloudMetadataKey(cloudAccountScope(api, provider), deviceId);
     const controller = new AbortController(); pending.current = controller; onBusy(true);
     try {
@@ -27,5 +28,7 @@ export function ChannelAliases({ api, deviceId, provider, code, alias, disabled,
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
       throw failure;
     } finally { if (!controller.signal.aborted) { pending.current = null; onBusy(false); } }
-  }} />;
+  }}
+    />
+  );
 }
