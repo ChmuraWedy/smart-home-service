@@ -7,6 +7,7 @@ import type { Capability, DeviceState, LocalDevice } from './home-api';
 import { CloudControl } from './components/CloudControl';
 import { DeviceMappings } from './components/DeviceMappings';
 import { ControlCenter } from './components/ControlCenter';
+import { renderWithStore } from './test/render-with-store';
 import { LocalControl, GroupControl } from './components/LocalControls';
 
 const connection = { baseUrl: 'http://api.test:8765', token: 'test-service-key' };
@@ -493,7 +494,7 @@ describe('local device and group controls', () => {
   });
   it('uses cached reads while filtering rooms and aliases and opening group members', async () => {
     const server = localServer(); const user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready onAuthError={vi.fn()} />);
     await screen.findByText('Лампа кухни');
     expect(server.reads.some(path => path.includes('refresh=true'))).toBe(false);
     await user.selectOptions(screen.getByLabelText('Комната'), '2');
@@ -514,15 +515,15 @@ describe('local device and group controls', () => {
     expect(server.writes).toHaveLength(0);
   });
   it('clears the previous server inventory before a replacement server responds', async () => {
-    localServer(); const onAuthError = vi.fn(), onLock = vi.fn();
-    const view = render(<ControlCenter api={new HomeApi(connection)} ready onAuthError={onAuthError} onLock={onLock} />);
+    localServer(); const onAuthError = vi.fn();
+    const view = renderWithStore(<ControlCenter api={new HomeApi(connection)} ready onAuthError={onAuthError} />);
     await screen.findByText('Лампа кухни');
     vi.mocked(fetch).mockImplementation((input, init) => {
       expect(String(input)).toContain('http://other-api.test');
       expect((init?.headers as Record<string,string>)['X-API-Key']).toBe('new-service-key');
       return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
     });
-    view.rerender(<ControlCenter api={new HomeApi({ baseUrl:'http://other-api.test',token:'new-service-key' })} ready onAuthError={onAuthError} onLock={onLock} />);
+    view.rerender(<ControlCenter api={new HomeApi({ baseUrl:'http://other-api.test',token:'new-service-key' })} ready onAuthError={onAuthError} />);
     expect(screen.queryByText('Лампа кухни')).toBeNull();
     expect(screen.queryByRole('button', { name:'Подробнее' })).toBeNull();
     expect(screen.getByText('Загружаем список…')).toBeInTheDocument();

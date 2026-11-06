@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ControlCenter } from './components/ControlCenter';
+import { renderWithStore } from './test/render-with-store';
 import { HomeApi } from './home-api';
 import type { LocalDevice, Topology } from './home-api';
 
@@ -40,7 +41,7 @@ function server(options: { local?: LocalDevice; syncFails?: boolean; empty?: boo
   return calls;
 }
 
-function setup(developerReady = false) { return render(<ControlCenter api={api()} ready sharingReady developerReady={developerReady} onAuthError={vi.fn()} onLock={vi.fn()} />); }
+function setup(developerReady = false) { return renderWithStore(<ControlCenter api={api()} ready sharingReady developerReady={developerReady} onAuthError={vi.fn()} />); }
 
 describe('Smart Life topology', () => {
   it.each(['sharing', 'developer'])('uses cached placement for room filtering and survey via %s without registration or sync', async provider => {
@@ -113,7 +114,7 @@ describe('Smart Life topology', () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Синхронизировать Smart Life' })); });
     const oldCount = calls.length;
-    view.rerender(<ControlCenter api={api()} ready sharingReady={false} onAuthError={vi.fn()} onLock={vi.fn()} />);
+    view.rerender(<ControlCenter api={api()} ready sharingReady={false} onAuthError={vi.fn()} />);
     await act(() => vi.advanceTimersByTimeAsync(5000));
     expect(screen.queryByText('Комнаты из Smart Life')).toBeNull();
     expect(calls.slice(oldCount).some(call => call.path.includes('/cloud/'))).toBe(false);

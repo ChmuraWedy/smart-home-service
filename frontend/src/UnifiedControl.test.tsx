@@ -1,7 +1,8 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ControlCenter } from './components/ControlCenter';
+import { renderWithStore } from './test/render-with-store';
 import { HomeApi } from './home-api';
 import type { LocalDevice } from './home-api';
 import { deviceRoutes, matchesDevice, mergeDevices } from './devices';
@@ -50,7 +51,7 @@ describe('unified device identity and management', () => {
       return original(input, init);
     });
     const user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     const card = await screen.findByRole('listitem',{name:shared.name});
     const toggle = await within(card).findByRole('switch',{name:'Питание'});
     await waitFor(() => expect(toggle).toBeEnabled());
@@ -68,7 +69,7 @@ describe('unified device identity and management', () => {
 
   it('opens details only from the chevron on a card without a sheet, using the selected route',async()=>{
     const calls=server(),user=userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
     const card=await screen.findByRole('listitem',{name:local.name});
     await user.selectOptions(within(card).getByRole('combobox'),'developer');
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -91,7 +92,7 @@ describe('unified device identity and management', () => {
       if (init?.method==='POST') {calls.push({path:url.pathname+url.search,method:'POST',body:JSON.parse(String(init.body))}); return pending;}
       return original(input,init);
     });
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     const card=await screen.findByRole('listitem',{name:local.name}),power=await within(card).findByRole('switch',{name:'Питание'});
     await waitFor(()=>expect(power).toBeEnabled());
     await user.click(within(card).getByRole('button',{name:'Обновить параметры'}));
@@ -123,7 +124,7 @@ describe('unified device identity and management', () => {
 
   it('shows one room-scoped card with aliases and explicit routes, with no physical/status polling on browse', async () => {
     const calls = server(); const user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
     await screen.findByRole('listitem', { name: 'Только в аккаунте' });
     const card = screen.getByRole('listitem', { name: local.name });
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
@@ -156,7 +157,7 @@ describe('unified device identity and management', () => {
       if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'tracer-real',name:'TRACER FOCUS 3',sub:false}]);
       return original(input,init);
     });
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     const card=await screen.findByRole('listitem',{name:'TRACER FOCUS 3'});
     expect(within(card).queryByText('Настройка отложена')).toBeNull();
     expect(within(card).getByRole('group',{name:'Основные параметры: TRACER FOCUS 3'})).toBeInTheDocument();
@@ -174,7 +175,7 @@ describe('unified device identity and management', () => {
       if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'actual-gateway',name:'WorkGtZb',category:'wg2',sub:true}]);
       return original(input,init);
     });
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     const card=await screen.findByRole('listitem',{name:'WorkGtZb'});
     expect(within(card).queryByText('Настройка отложена')).toBeNull();
     await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
@@ -191,7 +192,7 @@ describe('unified device identity and management', () => {
 
   it('routes commands by the chosen provider or local numeric record, without an automatic fallback', async () => {
     const calls = server({ commandFailure: true }); const user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
     await screen.findByRole('listitem', { name: local.name });
     const card = screen.getByRole('listitem', { name: local.name });
     await user.selectOptions(within(card).getByRole('combobox'), 'developer');
@@ -242,7 +243,7 @@ describe('unified device identity and management', () => {
 
   it('shows cloud-only devices without import, and keeps cloud access when the local inventory fails', async () => {
     server({ localFailure: true, noLocal: true });
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     expect(await screen.findByRole('listitem', { name: shared.name })).toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent('Inventory unavailable');
     expect(screen.queryByText(/импортируйте|parent\/cid|REST API/)).toBeNull();
@@ -250,7 +251,7 @@ describe('unified device identity and management', () => {
 
   it('keeps local and Developer controls when Sharing fails', async () => {
     const calls = server({ cloudFailure: true });
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Smart Life: Cloud unavailable');
     const card = await screen.findByRole('listitem', { name: local.name });
     expect(within(card).getByRole('combobox')).toHaveValue('developer');
@@ -259,19 +260,19 @@ describe('unified device identity and management', () => {
   });
 
   it('hides old cloud and local cards immediately on server replacement and ignores late old responses', async () => {
-    server(); const onAuthError = vi.fn(), onLock = vi.fn();
-    const view = render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={onAuthError} onLock={onLock} />);
+    server(); const onAuthError = vi.fn();
+    const view = renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={onAuthError} />);
     await screen.findByRole('listitem', { name: 'Только в аккаунте' });
     const pending: ((value: Response) => void)[] = [];
     vi.mocked(fetch).mockImplementation((_input, init) => {
       expect((init?.headers as Record<string, string>)['X-API-Key']).toBe('new-key');
       return new Promise(resolve => pending.push(resolve));
     });
-    view.rerender(<ControlCenter api={new HomeApi({ baseUrl: 'http://new-api.test', token: 'new-key' })} ready sharingReady onAuthError={onAuthError} onLock={onLock} />);
+    view.rerender(<ControlCenter api={new HomeApi({ baseUrl: 'http://new-api.test', token: 'new-key' })} ready sharingReady onAuthError={onAuthError} />);
     expect(screen.queryByRole('listitem')).toBeNull();
     // Cancel all requests while they are pending, then allow their transport to
     // resolve anyway. No late inventory is allowed to resurrect old controls.
-    view.rerender(<ControlCenter api={new HomeApi(connection)} ready={false} sharingReady onAuthError={onAuthError} onLock={onLock} />);
+    view.rerender(<ControlCenter api={new HomeApi(connection)} ready={false} sharingReady onAuthError={onAuthError} />);
     await act(async () => { pending.forEach(resolve => resolve(json([shared]))); });
     expect(screen.queryByRole('listitem')).toBeNull();
   });

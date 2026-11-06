@@ -11,17 +11,18 @@ const devices: LocalDevice[] = Array.from({ length: 30 }, (_, index) => ({
   version: '3.5', has_local_key: true,
 }));
 const json = (value: unknown) => new Response(JSON.stringify(value));
-function backend() {
+function backend(records = devices) {
   const calls: { path: string; method: string }[] = [];
   vi.mocked(fetch).mockImplementation(async (input, options) => {
     const url = new URL(String(input)), path = url.pathname;
     calls.push({ path: path + url.search, method: options?.method || 'GET' });
     if (path === '/api/v1/cloud/status') return json({ enabled: true, connected: false, has_saved_user_code: false, saved_user_code_requires_login: false, developer: { configured: false, connected: false } });
-    if (path === '/api/v1/devices') return json(devices);
+    if (path === '/api/v1/devices') return json(records);
     if (['/api/v1/buildings', '/api/v1/rooms', '/api/v1/groups'].includes(path)) return json([]);
     if (path.startsWith('/api/v1/activity/')) return json({ events: [], next_before: null });
-    const id = Number(path.split('/')[4]), device = devices.find(row => row.id === id);
-    if (path.endsWith('/state')) return json({ device_id: id, name: device?.name, enabled: true, available: true, values: {} });
+    const id = Number(path.split('/')[4]), device = records.find(row => row.id === id);
+    if (path.endsWith('/state')) return json({ device_id: id, name: device?.name, enabled: true, available: true,
+      values: device?.capabilities.switch ? { switch: { value: false, known: true, stale: false } } : {} });
     if (device) return json(device);
     throw new Error('Unexpected path: ' + path);
   });
@@ -98,6 +99,43 @@ describe('device deep navigation', () => {
     const nested = document.createElement('dialog'); nested.setAttribute('open', ''); document.body.append(nested);
     act(() => hash('#local-connections'));
     expect(window.location.hash).toBe(deviceHref('physical-29', 'local')); nested.remove();
+    act(() => hash('#local-connections'));
+    expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+  });
+  it('locks dashboard navigation until every pending card command settles', async () => {
+    backend(devices.slice(0, 2).map(device => ({
+      ...device, capabilities: { switch: { type: 'boolean', readable: true, writable: true } },
+    })));
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const pending = new Map<number, (response: Response) => void>();
+    vi.mocked(fetch).mockImplementation((input, options) => {
+      const path = new URL(String(input)).pathname;
+      const match = /\/devices\/(\d+)\/commands\/capabilities$/.exec(path);
+      return options?.method === 'POST' && match
+        ? new Promise(resolve => pending.set(Number(match[1]), resolve))
+        : original(input, options);
+    });
+    access('');
+    render(<App />);
+    const first = await screen.findByRole('listitem', { name: 'Устройство 0' });
+    const second = await screen.findByRole('listitem', { name: 'Устройство 1' });
+    const firstSwitch = await within(first).findByRole('switch');
+    const secondSwitch = await within(second).findByRole('switch');
+    await waitFor(() => { expect(firstSwitch).toBeEnabled(); expect(secondSwitch).toBeEnabled(); });
+    fireEvent.click(firstSwitch);
+    fireEvent.click(secondSwitch);
+    const menu = screen.getByRole('button', { name: 'Меню' });
+    await waitFor(() => expect(pending.size).toBe(2));
+    expect(menu).toBeDisabled();
+    expect(within(first).getByRole('button', { name: 'Подробнее' })).toBeDisabled();
+    expect(within(second).getByRole('button', { name: 'Подробнее' })).toBeDisabled();
+    await act(async () => pending.get(1)!(json({ acknowledged: true })));
+    await waitFor(() => expect(within(first).getByRole('button', { name: 'Подробнее' })).toBeEnabled());
+    expect(menu).toBeDisabled();
+    act(() => hash('#local-connections'));
+    expect(window.location.hash).toBe('');
+    await act(async () => pending.get(2)!(json({ acknowledged: true })));
+    await waitFor(() => expect(menu).toBeEnabled());
     act(() => hash('#local-connections'));
     expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
   });

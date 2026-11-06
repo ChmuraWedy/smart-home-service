@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DeviceSurvey } from './components/DeviceSurvey';
 import { ControlCenter } from './components/ControlCenter';
+import { renderWithStore } from './test/render-with-store';
 import { HomeApi } from './home-api';
 import type { CloudDevice } from './api';
 import type { DeviceDraft, Inventory, ObservationSession, LocalDevice } from './home-api';
@@ -175,7 +176,7 @@ describe('device survey before registration', () => {
 
   it('lists real gateway candidates from the chosen cloud provider without choosing a parent', async () => {
     const calls = server({ devices: [sensor, gateway, { ...gateway, id: 'other', name: 'Лампа', category: 'dj' }] }), user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onLock={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     const card = await screen.findByRole('listitem', { name: sensor.name });
     await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
     const select = screen.getByLabelText('Шлюз');
@@ -235,7 +236,7 @@ describe('device survey before registration', () => {
 
   it('opens the survey from a cloud card before registering anything', async () => {
     const calls = server(), user = userEvent.setup();
-    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onLock={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
     const card = await screen.findByRole('listitem', { name: cloudDevice.name });
     await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
     expect(screen.getByRole('heading', { name: 'Настроить локальное подключение' })).toBeInTheDocument();

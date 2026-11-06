@@ -1,5 +1,6 @@
 import { MSG, t, useLocale, translateText } from "./i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Provider as StoreProvider } from 'react-redux';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
 import { loadConnection, saveConnection } from './connection';
@@ -13,12 +14,18 @@ import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 import { deviceHref, readDeviceLink } from './device-links';
 import type { DeviceLink } from './device-links';
+import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
 type View = 'connections' | 'control' | 'network' | 'local-connections';
 
 export function App() {
+  const [store] = useState(createAppStore);
+  return <StoreProvider store={store}><AppContent /></StoreProvider>;
+}
+
+function AppContent() {
   const locale = useLocale();
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   const [connection, setConnection] = useState<Connection>(() => loadConnection());
@@ -28,7 +35,9 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dashboardPanel, setDashboardPanel] = useState<'search' | 'tools' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
-  const [controlOpen, setControlOpen] = useState(false);
+  const [localConnectionLocked, setLocalConnectionLocked] = useState(false);
+  const dashboardLocked = useAppSelector(selectDashboardLocked);
+  const controlLocked = dashboardLocked || localConnectionLocked;
   const [status, setStatus] = useState<CloudStatus | null>(null);
   const [provider, setProvider] = useState<Provider>('sharing');
   const [notice, setNotice] = useState<Notice>({ text: '' });
@@ -40,7 +49,7 @@ export function App() {
   const [qr, setQR] = useState<QR | null>(null);
   const [remaining, setRemaining] = useState(0);
   const api = useMemo(() => new HomeApi(connection), [connection]);
-  const locked = busy || controlOpen;
+  const locked = busy || controlLocked;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
   const showCodeForm = ready && (!status?.has_saved_user_code || editingCode);
@@ -52,7 +61,7 @@ export function App() {
     try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
     verified.current = next;
     setConnection(next); setStatus(null); setQR(null);
-    setControlOpen(false); setView('connections');
+    setLocalConnectionLocked(false); setView('connections');
   }
 
   useEffect(() => {
@@ -87,7 +96,7 @@ export function App() {
   }, [qr]);
 
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
-    if (busyRef.current || controlOpen) return;
+    if (busyRef.current || controlLocked) return;
     busyRef.current = true; setBusy(true); setNotice({ text: '' });
     try { await work(); }
     catch (error) {
@@ -167,7 +176,7 @@ export function App() {
   useEffect(() => {
     const changed = () => {
       const dialogs = document.querySelectorAll('dialog[open]');
-      if (busyRef.current || document.querySelector('dialog[open][aria-busy="true"]') || dialogs.length > 1 || (controlOpen && !dialogs.length)) {
+      if (busyRef.current || document.querySelector('dialog[open][aria-busy="true"]') || dialogs.length > 1 || (controlLocked && !dialogs.length)) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
         return;
       }
@@ -177,7 +186,7 @@ export function App() {
     };
     window.addEventListener('hashchange', changed);
     return () => window.removeEventListener('hashchange', changed);
-  }, [controlOpen]);
+  }, [controlLocked]);
   useEffect(() => {
     if (!menuOpen) return;
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !menuRef.current?.contains(event.target)) setMenuOpen(false); };
@@ -243,7 +252,7 @@ export function App() {
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>{t(MSG.USER_CODE_TUYA_CREDENTIALS_TOKENS_AND_LOCAL_KEYS)}</p></div>
         </section>
       </div>
-      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} /> : <ControlCenter dashboardPanel={dashboardPanel} api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
+      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => navigate('connections')} /> : <ControlCenter dashboardPanel={dashboardPanel} api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />{t(MSG.PLEASE_WAIT)}</> : translateText(notice.text)}</div>
       {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>
