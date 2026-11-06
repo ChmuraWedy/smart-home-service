@@ -869,7 +869,7 @@
       "count": 10
     },
     "object-curly-newline": {
-      "count": 34
+      "count": 32
     },
     "object-curly-spacing": {
       "count": 2
@@ -1153,10 +1153,10 @@
   },
   "src/components/DeviceControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 18
+      "count": 13
     },
     "@stylistic/max-len": {
-      "count": 20
+      "count": 17
     },
     "arrow-parens": {
       "count": 24
@@ -1177,7 +1177,7 @@
       "count": 1
     },
     "indent": {
-      "count": 31
+      "count": 27
     },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
@@ -1195,7 +1195,7 @@
       "count": 4
     },
     "no-nested-ternary": {
-      "count": 12
+      "count": 11
     },
     "no-plusplus": {
       "count": 5
@@ -1243,13 +1243,13 @@
       "count": 3
     },
     "react/jsx-first-prop-new-line": {
-      "count": 2
+      "count": 1
     },
     "react/jsx-indent": {
       "count": 1
     },
     "react/jsx-max-props-per-line": {
-      "count": 6
+      "count": 3
     },
     "react/jsx-no-bind": {
       "count": 1
@@ -1258,7 +1258,7 @@
       "count": 1
     },
     "space-infix-ops": {
-      "count": 3
+      "count": 1
     }
   },
   "src/components/DeviceMappings.tsx": {

@@ -13,7 +13,8 @@ import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFiel
 import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWizard';
 import { hasLightEffectWizard, LightEffectWizard } from './LightEffectWizard';
 import { ParameterIcon } from './DevicePresentation';
-import { Switch } from './ui/switch';
+import { PowerButton } from './PowerButton';
+import type { PowerButtonVariant } from './PowerButton';
 import { Icon, IconGlyph } from './ui/icon';
 
 export type ControlNotice = { text: string; error?: boolean };
@@ -313,6 +314,8 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
     else change(String(checked));
   }
   const powerKnown = awaiting || (reading?.known && typeof reading.value === 'boolean');
+  let powerVariant: PowerButtonVariant = dashboardSwitch ? 'dashboard-switch' : 'switch';
+  if (booleanButton) powerVariant = 'button';
   if (quickRange) {
     const minimum = spec.minimum!, maximum = spec.maximum!;
     const value = draft !== '' && Number.isFinite(Number(draft)) ? Number(draft) : undefined;
@@ -392,19 +395,17 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
           <div className="power-actions">
             {stage || immediatePower ? (
               <>
-                {booleanButton ? (
-                  <button id={powerId} type="button" className={powerIcon ? 'dashboard-power-button' : 'secondary compact mode-button'}
-                    data-slot={powerIcon ? 'power-button' : undefined} data-checked={powerIcon && selectedPower ? '' : undefined}
-                    title={reading?.known || awaiting ? (selectedPower ? t(MSG.TURN_OFF_PREFIX) : t(MSG.TURN_ON_PREFIX))+spec.label : undefined} aria-label={spec.label} aria-pressed={selectedPower} disabled={disabled || (!reading?.known && !awaiting)} onClick={() => changePower(!selectedPower)}
-                  >{powerIcon || (typeof buttonText==='function' ? buttonText(reading?.known || awaiting ? selectedPower : null) : buttonText || (selectedPower ? t(MSG.TURN_OFF) : t(MSG.TURN_ON)))}
-                  </button>
-)
-        : dashboardSwitch ? <Switch id={powerId} aria-label={spec.label} powerIcon={powerIcon} checked={selectedPower} disabled={disabled} onChange={changePower} />
-        : (
-          <button id={powerId} type="button" className="power-toggle" role="switch" aria-label={spec.label} aria-checked={selectedPower} disabled={disabled} onClick={() => changePower(!selectedPower)}>
-            <span />
-          </button>
-)}
+                <PowerButton
+                  id={powerId}
+                  label={spec.label}
+                  checked={selectedPower}
+                  disabled={disabled}
+                  variant={powerVariant}
+                  icon={powerIcon}
+                  known={Boolean(reading?.known || awaiting)}
+                  buttonText={buttonText}
+                  onChange={changePower}
+                />
                 {!powerIcon && !dirty && !awaiting && !reading?.known && <span className="power-selection">{t(MSG.NO_DATA)}</span>}
                 {!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
                 {(dirty || awaiting) && (

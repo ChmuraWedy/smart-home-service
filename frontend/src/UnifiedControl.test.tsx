@@ -237,7 +237,7 @@ describe('unified device identity and management', () => {
     }]);
   });
 
-  it('uses the bulb icon button to send a power command from the keyboard', async () => {
+  it.each(['[Space]', '{Enter}'])('sends a bulb power command with %s', async (key) => {
     const calls = server({noLocal:true});
     const original = vi.mocked(fetch).getMockImplementation()!;
     vi.mocked(fetch).mockImplementation(async (input, init) => {
@@ -259,7 +259,7 @@ describe('unified device identity and management', () => {
     expect(toggle).toHaveAttribute('data-slot','power-button');
     expect(toggle).not.toBeChecked();
     toggle.focus();
-    await user.keyboard('[Space]');
+    await user.keyboard(key);
     await waitFor(() => expect(toggle).toBeChecked());
     expect(calls.filter(call => call.method === 'POST').map(call => call.body)).toEqual([
       {commands:[{code:'switch_led',value:true}]},

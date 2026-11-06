@@ -19,8 +19,9 @@ import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
 import { Icon } from './ui/icon';
-import { DashboardAliases } from './DashboardAliases';
-import type { MouseEvent, ReactNode } from 'react';
+import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
+import DashboardCardFooter from './DashboardCardFooter';
+import type { MouseEvent } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
 import { dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery } from '../navigation';
 import type { DashboardPanel } from '../navigation';
@@ -38,44 +39,6 @@ const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
 function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
   if (event.defaultPrevented || !(event.target instanceof Element) || event.target.closest('button,a,input,select,textarea,label,summary,video,audio,[role="button"],[role="switch"],[contenteditable="true"],.camera-live') || window.getSelection()?.toString()) return;
   open();
-}
-
-function CardDetailsButton({ label, disabled, onClick }: { label:string; disabled?:boolean; onClick:() => void }) {
-  return (
-    <button
-      type="button"
-      className="secondary tile-icon-action"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Icon name="settings" />
-    </button>
-  );
-}
-
-function DashboardCardHeader({ icon, title, aliases, metadata, actions, secondary }: {
-  icon: ReactNode; title: ReactNode; aliases?: string[]; metadata: ReactNode; actions: ReactNode; secondary?: ReactNode;
-}) {
-  return (
-    <header className="dashboard-card-header" data-slot="card-header">
-      <span className="device-symbol" aria-hidden="true">{icon}</span>
-      <div className="device-card-identity">
-        <div className="device-card-title">
-          <h3>{title}</h3>
-          {!!aliases?.length && <DashboardAliases aliases={aliases} />}
-        </div>
-        <div className="device-card-context">{metadata}</div>
-      </div>
-      <div className="device-card-actions">{actions}</div>
-      {secondary && <div className="dashboard-card-subheader">{secondary}</div>}
-    </header>
-  );
-}
-
-function DashboardCardFooter({ children }: { children: ReactNode }) {
-  return <footer className="dashboard-card-footer" data-slot="card-footer">{children}</footer>;
 }
 
 function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd }: {
