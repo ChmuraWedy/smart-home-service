@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -21,7 +21,7 @@ const connection={baseUrl:'http://api.test',token:'private-test-key'};
 const url='https://video.example.test/live.m3u8?sign=temporary';
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status});
 function mount(provider:'sharing'|'developer'='sharing',onAuthError=vi.fn()) {
-  return render(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider={provider} onAuthError={onAuthError} />);
+  return renderWithStore(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider={provider} onAuthError={onAuthError} />);
 }
 function mountTiles(privacy?:boolean) {
   const functions=privacy===undefined ? [] : [{code:'basic_private',type:'Boolean',values:'{}'}];
@@ -94,7 +94,7 @@ describe('camera live viewing',()=>{
   });
   it('uses Safari presentation mode and closes the floating window when privacy is enabled',async()=>{
     const api=new CloudApi(connection),onAuthError=vi.fn();
-    const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact />);
+    const view=renderWithStore(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact />);
     const user=userEvent.setup();
     await user.click(screen.getByRole('button',{name:'Смотреть видео'}));
     await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
@@ -122,7 +122,7 @@ describe('camera live viewing',()=>{
 
   it('blocks preview allocation during privacy and keeps playback stopped when privacy is turned off',async()=>{
     const api=new CloudApi(connection),onAuthError=vi.fn(),blocked='Режим приватности включён. Выключите его для просмотра видео.';
-    const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart viewingBlocked={blocked} />);
+    const view=renderWithStore(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart viewingBlocked={blocked} />);
     expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
     expect(fetch).not.toHaveBeenCalled();
     view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart />);
@@ -140,7 +140,7 @@ describe('camera live viewing',()=>{
     let resolve!:(value:Response)=>void;
     vi.mocked(fetch).mockReturnValue(new Promise(r=>{resolve=r;}));
     const api=new CloudApi(connection),onAuthError=vi.fn();
-    const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} />);
+    const view=renderWithStore(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} />);
     await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
     view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} viewingBlocked="Режим приватности включён." />);
     await act(async()=>resolve(json({device_id:'camera',type:'hls',url})));
@@ -177,7 +177,7 @@ describe('camera live viewing',()=>{
   });
   it('does not invent an SD variant for a single-quality stream and does not confuse Wi-Fi signal with loading speed',async()=>{
     hls.levels=[{width:1920,height:1080,bitrate:2000000}];
-    render(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider="sharing" onAuthError={vi.fn()} networkSignal="-55 dBm" />);
+    renderWithStore(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider="sharing" onAuthError={vi.fn()} networkSignal="-55 dBm" />);
     await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
     await waitFor(()=>expect(hls.attach).toHaveBeenCalled());
     await act(async()=>hls.handlers.manifest());
@@ -294,9 +294,11 @@ describe('camera live viewing',()=>{
   });
   it('places video in the full camera editor without allocating automatically',async()=>{
     vi.mocked(fetch).mockImplementation(async input=>json(String(input).includes('/functions') ? {device_id:'camera',functions:[]} : {device_id:'camera',online:true,source:'cloud',status:{}}));
-    render(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
-    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeEnabled();
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const watch = screen.getByRole('button',{name:'Смотреть видео'});
+    expect(watch).toBeDisabled();
     await screen.findByText('Последнее известное состояние в облаке. Обновите статус для получения нового снимка.');
+    expect(watch).toBeEnabled();
     expect(vi.mocked(fetch).mock.calls.every(([,options])=>options?.method!=='POST')).toBe(true);
   });
   it('groups only advertised camera settings and sends edited original mode values automatically',async()=>{
@@ -313,7 +315,7 @@ describe('camera live viewing',()=>{
       if (String(input).includes('/functions')) return json({device_id:'camera',functions,status_range:[{code:'sd_status',type:'Integer',values:'{"min":1,"max":5,"scale":0,"step":1}'}]});
       return json({device_id:'camera',online:true,source:'cloud',status:{basic_private:false,basic_nightvision:'0',motion_switch:true,record_mode:'1',sd_status:1,sd_format:false,vendor_setting:false}});
     });
-    render(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const image=await screen.findByRole('region',{name:'Изображение и звук'});
     expect(within(screen.getByRole('region',{name:'Видео камеры'})).getByRole('button',{name:'Режим приватности'})).toHaveAttribute('aria-pressed','false');
     await waitFor(()=>expect(within(image).getByRole('combobox',{name:'Ночное видение'})).toHaveDisplayValue('Авто'));

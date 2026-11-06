@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderWithStore as render } from './test/render-with-store';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudControl } from './components/CloudControl';
 import { CloudApi } from './api';

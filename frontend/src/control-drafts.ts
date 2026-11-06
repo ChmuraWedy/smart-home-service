@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JsonValue } from './api';
 import type { ControlSpec } from './controls';
 
-export type ControlDraft = { spec: ControlSpec; value?: JsonValue; error?: string; accept: (sentAt: number) => void };
+export type ControlDraft = { spec: ControlSpec; value?: JsonValue; error?: string; begin: () => () => void };
 export type DraftStage = (key: string, draft: ControlDraft | null) => void;
 
 /** Coalesce slider/typing edits; discrete controls are sent on the next task.
@@ -12,12 +12,15 @@ export function useAutomaticControls(send: (changes: ControlDraft[]) => Promise<
   const pending = useRef(new Map<string, ControlDraft>());
   const latest = useRef(send);
   latest.current = send;
-  const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; pending.current.clear(); }; }, []);
+  useEffect(() => {
+    const drafts = pending.current;
+    return () => drafts.clear();
+  }, []);
   const [revision, setRevision] = useState(0);
   const stage = useCallback<DraftStage>((key, draft) => {
-    pending.current.delete(key);
+    const removed = pending.current.delete(key);
     if (draft) pending.current.set(key, draft);
+    else if (!removed) return;
     setRevision(value => value + 1);
   }, []);
   useEffect(() => {
@@ -27,9 +30,9 @@ export function useAutomaticControls(send: (changes: ControlDraft[]) => Promise<
     const delay = changes.some(change => ['boolean', 'enum'].includes(change.spec.kind)) ? 0 : 350;
     const timer = setTimeout(() => {
       for (const change of changes) if (pending.current.get(change.spec.key) === change) pending.current.delete(change.spec.key);
-      const sentAt = Date.now();
+      const acknowledge = changes.map(change => change.begin());
       void latest.current(changes).then(accepted => {
-        if (mounted.current && accepted === true) for (const change of changes) change.accept(sentAt);
+        if (accepted === true) for (const record of acknowledge) record();
       });
     }, delay);
     return () => clearTimeout(timer);

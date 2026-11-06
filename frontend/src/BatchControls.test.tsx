@@ -1,5 +1,5 @@
 import { renderWithStore } from './test/render-with-store';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -28,7 +28,7 @@ function cloud(error = false) {
     if (new URL(String(input)).pathname.endsWith('/functions')) return json({ device_id: device.id, functions });
     return json({ device_id: device.id, online: true, source: 'cloud', status });
   });
-  render(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+  renderWithStore(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
   return { writes, status };
 }
 const field = (name: string) => screen.getByRole('region', { name });

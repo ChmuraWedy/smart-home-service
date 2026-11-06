@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -94,7 +94,7 @@ describe('cloud device control', () => {
     });
     const api = new CloudApi(connection), user = userEvent.setup();
     const props = { api, device: cloudDevice, provider: 'sharing' as const, onClose: vi.fn(), onAuthError: vi.fn() };
-    const view = render(<CloudControl {...props} />);
+    const view = renderWithStore(<CloudControl {...props} />);
     await screen.findByRole('region', { name: 'Канал 1' });
     await user.click(within(screen.getByRole('region', { name: 'Канал 1' })).getByRole('button', { name: 'Добавить алиас' }));
     await user.type(screen.getByLabelText('Новый алиас'), 'Настольный свет');
@@ -106,7 +106,7 @@ describe('cloud device control', () => {
     await user.click(screen.getByRole('button',{name:'Таймер канала 1'}));
     expect(screen.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
     expect(writes).toEqual([{ method: 'PUT', body: { labels: { switch_1: 'Настольный свет' } } }]);
-    view.unmount(); render(<CloudControl {...props} />);
+    view.unmount(); renderWithStore(<CloudControl {...props} />);
     const channel = await screen.findByRole('region', { name: 'Канал 1' });
     expect(within(channel).getByRole('heading', { name: 'Канал 1' })).toBeInTheDocument();
     expect(within(channel).getByRole('group', { name: 'Алиасы' })).toHaveTextContent('Настольный свет');
@@ -116,7 +116,7 @@ describe('cloud device control', () => {
   });
   it('keeps raw codes in collapsed mapping diagnostics instead of ordinary device properties', async () => {
     cloudServer();
-    render(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,category:'dj',sub:true}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,category:'dj',sub:true}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     await screen.findByRole('region',{name:'Яркость'});
     const user=userEvent.setup();
     const properties=screen.getByText('Свойства устройства').closest('details')!;
@@ -147,7 +147,7 @@ describe('cloud device control', () => {
       if(path.endsWith('/functions')) return json({device_id:'cloud-lamp',functions,status_range:[functions[0]]});
       return json({device_id:'cloud-lamp',online:true,status:{switch_led:true},status_range:[functions[0]]});
     });
-    render(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,sub:true,category:'dj'}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{...cloudDevice,sub:true,category:'dj'}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const field=await screen.findByRole('region',{name:label});
     expect(within(field).getByText('Нет показания')).toBeInTheDocument();
     const user=userEvent.setup();
@@ -177,7 +177,7 @@ describe('cloud device control', () => {
         snapshot_received_at:'2026-10-08T07:00:00Z',event_stream_connected:true,
         status_observations:report?{switch_2:{observed_at:'2026-10-08T07:01:00Z',received_at:'2026-10-08T07:01:00.2Z'}}:{}});
     });
-    const view=render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const view=renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     try {
       const channel=await screen.findByRole('region',{name:'Канал 2'});
       expect(within(channel).getByRole('switch')).toHaveAttribute('aria-checked','false');
@@ -214,7 +214,7 @@ describe('cloud device control', () => {
       if(url.searchParams.get('refresh')==='false') return new Promise<Response>(resolve=>{resolvePoll=resolve;});
       return json(snapshot(++fresh>1));
     });
-    const view=render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const view=renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     try {
       const channel=await screen.findByRole('region',{name:'Канал 2'});
       await act(async()=>{vi.advanceTimersByTime(1000);});
@@ -235,7 +235,7 @@ describe('cloud device control', () => {
     vi.mocked(fetch).mockImplementation(async input => json(String(input).includes('/functions')
       ? {device_id:cloudDevice.id,functions}
       : {device_id:cloudDevice.id,online:true,status:{switch_led:false,work_mode:'white'}}));
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const modes=await screen.findByRole('combobox',{name:'Режим'});
     expect(within(modes).getAllByRole('option').map(option => option.textContent)).toEqual(['Выберите значение','Белый свет','Цветной свет','Музыка']);
     expect(screen.queryByRole('region',{name:'Расписания света'})).toBeNull();
@@ -252,7 +252,7 @@ describe('cloud device control', () => {
       if(String(input).includes('/functions')) return json({device_id:cloudDevice.id,functions});
       return json({device_id:cloudDevice.id,online:true,source:'cloud',status:{music_data:'',work_mode:'white'}});
     });
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const user=userEvent.setup();
     const music=await screen.findByRole('region',{name:'Светомузыка'});
     await user.click(within(music).getByRole('button',{name:'Настроить'}));
@@ -285,7 +285,7 @@ describe('cloud device control', () => {
       if (url.pathname.endsWith('/functions')) return json({ device_id: cloudDevice.id, functions, status_range: functions });
       return json({ device_id: cloudDevice.id, online: true, source: 'cloud', status: { switch_led: true, music_data: '', control_data: '', remote_switch: true, power_memory: 'AAEAAAAAAAAAAAAA' } });
     });
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const power = await screen.findByRole('region', { name: 'Питание' });
     expect(power.closest('details')).toBeNull();
     const summary = screen.getByText('Эффекты и дополнительные параметры');
@@ -325,7 +325,7 @@ describe('cloud device control', () => {
       if (url.pathname.endsWith('/functions')) return json({ device_id: device.id, functions: [], status_range: ranges });
       return json({ device_id: device.id, online: true, source: 'cloud', status_range: ranges, status: { pir: motion, battery: 90 }, device_update_time: 1 });
     });
-    render(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     expect(await screen.findByText('Движение обнаружено')).toBeInTheDocument();
     expect(screen.getByText('90')).toBeInTheDocument();
     expect(screen.getByLabelText('Батарея: 90')).toHaveAttribute('title', 'Последнее известное показание батареи');
@@ -346,7 +346,7 @@ describe('cloud device control', () => {
   });
   it.each(['sharing', 'developer'] as const)('sends one explicit %s command and keeps the observed state separate from ACK', async provider => {
     const server = cloudServer(); const user = userEvent.setup();
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const power = await screen.findByRole('region', { name: 'Питание' });
     await user.click(within(power).getByRole('switch'));
 
@@ -361,7 +361,7 @@ describe('cloud device control', () => {
   });
   it('sends brightness and color automatically with their matching mode', async () => {
     const server = cloudServer(); const user = userEvent.setup();
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const brightness = await screen.findByRole('region', { name: 'Яркость' });
     fireEvent.change(within(brightness).getByRole('slider'), { target: { value: '65' } });
     expect(server.writes).toHaveLength(0);
@@ -376,7 +376,7 @@ describe('cloud device control', () => {
   });
   it('allows an explicit command despite an advisory offline flag from Tuya', async () => {
     const server = cloudServer({ offline: true });
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const button = await screen.findByRole('switch');
     expect(button).toBeEnabled();
     expect(server.writes).toHaveLength(0);
@@ -386,7 +386,7 @@ describe('cloud device control', () => {
   });
   it('distinguishes accepted command from a failed follow-up status and never retries the command', async () => {
     const server = cloudServer({ postReadError: true }); const user = userEvent.setup();
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="developer" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="developer" onClose={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('switch'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Команда принята. Обновить статус не удалось');
@@ -395,7 +395,7 @@ describe('cloud device control', () => {
   });
   it('guards rapid duplicate input and prevents closing while a command is pending', async () => {
     const server = cloudServer({ pending: true }); const close = vi.fn();
-    render(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={close} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={cloudDevice} provider="sharing" onClose={close} onAuthError={vi.fn()} />);
     const button = await screen.findByRole('switch');
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
@@ -424,7 +424,7 @@ describe('manual device maps', () => {
       if(url.pathname.endsWith('/functions')) return json({device_id:target.id,functions:[targetSpec]});
       return json({device_id:cloudDevice.id,provider:'sharing',tuya_bindings_available:false,mappings:[]});
     });
-    render(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
     expect(fetch).not.toHaveBeenCalled();
     const user=userEvent.setup(); await user.click(screen.getByText('Ручные сопоставления в нашей базе'));
     await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
@@ -484,7 +484,7 @@ describe('local device and group controls', () => {
   });
   it('reports partial group acknowledgement by member and requests statuses separately', async () => {
     const server = localServer({ partial: true }); const user = userEvent.setup();
-    render(<GroupControl api={new HomeApi(connection)} group={group} onClose={vi.fn()} onDevice={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<GroupControl api={new HomeApi(connection)} group={group} onClose={vi.fn()} onDevice={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Включить группу' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Команда принята 1 из 2 устройств. Не подтверждено: Лампа Zigbee.');
     expect(server.writes).toEqual([{ path: '/api/v1/groups/1/commands/on', body: undefined }]);
