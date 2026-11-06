@@ -47,7 +47,7 @@ export function CardControls(props: CardProps) {
       if (inView && !props.paused) setActivated(true);
     });
     const controls = container.current!;
-    // A single power button joins the card's grid, leaving its wrapper without a layout box.
+    // Observe the card so visibility remains stable when its controls load or collapse.
     observer.observe(controls.closest('.dashboard-device') || controls);
     return () => observer.disconnect();
   }, [props.paused]);
