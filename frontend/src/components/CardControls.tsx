@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { CloudDevice, CloudFunctions, CloudSnapshot, JsonValue, Provider } from '../api';
@@ -54,13 +54,13 @@ export function CardControls(props: CardProps) {
   const pollingVisible = visible && !props.paused;
   let controls: ReactNode;
   if (!active) {
-    controls = <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>{t("Показать состояние")}</button>;
+    controls = <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>{t(MSG.SHOW_STATE)}</button>;
   } else if (props.route === 'local') {
     controls = <LocalCardControls {...props} visible={pollingVisible} />;
   } else if (cloud) {
     controls = <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={pollingVisible} />;
   }
-  return <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t("Основные параметры: ") + props.device.name}>
+  return <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + props.device.name}>
     {controls}
   </div>;
 }
@@ -75,7 +75,7 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
     try { return await execute(async () => {
       validateControlValue(spec,value);
       await send(spec,value);
-      return {text:t("Команда принята.")};
+      return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
     }) === true; } finally { setSending(false); }
   }
   return { sending, toggle };
@@ -108,15 +108,15 @@ function StandardCardControls({ name, paused, sheet, specs, reading, now, local,
   const sensorValues = sensors.length > 0 && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
     {sensors.map(spec => {
       const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
-      const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(" · Устарело") : '');
-      return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t("Устарело")}</span>}</span>;
+      const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(MSG.STALE_SUFFIX) : '');
+      return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t(MSG.STALE)}</span>}</span>;
     })}
   </div>;
   return <>
     <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
       {powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       {!powerLayout && sensorValues}
-      <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
+      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
     {powerLayout && sensorValues}
     {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
@@ -134,12 +134,12 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
   const metadata = useMemo(() => ({value:cloud.controls?.ready ? cloud.controls.definitions : null as CloudFunctions | null}),[api,cloud.id,provider]);
   const initial = useRef(cloud.controls?.snapshot);
   const checked = (snapshot:CloudSnapshot) => {
-    if (snapshot.device_id !== cloud.id || !snapshot.status || typeof snapshot.status !== 'object' || Array.isArray(snapshot.status)) throw new Error(t("Сервис вернул неожиданные данные устройства."));
+    if (snapshot.device_id !== cloud.id || !snapshot.status || typeof snapshot.status !== 'object' || Array.isArray(snapshot.status)) throw new Error(t(MSG.THE_SERVICE_RETURNED_UNEXPECTED_DEVICE_DATA));
     return snapshot;
   };
   const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
     const definitions = metadata.value || await api.deviceFunctions(cloud.id,provider,signal);
-    if (definitions.device_id !== cloud.id || !Array.isArray(definitions.functions)) throw new Error(t("Сервис вернул возможности другого устройства."));
+    if (definitions.device_id !== cloud.id || !Array.isArray(definitions.functions)) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_CAPABILITIES));
     if (!signal?.aborted) metadata.value = definitions;
     const snapshot = !refresh && initial.current ? initial.current : await api.deviceSnapshot(cloud.id,provider,signal,refresh);
     return {definitions,snapshot:checked(snapshot)};
@@ -153,7 +153,7 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
     const data = session.data!;
     const result = await api.sendDeviceCommands(cloud.id, provider, cloudBatchCommands([{spec,value}], data.definitions, data.snapshot.status));
-    if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
+    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
   const reading = (spec: ControlSpec) => session.data
     ? cloudReading(spec, session.data.snapshot.status[spec.key], session.data.snapshot.status_observations?.[spec.key])
@@ -171,12 +171,12 @@ function LocalCardControls({api,device,state,now,visible,paused,sheet,onAuthErro
   const initial = useRef(state);
   const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
     const result = !refresh && initial.current ? initial.current : await api.state(item.id,refresh,signal);
-    if (result.device_id !== item.id) throw new Error(t("Сервис вернул другое устройство."));
+    if (result.device_id !== item.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
     return result;
   },[api,item.id]);
   const poll = useCallback(async (_current:DeviceState,signal:AbortSignal) => {
     const result = await api.state(item.id,false,signal,true);
-    if (result.device_id !== item.id) throw new Error(t("Сервис вернул другое устройство."));
+    if (result.device_id !== item.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
     return result;
   },[api,item.id]);
   const session = useControlSession(load,onAuthError,visible ? poll : undefined);
@@ -186,7 +186,7 @@ function LocalCardControls({api,device,state,now,visible,paused,sheet,onAuthErro
   },[session.data,onStatus,item.capabilities]);
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
     const result = await api.setCapabilities(item.id, {[spec.key]:value});
-    if (result.acknowledged !== true) throw new Error(t("Сервис не подтвердил команду."));
+    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
   return <StandardCardControls name={device.name} paused={paused} sheet={sheet} specs={specs}
     category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => session.data?.values[spec.key]}

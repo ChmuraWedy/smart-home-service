@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import { useEffect, useRef } from 'react';
 import { ApiError } from '../api';
 import type { CloudApi, Provider } from '../api';
@@ -15,7 +15,7 @@ export function ChannelAliases({ api, deviceId, provider, code, alias, disabled,
     try {
       const result = await api.saveChannelLabels(deviceId, provider, { [code]: values[0] || null }, controller.signal);
       if (!controller.signal.aborted) {
-        if (result.device_id !== deviceId) throw new Error(t("Сервис вернул алиасы другого устройства."));
+        if (result.device_id !== deviceId) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_ALIASES));
         onSaved(result.labels);
       }
     } catch (failure) {

@@ -1,20 +1,20 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import type { DeviceRoute } from '../devices';
 import { routeLabel } from '../devices';
 
 type ConnectionDetails = { route: DeviceRoute; throughGateway?: boolean; localTransport?: 'wifi' | 'zigbee'; room?: string };
 
 export function connectionLabel({ route, throughGateway, localTransport }: ConnectionDetails) {
-  const local = localTransport === 'zigbee' ? t("Через шлюз") : localTransport === 'wifi' ? 'Wi-Fi' : t("Подключение не указано");
-  return route === 'local' ? local : throughGateway === true ? t("Через шлюз") : throughGateway === false ? t("Прямое подключение") : local;
+  const local = localTransport === 'zigbee' ? t(MSG.VIA_GATEWAY) : localTransport === 'wifi' ? 'Wi-Fi' : t(MSG.CONNECTION_NOT_SPECIFIED);
+  return route === 'local' ? local : throughGateway === true ? t(MSG.VIA_GATEWAY) : throughGateway === false ? t(MSG.DIRECT_CONNECTION) : local;
 }
 
 export function DeviceConnectionSummary(props: ConnectionDetails & { status: string; online?: boolean }) {
-  return <section className="device-connection-summary" aria-label={t("Подключение устройства")}><dl>
-    <div><dt>{t("Комната")}</dt><dd>{props.room || t("Без комнаты")}</dd></div>
-    <div><dt>{t("Подключение")}</dt><dd>{connectionLabel(props)}</dd></div>
-    <div><dt>{t("Управление")}</dt><dd>{routeLabel[props.route]}</dd></div>
-    <div><dt>{t("Состояние связи")}</dt><dd className={'presence' + (props.online ? ' online' : '')}>{props.status}</dd></div>
+  return <section className="device-connection-summary" aria-label={t(MSG.DEVICE_CONNECTION)}><dl>
+    <div><dt>{t(MSG.ROOM)}</dt><dd>{props.room || t(MSG.NO_ROOM)}</dd></div>
+    <div><dt>{t(MSG.CONNECTION)}</dt><dd>{connectionLabel(props)}</dd></div>
+    <div><dt>{t(MSG.CONTROL)}</dt><dd>{routeLabel[props.route]}</dd></div>
+    <div><dt>{t(MSG.CONNECTION_STATUS)}</dt><dd className={'presence' + (props.online ? ' online' : '')}>{props.status}</dd></div>
   </dl></section>;
 }
 
@@ -23,9 +23,9 @@ export function DeviceConnectionDescription(props: ConnectionDetails) {
   const gateway = route === 'local' || throughGateway === undefined ? localTransport === 'zigbee' : throughGateway;
   const known = route === 'local' ? !!localTransport : throughGateway !== undefined || !!localTransport;
   return <dl className="connection-description">
-    <div><dt>{room || t("Комната")}</dt><dd>{room === t("Без комнаты") ? t("Комната для устройства пока не назначена.") : t("Комната — размещение устройства в приложении. Она помогает группировать и находить устройства.")}</dd></div>
-    <div><dt>{connectionLabel(props)}</dt><dd>{!known ? t("Сервис пока не получил сведения о подключении устройства.") : gateway ? t("Устройство подключено через шлюз: шлюз передаёт ему команды и принимает его показания. Подпись «Через шлюз» сама по себе не уточняет протокол связи устройства со шлюзом.") : route === 'local' || throughGateway === undefined ? t("Сервис подключается к устройству по Wi-Fi в домашней сети.") : t("В данных Tuya устройство отмечено как самостоятельное, без родительского шлюза. Команды доставляются выбранным способом управления.")}</dd></div>
-    <div><dt>{routeLabel[route]}</dt><dd>{route === 'local' ? t("Браузер передаёт команду нашему сервису, а сервис — {0}. Для управления сервис должен иметь доступ к этой сети.", [gateway ? t('настроенному шлюзу в домашней сети, который передаёт её устройству') : t('устройству в домашней сети')]) : t("Браузер передаёт команду нашему сервису, сервис — в облако Tuya через подключённый аккаунт {0}. Облако доставляет её устройству или его шлюзу. Для этого способа управления нужен интернет.", [route === 'sharing' ? 'Smart Life' : 'Tuya Developer'])}</dd></div>
-    <div><dt>{t("Состояние связи")}</dt><dd>{route === 'local' ? t("Доступность в домашней сети определяется последним обращением сервиса к устройству или шлюзу.") : t("«В сети» и «Не в сети» — последний известный статус из Tuya. Облачные данные могут обновляться с задержкой.")}{" " + t("Принятие команды и новое показание устройства отображаются отдельно.")}{route === 'local' && <p>{t("Пока карточка видна, сервер запрашивает показания каждые 5 секунд. Карточка проверяет сохранённые данные каждую секунду. «Обновить статус» запрашивает показания сразу. Изменения настроек отправляются автоматически.")}</p>}</dd></div>
+    <div><dt>{room || t(MSG.ROOM)}</dt><dd>{room === t(MSG.NO_ROOM) ? t(MSG.NO_ROOM_HAS_BEEN_ASSIGNED_TO_THIS_DEVICE) : t(MSG.THE_ROOM_IS_THE_DEVICES_LOCATION_IN_THIS)}</dd></div>
+    <div><dt>{connectionLabel(props)}</dt><dd>{!known ? t(MSG.THE_SERVICE_HAS_NOT_RECEIVED_CONNECTION_DETAILS_FOR) : gateway ? t(MSG.THIS_DEVICE_CONNECTS_THROUGH_A_GATEWAY_WHICH_FORWARDS) : route === 'local' || throughGateway === undefined ? t(MSG.THE_SERVICE_CONNECTS_TO_THIS_DEVICE_OVER_WIFI) : t(MSG.TUYA_IDENTIFIES_THIS_AS_AN_INDEPENDENT_DEVICE_WITHOUT)}</dd></div>
+    <div><dt>{routeLabel[route]}</dt><dd>{route === 'local' ? t(MSG.LOCAL_COMMAND_ROUTE_HELP, [gateway ? t(MSG.THE_CONFIGURED_GATEWAY_ON_YOUR_HOME_NETWORK_WHICH) : t(MSG.THE_DEVICE_ON_YOUR_HOME_NETWORK)]) : t(MSG.CLOUD_COMMAND_ROUTE_HELP, [route === 'sharing' ? 'Smart Life' : 'Tuya Developer'])}</dd></div>
+    <div><dt>{t(MSG.CONNECTION_STATUS)}</dt><dd>{route === 'local' ? t(MSG.LOCAL_AVAILABILITY_IS_BASED_ON_THE_SERVICES_LAST) : t(MSG.ONLINE_AND_OFFLINE_ARE_THE_LAST_KNOWN_TUYA)}{" " + t(MSG.COMMAND_ACKNOWLEDGEMENT_AND_NEW_DEVICE_READINGS_ARE_DISPLAYED)}{route === 'local' && <p>{t(MSG.WHILE_THE_CARD_IS_VISIBLE_THE_SERVER_REQUESTS)}</p>}</dd></div>
   </dl>;
 }

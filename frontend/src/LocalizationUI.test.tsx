@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CloudControl } from './components/CloudControl';
 import { CloudApi } from './api';
 import { LanguageSelector } from './components/LanguageSelector';
-import { LANGUAGES, setLocale, t, useLocale } from './i18n';
+import { MSG, LANGUAGES, setLocale, t, useLocale } from './i18n';
 import { setTheme } from './theme';
 
 const device={id:'room-lamp',name:'Лампа Łąka',online:true,has_local_key:false};
@@ -36,7 +36,7 @@ describe('localized device controls',()=>{
     }
     for (const language of LANGUAGES) {
       act(()=>setLocale(language.value));
-      expect(screen.getByRole('spinbutton',{name:t('Яркость')+' (%)'})).toBe(brightness);
+      expect(screen.getByRole('spinbutton',{name:t(MSG.BRIGHTNESS)+' (%)'})).toBe(brightness);
       expect(brightness).toHaveValue(78);
       expect(screen.getByRole('dialog',{name:'Лампа Łąka'})).toBeInTheDocument();
       expect(writes).toEqual([]);

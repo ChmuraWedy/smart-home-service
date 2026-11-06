@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { CloudApi } from './api';
 import { cloudCommands, cloudSpec, labelFor, optionLabel } from './controls';
-import { LANGUAGE_STORAGE_KEY, LANGUAGES, dateLocale, detectLocale, getLocale, localizeMessages, savedLocale, setLocale, t } from './i18n';
+import { MSG, LANGUAGE_STORAGE_KEY, LANGUAGES, dateLocale, detectLocale, getLocale, localizeMessages, rawMessages, savedLocale, setLocale, t, translateText } from './i18n';
 import english from './i18n/en.json';
 import polish from './i18n/pl.json';
 import belarusian from './i18n/be.json';
+import russian from './i18n/ru.json';
 import { STORAGE_KEY } from './connection';
 import { encodePowerMemory } from './lighting';
 
@@ -46,22 +47,23 @@ describe('Interface localization', () => {
   });
 
   it('changes date locale, control names, parameterized channels and lazy tables after imports', () => {
-    const labels=localizeMessages({title:'Температура',nested:{button:'Сохранить'}});
+    const labels=localizeMessages({title:MSG.TEMPERATURE,nested:{button:MSG.SAVE}});
     act(()=>setLocale('en'));
     expect(dateLocale()).toBe('en-GB'); expect(labels.title).toBe('Temperature'); expect(labels.nested.button).toBe('Save');
+    expect(rawMessages(labels).title).toBe(MSG.TEMPERATURE);
     expect(labelFor('switch_2')).toBe('Channel 2');
     const timer=labelFor('countdown_2'); expect(timer).toBe('Channel 2 timer');
     expect(labelFor('basic_private')).toBe('Privacy mode'); expect(optionLabel('on','relay_status')).toBe('On');
-    const notice=t('Tuya Developer подключён. Найдено устройств: {0}.',[3]);
+    const notice=t(MSG.TUYA_DEVELOPER_CONNECTED_DEVICE_COUNT,[3]);
     expect(notice).toBe('Tuya Developer connected. Devices found: 3.');
     act(()=>setLocale('ru'));
-    expect(t(notice)).toBe('Tuya Developer подключён. Найдено устройств: 3.');
-    expect(t(timer)).toBe('Таймер канала 2');
+    expect(translateText(notice)).toBe('Tuya Developer подключён. Найдено устройств: 3.');
+    expect(translateText(timer)).toBe('Таймер канала 2');
     expect(dateLocale()).toBe('ru-RU'); expect(labels.title).toBe('Температура'); expect(labelFor('basic_private')).toBe('Режим приватности');
     expect(optionLabel('on','relay_status')).toBe('Включено');
-    expect(t('Unknown firmware message')).toBe('Unknown firmware message');
+    expect(translateText('Unknown firmware message')).toBe('Unknown firmware message');
     setLocale('en');
-    for(const text of ['constructor','toString','__proto__']) expect(t(text)).toBe(text);
+    for(const text of ['constructor','toString','__proto__','SHOW_STATE']) expect(translateText(text)).toBe(text);
   });
 
   it('never translates device identifiers, enum wire values, payloads or binary light settings', async () => {
@@ -96,7 +98,7 @@ describe('Interface localization', () => {
 
   it('keeps switching usable if preference storage is blocked', () => {
     const spy=vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new Error('blocked')});
-    try { expect(()=>setLocale('en')).not.toThrow(); expect(getLocale()).toBe('en'); expect(t('Сохранить')).toBe('Save'); }
+    try { expect(()=>setLocale('en')).not.toThrow(); expect(getLocale()).toBe('en'); expect(t(MSG.SAVE)).toBe('Save'); }
     finally {spy.mockRestore();}
   });
 
@@ -107,38 +109,39 @@ describe('Interface localization', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('covers source message keys in every application screen', () => {
-    const files=import.meta.glob<string>(['./*.ts','./*.tsx','./components/*.tsx','!./*.test.ts','!./*.test.tsx'],{eager:true,query:'?raw',import:'default'});
-    const catalog:Record<string,string>=english;
-    for(const [file,source] of Object.entries(files)){
-      for(const match of source.matchAll(/\bt\(("(?:\\.|[^"\\])*")/g)){
-        if(!match[1])continue;
-        const message=JSON.parse(match[1]) as string;
-        if(/[А-Яа-яЁё]/.test(message))expect(catalog[message],file+': '+message).toBeTypeOf('string');
-      }
+  it('uses named message keys throughout the application', () => {
+    const files = import.meta.glob<string>(['./**/*.{ts,tsx}', '!./**/*.test.{ts,tsx}', '!./test/**', '!./i18n/**'],
+      {eager:true,query:'?raw',import:'default'});
+    for (const [file, source] of Object.entries(files)) {
+      expect(source, file).not.toMatch(/\bt\s*\(\s*["'`]/);
+      expect(source, file).not.toMatch(/\p{Script=Cyrillic}/u);
     }
   });
 
-  it.each([['English',english],['Polish',polish],['Belarusian',belarusian]])('has a complete %s catalog and preserves every interpolation placeholder', (_language,messages) => {
-    expect(Object.keys(messages).sort()).toEqual(Object.keys(english).sort());
-    for(const [source,value] of Object.entries(messages)){
-      expect(value.trim(),source).not.toBe('');
-      if (_language === 'Belarusian') expect(value,source).not.toMatch(/[ИиЩщЪъ]/);
-      else expect(value,source).not.toMatch(/[А-Яа-яЁё]/);
-      expect([...value.matchAll(/\{\d+\}/g)].map(x=>x[0]).sort(),source).toEqual([...source.matchAll(/\{\d+\}/g)].map(x=>x[0]).sort());
+  it.each([['en',english],['pl',polish],['be',belarusian],['ru',russian]] as const)('has a complete %s catalog and preserves every interpolation placeholder', (locale,messages) => {
+    expect(Object.keys(messages).sort()).toEqual(Object.keys(MSG).sort());
+    const placeholders = (value: string) => value.match(/\{\d+\}/g)?.sort() ?? [];
+    setLocale(locale);
+    for (const key of Object.values(MSG)) {
+      const value = messages[key];
+      expect(key).toMatch(/^[A-Z][A-Z0-9_]*$/);
+      expect(value.trim(),key).not.toBe('');
+      if (locale === 'be') expect(value,key).not.toMatch(/[ИиЩщЪъ]/);
+      if (locale === 'en' || locale === 'pl') expect(value,key).not.toMatch(/\p{Script=Cyrillic}/u);
+      expect(placeholders(value),key).toEqual(placeholders(russian[key]));
+      expect(t(key),key).toBe(value);
     }
   });
 
   it('retranslates formatted notices and timers between every supported language', () => {
-    const source='Tuya Developer подключён. Найдено устройств: {0}.';
     for(const origin of LANGUAGES){
       setLocale(origin.value);
-      const notice=t(source,[3]);
-      const timer=t('Таймер канала {0}',[2]);
+      const notice=t(MSG.TUYA_DEVELOPER_CONNECTED_DEVICE_COUNT,[3]);
+      const timer=t(MSG.CHANNEL_TIMER,[2]);
       for(const target of LANGUAGES){
         setLocale(target.value);
-        expect(t(notice)).toBe(t(source,[3]));
-        expect(t(timer)).toBe(t('Таймер канала {0}',[2]));
+        expect(translateText(notice)).toBe(t(MSG.TUYA_DEVELOPER_CONNECTED_DEVICE_COUNT,[3]));
+        expect(translateText(timer)).toBe(t(MSG.CHANNEL_TIMER,[2]));
       }
     }
   });
@@ -166,8 +169,8 @@ describe('Interface localization', () => {
     expect(labelFor('countdown_2')).toBe(language.timer);
     expect(labelFor('basic_private')).toBe(language.privacy);
     expect(optionLabel('on','relay_status')).toBe(language.on);
-    expect(t('Температура')).toBe(language.temperature);
-    expect(t('Firmware-specific response X7')).toBe('Firmware-specific response X7');
+    expect(t(MSG.TEMPERATURE)).toBe(language.temperature);
+    expect(translateText('Firmware-specific response X7')).toBe('Firmware-specific response X7');
     expect(fetch).not.toHaveBeenCalled();
     const api=new CloudApi({baseUrl:'http://api.test',token:'test-token'});
     vi.mocked(fetch).mockImplementation(async()=>json({detail:'Выбранная сеть больше недоступна. Обновите список сетей.'},409));

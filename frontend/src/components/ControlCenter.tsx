@@ -1,4 +1,4 @@
-import { dateLocale, t } from "../i18n";
+import { MSG, dateLocale, t, translateText } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
@@ -43,7 +43,7 @@ function DashboardCardHeader({ icon, title, aliases, metadata, actions }: {
     <span className="device-symbol" aria-hidden="true">{icon}</span>
     <div className="device-card-identity">
       <div className="device-card-title"><h3>{title}</h3>
-        {!!aliases?.length && <div className="capability-aliases" role="group" aria-label={t("Алиасы устройства")}>
+        {!!aliases?.length && <div className="capability-aliases" role="group" aria-label={t(MSG.DEVICE_ALIASES)}>
           {aliases.map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}
         </div>}
       </div>
@@ -91,13 +91,13 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
     <DashboardCardHeader icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={deviceAliases(device)}
       title={hasSheet ? <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
         aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}>{device.name}</button> : device.name}
-      metadata={<><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t("В сети") : t("Не в сети")) : local && !enabled ? t("Отключено в настройках") : online ? t("Доступно дома") : t("Состояние неизвестно")}</span><BatteryBadge reading={battery} /></div></>}
-      actions={<><CardDetailsButton label={t("Подробнее")} disabled={quickBusy} onClick={() => onOpen(route)} />
-        {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t("Настроить локальное подключение")} title={t("Настроить локальное подключение")} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}</>} />
+      metadata={<><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : local && !enabled ? t(MSG.DISABLED_IN_SETTINGS) : online ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)}</span><BatteryBadge reading={battery} /></div></>}
+      actions={<><CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy} onClick={() => onOpen(route)} />
+        {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)} title={t(MSG.SET_UP_LOCAL_CONNECTION)} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}</>} />
     <DashboardCardFooter>
       <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:() => setQuickOpen(false), trigger:sheetTrigger, onLightAvailable}} />
       {routes.length > 1 && <div className="device-card-footer tw:mt-2">
-        <select className="device-route-select" aria-label={t("Способ управления: ") + device.name} value={route} disabled={quickBusy} onChange={event => { setQuickOpen(false); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>
+        <select className="device-route-select" aria-label={t(MSG.CONTROL_METHOD) + device.name} value={route} disabled={quickBusy} onChange={event => { setQuickOpen(false); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>
       </div>}
     </DashboardCardFooter>
   </Card>;
@@ -129,7 +129,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
   function location(device: UnifiedDevice) { return device.local || placements.get(device.id); }
-  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === location(device)?.room_id)?.name || t("Без комнаты"); }
+  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === location(device)?.room_id)?.name || t(MSG.NO_ROOM); }
   const [busy, setBusy] = useState(false);
   const [selection, setSelection] = useState<{ api: HomeApi; mask: string; value: Selection } | null>(null);
   const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
@@ -152,17 +152,17 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
       try {
         const result = await read();
         if (controller.signal.aborted) return;
-        if (provider && !Array.isArray(result)) throw new Error(t("Сервис вернул неожиданный список устройств."));
+        if (provider && !Array.isArray(result)) throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_UNEXPECTED_DEVICE_LIST));
         setRecord(previous => previous?.api === api && previous.mask === mask ? {
           ...previous, ...(provider ? { cloud: { ...previous.cloud, [provider]: result as CloudDevice[] } } : { inventory: result as Inventory }),
         } : previous);
       } catch (failure) {
         if (controller.signal.aborted) return;
-        setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, errors: [...previous.errors, label + ': ' + (failure instanceof Error ? failure.message : t("Не удалось загрузить устройства."))] } : previous);
+        setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, errors: [...previous.errors, label + ': ' + (failure instanceof Error ? failure.message : t(MSG.COULD_NOT_LOAD_DEVICES))] } : previous);
         if (failure instanceof ApiError && failure.status === 401) onAuthError();
       }
     };
-    const requests = [handle(t("Домашняя сеть"), () => api.inventory(controller.signal))];
+    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal))];
     if (sharingReady) requests.push(handle('Smart Life', () => api.devices('sharing', controller.signal), 'sharing'));
     if (developerReady) requests.push(handle('Tuya Developer', () => api.devices('developer', controller.signal), 'developer'));
     void Promise.all(requests).finally(() => { if (!controller.signal.aborted) setBusy(false); });
@@ -171,7 +171,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const devices = useMemo(() => mergeDevices(inventory?.devices || [], cloud), [inventory, cloud]);
   const linked = deviceLink ? devices.find(device => device.id === deviceLink.id) : undefined;
   const linkedRoute = linked ? deviceLink?.route || deviceRoutes(linked)[0] : undefined;
-  const linkError = deviceLink && ready && current && !busy ? !linked ? t("Устройство из ссылки не найдено в доступных списках.") : linkedRoute && !deviceRoutes(linked).includes(linkedRoute) ? t("Указанный в ссылке способ управления недоступен для этого устройства.") : '' : '';
+  const linkError = deviceLink && ready && current && !busy ? !linked ? t(MSG.THE_LINKED_DEVICE_WAS_NOT_FOUND_IN_THE) : linkedRoute && !deviceRoutes(linked).includes(linkedRoute) ? t(MSG.THE_CONTROL_METHOD_IN_THIS_LINK_IS_UNAVAILABLE) : '' : '';
   useEffect(() => {
     if (!deviceLink) {
       if (activeLink.current && selected?.kind === 'device') setSelection(null);
@@ -220,53 +220,53 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} existing={selected.existing} provider={selected.provider} cloudDevices={selected.provider ? cloud[selected.provider] : undefined} gatewayPlacements={Array.from(placements.values())} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={() => selected.existing ? choose({ kind: 'device', device: mergeDevices([selected.existing], cloud).find(row => row.id === selected.existing!.device_id)!, route: 'local' }) : close()} onSaved={selected.existing ? saved => { setRevision(value => value + 1); choose({ kind: 'device', device: mergeDevices([saved], cloud).find(row => row.id === saved.device_id)!, route: 'local' }); } : undefined} onAuthError={onAuthError} />;
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading">
-      <div><p className="eyebrow">{t("Ваш дом")}</p><h2 id="control-center-heading">{t("Устройства и группы")}{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div>
+      <div><p className="eyebrow">{t(MSG.YOUR_HOME)}</p><h2 id="control-center-heading">{t(MSG.DEVICES_AND_GROUPS)}{current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}</h2></div>
       <div className="survey-toolbar dashboard-actions">
-        <button className="secondary compact" disabled={!inventory || busy} aria-label={t("Настроить локальное устройство")} title={t("Настроить локальное устройство")} onClick={() => choose({ kind: 'survey' })}>
+        <button className="secondary compact" disabled={!inventory || busy} aria-label={t(MSG.SET_UP_LOCAL_DEVICE)} title={t(MSG.SET_UP_LOCAL_DEVICE)} onClick={() => choose({ kind: 'survey' })}>
           <svg className="dashboard-action-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-          <span>{t("Настроить локальное устройство")}</span>
+          <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
         </button>
-        <button className="secondary compact" disabled={!ready || busy} aria-label={t("Обновить список")} title={t("Обновить список")} onClick={() => setRevision(value => value + 1)}>
+        <button className="secondary compact" disabled={!ready || busy} aria-label={t(MSG.REFRESH_LIST)} title={t(MSG.REFRESH_LIST)} onClick={() => setRevision(value => value + 1)}>
           <svg className="dashboard-action-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 4v5h-5M20 9a8 8 0 1 0 0 6" /></svg>
-          <span>{t("Обновить список")}</span>
+          <span>{t(MSG.REFRESH_LIST)}</span>
         </button>
       </div>
     </div>
-    {!ready ? <p className="saved-summary">{t("Сначала сохраните доступ к сервису в настройках подключения.")}</p> : <>
+    {!ready ? <p className="saved-summary">{t(MSG.SAVE_SERVICE_ACCESS_IN_CONNECTION_SETTINGS_FIRST)}</p> : <>
       {linkError && <p className="field-error" role="alert">{linkError}</p>}
-      <div className="dashboard-room-chips" role="group" aria-label={t("Все комнаты")}>
-        <button type="button" className="secondary" aria-pressed={!room} onClick={() => selectRoom('')}>{t("Все")}</button>
+      <div className="dashboard-room-chips" role="group" aria-label={t(MSG.ALL_ROOMS)}>
+        <button type="button" className="secondary" aria-pressed={!room} onClick={() => selectRoom('')}>{t(MSG.ALL)}</button>
         {filteredRooms.map(item => <button type="button" key={item.id} className="secondary" aria-pressed={room === String(item.id)} onClick={() => selectRoom(String(item.id))}>{item.name}</button>)}
-        <button type="button" className="secondary" aria-pressed={room === 'none'} onClick={() => selectRoom('none')}>{t("Без комнаты")}</button>
+        <button type="button" className="secondary" aria-pressed={room === 'none'} onClick={() => selectRoom('none')}>{t(MSG.NO_ROOM)}</button>
       </div>
-      <p className="help dashboard-intro">{t("Основные параметры доступны прямо здесь. Расписания, журнал и дополнительные настройки — в подробной карточке.")}</p>
+      <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
       {sharingReady && <div className="topology-summary">
-        <div><h3>{t("Комнаты из Smart Life")}</h3><p className={topology.busy ? 'help' : 'help topology-note'}>{topology.busy ? t("Получаем структуру дома… {0} / {1}", [topology.data?.job.processed || 0, topology.data?.job.total || '…']) : topology.data?.synced_at ? t("Синхронизировано: ") + new Date(topology.data.synced_at).toLocaleString(dateLocale()) : t("Подставим здание и комнату в карточки и мастер добавления.")}</p></div>
-        <button className="secondary compact" disabled={topology.busy} onClick={() => void topology.sync()}>{t("Синхронизировать Smart Life")}</button>
-        {topology.busy && <p role="status" className="help">{t("Синхронизация выполняется в фоне. Можно продолжать пользоваться устройствами.")}</p>}
+        <div><h3>{t(MSG.ROOMS_FROM_SMART_LIFE)}</h3><p className={topology.busy ? 'help' : 'help topology-note'}>{topology.busy ? t(MSG.LOADING_HOME_STRUCTURE, [topology.data?.job.processed || 0, topology.data?.job.total || '…']) : topology.data?.synced_at ? t(MSG.SYNCED) + new Date(topology.data.synced_at).toLocaleString(dateLocale()) : t(MSG.BUILDINGS_AND_ROOMS_WILL_BE_USED_IN_DEVICE)}</p></div>
+        <button className="secondary compact" disabled={topology.busy} onClick={() => void topology.sync()}>{t(MSG.SYNC_SMART_LIFE)}</button>
+        {topology.busy && <p role="status" className="help">{t(MSG.SYNCHRONIZATION_RUNS_IN_THE_BACKGROUND)}</p>}
         {(topology.error || topology.data?.job.message) && <p role="alert" className="field-error">{topology.error || topology.data?.job.message}</p>}
-        {Boolean(topology.data?.warnings) && <p className="help">{t("Сохранены ручные настройки или обнаружены ограничения размещения:") + " "}{topology.data?.warnings}{t(". Проверьте комнаты нужных устройств.")}</p>}
-        <p className="help topology-note">{t("Пустые комнаты Smart Life при этой синхронизации не передаются.")}</p>
+        {Boolean(topology.data?.warnings) && <p className="help">{t(MSG.MANUAL_SETTINGS_WERE_PRESERVED_OR_PLACEMENT_LIMITATIONS_WERE) + " "}{topology.data?.warnings}{t(MSG.CHECK_THE_RELEVANT_DEVICES_ROOMS)}</p>}
+        <p className="help topology-note">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
       </div>}
-      <div className="control-filters"><label>{t("Здание")}<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); setPage(0); }}><option value="">{t("Все здания")}</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>{t("Комната")}<select value={room} onChange={event => selectRoom(event.target.value)}><option value="">{t("Все комнаты")}</option><option value="none">{t("Без комнаты")}</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label id="dashboard-search" className="dashboard-search-field"><span>{t("Поиск по названию, алиасу или ID")}</span><input ref={searchInput} type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder={t("Найти устройство или группу")} /></label></div>
-      {busy && <p role="status" className="help">{t("Загружаем список…")}</p>}{current?.errors.map(error => <p key={t(error)} role="alert" className="field-error">{t(error)}</p>)}
-      {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? t("Ничего не найдено") : t("Устройств пока нет")}</h3><p>{devices.length || inventory?.groups.length ? t("Измените фильтры или поисковый запрос.") : sharingReady || developerReady ? t("Добавьте устройства в Smart Life и обновите список.") : t("Подключите аккаунт Tuya, чтобы увидеть свои устройства.")}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t("Настроить подключение")}</button>}</div>}
+      <div className="control-filters"><label>{t(MSG.BUILDING)}<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); setPage(0); }}><option value="">{t(MSG.ALL_BUILDINGS)}</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>{t(MSG.ROOM)}<select value={room} onChange={event => selectRoom(event.target.value)}><option value="">{t(MSG.ALL_ROOMS)}</option><option value="none">{t(MSG.NO_ROOM)}</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label id="dashboard-search" className="dashboard-search-field"><span>{t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}</span><input ref={searchInput} type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)} /></label></div>
+      {busy && <p role="status" className="help">{t(MSG.LOADING_LIST)}</p>}{current?.errors.map(error => <p key={translateText(error)} role="alert" className="field-error">{translateText(error)}</p>)}
+      {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? t(MSG.NOTHING_FOUND) : t(MSG.NO_DEVICES_YET)}</h3><p>{devices.length || inventory?.groups.length ? t(MSG.CHANGE_YOUR_FILTERS_OR_SEARCH_QUERY) : sharingReady || developerReady ? t(MSG.ADD_DEVICES_IN_SMART_LIFE_AND_REFRESH_THE) : t(MSG.CONNECT_A_TUYA_ACCOUNT_TO_SEE_YOUR_DEVICES)}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t(MSG.SET_UP_CONNECTION)}</button>}</div>}
       <ul className="dashboard-device-grid tw:m-0 tw:grid tw:list-none tw:grid-cols-[repeat(auto-fill,minmax(min(100%,264px),1fr))] tw:items-start tw:gap-3 tw:p-0 tw:max-[600px]:gap-2">{visible.map(entry => entry.kind === 'group' ? <Card className="device-card dashboard-device" key={'group-' + entry.group.id} aria-label={entry.group.name} onClick={event=>openCard(event,()=>choose(entry))}>
         <DashboardCardHeader title={entry.group.name}
           icon={<svg className="device-type-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>}
-          metadata={<><span className="device-location">{t("Группа ·")} {entry.group.device_ids.length} {t("устройств")}</span>
-            <span className="device-location">{t("В домашней сети")}</span></>}
-          actions={<CardDetailsButton label={t("Открыть группу")} onClick={() => choose(entry)} />} />
+          metadata={<><span className="device-location">{t(MSG.GROUP)} {entry.group.device_ids.length} {t(MSG.DEVICES)}</span>
+            <span className="device-location">{t(MSG.ON_YOUR_HOME_NETWORK)}</span></>}
+          actions={<CardDetailsButton label={t(MSG.OPEN_GROUP)} onClick={() => choose(entry)} />} />
         <DashboardCardFooter>
-          <p className="dashboard-group-reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t("Состояние неизвестно")}</p>
+          <p className="dashboard-group-reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t(MSG.STATUS_UNKNOWN)}</p>
         </DashboardCardFooter>
       </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} state={entry.device.local ? states[entry.device.local.id] : undefined} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onCommandBusy={onCommandBusy} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
-      {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t("Назад")}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>{t("Далее")}</button></div>}
+      {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t(MSG.BACK)}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>{t(MSG.NEXT)}</button></div>}
     </>}
     {selected?.kind === 'device' && selected.route === 'local' && selected.device.local && <LocalControl room={roomName(selected.device)} key={selected.device.local.id} api={api} device={selected.device.local} onAuthError={onAuthError} onSetup={inventory ? () => {
       const provider = selected.device.cloud.sharing ? 'sharing' : selected.device.cloud.developer ? 'developer' : undefined;
       choose({ kind: 'survey', existing: selected.device.local, provider, device: provider ? selected.device.cloud[provider] : undefined });
-    } : undefined} closeLabel={selected.parent ? t("Назад к группе") : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
+    } : undefined} closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
     {selected?.kind === 'device' && selected.route !== 'local' && selected.device.cloud[selected.route] && <CloudControl room={roomName(selected.device)} localTransport={selected.device.local?.transport} key={selected.route + selected.device.id} api={api} device={{ ...selected.device.cloud[selected.route]!, name: selected.device.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
     {selected?.kind === 'group' && <GroupControl key={selected.group.id} api={api} group={selected.group} onAuthError={onAuthError} onClose={close} onDevice={device => choose({ kind: 'device', device: mergeDevices([device], cloud)[0], route: 'local', parent: selected.group })} />}
   </section>;

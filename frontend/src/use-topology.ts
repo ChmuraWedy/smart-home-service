@@ -1,4 +1,4 @@
-import { t } from "./i18n";
+import { MSG, t } from "./i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from './api';
 import type { HomeApi, Topology } from './home-api';
@@ -18,7 +18,7 @@ export function useTopology(api: HomeApi, ready: boolean, onSynced: () => void, 
       try {
         const data = await api.topology(controller.signal);
         if (controller.signal.aborted) return;
-        if (!Array.isArray(data.placements) || !data.job) throw new Error(t("Не удалось прочитать структуру дома."));
+        if (!Array.isArray(data.placements) || !data.job) throw new Error(t(MSG.COULD_NOT_READ_THE_HOME_STRUCTURE));
         setRecord({ api, data });
         if (data.job.status === 'running') {
           wasRunning = true;
@@ -29,7 +29,7 @@ export function useTopology(api: HomeApi, ready: boolean, onSynced: () => void, 
         }
       } catch (failure) {
         if (controller.signal.aborted) return;
-        setRecord(previous => ({ ...(previous?.api === api ? previous : {}), api, starting: false, error: failure instanceof Error ? failure.message : t("Не удалось прочитать структуру дома.") }));
+        setRecord(previous => ({ ...(previous?.api === api ? previous : {}), api, starting: false, error: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_READ_THE_HOME_STRUCTURE) }));
         if (failure instanceof ApiError && failure.status === 401) callbacks.current.onAuthError();
       }
     }
@@ -50,7 +50,7 @@ export function useTopology(api: HomeApi, ready: boolean, onSynced: () => void, 
       setRevision(value => value + 1);
     } catch (failure) {
       if (controller.signal.aborted) return;
-      setRecord(previous => ({ ...(previous?.api === api ? previous : {}), api, starting: false, error: failure instanceof Error ? failure.message : t("Не удалось начать синхронизацию.") }));
+      setRecord(previous => ({ ...(previous?.api === api ? previous : {}), api, starting: false, error: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_START_SYNCHRONIZATION) }));
       if (failure instanceof ApiError && failure.status === 401) callbacks.current.onAuthError();
     }
   }
