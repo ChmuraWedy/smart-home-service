@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { App } from './App';
+import { App } from './test/App';
 import { DEFAULT_API_BASE, STORAGE_KEY } from './connection';
 import type { CloudStatus } from './api';
 
@@ -62,8 +62,8 @@ it('opens local connections from the hamburger and restores its direct URL', asy
   expect(screen.getByRole('button', { name: 'Найти устройства' })).toBeDisabled();
   expect(screen.queryByRole('combobox', { name: 'Устройство' })).toBeNull();
   expect(backend.calls.some(call => call.path.endsWith('/find') || call.path.endsWith('/save'))).toBe(false);
-  await go(userEvent.setup(), 'Сеть и пакеты'); expect(window.location.hash).toBe('#network');
-  await go(userEvent.setup(), 'Локальные подключения'); expect(window.location.hash).toBe('#local-connections');
+  await go(userEvent.setup(), 'Сеть и пакеты'); expect(window.location.pathname).toBe('/network');
+  await go(userEvent.setup(), 'Локальные подключения'); expect(window.location.pathname).toBe('/local-connections');
   expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
 });
 
@@ -290,5 +290,5 @@ it('opens LAN observations from the menu without a connected Tuya account', asyn
   fireEvent.click(menu); fireEvent.pointerDown(document.body); expect(screen.queryByRole('navigation')).toBeNull();
   await go(userEvent.setup(), 'Подключения');
   expect(screen.queryByRole('heading', { name: 'Сеть и пакеты' })).toBeNull();
-  expect(window.location.hash).toBe('');
+  expect(window.location.pathname).toBe('/settings/connections');
 });

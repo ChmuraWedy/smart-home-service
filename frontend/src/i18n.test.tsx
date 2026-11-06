@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { App } from './App';
+import { App } from './test/App';
 import { CloudApi } from './api';
 import { cloudCommands, cloudSpec, labelFor, optionLabel } from './controls';
 import { MSG, LANGUAGE_STORAGE_KEY, LANGUAGES, dateLocale, detectLocale, getLocale, localizeMessages, rawMessages, savedLocale, setLocale, t, translateText } from './i18n';

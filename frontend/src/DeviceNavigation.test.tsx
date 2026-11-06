@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { App } from './App';
+import { App } from './test/App';
 import { STORAGE_KEY } from './connection';
 import { deviceCardId, deviceHref, readDeviceLink } from './device-links';
-import type { LocalDevice } from './home-api';
+import type { LocalDevice, Room } from './home-api';
 
 const devices: LocalDevice[] = Array.from({ length: 30 }, (_, index) => ({
   id: index + 1, device_id: 'physical-' + index, name: 'Устройство ' + index, aliases: [], building_id: null, room_id: null,
@@ -11,14 +11,15 @@ const devices: LocalDevice[] = Array.from({ length: 30 }, (_, index) => ({
   version: '3.5', has_local_key: true,
 }));
 const json = (value: unknown) => new Response(JSON.stringify(value));
-function backend(records = devices) {
+function backend(records = devices, rooms: Room[] = []) {
   const calls: { path: string; method: string }[] = [];
   vi.mocked(fetch).mockImplementation(async (input, options) => {
     const url = new URL(String(input)), path = url.pathname;
     calls.push({ path: path + url.search, method: options?.method || 'GET' });
     if (path === '/api/v1/cloud/status') return json({ enabled: true, connected: false, has_saved_user_code: false, saved_user_code_requires_login: false, developer: { configured: false, connected: false } });
     if (path === '/api/v1/devices') return json(records);
-    if (['/api/v1/buildings', '/api/v1/rooms', '/api/v1/groups'].includes(path)) return json([]);
+    if (path === '/api/v1/rooms') return json(rooms);
+    if (['/api/v1/buildings', '/api/v1/groups'].includes(path)) return json([]);
     if (path.startsWith('/api/v1/activity/')) return json({ events: [], next_before: null });
     const id = Number(path.split('/')[4]), device = records.find(row => row.id === id);
     if (path.endsWith('/state')) return json({ device_id: id, name: device?.name, enabled: true, available: true,
@@ -28,13 +29,23 @@ function backend(records = devices) {
   });
   return calls;
 }
-function access(hash: string) {
+function access(path: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ baseUrl: 'http://navigation-api.test', token: 'test-service-key' }));
-  window.history.replaceState(null, '', '/' + hash);
+  window.history.replaceState(null, '', path || '/');
 }
-function hash(hash: string) {
-  window.history.replaceState(null, '', '/' + hash);
-  fireEvent(window, new HashChangeEvent('hashchange'));
+function currentPath() { return window.location.pathname + window.location.search; }
+async function historyStep(step: 'back' | 'forward') {
+  await act(async () => {
+    const popped = new Promise(resolve => window.addEventListener('popstate', resolve, { once: true }));
+    window.history[step]();
+    await popped;
+  });
+}
+async function go(name: string) {
+  const menu = screen.getByRole('button', { name: 'Меню' });
+  await waitFor(() => expect(menu).toBeEnabled());
+  fireEvent.click(menu);
+  fireEvent.click(screen.getByRole('button', { name }));
 }
 
 describe('device deep navigation', () => {
@@ -64,20 +75,95 @@ describe('device deep navigation', () => {
     fireEvent.click(within(card).getByRole('button', { name: 'Подробнее' }));
     const dialog = await screen.findByRole('dialog', { name: 'Устройство 0' });
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeEnabled());
-    expect(window.location.hash).toBe('#device/physical-0?route=local');
+    expect(currentPath()).toBe('/devices/physical-0?route=local');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(window.location.hash).toBe('');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(currentPath()).toBe('/');
   });
-  it('follows same-tab hash links and back/forward route changes', async () => {
-    backend(); access('#local-connections'); render(<App />); await screen.findByText('API подключён');
-    act(() => hash(deviceHref('physical-2', 'local')));
+  it('keeps room and page context in the URL when opening a device and moving through history', async () => {
+    const rooms = [{ id: 7, building_id: 1, name: 'Рабочая', aliases: [] }];
+    const calls = backend(devices.map(device => ({ ...device, room_id: 7 })), rooms);
+    access(''); render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Рабочая' }));
+    expect(currentPath()).toBe('/rooms/7');
+    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+    expect(currentPath()).toBe('/rooms/7?page=2');
+    const card = await screen.findByRole('listitem', { name: 'Устройство 29' });
+    fireEvent.click(within(card).getByRole('button', { name: 'Подробнее' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Устройство 29' });
+    await waitFor(() => expect(dialog).toHaveAttribute('aria-busy', 'false'));
+    expect(currentPath()).toBe('/devices/physical-29?page=2&room=7&route=local');
+    expect(calls.filter(call => call.path.startsWith('/api/v1/devices?'))).toHaveLength(1);
+    await historyStep('back');
+    expect(currentPath()).toBe('/rooms/7?page=2');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Рабочая' })).toHaveAttribute('aria-pressed', 'true');
+    await historyStep('forward');
+    expect(await screen.findByRole('dialog', { name: 'Устройство 29' })).toBeInTheDocument();
+  });
+
+  it('restores a bulb quick sheet from its own URL and returns to the room on close', async () => {
+    const lamp: LocalDevice = { ...devices[0], name: 'Рабочая лампа', room_id: 7, capabilities: {
+      switch: { type: 'boolean', readable: true, writable: true },
+      brightness: { type: 'integer', readable: true, writable: true, minimum: 1, maximum: 100, unit: '%' },
+    } };
+    backend([lamp], [{ id: 7, building_id: 1, name: 'Рабочая', aliases: [] }]);
+    access('/rooms/7');
+    const first = render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: lamp.name }));
+    const quickPath = '/devices/physical-0/quick?room=7&route=local';
+    expect(currentPath()).toBe(quickPath);
+    expect(within(await screen.findByRole('dialog', { name: lamp.name })).getByRole('slider', { name: 'Яркость' })).toBeInTheDocument();
+    first.unmount();
+    window.history.replaceState(null, '', quickPath);
+    render(<App />);
+    const sheet = await screen.findByRole('dialog', { name: lamp.name });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Закрыть' }));
+    await waitFor(() => expect(currentPath()).toBe('/rooms/7'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('returns a signed-out visitor to the requested device after saving service access', async () => {
+    backend();
+    window.history.replaceState(null, '', deviceHref('physical-0', 'local'));
+    render(<App />);
+    expect(currentPath()).toBe('/settings/connections');
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'), { target: { value: 'service-key' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
+    expect(await screen.findByRole('dialog', { name: 'Устройство 0' })).toBeInTheDocument();
+    expect(currentPath()).toBe('/devices/physical-0?route=local');
+  });
+
+  it('gives appearance, dashboard tools, and provider settings distinct URLs', async () => {
+    backend(); access('/'); render(<App />);
+    await go('Параметры');
+    expect(currentPath()).toBe('/settings');
+    expect(screen.getByLabelText('Размер карточек')).toBeInTheDocument();
+    await go('Управление');
+    await go('Настройки панели');
+    expect(currentPath()).toBe('/settings/dashboard');
+    expect(screen.getByRole('button', { name: 'Обновить список' })).toBeInTheDocument();
+    await go('Подключения');
+    fireEvent.click(screen.getByRole('button', { name: 'Access ID / Secret' }));
+    expect(currentPath()).toBe('/settings/connections?provider=developer');
+    expect(screen.getByRole('heading', { name: 'Tuya Developer' })).toBeInTheDocument();
+    await historyStep('back');
+    expect(screen.getByRole('heading', { name: 'Smart Life / Tuya Smart' })).toBeInTheDocument();
+  });
+  it('converts an old bookmark to a canonical device URL and follows browser history', async () => {
+    backend(); access('/#device/physical-2?route=local'); render(<App />);
     const dialog = await screen.findByRole('dialog', { name: 'Устройство 2' });
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeEnabled());
-    act(() => hash('#local-connections'));
+    expect(currentPath()).toBe(deviceHref('physical-2', 'local'));
+    expect(window.location.hash).toBe('');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    await waitFor(() => expect(currentPath()).toBe('/'));
+    await go('Локальные подключения');
     expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
-    act(() => hash(deviceHref('physical-2', 'local')));
-    expect(await screen.findByRole('dialog', { name: 'Устройство 2' })).toBeInTheDocument();
+    await historyStep('back');
+    expect(await screen.findByRole('listitem', { name: 'Устройство 2' })).toBeInTheDocument();
+    await historyStep('forward');
+    expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
   });
   it.each([['missing-id', 'local', 'не найдено'], ['physical-0', 'sharing', 'недоступен']] as const)('reports unavailable target %s/%s without substituting another device or connection', async (id, route, text) => {
     const calls = backend(); access(deviceHref(id, route)); render(<App />);
@@ -89,18 +175,23 @@ describe('device deep navigation', () => {
     let finish!: (response: Response) => void;
     vi.mocked(fetch).mockImplementation((input, options) => new URL(String(input)).pathname === '/api/v1/devices/30'
       ? new Promise<Response>(resolve => { finish = resolve; }) : original(input, options));
-    access(deviceHref('physical-29', 'local')); render(<App />);
+    access(''); render(<App />);
+    await screen.findByRole('listitem', { name: 'Устройство 0' });
+    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+    fireEvent.click(within(await screen.findByRole('listitem', { name: 'Устройство 29' })).getByRole('button', { name: 'Подробнее' }));
     const dialog = await screen.findByRole('dialog', { name: 'Устройство 29' });
     expect(dialog).toHaveAttribute('aria-busy', 'true');
-    act(() => hash('#local-connections'));
-    expect(window.location.hash).toBe(deviceHref('physical-29', 'local')); expect(dialog).toBeInTheDocument();
+    const detailsPath = currentPath();
+    await historyStep('back');
+    await waitFor(() => expect(currentPath()).toBe(detailsPath)); expect(dialog).toBeInTheDocument();
     await act(async () => finish(json(devices[29])));
     await waitFor(() => expect(dialog).toHaveAttribute('aria-busy', 'false'));
     const nested = document.createElement('dialog'); nested.setAttribute('open', ''); document.body.append(nested);
-    act(() => hash('#local-connections'));
-    expect(window.location.hash).toBe(deviceHref('physical-29', 'local')); nested.remove();
-    act(() => hash('#local-connections'));
-    expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+    await historyStep('back');
+    await waitFor(() => expect(currentPath()).toBe(detailsPath)); nested.remove();
+    await historyStep('back');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(currentPath()).toBe('/?page=2');
   });
   it('locks dashboard navigation until every pending card command settles', async () => {
     backend(devices.slice(0, 2).map(device => ({
@@ -115,8 +206,9 @@ describe('device deep navigation', () => {
         ? new Promise(resolve => pending.set(Number(match[1]), resolve))
         : original(input, options);
     });
-    access('');
+    access('/local-connections');
     render(<App />);
+    await go('Управление');
     const first = await screen.findByRole('listitem', { name: 'Устройство 0' });
     const second = await screen.findByRole('listitem', { name: 'Устройство 1' });
     const firstSwitch = await within(first).findByRole('switch');
@@ -132,11 +224,11 @@ describe('device deep navigation', () => {
     await act(async () => pending.get(1)!(json({ acknowledged: true })));
     await waitFor(() => expect(within(first).getByRole('button', { name: 'Подробнее' })).toBeEnabled());
     expect(menu).toBeDisabled();
-    act(() => hash('#local-connections'));
-    expect(window.location.hash).toBe('');
+    await historyStep('back');
+    await waitFor(() => expect(currentPath()).toBe('/'));
     await act(async () => pending.get(2)!(json({ acknowledged: true })));
     await waitFor(() => expect(menu).toBeEnabled());
-    act(() => hash('#local-connections'));
+    await historyStep('back');
     expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
   });
 

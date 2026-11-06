@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import bootstrapHTML from '../index.html?raw';
 
 let theme: typeof import('./theme');
-let App: typeof import('./App')['App'];
+let App: typeof import('./test/App')['App'];
 const media = Object.assign(new EventTarget(), { matches: false });
 const systemChange = (dark: boolean) => {
   media.matches = dark;
@@ -13,7 +13,7 @@ const systemChange = (dark: boolean) => {
 beforeAll(async () => {
   Object.defineProperty(window, 'matchMedia', { configurable: true, writable: true, value: () => media });
   theme = await import('./theme');
-  App = (await import('./App')).App;
+  App = (await import('./test/App')).App;
 });
 beforeEach(() => {
   media.matches = false;

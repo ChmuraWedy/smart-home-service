@@ -1,5 +1,6 @@
 import { MSG, dateLocale, t, translateText } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { matchPath, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { localSpec } from '../controls';
@@ -18,13 +19,14 @@ import { CardControls } from './CardControls';
 import { Card } from './ui/card';
 import { DashboardAliases } from './DashboardAliases';
 import type { MouseEvent, ReactNode } from 'react';
-import { deviceCardId } from '../device-links';
+import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
+import { dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery } from '../navigation';
+import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
 import { readLocalDevice } from '../local-device-cache';
 import { cloudAccountScope } from '../cloud-account-scope';
 import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, localMetadataKey, nextDeviceMetadataRevision } from '../device-metadata';
 import { useLocalDeviceState } from '../use-local-device-state';
-import type { DeviceLink } from '../device-links';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -64,8 +66,9 @@ function DashboardCardFooter({ children }: { children: ReactNode }) {
   return <footer className="dashboard-card-footer" data-slot="card-footer">{children}</footer>;
 }
 
-function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd }: {
+function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd }: {
   api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
+  quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
   const aliases = useMemo(() => deviceAliases(device), [device]);
@@ -73,21 +76,20 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
   const dispatch = useAppDispatch();
   const quickBusy = useAppSelector(state => selectCommandPending(state, device.id));
-  const [quickOpen, setQuickOpen] = useState(false);
+  const quickOpen = quickRoute !== undefined;
   const [lightSheet, setLightSheet] = useState<{route:DeviceRoute;available:boolean}>();
   const sheetTrigger = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (paused) setQuickOpen(false); }, [paused]);
   const notifyBusy = useCallback((pending: boolean) => {
     dispatch(setCommandPending({ deviceId: device.id, pending }));
   }, [device.id, dispatch]);
-  const route = chosen && routes.includes(chosen) ? chosen : routes[0];
+  const route = quickRoute ?? (chosen && routes.includes(chosen) ? chosen : routes[0]);
   const [liveStatus,setLiveStatus] = useState<{route:DeviceRoute;status:CardStatus}>();
   const updateStatus = useCallback((status:CardStatus)=>setLiveStatus({route,status}),[route]);
   const live = liveStatus?.route === route ? liveStatus.status : undefined;
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const hasSheet = isCamera(cloud?.category) || (lightSheet?.route === route && lightSheet.available);
   const onLightAvailable = useCallback((available:boolean) => setLightSheet({route,available}), [route]);
-  const showSheet = () => { if (!paused && !quickBusy && hasSheet) setQuickOpen(true); };
+  const showSheet = () => { if (!paused && !quickBusy && hasSheet && !quickOpen) onQuickOpen(route); };
   const local = device.local;
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
@@ -107,19 +109,18 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
       actions={<><CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy} onClick={() => onOpen(route)} />
         {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)} title={t(MSG.SET_UP_LOCAL_CONNECTION)} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}</>} />
     <DashboardCardFooter>
-      <CardControls key={route} api={api} device={device} route={route} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:() => setQuickOpen(false), trigger:sheetTrigger, onLightAvailable}} />
+      <CardControls key={route} api={api} device={device} route={route} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} sheet={{open:quickOpen, close:onQuickClose, trigger:sheetTrigger, onLightAvailable}} />
       {routes.length > 1 && <div className="device-card-footer tw:mt-2">
-        <select className="device-route-select" aria-label={t(MSG.CONTROL_METHOD) + device.name} value={route} disabled={quickBusy} onChange={event => { setQuickOpen(false); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>
+        <select className="device-route-select" aria-label={t(MSG.CONTROL_METHOD) + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>
       </div>}
     </DashboardCardFooter>
   </Card>;
 
 }
 
-export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onConnections, deviceLink, onDeviceLinkChange }: {
-  dashboardPanel?: 'search' | 'tools' | null; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
+export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onConnections }: {
+  dashboardPanel?: DashboardPanel; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
   onAuthError: () => void; onConnections?: () => void;
-  deviceLink?: DeviceLink | null; onDeviceLinkChange?: (target: DeviceLink | null) => void;
 }) {
   const mask = `${sharingReady}:${developerReady}`;
   const [record, setRecord] = useState<Loaded | null>(null);
@@ -127,39 +128,43 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const current = ready && record?.api === api && record.mask === mask ? record : null;
   const inventory = current?.inventory;
   const cloud = current?.cloud || NO_CLOUD;
-  const [building, setBuilding] = useState(''), [room, setRoom] = useState(''), [search, setSearch] = useState('');
-  const [page, setPage] = useState(0), [revision, setRevision] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const query = new URLSearchParams(location.search);
+  const building = query.get('building') ?? '';
+  const room = dashboardRoom(location.pathname, query);
+  const search = query.get('q') ?? '';
+  const requestedPage = Number(query.get('page') ?? 1);
+  const deviceLink = readDeviceLink(location.pathname + location.search);
+  const quick = Boolean(matchPath(quickPattern, location.pathname));
+  const groupId = matchPath(groupPattern, location.pathname)?.params.groupId;
+  const [revision, setRevision] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
-  const previousPanel = useRef(dashboardPanel);
-  useEffect(() => {
-    if (dashboardPanel === 'search') searchInput.current?.focus();
-    else if (previousPanel.current === 'search') { setSearch(''); setPage(0); }
-    previousPanel.current = dashboardPanel;
-  }, [dashboardPanel]);
-  function selectRoom(value: string) { setRoom(value); setPage(0); }
+  useEffect(() => { if (dashboardPanel === 'search') searchInput.current?.focus(); }, [dashboardPanel]);
+  function selectRoom(value: string) { query.delete('page'); void navigate(dashboardHref(value, query, dashboardPanel)); }
+  function setBuilding(value: string) {
+    if (value) query.set('building', value); else query.delete('building');
+    selectRoom('');
+  }
+  function setSearch(value: string) {
+    if (value) query.set('q', value); else query.delete('q');
+    query.delete('page');
+    void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
+  }
 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
-  function location(device: UnifiedDevice) { return device.local || placements.get(device.id); }
-  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === location(device)?.room_id)?.name || t(MSG.NO_ROOM); }
+  function placementOf(device: UnifiedDevice) { return device.local || placements.get(device.id); }
+  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === placementOf(device)?.room_id)?.name || t(MSG.NO_ROOM); }
   const [busy, setBusy] = useState(false);
-  const [selection, setSelection] = useState<{ api: HomeApi; mask: string; value: Selection } | null>(null);
-  const selected = ready && selection?.api === api && selection.mask === mask ? selection.value : null;
-  const activeLink = useRef<string | null>(null);
+  const [survey, setSurvey] = useState<{ api: HomeApi; mask: string; key: string; value: Extract<Selection, { kind: 'survey' }> } | null>(null);
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
   const dispatch = useAppDispatch();
   const identity = useAppSelector(state => state.deviceMetadata.devices);
   const now = useClock();
-  const detailsOpen = selected !== null;
-  useEffect(() => {
-    if (!detailsOpen) return;
-    dispatch(setDetailsOpen(true));
-    return () => { dispatch(setDetailsOpen(false)); };
-  }, [detailsOpen, dispatch]);
-  useEffect(() => { setSelection(null); activeLink.current = null; }, [api, ready, mask]);
   useEffect(() => {
     if (!ready) return;
-    const controller = new AbortController(); setBusy(true); setPage(0);
+    const controller = new AbortController(); setBusy(true);
     setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, errors: [] } : { api, mask, inventory: null, cloud: {}, errors: [] });
     const handle = async (label: string, read: () => Promise<Inventory | CloudDevice[]>, provider?: Provider) => {
       const scope = provider ? cloudAccountScope(api, provider) : undefined;
@@ -210,33 +215,38 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     }
     return mergeDevices(localDevices, cloudDevices);
   }, [api, inventory, cloud, identity]);
-  const detailDevice = selected?.kind === 'device' ? devices.find(device => device.id === selected.device.id) ?? selected.device : undefined;
   const linked = deviceLink ? devices.find(device => device.id === deviceLink.id) : undefined;
   const linkedRoute = linked ? deviceLink?.route || deviceRoutes(linked)[0] : undefined;
+  const validRoute = linked && linkedRoute && deviceRoutes(linked).includes(linkedRoute) ? linkedRoute : undefined;
   const linkError = deviceLink && ready && current && !busy ? !linked ? t(MSG.THE_LINKED_DEVICE_WAS_NOT_FOUND_IN_THE) : linkedRoute && !deviceRoutes(linked).includes(linkedRoute) ? t(MSG.THE_CONTROL_METHOD_IN_THIS_LINK_IS_UNAVAILABLE) : '' : '';
+  const group = inventory?.groups.find(item => String(item.id) === groupId);
+  const parent = inventory?.groups.find(item => String(item.id) === query.get('group') && linked?.local && item.device_ids.includes(linked.local.id));
+  const activeSurvey = ready && survey?.api === api && survey.mask === mask && survey.key === location.key ? survey.value : null;
+  const selected: Selection | null = activeSurvey ?? (!quick && linked && validRoute ? { kind: 'device', device: linked, route: validRoute, parent }
+    : group ? { kind: 'group', group } : null);
+  const detailDevice = selected?.kind === 'device' ? selected.device : undefined;
+  const detailsOpen = selected !== null;
   useEffect(() => {
-    if (!deviceLink) {
-      if (activeLink.current && selected?.kind === 'device') setSelection(null);
-      activeLink.current = null; return;
-    }
-    if (!ready || busy || !current || !linked || !linkedRoute || linkError) return;
-    const key = deviceLink.id + ':' + linkedRoute;
-    if (activeLink.current === key && selected?.kind === 'device' && selected.device.id === linked.id && selected.route === linkedRoute) return;
-    activeLink.current = key;
-    if (selected?.kind === 'device' && selected.device.id === linked.id && selected.route === linkedRoute) return;
-    setBuilding(''); setRoom(''); setSearch('');
-    setPage(Math.floor(((inventory?.groups.length || 0) + devices.indexOf(linked)) / PAGE_SIZE));
-    setSelection({ api, mask, value: { kind: 'device', device: linked, route: linkedRoute } });
-  }, [deviceLink, ready, busy, current, linked, linkedRoute, linkError, selected, api, mask, devices, inventory]);
+    if (!detailsOpen) return;
+    dispatch(setDetailsOpen(true));
+    return () => { dispatch(setDetailsOpen(false)); };
+  }, [detailsOpen, dispatch]);
   const filteredRooms = inventory?.rooms.filter(item => !building || String(item.building_id) === building) || [];
   const entries = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
-    const filtered = devices.filter(device => (!building || String(location(device)?.building_id) === building) && inRoom(location(device)?.room_id ?? null) && matchesDevice(device, needle));
+    const filtered = devices.filter(device => (!building || String(placementOf(device)?.building_id) === building) && inRoom(placementOf(device)?.room_id ?? null) && matchesDevice(device, needle));
     const groups = inventory?.groups.filter(group => inRoom(group.room_id) && (!building || String(inventory.rooms.find(item => item.id === group.room_id)?.building_id) === building) && group.name.toLocaleLowerCase().includes(needle)) || [];
     return [...groups.map(group => ({ kind: 'group' as const, group })), ...filtered.map(device => ({ kind: 'device' as const, device }))];
   }, [devices, inventory, building, room, search, placements]);
-  const visible = useMemo(() => entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [entries, page]);
+  const linkedIndex = entries.findIndex(entry => entry.kind === 'device' ? entry.device === linked : entry.group === group);
+  const page = linkedIndex >= 0 ? Math.floor(linkedIndex / PAGE_SIZE)
+    : Number.isSafeInteger(requestedPage) ? Math.min(Math.max(requestedPage - 1, 0), Math.max(0, Math.ceil(entries.length / PAGE_SIZE) - 1)) : 0;
+  const visible = useMemo(() => {
+    const pageEntries = entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    // A copied quick link can outlive the device's room assignment or alias.
+    return quick && linked && validRoute && linkedIndex < 0 ? [{ kind: 'device' as const, device: linked }, ...pageEntries] : pageEntries;
+  }, [entries, page, quick, linked, validRoute, linkedIndex]);
   useEffect(() => {
     const controller = new AbortController();
     setGroupStates({});
@@ -254,11 +264,37 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     }
     return () => controller.abort();
   }, [api, dispatch, visible]);
-  function choose(value: Selection) {
-    setSelection({ api, mask, value });
-    onDeviceLinkChange?.(value.kind === 'device' ? { id: value.device.id, route: value.route } : null);
+  function setPage(value: number) {
+    if (value > 0) query.set('page', String(value + 1)); else query.delete('page');
+    void navigate(dashboardHref(room, query, dashboardPanel));
   }
-  function close() { setSelection(null); onDeviceLinkChange?.(null); setRevision(value => value + 1); }
+  function overlayHref(path: string, route?: DeviceRoute, group?: Group) {
+    const params = new URLSearchParams(query);
+    if (room) params.set('room', room);
+    if (dashboardPanel) params.set('panel', dashboardPanel);
+    if (route) params.set('route', route); else params.delete('route');
+    if (group) params.set('group', String(group.id)); else params.delete('group');
+    return withQuery(path, params);
+  }
+  function openOverlay(href: string) {
+    if (href !== location.pathname + location.search) void navigate(href, { state: { dashboardOverlay: true } });
+  }
+  function choose(value: Selection) {
+    if (value.kind === 'survey') { setSurvey({ api, mask, key: location.key, value }); return; }
+    setSurvey(null);
+    if (value.kind === 'device') openOverlay(overlayHref(devicePath(value.device.id), value.route, value.parent));
+    else openOverlay(overlayHref('/groups/' + value.group.id));
+  }
+  function closeOverlay() {
+    if (location.state?.dashboardOverlay) { void navigate(-1); return; }
+    if (parent) { void navigate(overlayHref('/groups/' + parent.id), { replace: true }); return; }
+    if (page > 0) query.set('page', String(page + 1));
+    void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
+  }
+  function close() {
+    if (activeSurvey) setSurvey(null); else closeOverlay();
+    setRevision(value => value + 1);
+  }
   if (selected?.kind === 'survey' && inventory) return <DeviceSurvey api={api} inventory={inventory} device={selected.device} existing={selected.existing} provider={selected.provider} cloudDevices={selected.provider ? cloud[selected.provider] : undefined} gatewayPlacements={Array.from(placements.values())} placement={selected.device ? placements.get(selected.device.id) : undefined} onClose={() => selected.existing ? choose({ kind: 'device', device: mergeDevices([selected.existing], cloud).find(row => row.id === selected.existing!.device_id)!, route: 'local' }) : close()} onSaved={selected.existing ? saved => { setRevision(value => value + 1); choose({ kind: 'device', device: mergeDevices([saved], cloud).find(row => row.id === saved.device_id)!, route: 'local' }); } : undefined} onAuthError={onAuthError} />;
   return <section className="card control-center" aria-labelledby="control-center-heading">
     <div className="card-heading">
@@ -290,7 +326,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
         {Boolean(topology.data?.warnings) && <p className="help">{t(MSG.MANUAL_SETTINGS_WERE_PRESERVED_OR_PLACEMENT_LIMITATIONS_WERE) + " "}{topology.data?.warnings}{t(MSG.CHECK_THE_RELEVANT_DEVICES_ROOMS)}</p>}
         <p className="help topology-note">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
       </div>}
-      <div className="control-filters"><label>{t(MSG.BUILDING)}<select value={building} onChange={event => { setBuilding(event.target.value); setRoom(''); setPage(0); }}><option value="">{t(MSG.ALL_BUILDINGS)}</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>{t(MSG.ROOM)}<select value={room} onChange={event => selectRoom(event.target.value)}><option value="">{t(MSG.ALL_ROOMS)}</option><option value="none">{t(MSG.NO_ROOM)}</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label id="dashboard-search" className="dashboard-search-field"><span>{t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}</span><input ref={searchInput} type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)} /></label></div>
+      <div className="control-filters"><label>{t(MSG.BUILDING)}<select value={building} onChange={event => setBuilding(event.target.value)}><option value="">{t(MSG.ALL_BUILDINGS)}</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>{t(MSG.ROOM)}<select value={room} onChange={event => selectRoom(event.target.value)}><option value="">{t(MSG.ALL_ROOMS)}</option><option value="none">{t(MSG.NO_ROOM)}</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label id="dashboard-search" className="dashboard-search-field"><span>{t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}</span><input ref={searchInput} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)} /></label></div>
       {busy && <p role="status" className="help">{t(MSG.LOADING_LIST)}</p>}{current?.errors.map(error => <p key={translateText(error)} role="alert" className="field-error">{translateText(error)}</p>)}
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? t(MSG.NOTHING_FOUND) : t(MSG.NO_DEVICES_YET)}</h3><p>{devices.length || inventory?.groups.length ? t(MSG.CHANGE_YOUR_FILTERS_OR_SEARCH_QUERY) : sharingReady || developerReady ? t(MSG.ADD_DEVICES_IN_SMART_LIFE_AND_REFRESH_THE) : t(MSG.CONNECT_A_TUYA_ACCOUNT_TO_SEE_YOUR_DEVICES)}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t(MSG.SET_UP_CONNECTION)}</button>}</div>}
       <ul className="dashboard-device-grid tw:m-0 tw:grid tw:list-none tw:grid-cols-[repeat(auto-fill,minmax(min(100%,264px),1fr))] tw:items-start tw:gap-3 tw:p-0 tw:max-[600px]:gap-2">{visible.map(entry => entry.kind === 'group' ? <Card className="device-card dashboard-device" key={'group-' + entry.group.id} aria-label={entry.group.name} onClick={event=>openCard(event,()=>choose(entry))}>
@@ -302,13 +338,16 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
         <DashboardCardFooter>
           <p className="dashboard-group-reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t(MSG.STATUS_UNKNOWN)}</p>
         </DashboardCardFooter>
-      </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} room={roomName(entry.device)} now={now} paused={Boolean(selected)} onAuthError={onAuthError} onOpen={route => choose({ ...entry, route })} onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
-      {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(value => value - 1)}>{t(MSG.BACK)}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(value => value + 1)}>{t(MSG.NEXT)}</button></div>}
+      </Card> : <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} room={roomName(entry.device)} now={now} paused={Boolean(selected)}
+        quickRoute={quick && entry.device === linked ? validRoute : undefined} onAuthError={onAuthError} onOpen={route => choose({ ...entry, route })}
+        onQuickOpen={route => openOverlay(overlayHref(devicePath(entry.device.id, true), route))} onQuickClose={closeOverlay}
+        onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined} />)}</ul>
+      {entries.length > PAGE_SIZE && <div className="pagination"><button className="secondary compact" disabled={page === 0} onClick={() => setPage(page - 1)}>{t(MSG.BACK)}</button><span>{page + 1} / {Math.ceil(entries.length / PAGE_SIZE)}</span><button className="secondary compact" disabled={(page + 1) * PAGE_SIZE >= entries.length} onClick={() => setPage(page + 1)}>{t(MSG.NEXT)}</button></div>}
     </>}
     {selected?.kind === 'device' && selected.route === 'local' && detailDevice?.local && <LocalControl room={roomName(detailDevice)} key={detailDevice.local.id} api={api} device={detailDevice.local} onAuthError={onAuthError} onSetup={inventory ? () => {
       const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
       choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
-    } : undefined} closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined} onClose={() => selected.parent ? choose({ kind: 'group', group: selected.parent }) : close()} />}
+    } : undefined} closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined} onClose={close} />}
     {selected?.kind === 'device' && selected.route !== 'local' && detailDevice?.cloud[selected.route] && <CloudControl room={roomName(detailDevice)} localTransport={detailDevice.local?.transport} localDeviceId={detailDevice.local?.id} key={selected.route + detailDevice.id} api={api} device={{ ...detailDevice.cloud[selected.route]!, name: detailDevice.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
     {selected?.kind === 'group' && <GroupControl key={selected.group.id} api={api} group={selected.group} onAuthError={onAuthError} onClose={close} onDevice={device => choose({ kind: 'device', device: mergeDevices([device], cloud)[0], route: 'local', parent: selected.group })} />}
   </section>;
