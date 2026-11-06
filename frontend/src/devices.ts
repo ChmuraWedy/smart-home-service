@@ -1,4 +1,4 @@
-import { localizeMessages, t } from "./i18n";
+import { MSG, localizeMessages, t } from "./i18n";
 import type { CloudDevice, Provider } from './api';
 import type { LocalDevice } from './home-api';
 
@@ -10,7 +10,7 @@ export type UnifiedDevice = {
   cloud: Partial<Record<Provider, CloudDevice>>;
 };
 export const routeLabel: Record<DeviceRoute, string> = localizeMessages({
-  local: 'В домашней сети', sharing: 'Через интернет · Smart Life', developer: 'Через интернет · Tuya Developer',
+  local: MSG.ON_YOUR_HOME_NETWORK, sharing: MSG.OVER_THE_INTERNET_SMART_LIFE, developer: MSG.OVER_THE_INTERNET_TUYA_DEVELOPER,
 });
 
 // The database's numeric ID addresses a local record; device_id is the same
@@ -20,7 +20,7 @@ export function mergeDevices(local: LocalDevice[], cloud: Partial<Record<Provide
   for (const device of local) devices.set(device.device_id, { id: device.device_id, name: device.name, local: device, cloud: {} });
   for (const provider of ['sharing', 'developer'] as const) {
     for (const device of cloud[provider] || []) {
-      const entry = devices.get(device.id) || { id: device.id, name: device.name || t("Без названия"), cloud: {} };
+      const entry = devices.get(device.id) || { id: device.id, name: device.name || t(MSG.UNNAMED), cloud: {} };
       entry.cloud[provider] = device;
       devices.set(device.id, entry);
     }

@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import { useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import type { CloudApi, Provider } from '../api';
@@ -11,8 +11,8 @@ export function CameraArea({value,disabled,onChange,api,deviceId,provider,onAuth
   const [editing,setEditing]=useState<ReturnType<typeof parseArea>>(null);
   const parsed=parseArea(value);
   return <div className="camera-area-launch">
-    <button type="button" className="secondary compact" disabled={disabled || !parsed} onClick={()=>setEditing(parsed)}>{t("Изменить область")}</button>
-    {!parsed && value && <p className="help">{t("Формат области этой камеры не поддерживается графическим редактором. Исходные данные сохранены.")}</p>}
+    <button type="button" className="secondary compact" disabled={disabled || !parsed} onClick={()=>setEditing(parsed)}>{t(MSG.EDIT_AREA)}</button>
+    {!parsed && value && <p className="help">{t(MSG.THIS_CAMERAS_AREA_FORMAT_IS_NOT_SUPPORTED_BY)}</p>}
     {editing && <AreaDialog viewingBlocked={viewingBlocked} initial={editing} api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} onClose={()=>setEditing(null)} onSave={area=>{onChange(encodeArea(editing.document,area)); setEditing(null);}} />}
   </div>;
 }
@@ -40,18 +40,18 @@ function AreaDialog({initial,api,deviceId,provider,onAuthError,onClose,onSave,vi
   }
   const overlay=<div className="camera-area-surface" ref={surface}>
     <div className="camera-area-box" style={{left:area.x+'%',top:area.y+'%',width:area.xlen+'%',height:area.ylen+'%'}}>
-      <button type="button" className="camera-area-move" aria-label={t("Переместить область")} onPointerDown={event=>begin(event,false)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,false)} />
-      <button type="button" className="camera-area-resize" aria-label={t("Изменить размер области")} onPointerDown={event=>begin(event,true)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,true)}>↘</button>
+      <button type="button" className="camera-area-move" aria-label={t(MSG.MOVE_AREA)} onPointerDown={event=>begin(event,false)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,false)} />
+      <button type="button" className="camera-area-resize" aria-label={t(MSG.RESIZE_AREA)} onPointerDown={event=>begin(event,true)} onPointerMove={move} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}} onKeyDown={event=>key(event,true)}>↘</button>
     </div>
   </div>;
-  return <ControlDialog title={t("Область обнаружения")} busy={false} onClose={onClose} className="camera-area-dialog">
+  return <ControlDialog title={t(MSG.DETECTION_AREA)} busy={false} onClose={onClose} className="camera-area-dialog">
     <div className="camera-area-body">
-    <p className="help">{t("Переместите красную рамку и потяните её угол. Стрелки клавиатуры также перемещают рамку или меняют её размер.")}</p>
+    <p className="help">{t(MSG.MOVE_THE_RED_FRAME_AND_DRAG_ITS_CORNER)}</p>
     <CameraLive viewingBlocked={viewingBlocked} api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError} compact overlay={overlay} />
-    <div className="camera-area-values">{(['x','y','xlen','ylen'] as const).map(key=><label key={key}>{({x:t("Слева"),y:t("Сверху"),xlen:t("Ширина"),ylen:t("Высота")})[key]} (%)<input type="number" min={key==='x'||key==='y'?0:1} max={100} step={1} value={area[key]} onChange={event=>setArea({...area,[key]:Number(event.target.value)})} /></label>)}</div>
-    {!validArea(area) && <p role="alert" className="error">{t("Область должна целиком находиться внутри изображения и иметь ненулевой размер.")}</p>}
-    <p className="help">{t("«Сохранить» отправит выбранную область камере.")}</p>
+    <div className="camera-area-values">{(['x','y','xlen','ylen'] as const).map(key=><label key={key}>{({x:t(MSG.LEFT),y:t(MSG.TOP),xlen:t(MSG.WIDTH),ylen:t(MSG.HEIGHT)})[key]} (%)<input type="number" min={key==='x'||key==='y'?0:1} max={100} step={1} value={area[key]} onChange={event=>setArea({...area,[key]:Number(event.target.value)})} /></label>)}</div>
+    {!validArea(area) && <p role="alert" className="error">{t(MSG.THE_AREA_MUST_FIT_INSIDE_THE_IMAGE_AND)}</p>}
+    <p className="help">{t(MSG.SAVE_SENDS_THE_SELECTED_AREA_TO_THE_CAMERA)}</p>
     </div>
-    <div className="camera-format-actions camera-area-footer"><button type="button" className="secondary" onClick={onClose}>{t("Отмена")}</button><button type="button" disabled={!validArea(area)} onClick={()=>onSave(area)}>{t("Сохранить")}</button></div>
+    <div className="camera-format-actions camera-area-footer"><button type="button" className="secondary" onClick={onClose}>{t(MSG.CANCEL)}</button><button type="button" disabled={!validArea(area)} onClick={()=>onSave(area)}>{t(MSG.SAVE)}</button></div>
   </ControlDialog>;
 }

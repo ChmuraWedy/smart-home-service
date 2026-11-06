@@ -1,4 +1,4 @@
-import { dateLocale, t } from "../i18n";
+import { MSG, dateLocale, t, translateText } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudApi, NetworkObservation, Provider } from '../api';
@@ -21,11 +21,11 @@ export function DeviceNetwork({ api, deviceId, provider, onAuthError }: {
       }
       try {
         const result = await api.deviceNetworkObservation(deviceId, provider, controller.signal);
-        if (result.device_id !== deviceId || !result.target_id || !Array.isArray(result.changes)) throw new Error(t("Сервис вернул неожиданные данные наблюдения."));
+        if (result.device_id !== deviceId || !result.target_id || !Array.isArray(result.changes)) throw new Error(t(MSG.THE_SERVICE_RETURNED_UNEXPECTED_OBSERVATION_DATA));
         if (!controller.signal.aborted) { setData(result); setError(''); }
       } catch (failure) {
         if (controller.signal.aborted) return;
-        setError(failure instanceof ApiError && failure.status === 409 ? t("Шлюз этого устройства пока неизвестен. Сначала укажите его при добавлении устройства в дом.") : failure instanceof Error ? failure.message : t("Не удалось начать наблюдение."));
+        setError(failure instanceof ApiError && failure.status === 409 ? t(MSG.THIS_DEVICES_GATEWAY_IS_NOT_KNOWN_YET) : failure instanceof Error ? failure.message : t(MSG.COULD_NOT_START_OBSERVATION));
         if (failure instanceof ApiError && failure.status === 401) { auth.current(); return; }
         if (failure instanceof ApiError && failure.status === 409) return;
       }
@@ -34,22 +34,22 @@ export function DeviceNetwork({ api, deviceId, provider, onAuthError }: {
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [open, api, deviceId, provider]);
-  return <details className="cloud-properties device-network" onToggle={event => setOpen(event.currentTarget.open)}><summary>{t("Устройство в домашней сети")}</summary>
-    <p className="help">{t("Сервис постоянно принимает сетевые объявления Tuya. Здесь показаны сохранённый IP, последнее объявление и изменения адреса устройства или его шлюза.")}</p>
-    <p className="help">{t("Общий приёмник работает и при закрытых карточках. Объявления не подтверждают состояние выключателя; отсутствие объявлений не означает, что устройство выключено. IP в настройках автоматически не изменяется.")}</p>
-    {data && <p role="status">{data.listening ? t("Слушаем объявления в домашней сети.") : !data.enabled ? t("Общий приём объявлений отключён в настройках сервиса.") : data.failed_ports.length ? t("Не удалось открыть приём объявлений.") : t("Запускаем приём объявлений…")}</p>}
+  return <details className="cloud-properties device-network" onToggle={event => setOpen(event.currentTarget.open)}><summary>{t(MSG.DEVICE_ON_YOUR_HOME_NETWORK)}</summary>
+    <p className="help">{t(MSG.THE_SERVICE_CONTINUOUSLY_RECEIVES_TUYA_NETWORK_ANNOUNCEMENTS)}</p>
+    <p className="help">{t(MSG.THE_SHARED_RECEIVER_ALSO_RUNS_WHILE_CARDS_ARE)}</p>
+    {data && <p role="status">{data.listening ? t(MSG.LISTENING_FOR_ANNOUNCEMENTS_ON_YOUR_HOME_NETWORK) : !data.enabled ? t(MSG.GLOBAL_ANNOUNCEMENT_RECEPTION_IS_DISABLED_IN_THE_SERVICE) : data.failed_ports.length ? t(MSG.COULD_NOT_START_THE_ANNOUNCEMENT_RECEIVER) : t(MSG.STARTING_ANNOUNCEMENT_RECEIVER)}</p>}
     {data && <>
       <dl>
-        <div><dt>{t("Отслеживаем")}</dt><dd>{data.route === 'gateway' ? t("Шлюз устройства") : t("Само устройство")} · <code>{data.target_id}</code></dd></div>
-        <div><dt>{t("IP в настройках")}</dt><dd>{data.configured_ip || t("Не задан")}</dd></div>
-        <div><dt>{t("Обнаруженный IP")}</dt><dd>{data.observed_ip || t("Объявлений пока нет")}</dd></div>
-        <div><dt>{t("Последнее объявление")}</dt><dd>{data.last_seen ? new Date(data.last_seen).toLocaleString(dateLocale()) : t("Пока нет")}</dd></div>
-        <div><dt>{t("Получено объявлений")}</dt><dd>{data.packets}</dd></div>
+        <div><dt>{t(MSG.MONITORING)}</dt><dd>{data.route === 'gateway' ? t(MSG.DEVICE_GATEWAY) : t(MSG.DEVICE_ITSELF)} · <code>{data.target_id}</code></dd></div>
+        <div><dt>{t(MSG.CONFIGURED_IP)}</dt><dd>{data.configured_ip || t(MSG.NOT_SET)}</dd></div>
+        <div><dt>{t(MSG.OBSERVED_IP)}</dt><dd>{data.observed_ip || t(MSG.NO_ANNOUNCEMENTS_YET)}</dd></div>
+        <div><dt>{t(MSG.LAST_ANNOUNCEMENT)}</dt><dd>{data.last_seen ? new Date(data.last_seen).toLocaleString(dateLocale()) : t(MSG.NOT_YET)}</dd></div>
+        <div><dt>{t(MSG.ANNOUNCEMENTS_RECEIVED)}</dt><dd>{data.packets}</dd></div>
       </dl>
-      {data.configured_ip && data.observed_ip && data.configured_ip !== data.observed_ip && <p className="saved-summary">{t("Обнаруженный IP отличается от сохранённого в настройках.")}</p>}
-      {!!data.failed_ports.length && <p role="alert">{t("Часть приёма недоступна: UDP") + " "}{data.failed_ports.join(', ')}{t(". Проверьте, не занят ли порт другим приложением.")}</p>}
-      {!!data.changes.length && <><h3>{t("Последние изменения IP")}</h3><ul>{data.changes.map((change, index) => <li key={index}>{new Date(change.at).toLocaleTimeString(dateLocale())} · {change.previous_ip ? change.previous_ip + ' → ' : t("Обнаружен: ")}{change.ip}</li>)}</ul></>}
+      {data.configured_ip && data.observed_ip && data.configured_ip !== data.observed_ip && <p className="saved-summary">{t(MSG.THE_OBSERVED_IP_DIFFERS_FROM_THE_SAVED_CONFIGURATION)}</p>}
+      {!!data.failed_ports.length && <p role="alert">{t(MSG.SOME_RECEPTION_IS_UNAVAILABLE_UDP) + " "}{data.failed_ports.join(', ')}{t(MSG.CHECK_WHETHER_ANOTHER_APPLICATION_IS_USING_THE_PORT)}</p>}
+      {!!data.changes.length && <><h3>{t(MSG.RECENT_IP_CHANGES)}</h3><ul>{data.changes.map((change, index) => <li key={index}>{new Date(change.at).toLocaleTimeString(dateLocale())} · {change.previous_ip ? change.previous_ip + ' → ' : t(MSG.DISCOVERED)}{change.ip}</li>)}</ul></>}
     </>}
-    {error && <p role="alert">{t(error)}</p>}
+    {error && <p role="alert">{translateText(error)}</p>}
   </details>;
 }

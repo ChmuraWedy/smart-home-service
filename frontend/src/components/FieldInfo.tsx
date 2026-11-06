@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
 export function FieldInfo({label,text}: {label:string;text:string}) {
@@ -22,9 +22,9 @@ export function FieldInfo({label,text}: {label:string;text:string}) {
     return ()=>{document.removeEventListener('pointerdown',outside); document.removeEventListener('keydown',escape,true); window.removeEventListener('resize',reposition); document.removeEventListener('scroll',scroll,true);};
   },[open]);
   return <span className="field-info" ref={container}>
-    <button ref={button} type="button" className="secondary field-info-button" aria-label={t("Подробнее: ")+label} aria-expanded={open} aria-controls={id} onClick={()=>setOpen(value=>!value)}>i</button>
+    <button ref={button} type="button" className="secondary field-info-button" aria-label={t(MSG.MORE_INFORMATION)+label} aria-expanded={open} aria-controls={id} onClick={()=>setOpen(value=>!value)}>i</button>
     {open && <span ref={panel} style={position} id={id} className="field-info-panel" role="note" aria-label={label}>
-      <button type="button" className="secondary" aria-label={t("Закрыть пояснение")} onClick={()=>{setOpen(false); button.current?.focus();}}>×</button>{text}
+      <button type="button" className="secondary" aria-label={t(MSG.CLOSE_EXPLANATION)} onClick={()=>{setOpen(false); button.current?.focus();}}>×</button>{text}
     </span>}
   </span>;
 }

@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import type { JsonValue } from '../api';
 import type { ControlSpec } from '../controls';
 
@@ -11,8 +11,8 @@ export function ParameterIcon({ code }: { code: string }) {
 }
 export function BatteryBadge({ reading }: { reading?: BatteryReading | null }) {
   if (!reading || reading.value === null) return null;
-  const value = typeof reading.value === 'string' ? ({low:t("Низкий заряд"),middle:t("Средний заряд"),medium:t("Средний заряд"),high:t("Высокий заряд"),full:t("Полный заряд")}[reading.value] || reading.value) : String(reading.value);
-  return <span className="battery-badge" aria-label={t("Батарея: ") + value + (reading.unit ? ' ' + reading.unit : '')} title={t("Последнее известное показание батареи")}><ParameterIcon code="battery" /><span className="battery-value">{value}{reading.unit && ' ' + reading.unit}</span></span>;
+  const value = typeof reading.value === 'string' ? ({low:t(MSG.LOW_BATTERY),middle:t(MSG.MEDIUM_BATTERY),medium:t(MSG.MEDIUM_BATTERY),high:t(MSG.HIGH_BATTERY),full:t(MSG.FULL_BATTERY)}[reading.value] || reading.value) : String(reading.value);
+  return <span className="battery-badge" aria-label={t(MSG.BATTERY_PREFIX) + value + (reading.unit ? ' ' + reading.unit : '')} title={t(MSG.LAST_KNOWN_BATTERY_READING)}><ParameterIcon code="battery" /><span className="battery-value">{value}{reading.unit && ' ' + reading.unit}</span></span>;
 }
 export function batteryFromSpecs(specs: ControlSpec[], values: Record<string, JsonValue>) {
   const spec = specs.find(item => isBattery(item.key) && item.readable && values[item.key] !== undefined);

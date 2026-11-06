@@ -2,8 +2,8 @@ import { useSyncExternalStore } from 'react';
 import english from './en.json';
 import polish from './pl.json';
 import belarusian from './be.json';
+import russian from './ru.json';
 
-const catalogs: Record<string, Record<string, string>> = { en: english, pl: polish, be: belarusian };
 export const LANGUAGES = [
   { value: 'en', label: 'English', dateLocale: 'en-GB' },
   { value: 'ru', label: 'Русский', dateLocale: 'ru-RU' },
@@ -11,9 +11,14 @@ export const LANGUAGES = [
   { value: 'be', label: 'Беларуская', dateLocale: 'be-BY' },
 ] as const;
 export type Locale = typeof LANGUAGES[number]['value'];
+export type MessageKey = keyof typeof russian;
+export const MSG = Object.freeze(Object.fromEntries(Object.keys(russian).map(key => [key, key]))) as {
+  readonly [Key in MessageKey]: Key;
+};
+const catalogs: Record<Locale, Record<MessageKey, string>> = { en: english, pl: polish, be: belarusian, ru: russian };
+const isMessageKey = (value: string): value is MessageKey => Object.hasOwn(russian, value);
 const isLocale = (value: unknown): value is Locale => LANGUAGES.some(language => language.value === value);
 export const LANGUAGE_STORAGE_KEY = 'smart-home.ui.language.v1';
-const catalog: Record<string, string> = english;
 const listeners = new Set<() => void>();
 const rawTables = new WeakMap<object, object>();
 export const rawMessages = <T extends object>(table: T): T => (rawTables.get(table) || table) as T;
@@ -49,7 +54,15 @@ window.addEventListener('storage', event => {
 export function useLocale(): Locale {
   return useSyncExternalStore(callback => { listeners.add(callback); return () => { listeners.delete(callback); }; }, getLocale);
 }
-const reverse = new Map(Object.values(catalogs).flatMap(messages => Object.entries(messages).map(([source, value]) => [value, source] as const)));
+export function t(key: MessageKey, values: readonly unknown[] = []): string {
+  return catalogs[locale][key].replace(/\{(\d+)\}/g, (placeholder, index: string) =>
+    Number(index) < values.length ? String(values[Number(index)]) : placeholder);
+}
+
+const messageKeys = Object.keys(MSG) as MessageKey[];
+const sourceKeys = new Map(messageKeys.map(key => [russian[key], key] as const));
+const translatedKeys = new Map([english, polish, belarusian].flatMap(messages =>
+  messageKeys.map(key => [messages[key], key] as const)));
 function messagePattern(message: string) {
   const indexes: number[] = [];
   const pattern = message.split(/(\{\d+\})/).map(part => {
@@ -58,30 +71,27 @@ function messagePattern(message: string) {
   }).join('');
   return { expression: new RegExp('^'+pattern+'$', 's'), indexes };
 }
-const patterns = Object.entries(catalog).filter(([source, value]) => source !== value && /\{\d+\}/.test(source))
-  .sort(([left], [right]) => right.replace(/\{\d+\}/g,'').length - left.replace(/\{\d+\}/g,'').length)
-  .map(([source]) => ({source, variants:[source, ...Object.values(catalogs).map(messages => messages[source])].filter((value): value is string => typeof value === 'string').map(messagePattern)}));
-/** Source-language message IDs keep Russian complete; unknown external text is preserved. */
-export function t(message: string, values: readonly unknown[] = []): string {
-  let source = Object.hasOwn(catalog, message) ? message : reverse.get(message) || message;
-  let parameters = values;
-  if (!Object.hasOwn(catalog, source)) {
-    outer: for (const pattern of patterns) for (const variant of pattern.variants) {
-      const match = variant.expression.exec(message);
-      if (!match) continue;
-      source = pattern.source;
-      const extracted: string[] = [];
-      variant.indexes.forEach((index, position) => { extracted[index] = match[position+1]; });
-      parameters = extracted;
-      break outer;
-    }
+const patterns = messageKeys.filter(key => russian[key] !== english[key] && /\{\d+\}/.test(russian[key]))
+  .sort((left, right) => russian[right].replace(/\{\d+\}/g, '').length - russian[left].replace(/\{\d+\}/g, '').length)
+  .map(key => ({key, variants: [russian[key], english[key], polish[key], belarusian[key]].map(messagePattern)}));
+
+/** Translate known service messages and previously formatted notices at the display boundary. */
+export function translateText(message: string): string {
+  const key = sourceKeys.get(message) ?? translatedKeys.get(message);
+  if (key) return t(key);
+  for (const pattern of patterns) for (const variant of pattern.variants) {
+    const match = variant.expression.exec(message);
+    if (!match) continue;
+    const values: string[] = [];
+    variant.indexes.forEach((index, position) => { values[index] = match[position + 1]; });
+    return t(pattern.key, values);
   }
-  const selected = catalogs[locale];
-  const translated = selected && Object.hasOwn(selected, source) ? selected[source] : source;
-  return translated.replace(/\{(\d+)\}/g, (placeholder, index: string) => Number(index) < parameters.length ? String(parameters[Number(index)]) : placeholder);
+  return message;
 }
+
+type Localized<T> = T extends MessageKey ? string : T extends object ? { [Key in keyof T]: Localized<T[Key]> } : T;
 /** Lazy message tables update on every lookup, including tables imported by other modules. */
-export function localizeMessages<T extends object>(messages: T): T {
+export function localizeMessages<T extends object>(messages: T): Localized<T> {
   const cache = new WeakMap<object, object>();
   function wrap<V extends object>(value: V): V {
     const cached = cache.get(value);
@@ -89,12 +99,13 @@ export function localizeMessages<T extends object>(messages: T): T {
     const proxy = new Proxy(value, {
       get(target, key, receiver) {
         const item = Reflect.get(target, key, receiver);
-        return typeof item === 'string' ? t(item) : item && typeof item === 'object' ? wrap(item) : item;
+        if (typeof item === 'string') return isMessageKey(item) ? t(item) : item;
+        return item && typeof item === 'object' ? wrap(item) : item;
       },
     });
     cache.set(value, proxy);
     rawTables.set(proxy, value);
     return proxy;
   }
-  return wrap(messages);
+  return wrap(messages) as Localized<T>;
 }

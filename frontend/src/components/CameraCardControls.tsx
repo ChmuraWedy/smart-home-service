@@ -1,4 +1,4 @@
-import { t } from '../i18n';
+import { MSG, t } from '../i18n';
 import type { JsonValue, Provider } from '../api';
 import { CAMERA_QUICK_LABELS, cameraPrivacyBlock } from '../camera-controls';
 import type { ControlSpec } from '../controls';
@@ -29,11 +29,11 @@ export function CameraCardControls({
   function renderPreview(privacyState?: boolean | null, changePrivacy?: () => void) {
     if (!sheet?.open || paused) return null;
     return <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
-      <span className={'presence ' + (online ? 'online' : '')}>{online ? t("В сети") : t("Не в сети")}</span>
+      <span className={'presence ' + (online ? 'online' : '')}>{online ? t(MSG.ONLINE) : t(MSG.OFFLINE)}</span>
       <CameraLive api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError}
         compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyState : null)}
         headingActions={changePrivacy && <button type="button" className="secondary" disabled={disabled || privacyState === null}
-          onClick={changePrivacy}>{privacyState ? t("Выключить приватность") : t("Включить приватность")}</button>} />
+          onClick={changePrivacy}>{privacyState ? t(MSG.TURN_OFF_PRIVACY) : t(MSG.TURN_ON_PRIVACY)}</button>} />
       {notice.error && <ControlFeedback busy={false} notice={notice} />}
     </DashboardSheet>;
   }
@@ -56,7 +56,7 @@ export function CameraCardControls({
       {!!switches.length && <div className="camera-card-switches">
         {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       </div>}
-      <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
+      <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
     {!privacy && renderPreview(privacyStatus)}
     {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}

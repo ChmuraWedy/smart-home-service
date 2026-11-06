@@ -1,4 +1,4 @@
-import { t } from "./i18n";
+import { MSG, t, translateText } from "./i18n";
 export type Provider = 'sharing' | 'developer';
 export type Region = 'eu' | 'eu-w' | 'us' | 'us-e' | 'cn' | 'in' | 'sg';
 export type Connection = { baseUrl: string; token: string };
@@ -82,9 +82,9 @@ export function normalizeApiBase(input: string): string {
   const value = input.trim();
   let url: URL;
   try { url = new URL(value); }
-  catch { throw new Error(t("Укажите полный адрес API, например http://192.168.1.10:8000.")); }
+  catch { throw new Error(t(MSG.ENTER_A_FULL_API_ADDRESS_FOR_EXAMPLE_HTTP)); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-    throw new Error(t("Адрес API должен быть HTTP(S), без пароля, параметров и фрагмента."));
+    throw new Error(t(MSG.THE_API_ADDRESS_MUST_USE_HTTP_S_WITHOUT));
   }
   return url.href.replace(/\/+$/, '');
 }
@@ -97,7 +97,7 @@ export class CloudApi {
 
   private url(path: string): string {
     if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {
-      throw new Error(t("Сервис вернул недопустимый путь запроса."));
+      throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_INVALID_REQUEST_PATH));
     }
     return this.baseUrl + path;
   }
@@ -118,17 +118,17 @@ export class CloudApi {
         cache: 'no-store',
         signal: timeout.signal,
       });
-      if (response.status === 401) throw new ApiError(t("Ключ доступа недействителен. Проверьте настройки подключения."), 401);
+      if (response.status === 401) throw new ApiError(t(MSG.INVALID_ACCESS_KEY), 401);
       if (!response.ok) {
         let detail: unknown;
         try { detail = (await response.json()).detail; } catch { /* Non-JSON proxy error. */ }
-        throw new ApiError(typeof detail === 'string' ? t(detail) : t("Сервис не выполнил запрос ({0}).", [response.status]), response.status);
+        throw new ApiError(typeof detail === 'string' ? translateText(detail) : t(MSG.THE_SERVICE_COULD_NOT_COMPLETE_THE_REQUEST, [response.status]), response.status);
       }
       return response;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      throw new Error(timeout.signal.aborted ? t("Сервис не ответил вовремя. Попробуйте ещё раз.") : t("Не удалось связаться с API. Проверьте адрес, доступность сервиса и разрешённый адрес интерфейса."));
+      throw new Error(timeout.signal.aborted ? t(MSG.THE_SERVICE_DID_NOT_RESPOND_IN_TIME) : t(MSG.COULD_NOT_REACH_THE_API));
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
@@ -138,7 +138,7 @@ export class CloudApi {
   protected async request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
     const response = await this.response('/api/v1' + path, method, body, signal);
     try { return await response.json() as T; }
-    catch { throw new Error(t("Сервис вернул неожиданный ответ.")); }
+    catch { throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_UNEXPECTED_RESPONSE)); }
   }
 
   protected async deleteResource(path: string): Promise<void> {
@@ -210,7 +210,7 @@ export class CloudApi {
     // Resolve only this account's QR endpoint on the configured API. Never send
     // the service key to a URL supplied by a different origin.
     const expected = '/api/v1/cloud/login/' + encodeURIComponent(login.session_id) + '/qr.svg';
-    if (login.qr_url !== expected) throw new Error(t("Сервис вернул недопустимый адрес QR-кода."));
+    if (login.qr_url !== expected) throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_INVALID_QR_CODE_URL));
     const response = await this.response(expected, 'GET');
     return response.blob();
   }

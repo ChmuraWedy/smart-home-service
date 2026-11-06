@@ -1,4 +1,4 @@
-import { t } from "../i18n";
+import { MSG, t } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudApi, Provider } from '../api';
@@ -20,13 +20,13 @@ export function DeviceAliases({ api, deviceId, name, initialAliases = [], provid
       const result = provider ? await api.saveDeviceAliases(deviceId, provider, values, controller.signal)
         : await api.saveLocalDeviceAliases(localId!, values, controller.signal);
       if (controller.signal.aborted) return;
-      if (result.device_id !== deviceId || !Array.isArray(result.aliases)) throw new Error(t("Сервис вернул алиасы другого устройства."));
+      if (result.device_id !== deviceId || !Array.isArray(result.aliases)) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_ALIASES));
       setAliases(custom(result.aliases));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
-      if (failure instanceof ApiError && failure.status === 409) throw new Error(t("Этот алиас уже используется другим устройством."));
+      if (failure instanceof ApiError && failure.status === 409) throw new Error(t(MSG.THIS_ALIAS_IS_ALREADY_USED_BY_ANOTHER_DEVICE));
       throw failure;
     } finally { if (!controller.signal.aborted) { pending.current = null; onBusy(false); } }
   }
-  return <div className="device-alias-heading"><h2>{name}</h2><AliasRow label={t("Алиасы:")} aliases={aliases} disabled={disabled} onSave={save} validate={value => /^[\p{L}][\p{L}\p{M}\p{N} ._-]*$/u.test(value)} /></div>;
+  return <div className="device-alias-heading"><h2>{name}</h2><AliasRow label={t(MSG.ALIASES_LABEL)} aliases={aliases} disabled={disabled} onSave={save} validate={value => /^[\p{L}][\p{L}\p{M}\p{N} ._-]*$/u.test(value)} /></div>;
 }

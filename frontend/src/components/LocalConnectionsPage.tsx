@@ -1,4 +1,4 @@
-import { localizeMessages, t } from "../i18n";
+import { MSG, localizeMessages, t, translateText } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, LanDevice, NetworkInterface, NetworkScan, Provider } from '../api';
@@ -9,9 +9,9 @@ type Stage = 'start' | 'search' | 'choose' | 'verify' | 'confirm' | 'save' | 'do
 type Candidate = { device: CloudDevice; observed: LanDevice[]; configured: boolean };
 type Checked = { candidate: Candidate; finding?: ConnectionFinding; expiresAt?: number; error?: string };
 type Outcome = { id: string; name: string; message: string; saved: boolean; connectionId?: string };
-const actions = localizeMessages({ created: 'Будет добавлено', updated: 'Будет обновлено', unchanged: 'Изменений нет' });
-const savedActions = localizeMessages({ created: 'Подключение сохранено', updated: 'Подключение обновлено', unchanged: 'Проверено: изменений нет' });
-const changes = localizeMessages({ ip: 'IP-адрес', version: 'версия протокола', local_key: 'локальный ключ' });
+const actions = localizeMessages({ created: MSG.WILL_BE_ADDED, updated: MSG.WILL_BE_UPDATED, unchanged: MSG.NO_CHANGES });
+const savedActions = localizeMessages({ created: MSG.CONNECTION_SAVED, updated: MSG.CONNECTION_UPDATED, unchanged: MSG.VERIFIED_NO_CHANGES });
+const changes = localizeMessages({ ip: MSG.IP_ADDRESS, version: MSG.PROTOCOL_VERSION, local_key: MSG.LOCAL_KEY_INLINE });
 const SEARCH_SECONDS = 15;
 const MAX_SELECTION = 16;
 
@@ -29,7 +29,7 @@ function pause(ms: number, signal: AbortSignal) {
     signal.addEventListener('abort', abort, { once: true });
   });
 }
-const message = (failure: unknown) => failure instanceof Error ? failure.message : t("Не удалось выполнить запрос.");
+const message = (failure: unknown) => failure instanceof Error ? failure.message : t(MSG.COULD_NOT_COMPLETE_THE_REQUEST);
 
 export function LocalConnectionsPage({ api, ready, sharingReady, developerReady, onAuthError, onConnections, onLock }: {
   api: HomeApi; ready: boolean; sharingReady: boolean; developerReady: boolean;
@@ -86,7 +86,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     void Promise.all([api.devices(provider, controller.signal), api.networkInterfaces(controller.signal), api.inventory(controller.signal)])
       .then(([rows, networks, home]) => {
         if (controller.signal.aborted) return;
-        if (!Array.isArray(rows) || !Array.isArray(networks)) throw new Error(t("Не удалось прочитать устройства и сети."));
+        if (!Array.isArray(rows) || !Array.isArray(networks)) throw new Error(t(MSG.COULD_NOT_READ_DEVICES_AND_NETWORKS));
         setDevices(rows); setInterfaces(networks); setInventory(home);
       }).catch(failure => { if (!controller.signal.aborted) fail(failure); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -102,7 +102,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     const hidden = () => {
       if (!document.hidden) return;
       stop(); setChecked([]); setConfirmed(false); setStage(stage === 'search' ? 'start' : 'choose');
-      setError(t("Поиск остановлен: вкладка скрыта. Запустите его снова, когда будете готовы."));
+      setError(t(MSG.SEARCH_STOPPED_BECAUSE_THE_TAB_IS_HIDDEN));
     };
     document.addEventListener('visibilitychange', hidden);
     return () => document.removeEventListener('visibilitychange', hidden);
@@ -116,14 +116,14 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     try {
       let snapshot = await api.startNetworkScan(address, controller.signal); id = snapshot.scan_id; scan.current = id;
       const validate = (row: NetworkScan) => {
-        if (row.scan_id !== id || row.interface?.address !== address || !Array.isArray(row.devices)) throw new Error(t("Наблюдение относится к другой сети. Повторите поиск."));
+        if (row.scan_id !== id || row.interface?.address !== address || !Array.isArray(row.devices)) throw new Error(t(MSG.THE_OBSERVATION_BELONGS_TO_A_DIFFERENT_NETWORK));
       };
       validate(snapshot);
       const readyBy = Date.now() + 2000;
       while (!snapshot.ports.includes(7000) && Date.now() < readyBy) {
         await pause(250, controller.signal); snapshot = await api.networkScan(id, controller.signal); validate(snapshot);
       }
-      if (!snapshot.ports.includes(7000)) throw new Error(t("Приём объявлений Tuya недоступен. Проверьте доступность порта 7000."));
+      if (!snapshot.ports.includes(7000)) throw new Error(t(MSG.CHECK_TUYA_ANNOUNCEMENT_PORT));
       snapshot = await api.requestNetworkAnnouncements(id, controller.signal); validate(snapshot);
       const deadline = Date.now() + SEARCH_SECONDS * 1000;
       while (Date.now() < deadline) {
@@ -144,7 +144,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
       setCandidates(detected); setExcluded(skipped);
       setUnknown(snapshot.devices.filter(row => row.device_id && !devices.some(device => device.id === row.device_id)).length);
       setSelected([]); setStage('choose');
-      if (snapshot.failed_ports.length) setError(t("Часть портов недоступна. Список может быть неполным."));
+      if (snapshot.failed_ports.length) setError(t(MSG.SOME_PORTS_ARE_UNAVAILABLE));
     } catch (failure) {
       if (!controller.signal.aborted) { fail(failure); setStage('start'); }
     } finally {
@@ -160,7 +160,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     try {
       for (const candidate of candidates.filter(row => selected.includes(row.device.id))) {
         await pause(Math.max(0, nextAnnouncement - Date.now()), controller.signal);
-        setProgress(t("Проверяем ") + (results.length + 1) + t(" из ") + selected.length + ': ' + candidate.device.name);
+        setProgress(t(MSG.CHECKING) + (results.length + 1) + t(MSG.OF_SEPARATOR) + selected.length + ': ' + candidate.device.name);
         try {
           const finding = await api.findLocalConnection(candidate.device.id, provider, address, controller.signal, 3);
           if (controller.signal.aborted) return;
@@ -168,8 +168,8 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
               finding.connection_device_id !== finding.device.device_id || !finding.finding_id || !Object.hasOwn(actions, finding.action) ||
               !['direct', 'gateway'].includes(finding.route) || (finding.route === 'direct' && finding.connection_device_id !== candidate.device.id) ||
               !Array.isArray(finding.device.changed_fields) || !Array.isArray(finding.device.aliases) ||
-              !Number.isFinite(finding.expires_in) || finding.expires_in <= 0) throw new Error(t("Сервис вернул неожиданный результат. Повторите поиск."));
-          if (results.some(row => row.finding?.connection_device_id === finding.connection_device_id)) throw new Error(t("Это подключение уже показано для другого выбранного устройства."));
+              !Number.isFinite(finding.expires_in) || finding.expires_in <= 0) throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_UNEXPECTED_RESULT));
+          if (results.some(row => row.finding?.connection_device_id === finding.connection_device_id)) throw new Error(t(MSG.THIS_CONNECTION_IS_ALREADY_SHOWN_FOR_ANOTHER_SELECTED));
           results.push({ candidate, finding, expiresAt: Date.now() + Math.min(300, finding.expires_in) * 1000 });
         } catch (failure) {
           if (controller.signal.aborted) return;
@@ -196,9 +196,9 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
       for (const row of batch) {
         if (!mounted.current) break;
         const finding = row.finding!;
-        setProgress(t("Сохраняем ") + finding.device.name);
+        setProgress(t(MSG.SAVING) + finding.device.name);
         if (row.expiresAt! <= Date.now()) {
-          results.push({ id: row.candidate.device.id, name: finding.device.name, message: t("Срок проверки истёк. Нужен новый поиск."), saved: false }); continue;
+          results.push({ id: row.candidate.device.id, name: finding.device.name, message: t(MSG.VERIFICATION_EXPIRED), saved: false }); continue;
         }
         try {
           const result = await api.saveLocalConnection(finding.finding_id);
@@ -207,7 +207,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
           results.push({ id: row.candidate.device.id, connectionId: result.device.device_id, name: result.device.name, message: savedActions[result.action], saved: true });
         } catch (failure) {
           if (!mounted.current) break;
-          results.push({ id: row.candidate.device.id, name: finding.device.name, message: failure instanceof ApiError ? failure.message : t("Ответ не получен. Подключение могло сохраниться; нужен новый поиск для проверки."), saved: false });
+          results.push({ id: row.candidate.device.id, name: finding.device.name, message: failure instanceof ApiError ? failure.message : t(MSG.NO_RESPONSE_RECEIVED), saved: false });
           if (failure instanceof ApiError && failure.status === 401) { callbacks.current.onAuthError(); break; }
           // An ambiguous write is never automatically retried.
         }
@@ -217,57 +217,57 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   }
   const step = stage === 'start' || stage === 'search' ? 0 : stage === 'choose' || stage === 'verify' ? 1 : stage === 'confirm' || stage === 'save' ? 2 : 3;
   return <section className="card local-connections-page" aria-labelledby="local-connections-heading">
-    <p className="eyebrow">{t("Домашняя сеть")}</p><h1 id="local-connections-heading">{t("Локальные подключения")}</h1>
-    <ol className="connection-steps" aria-label={t("Этапы настройки")}>{[t("Сеть"), t("Найденные устройства"), t("Подтверждение"), t("Результат")].map((label, index) => <li key={label} aria-current={step === index ? 'step' : undefined}><span>{index + 1}</span>{label}</li>)}</ol>
-    {stage !== 'start' && <p className="help">{t("Сеть:") + " "}{interfaces.find(row => row.address === address)?.network}{" " + t("· IP компьютера") + " "}{address}</p>}
-    {!sharingReady && !developerReady && <div className="saved-summary">{t("Сначала подключите Tuya-аккаунт.") + " "}<button className="secondary" onClick={onConnections}>{t("Открыть подключения")}</button></div>}
+    <p className="eyebrow">{t(MSG.HOME_NETWORK)}</p><h1 id="local-connections-heading">{t(MSG.LOCAL_CONNECTIONS)}</h1>
+    <ol className="connection-steps" aria-label={t(MSG.SETUP_STEPS)}>{[t(MSG.NETWORK), t(MSG.DISCOVERED_DEVICES), t(MSG.CONFIRMATION), t(MSG.RESULT)].map((label, index) => <li key={label} aria-current={step === index ? 'step' : undefined}><span>{index + 1}</span>{label}</li>)}</ol>
+    {stage !== 'start' && <p className="help">{t(MSG.NETWORK_LABEL) + " "}{interfaces.find(row => row.address === address)?.network}{" " + t(MSG.SERVER_IP) + " "}{address}</p>}
+    {!sharingReady && !developerReady && <div className="saved-summary">{t(MSG.CONNECT_A_TUYA_ACCOUNT_FIRST) + " "}<button className="secondary" onClick={onConnections}>{t(MSG.OPEN_CONNECTIONS)}</button></div>}
     {stage === 'start' && <>
-      <h2>{t("Где искать устройства?")}</h2><p className="muted">{t("За 15 секунд соберём объявления в выбранной сети и сопоставим устройства с вашим аккаунтом. Поиск ничего не сохраняет.")}</p>
+      <h2>{t(MSG.WHERE_SHOULD_WE_LOOK_FOR_DEVICES)}</h2><p className="muted">{t(MSG.COLLECT_ANNOUNCEMENTS_ON_THE_SELECTED_NETWORK_FOR_15)}</p>
       <div className="local-connection-form connection-network-form">
-        <label>{t("Аккаунт")}<select value={provider} disabled={!ready || loading || (!sharingReady && !developerReady)} onChange={event => setProvider(event.target.value as Provider)}><option value="sharing" disabled={!sharingReady}>Smart Life / QR</option><option value="developer" disabled={!developerReady}>Tuya Developer</option></select></label>
-        <label>{t("Сеть устройства")}<select value={address} disabled={!connected || loading} onChange={event => setAddress(event.target.value)}><option value="">{t("Выберите сеть")}</option>{interfaces.map(row => <option key={row.address} value={row.address}>{row.name} · {row.network} · IP {row.address}</option>)}</select></label>
+        <label>{t(MSG.ACCOUNT)}<select value={provider} disabled={!ready || loading || (!sharingReady && !developerReady)} onChange={event => setProvider(event.target.value as Provider)}><option value="sharing" disabled={!sharingReady}>Smart Life / QR</option><option value="developer" disabled={!developerReady}>Tuya Developer</option></select></label>
+        <label>{t(MSG.DEVICE_NETWORK)}<select value={address} disabled={!connected || loading} onChange={event => setAddress(event.target.value)}><option value="">{t(MSG.SELECT_A_NETWORK)}</option>{interfaces.map(row => <option key={row.address} value={row.address}>{row.name} · {row.network} · IP {row.address}</option>)}</select></label>
       </div>
-      <label className="local-connection-confirm"><input type="checkbox" checked={includeConfigured} disabled={!connected || loading} onChange={event => setIncludeConfigured(event.target.checked)} />{t("Включить уже настроенные устройства для перенастройки")}</label>
-      <p className="help">{includeConfigured ? t("Будем искать все устройства аккаунта, включая уже настроенные. Изменения применятся только после подтверждения.") : t("Будем искать только устройства без настроенного локального подключения.")}{connected && !loading && t(" Нужно настроить: ") + pending.length + t(" · Настроено: ") + (devices.length - pending.length)}</p>
-      <div className="local-connection-actions"><button disabled={!connected || loading || !address} onClick={() => void search()}>{t("Найти устройства")}</button><button className="secondary" disabled={!connected || loading} onClick={() => setRevision(value => value + 1)}>{t("Обновить списки")}</button></div>
-      {connected && !loading && !interfaces.length && <p className="help">{t("Частные IPv4-сети не найдены. Подключите компьютер с сервисом к нужной сети.")}</p>}
+      <label className="local-connection-confirm"><input type="checkbox" checked={includeConfigured} disabled={!connected || loading} onChange={event => setIncludeConfigured(event.target.checked)} />{t(MSG.INCLUDE_CONFIGURED_DEVICES_FOR_RECONFIGURATION)}</label>
+      <p className="help">{includeConfigured ? t(MSG.SEARCH_ALL_ACCOUNT_DEVICES_INCLUDING_CONFIGURED_ONES) : t(MSG.SEARCH_ONLY_DEVICES_WITHOUT_A_CONFIGURED_LOCAL_CONNECTION)}{connected && !loading && t(MSG.NEED_SETUP) + pending.length + t(MSG.CONFIGURED) + (devices.length - pending.length)}</p>
+      <div className="local-connection-actions"><button disabled={!connected || loading || !address} onClick={() => void search()}>{t(MSG.FIND_DEVICES)}</button><button className="secondary" disabled={!connected || loading} onClick={() => setRevision(value => value + 1)}>{t(MSG.REFRESH_LISTS)}</button></div>
+      {connected && !loading && !interfaces.length && <p className="help">{t(MSG.NO_PRIVATE_IPV4_NETWORKS_FOUND)}</p>}
     </>}
-    {working && <div className="connection-progress" role="status"><span className="spinner" aria-hidden="true" /><strong>{stage === 'search' ? t("Ищем устройства · осталось ") + seconds + t(" сек.") : progress}</strong><p className="help">{stage === 'search' ? t("Принимаем объявления только в выбранной сети.") : stage === 'verify' ? t("Проверяем ключ чтением состояния. Несколько устройств проверяются по очереди; это может занять несколько минут.") : t("Каждое подтверждённое подключение сохраняется отдельно.")}</p>{stage !== 'save' && <button className="secondary" onClick={() => { stop(); setChecked([]); setStage(stage === 'search' ? 'start' : 'choose'); }}>{t("Отмена")}</button>}</div>}
+    {working && <div className="connection-progress" role="status"><span className="spinner" aria-hidden="true" /><strong>{stage === 'search' ? t(MSG.SEARCHING_FOR_DEVICES_REMAINING) + seconds + t(MSG.SECONDS_SUFFIX) : progress}</strong><p className="help">{stage === 'search' ? t(MSG.RECEIVING_ANNOUNCEMENTS_ONLY_ON_THE_SELECTED_NETWORK) : stage === 'verify' ? t(MSG.VERIFY_KEYS_BY_READING_STATUS) : t(MSG.EACH_CONFIRMED_CONNECTION_IS_SAVED_SEPARATELY)}</p>{stage !== 'save' && <button className="secondary" onClick={() => { stop(); setChecked([]); setStage(stage === 'search' ? 'start' : 'choose'); }}>{t(MSG.CANCEL)}</button>}</div>}
     {stage === 'choose' && <>
-      <h2>{t("Найдено устройств:") + " "}{candidates.length}</h2><p className="help">{t("Выберите подключения для проверки. Перед сохранением покажем проверенные параметры. За один раз можно выбрать до") + " "}{MAX_SELECTION}{" " + t("устройств.")}</p>
-      {!candidates.length && <p className="saved-summary">{t("Подходящих устройств в этой сети не найдено. Проверьте сеть и питание. Отсутствие объявления не означает, что устройство выключено.")}</p>}
-      {candidates.length > 0 && <div className="connection-table-wrap"><table className="connection-device-table" aria-label={t("Найденные устройства")}><thead><tr><th scope="col"><input ref={selectAll} type="checkbox" aria-label={candidates.length > MAX_SELECTION ? t("Выбрать первые 16 устройств") : t("Выбрать все устройства")} checked={allSelected} onChange={event => setSelected(event.target.checked ? candidates.slice(0, MAX_SELECTION).map(row => row.device.id) : [])} /></th><th scope="col">{t("Устройство")}</th><th scope="col">{t("IP-адрес")}</th><th scope="col">{t("Подключение")}</th></tr></thead><tbody>{candidates.map(row => <tr key={row.device.id}><td><input type="checkbox" aria-label={t("Выбрать ") + row.device.name} checked={selected.includes(row.device.id)} disabled={!selected.includes(row.device.id) && selected.length >= MAX_SELECTION} onChange={event => setSelected(current => event.target.checked ? [...current, row.device.id] : current.filter(id => id !== row.device.id))} /></td><td><strong>{row.device.name}</strong>{row.device.aliases?.length ? <small>{row.device.aliases.join(' · ')}</small> : null}</td><td>{row.observed.map(item => item.ip).join(', ')}</td><td>{row.configured ? t("Уже настроено") : t("Не настроено локально")}</td></tr>)}</tbody></table></div>}
-      {candidates.length > 0 && <p className="help">{t("Выбрано:") + " "}{selected.length}{" " + t("из") + " "}{candidates.length}{candidates.length > MAX_SELECTION ? t(". Общая галочка выбирает первые 16 устройств; остальные можно настроить следующим проходом.") : ''}</p>}
-      {excluded > 0 && <p className="help">{t("Уже настроенных устройств пропущено:") + " "}{excluded}{t(". Чтобы включить их, измените флажок на первом шаге.")}</p>}
-      {unknown > 0 && <p className="help">{t("Объявлений Tuya вне выбранного аккаунта:") + " "}{unknown}{t(". Они не предлагаются для настройки.")}</p>}
-      <div className="local-connection-actions"><button disabled={!selected.length} onClick={() => void verify()}>{t("Проверить выбранные")}</button><button className="secondary" onClick={startOver}>{t("Назад к выбору сети")}</button><button className="secondary" onClick={() => { setOutcomes([]); setStage('done'); }}>{t("Завершить без сохранения")}</button></div>
+      <h2>{t(MSG.DEVICES_FOUND) + " "}{candidates.length}</h2><p className="help">{t(MSG.SELECT_CONNECTIONS_TO_VERIFY) + " "}{MAX_SELECTION}{" " + t(MSG.DEVICES_AT_A_TIME)}</p>
+      {!candidates.length && <p className="saved-summary">{t(MSG.NO_MATCHING_DEVICES_FOUND_ON_THIS_NETWORK)}</p>}
+      {candidates.length > 0 && <div className="connection-table-wrap"><table className="connection-device-table" aria-label={t(MSG.DISCOVERED_DEVICES)}><thead><tr><th scope="col"><input ref={selectAll} type="checkbox" aria-label={candidates.length > MAX_SELECTION ? t(MSG.SELECT_FIRST_16_DEVICES) : t(MSG.SELECT_ALL_DEVICES)} checked={allSelected} onChange={event => setSelected(event.target.checked ? candidates.slice(0, MAX_SELECTION).map(row => row.device.id) : [])} /></th><th scope="col">{t(MSG.DEVICE)}</th><th scope="col">{t(MSG.IP_ADDRESS)}</th><th scope="col">{t(MSG.CONNECTION)}</th></tr></thead><tbody>{candidates.map(row => <tr key={row.device.id}><td><input type="checkbox" aria-label={t(MSG.SELECT) + row.device.name} checked={selected.includes(row.device.id)} disabled={!selected.includes(row.device.id) && selected.length >= MAX_SELECTION} onChange={event => setSelected(current => event.target.checked ? [...current, row.device.id] : current.filter(id => id !== row.device.id))} /></td><td><strong>{row.device.name}</strong>{row.device.aliases?.length ? <small>{row.device.aliases.join(' · ')}</small> : null}</td><td>{row.observed.map(item => item.ip).join(', ')}</td><td>{row.configured ? t(MSG.ALREADY_CONFIGURED) : t(MSG.NOT_CONFIGURED_LOCALLY)}</td></tr>)}</tbody></table></div>}
+      {candidates.length > 0 && <p className="help">{t(MSG.SELECTED) + " "}{selected.length}{" " + t(MSG.OF) + " "}{candidates.length}{candidates.length > MAX_SELECTION ? t(MSG.THE_HEADER_CHECKBOX_SELECTS_THE_FIRST_16_DEVICES) : ''}</p>}
+      {excluded > 0 && <p className="help">{t(MSG.CONFIGURED_DEVICES_SKIPPED) + " "}{excluded}{t(MSG.TO_INCLUDE_THEM_CHANGE_THE_CHECKBOX_ON_THE)}</p>}
+      {unknown > 0 && <p className="help">{t(MSG.TUYA_ANNOUNCEMENTS_OUTSIDE_THE_SELECTED_ACCOUNT) + " "}{unknown}{t(MSG.THESE_ARE_NOT_OFFERED_FOR_CONFIGURATION)}</p>}
+      <div className="local-connection-actions"><button disabled={!selected.length} onClick={() => void verify()}>{t(MSG.VERIFY_SELECTED)}</button><button className="secondary" onClick={startOver}>{t(MSG.BACK_TO_NETWORK_SELECTION)}</button><button className="secondary" onClick={() => { setOutcomes([]); setStage('done'); }}>{t(MSG.FINISH_WITHOUT_SAVING)}</button></div>
     </>}
     {stage === 'confirm' && <>
-      <h2>{t("Подтвердите сохранение")}</h2><p className="help">{t("Проверьте имена, адреса и изменения. Локальные ключи остаются на сервере. Пока ничего не сохранено. Подключения сохраняются по очереди; при ошибке уже сохранённые остаются настроенными.")}</p>
+      <h2>{t(MSG.CONFIRM_SAVING)}</h2><p className="help">{t(MSG.CHECK_NAMES_ADDRESSES_AND_CHANGES)}</p>
       {checked.map(row => <section className="local-connection-preview" key={row.candidate.device.id}>
         <h3>{row.finding?.device.name || row.candidate.device.name}</h3>
         {row.finding ? <>
-          <p><strong>{actions[row.finding.action]}</strong>{" " + t("· Соединение проверено")}</p>
-          {row.finding.route === 'gateway' && <p className="help">{t("Выбрано:") + " "}{row.candidate.device.name}{t(". Сохраняется шлюз; связь с дочерним устройством этим не подтверждается.")}</p>}
-          <dl className="local-connection-facts"><div><dt>{t("IP устройства")}</dt><dd>{row.finding.device.ip}</dd></div><div><dt>{t("Протокол Tuya")}</dt><dd>{row.finding.device.version}</dd></div><div><dt>{t("Подключение")}</dt><dd>{row.finding.device.is_gateway ? t("Шлюз Tuya") : t("Устройство Wi-Fi")}</dd></div><div><dt>{t("Здание")}</dt><dd>{inventory?.buildings.find(building => building.id === row.finding!.device.building_id)?.name || t("Не назначено")}</dd></div><div><dt>{t("Комната")}</dt><dd>{inventory?.rooms.find(room => room.id === row.finding!.device.room_id)?.name || t("Не назначена")}</dd></div><div><dt>{t("Ключ")}</dt><dd>{t("Проверен ·") + " "}{row.finding.key_source === 'device' ? t("из данных этого устройства") : t("из данных дочернего устройства шлюза")}</dd></div></dl>
+          <p><strong>{actions[row.finding.action]}</strong>{" " + t(MSG.CONNECTION_VERIFIED_BADGE)}</p>
+          {row.finding.route === 'gateway' && <p className="help">{t(MSG.SELECTED) + " "}{row.candidate.device.name}{t(MSG.THE_GATEWAY_IS_BEING_SAVED_THIS_DOES_NOT)}</p>}
+          <dl className="local-connection-facts"><div><dt>{t(MSG.DEVICE_IP)}</dt><dd>{row.finding.device.ip}</dd></div><div><dt>{t(MSG.TUYA_PROTOCOL)}</dt><dd>{row.finding.device.version}</dd></div><div><dt>{t(MSG.CONNECTION)}</dt><dd>{row.finding.device.is_gateway ? t(MSG.TUYA_GATEWAY_TYPE) : t(MSG.WIFI_DEVICE_TYPE)}</dd></div><div><dt>{t(MSG.BUILDING)}</dt><dd>{inventory?.buildings.find(building => building.id === row.finding!.device.building_id)?.name || t(MSG.NOT_ASSIGNED)}</dd></div><div><dt>{t(MSG.ROOM)}</dt><dd>{inventory?.rooms.find(room => room.id === row.finding!.device.room_id)?.name || t(MSG.NOT_ASSIGNED_FEMININE)}</dd></div><div><dt>{t(MSG.KEY)}</dt><dd>{t(MSG.VERIFIED) + " "}{row.finding.key_source === 'device' ? t(MSG.FROM_THIS_DEVICES_DATA) : t(MSG.FROM_A_GATEWAY_CHILD_DEVICES_DATA)}</dd></div></dl>
           {row.finding.device.aliases.length > 0 && <p className="help">{row.finding.device.aliases.join(' · ')}</p>}
-          {row.finding.action === 'updated' && <p className="help">{t("Изменения:") + " "}{row.finding.device.changed_fields.map(key => changes[key]).join(', ')}{t(". Имя, алиасы, комната и функции сохраняются.")}</p>}
-          {row.finding.action === 'created' && <p className="help">{t("Будет создано подключение с показанными именем и размещением. Функции управления настраиваются отдельно.")}</p>}
-          <p className="help">{row.expiresAt! > now ? t("Результат действует ещё ") + Math.ceil((row.expiresAt! - now) / 1000) + t(" сек.") : t("Срок результата истёк. Повторите проверку.")}</p>
+          {row.finding.action === 'updated' && <p className="help">{t(MSG.CHANGES) + " "}{row.finding.device.changed_fields.map(key => changes[key]).join(', ')}{t(MSG.NAME_ALIASES_ROOM_AND_FUNCTIONS_ARE_PRESERVED)}</p>}
+          {row.finding.action === 'created' && <p className="help">{t(MSG.A_CONNECTION_WILL_BE_CREATED_WITH_THE_SHOWN)}</p>}
+          <p className="help">{row.expiresAt! > now ? t(MSG.RESULT_VALID_FOR_ANOTHER) + Math.ceil((row.expiresAt! - now) / 1000) + t(MSG.SECONDS_SUFFIX) : t(MSG.THE_RESULT_EXPIRED)}</p>
         </> : <p className="field-error">{row.error}</p>}
       </section>)}
-      <label className="local-connection-confirm"><input type="checkbox" checked={confirmed} disabled={!valid.length || expired} onChange={event => setConfirmed(event.target.checked)} />{t("Подтверждаю сохранение показанных подключений (")}{valid.length})</label>
-      <div className="local-connection-actions"><button disabled={!confirmed || !valid.length || expired} onClick={() => void save()}>{t("Сохранить подключения")}</button><button className="secondary" onClick={() => { setChecked([]); setConfirmed(false); setStage('choose'); }}>{t("Изменить выбор")}</button><button className="secondary" onClick={() => { setOutcomes(checked.filter(row => row.error).map(row => ({ id: row.candidate.device.id, name: row.candidate.device.name, message: row.error!, saved: false }))); setChecked([]); setConfirmed(false); setStage('done'); }}>{t("Завершить без сохранения")}</button></div>
+      <label className="local-connection-confirm"><input type="checkbox" checked={confirmed} disabled={!valid.length || expired} onChange={event => setConfirmed(event.target.checked)} />{t(MSG.I_CONFIRM_SAVING_THESE_CONNECTIONS)}{valid.length})</label>
+      <div className="local-connection-actions"><button disabled={!confirmed || !valid.length || expired} onClick={() => void save()}>{t(MSG.SAVE_CONNECTIONS)}</button><button className="secondary" onClick={() => { setChecked([]); setConfirmed(false); setStage('choose'); }}>{t(MSG.CHANGE_SELECTION)}</button><button className="secondary" onClick={() => { setOutcomes(checked.filter(row => row.error).map(row => ({ id: row.candidate.device.id, name: row.candidate.device.name, message: row.error!, saved: false }))); setChecked([]); setConfirmed(false); setStage('done'); }}>{t(MSG.FINISH_WITHOUT_SAVING)}</button></div>
     </>}
     {stage === 'done' && <>
-      <h2>{t("Результат настройки")}</h2>
-      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}>{row.saved && row.connectionId ? <a href={deviceHref(row.connectionId, 'local')}>{row.name}</a> : <strong>{row.name}</strong>}<span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">{t("Подключения не сохранялись.")}</p>}
-      <h3>{t("Ещё не настроены:") + " "}{pending.length}</h3><p className="help">{t("Это устройства аккаунта без полного локального подключения. Они могут быть в другой сети или не передавать объявления. Zigbee-датчики подключаются через явно назначенный шлюз и не имеют собственного IP.")}</p>
+      <h2>{t(MSG.SETUP_RESULTS)}</h2>
+      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}>{row.saved && row.connectionId ? <a href={deviceHref(row.connectionId, 'local')}>{row.name}</a> : <strong>{row.name}</strong>}<span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">{t(MSG.NO_CONNECTIONS_WERE_SAVED)}</p>}
+      <h3>{t(MSG.STILL_UNCONFIGURED) + " "}{pending.length}</h3><p className="help">{t(MSG.THESE_ACCOUNT_DEVICES_LACK_COMPLETE_LOCAL_CONNECTIONS)}</p>
       <ul className="connection-results">{pending.map(device => <li key={device.id}><strong>{device.name}</strong>{device.aliases?.length ? <span>{device.aliases.join(' · ')}</span> : null}</li>)}</ul>
-      {!pending.length && <p className="help">{t("Все устройства имеют локальное подключение.")}</p>}
-      <div className="local-connection-actions"><button onClick={() => { startOver(); setRevision(value => value + 1); }}>{t("Новый поиск")}</button></div>
+      {!pending.length && <p className="help">{t(MSG.ALL_DEVICES_HAVE_LOCAL_CONNECTIONS)}</p>}
+      <div className="local-connection-actions"><button onClick={() => { startOver(); setRevision(value => value + 1); }}>{t(MSG.NEW_SEARCH)}</button></div>
     </>}
-    {error && <p role="alert" className="field-error">{t(error)}</p>}
-    {!working && <details className="network-explanation"><summary>{t("Как работает поиск")}</summary><p>{t("Только объявления с точным идентификатором устройства из выбранного Tuya-аккаунта попадают в список. Названия и алиасы берём из его данных. Наличие облачного ключа не означает, что локальное подключение настроено; сохранённая конфигурация не гарантирует текущую доступность.")}</p><p>{t("После выбора сервер заново находит адрес и проверяет ключ только чтением. Сохранение требует вашего отдельного подтверждения, заново проверяет соединение и не назначает Zigbee-родителей по догадке. Результаты проверки действуют пять минут. Сбой одного сохранения не отменяет уже выполненные; повтор автоматически не отправляется.")}</p></details>}
+    {error && <p role="alert" className="field-error">{translateText(error)}</p>}
+    {!working && <details className="network-explanation"><summary>{t(MSG.HOW_DISCOVERY_WORKS)}</summary><p>{t(MSG.ONLY_ANNOUNCEMENTS_WITH_AN_EXACT_DEVICE_ID_IN)}</p><p>{t(MSG.AFTER_SELECTION_THE_SERVER_DISCOVERS_THE_ADDRESS_AGAIN)}</p></details>}
   </section>;
 }
