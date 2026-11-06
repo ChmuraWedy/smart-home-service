@@ -1357,19 +1357,40 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
   [data-power-layout="channels"] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:11px; }
 
+.dashboard-view .dashboard-device:has([data-power-layout="single"]) {
+  padding-inline-start:0;
+  padding-block-start:0;
+}
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout="single"]):not(:has(.card-sensor-values, .control-feedback)) {
+  padding-block-end:0;
+}
 .dashboard-device:has([data-power-layout="single"]) > header {
   @apply tw:grid-cols-[64px_minmax(0,1fr)_auto_auto] tw:gap-x-3;
 }
+.dashboard-device:has([data-power-layout="single"]) .device-card-title { @apply tw:pt-1; }
 .dashboard-device:has([data-power-layout="single"]) .device-symbol,
 .dashboard-device [data-power-layout="single"] :is(.capability-heading, .capability > .help) { @apply tw:hidden; }
 .dashboard-device:has([data-power-layout="single"]) .card-quick-controls,
 .dashboard-device [data-power-layout="single"] :is(.channel-control, .capability, .capability-row),
 .dashboard-device [data-power-layout="single"] { @apply tw:contents; }
 .dashboard-device [data-power-layout="single"] .capability-boolean > .capability-row > .power-actions {
-  @apply tw:col-start-1 tw:row-start-1 tw:row-end-4 tw:self-start;
+  @apply tw:relative tw:col-start-1 tw:row-start-1 tw:row-end-4 tw:self-stretch;
 }
-.dashboard-device [data-power-layout="single"] .dashboard-power-button { border-start-start-radius:8px; border-end-start-radius:8px; }
-.dashboard-device [data-power-layout="single"] .dashboard-power-state { @apply tw:col-start-2 tw:col-end-4 tw:row-start-3 tw:self-start; }
+.dashboard-device [data-power-layout="single"] .dashboard-power-button { border-start-start-radius:11px; }
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+  [data-power-layout="single"] .dashboard-power-button { border-end-start-radius:11px; }
+/* Let a wrapped title or alias extend the colored tap area without resizing the square. */
+.dashboard-device [data-power-layout="single"] .dashboard-power-button::before {
+  content:"";
+  position:absolute;
+  inset:0;
+  background:inherit;
+  border-radius:inherit;
+}
+.dashboard-device [data-power-layout="single"] .dashboard-power-button:hover:enabled { filter:none; }
+.dashboard-device [data-power-layout="single"] .power-actions:has(.dashboard-power-button:hover:enabled) { filter:brightness(.93); }
+.dashboard-device [data-power-layout="single"] .dashboard-power-button svg { @apply tw:relative; }
+.dashboard-device [data-power-layout="single"] .dashboard-power-state { @apply tw:col-start-2 tw:col-end-4 tw:row-start-3 tw:self-start tw:pb-1; }
 .dashboard-device [data-power-layout="single"] .card-sensor-values { @apply tw:col-start-2 tw:col-end-4 tw:row-start-4 tw:mt-2; }
 .dashboard-view[data-dashboard-panel="tools"] .dashboard-device [data-power-layout="single"] .card-refresh {
   @apply tw:static tw:col-start-4 tw:row-start-4 tw:justify-self-end;
