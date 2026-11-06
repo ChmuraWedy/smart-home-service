@@ -36,7 +36,7 @@ export function DashboardCardHeader({
       <span className="device-symbol" aria-hidden="true">{icon}</span>
       <div className="device-card-identity">
         <div className="device-card-title">
-          <h3>{title}</h3>
+          <h3 title={typeof title === 'string' ? title : undefined}>{title}</h3>
           {!!aliases?.length && <DashboardAliases aliases={aliases} />}
         </div>
         <div className="device-card-context">{metadata}</div>
