@@ -1269,6 +1269,8 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:py-2.5;
   padding-inline:var(--dashboard-card-inset);
 }
+.dashboard-view .dashboard-device[data-unavailable] { @apply tw:bg-(--surface-soft); }
+.dashboard-device[data-unavailable] .card-primary-controls { @apply tw:grayscale; }
 .dashboard-card-header {
   @apply tw:grid tw:grid-cols-[28px_minmax(0,1fr)_auto] tw:items-center tw:gap-x-2;
 }
@@ -1276,6 +1278,34 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-card-header .device-type-icon { @apply tw:size-5; }
 .dashboard-card-header .device-card-identity { @apply tw:grid tw:min-w-0 tw:gap-0.5; }
 .dashboard-card-header .device-card-title { @apply tw:flex tw:min-w-0 tw:flex-wrap tw:items-center tw:gap-x-2 tw:gap-y-1; }
+.dashboard-aliases {
+  --alias-overflow-width:32px;
+  @apply tw:relative tw:flex tw:basis-full tw:min-w-0 tw:items-center tw:gap-1;
+}
+.dashboard-alias-measure-box { @apply tw:invisible tw:pointer-events-none tw:absolute tw:inset-x-0 tw:h-0 tw:overflow-hidden; }
+.dashboard-alias-measure, .dashboard-alias-visible { @apply tw:flex tw:items-center tw:gap-1; }
+.dashboard-alias-measure { @apply tw:w-max; }
+.dashboard-alias-visible { @apply tw:min-w-0 tw:overflow-hidden tw:empty:hidden; }
+.dashboard-aliases .alias-tag { @apply tw:shrink-0 tw:whitespace-nowrap; }
+.dashboard-alias-visible .alias-tag:only-child { @apply tw:shrink tw:truncate; }
+.dashboard-alias-measure .alias-tag::before { content:attr(data-alias); }
+.dashboard-alias-overflow, .dashboard-alias-more-width, button.dashboard-alias-more {
+  @apply tw:shrink-0;
+  width:var(--alias-overflow-width);
+}
+button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0 tw:leading-none; }
+.dashboard-alias-tooltip {
+  @apply tw:invisible tw:pointer-events-none tw:absolute tw:bottom-full tw:end-0 tw:z-20 tw:mb-1.5 tw:max-w-full tw:rounded-md tw:border tw:border-(--border-strong) tw:bg-(--overlay-surface) tw:px-2 tw:py-1 tw:text-xs tw:text-(--text) tw:shadow-md;
+  overflow-wrap:anywhere;
+}
+.dashboard-alias-tooltip { @apply tw:line-clamp-3; }
+.dashboard-alias-more:is(:hover, :focus-visible) + .dashboard-alias-tooltip { @apply tw:visible; }
+.dashboard-alias-popup {
+  @apply tw:z-30 tw:max-h-[50dvh] tw:w-max tw:max-w-[min(18rem,calc(100vw-16px))] tw:overflow-y-auto tw:rounded-xl tw:border tw:border-(--border-strong) tw:bg-(--overlay-surface) tw:px-3 tw:py-2 tw:text-sm tw:text-(--text) tw:shadow-lg;
+}
+.dashboard-alias-popup-header { @apply tw:flex tw:items-center tw:justify-between tw:gap-3; }
+.dashboard-alias-popup-header button { @apply tw:grid tw:size-8 tw:place-items-center tw:p-0 tw:text-lg; }
+.dashboard-alias-popup .alias-tag { @apply tw:max-w-full; }
 .dashboard-card-header .device-card-context { @apply tw:flex tw:min-w-0 tw:flex-wrap tw:items-center tw:gap-x-1.5; }
 .dashboard-card-header .device-card-actions { @apply tw:flex tw:flex-none tw:items-center tw:gap-0.5; }
 .dashboard-card-header .tile-icon-action { @apply tw:h-11 tw:min-h-11 tw:w-8; }
@@ -1335,7 +1365,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .camera-card-switches .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-2 tw:flex-col tw:items-center;
 }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback)) {
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback, .dashboard-light-presets)) {
   @apply tw:pb-0;
 }
 .dashboard-device [data-power-layout] .channel-control + .channel-control { border-top:1px solid var(--border); }
@@ -1353,12 +1383,39 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:rounded-none tw:border-0 tw:bg-transparent tw:p-0 tw:text-xs;
 }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-1; }
+.dashboard-device [data-power-layout] .dashboard-power-state-summary {
+  @apply tw:relative tw:row-span-2 tw:row-start-1 tw:flex tw:self-stretch tw:pb-0;
+}
+.dashboard-view .dashboard-device [data-power-layout] .capability-boolean > .capability-row:has(> .dashboard-power-state-summary) {
+  @apply tw:gap-x-0;
+}
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device .dashboard-power-state-summary {
+  margin-inline-end:calc(-1 * var(--dashboard-card-inset));
+}
+.dashboard-light-readings { @apply tw:grid tw:auto-rows-fr tw:grid-cols-1 tw:min-w-0 tw:flex-1; }
+.dashboard-light-reading {
+  @apply tw:relative tw:isolate tw:grid tw:min-w-0 tw:content-center tw:px-3 tw:py-0.5;
+  overflow-wrap:anywhere;
+}
+.dashboard-light-reading + .dashboard-light-reading { border-block-start:1px solid var(--border); }
+.dashboard-light-tint { @apply tw:absolute tw:inset-0 tw:-z-10 tw:opacity-25; }
+.dashboard-light-copy { @apply tw:flex tw:w-fit tw:max-w-full tw:flex-wrap tw:items-center tw:gap-x-1.5; }
+.dashboard-light-icon, .dashboard-light-off-mark, .dashboard-light-swatch { @apply tw:hidden; }
+.dashboard-light-label { @apply tw:text-xs tw:font-medium tw:text-(--text); }
+.dashboard-light-value { @apply tw:text-sm tw:font-semibold tw:text-(--text-strong); }
+.dashboard-light-presets {
+  @apply tw:border-t tw:border-(--border) tw:pt-1.5;
+  padding-inline:var(--dashboard-card-inset);
+  margin-inline-end:calc(-1 * var(--dashboard-card-inset));
+}
+.dashboard-light-presets select { @apply tw:m-0 tw:min-h-0 tw:w-full tw:cursor-default tw:px-2 tw:py-1 tw:text-xs; }
+.dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
 }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback, .dashboard-light-presets))
   [data-power-layout] .channel-control:last-of-type .power-actions { @apply tw:self-end; }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback, .dashboard-light-presets))
   [data-power-layout] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:11px; }
 
 .dashboard-device[data-card-layout="climate"] .card-sensor-values { @apply tw:grid tw:w-full tw:grid-cols-2 tw:gap-1.5; }
@@ -1391,6 +1448,15 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view[data-card-size="small"] .card-primary-controls .dashboard-power-button :is(.parameter-icon, .device-type-icon) { @apply tw:size-5; }
 .dashboard-view[data-card-size="small"] :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row { @apply tw:gap-x-1.5; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading, .dashboard-power-state) { @apply tw:py-0; }
+.dashboard-view[data-card-size="small"] .dashboard-light-reading { @apply tw:px-1.5; }
+.dashboard-view[data-card-size="small"] :is(.dashboard-light-label, .dashboard-light-off-label) { @apply tw:sr-only; }
+.dashboard-view[data-card-size="small"] :is(.dashboard-light-icon, .dashboard-light-off-mark) { @apply tw:block; }
+.dashboard-view[data-card-size="small"] .dashboard-light-icon .parameter-icon { @apply tw:size-3.5; }
+.dashboard-view[data-card-size="small"] .dashboard-light-value { @apply tw:text-xs/tight; }
+.dashboard-view[data-card-size="small"] .dashboard-light-swatch {
+  @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong);
+}
+.dashboard-view[data-card-size="small"] .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
 .dashboard-view[data-card-size="small"] .card-primary-controls :is(.capability-heading h3, .alias-tag, .dashboard-power-state) { line-height:1.15; }
 .dashboard-view[data-card-size="small"] :is(.device-card-title h3, .card-sensor-value, .dashboard-power-state) {
   min-width:0;

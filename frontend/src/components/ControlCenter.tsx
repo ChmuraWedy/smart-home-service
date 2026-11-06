@@ -16,6 +16,7 @@ import { useTopology } from '../use-topology';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
+import { DashboardAliases } from './DashboardAliases';
 import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId } from '../device-links';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
@@ -37,7 +38,10 @@ function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
 
 function CardDetailsButton({ label, disabled, onClick }: { label:string; disabled?:boolean; onClick:() => void }) {
   return <button type="button" className="secondary tile-icon-action" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 3h4l.6 2.7 1.9 1.1 2.6-.9 2 3.5-2 1.8v2.2l2 1.8-2 3.5-2.6-.9-1.9 1.1L14 21h-4l-.6-2.7-1.9-1.1-2.6.9-2-3.5 2-1.8v-2.2l-2-1.8 2-3.5 2.6.9 1.9-1.1L10 3Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   </button>;
 }
 
@@ -48,9 +52,7 @@ function DashboardCardHeader({ icon, title, aliases, metadata, actions }: {
     <span className="device-symbol" aria-hidden="true">{icon}</span>
     <div className="device-card-identity">
       <div className="device-card-title"><h3>{title}</h3>
-        {!!aliases?.length && <div className="capability-aliases" role="group" aria-label={t(MSG.DEVICE_ALIASES)}>
-          {aliases.map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}
-        </div>}
+        {!!aliases?.length && <DashboardAliases aliases={aliases} />}
       </div>
       <div className="device-card-context">{metadata}</div>
     </div>
@@ -66,6 +68,7 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
   api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
+  const aliases = useMemo(() => deviceAliases(device), [device]);
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
   const dispatch = useAppDispatch();
@@ -88,16 +91,16 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
   const local = device.local;
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
-  const online = live ? live.online : cloud?.online || (route === 'local' && state?.available);
   const enabled = (route === 'local' ? state?.enabled : undefined) ?? local?.enabled;
+  const online = route === 'local' ? enabled && state?.available : live?.online ?? cloud?.online;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
     && codes.some(code => /^(humidity|va_humidity|humidity_value)$/.test(code))
     && !codes.some(code => /^switch(?:_|$)/.test(code));
   const cardLayout = climate && !isCamera(cloud?.category) ? 'climate' : undefined;
-  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
-    <DashboardCardHeader icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={deviceAliases(device)}
+  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-unavailable={!online || undefined} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
+    <DashboardCardHeader icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
       title={hasSheet ? <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
         aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}>{device.name}</button> : device.name}
       metadata={<><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : local && !enabled ? t(MSG.DISABLED_IN_SETTINGS) : online ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)}</span><BatteryBadge reading={battery} /></div></>}
