@@ -112,9 +112,9 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
   return { sending, toggle };
 }
 
-function StandardCardControls({ name, pendingScope, paused, sheet, specs, reading, now, local, busy, readOK, sending, refresh, toggle, notice, category }: {
+function StandardCardControls({ name, pendingScope, paused, sheet, specs, reading, now, local, online, busy, readOK, sending, refresh, toggle, notice, category }: {
   name: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
-  now: number; local: boolean; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
+  now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
   toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice; category?: string;
 }) {
   const powers = specs.filter(powerControl);
@@ -153,11 +153,11 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
     </span>
   ) : undefined;
   const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
-  const disabled = busy || !readOK || sending;
+  const disabled = busy || !readOK || sending || (!!summary && !online);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
   const field = (spec:ControlSpec, headingActions?:ReactNode, showSummary = true) => <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
     powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : <ParameterIcon code={spec.key} />}
-    powerSummary={showSummary ? summary : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
+    powerSummary={showSummary && summary ? power => summary(online ? power : null) : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
   const sensorValues = sensors.length > 0 && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
     {sensors.map(spec => {
       const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
@@ -172,6 +172,9 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
       <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
     {powerLayout && sensorValues}
+    {summary && <div className="dashboard-light-presets">
+      <select aria-label={t(MSG.PRESETS)} disabled><option>{t(MSG.PRESETS)}</option></select>
+    </div>}
     {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
         <div className="dashboard-sheet-power">{field(powers[0],undefined,false)}</div>
         {sliders.map(spec => <CapabilityField pendingScope={pendingScope} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local}
@@ -234,7 +237,7 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
   return isCamera(cloud.category)
     ? <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
         online={snapshot?.online ?? cloud.online} />
-    : <StandardCardControls {...controls} local={false} category={cloud.category} />;
+    : <StandardCardControls {...controls} local={false} online={snapshot?.online ?? cloud.online} category={cloud.category} />;
 }
 
 function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBusy}: CardProps & {visible:boolean}) {
@@ -254,6 +257,6 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
   });
   return <StandardCardControls name={device.name} pendingScope={localPendingScope(api, item.id)} paused={paused} sheet={sheet} specs={specs}
     category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => state?.values[spec.key]}
-    now={now} local busy={session.busy} readOK={session.readOK && !!state?.enabled}
+    now={now} local online={!!state?.enabled && state.available} busy={session.busy} readOK={session.readOK && !!state?.enabled}
     refresh={session.refresh} notice={session.notice} {...commands} />;
 }

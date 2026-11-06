@@ -38,7 +38,10 @@ function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
 
 function CardDetailsButton({ label, disabled, onClick }: { label:string; disabled?:boolean; onClick:() => void }) {
   return <button type="button" className="secondary tile-icon-action" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 3h4l.6 2.7 1.9 1.1 2.6-.9 2 3.5-2 1.8v2.2l2 1.8-2 3.5-2.6-.9-1.9 1.1L14 21h-4l-.6-2.7-1.9-1.1-2.6.9-2-3.5 2-1.8v-2.2l-2-1.8 2-3.5 2.6.9 1.9-1.1L10 3Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   </button>;
 }
 
@@ -88,15 +91,15 @@ function DeviceCard({ api, device, room, now, paused, onAuthError, onOpen, onAdd
   const local = device.local;
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
-  const online = live ? live.online : cloud?.online || (route === 'local' && state?.available);
   const enabled = (route === 'local' ? state?.enabled : undefined) ?? local?.enabled;
+  const online = route === 'local' ? enabled && state?.available : live?.online ?? cloud?.online;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
     && codes.some(code => /^(humidity|va_humidity|humidity_value)$/.test(code))
     && !codes.some(code => /^switch(?:_|$)/.test(code));
   const cardLayout = climate && !isCamera(cloud?.category) ? 'climate' : undefined;
-  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
+  return <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-unavailable={!online || undefined} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
     <DashboardCardHeader icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
       title={hasSheet ? <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
         aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}>{device.name}</button> : device.name}
