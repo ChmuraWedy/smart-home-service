@@ -71,7 +71,7 @@ describe('appearance preferences', () => {
     } finally { read.mockRestore(); write.mockRestore(); }
   });
 
-  it('offers both preferences in the menu before connecting and preserves a live API/key draft', () => {
+  it('offers appearance preferences in the menu before connecting and preserves a live API/key draft', () => {
     render(<App/>);
     const address=screen.getByLabelText('Адрес API');
     const key=screen.getByLabelText('Ключ доступа к сервису');
@@ -97,6 +97,25 @@ describe('appearance preferences', () => {
     expect(menu).toHaveFocus();
     expect(menu).toHaveAttribute('aria-expanded','false');
     expect(key).toHaveValue('чернавік-Łąka');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('changes card size immediately and restores the saved selection on remount', () => {
+    const first = render(<App />);
+    const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Меню' }));
+    openMenu();
+    const size = screen.getByLabelText('Размер карточек');
+    expect(size).toHaveValue('large');
+    expect(first.container.firstElementChild).toHaveAttribute('data-card-size', 'large');
+    fireEvent.change(size, { target: { value: 'small' } });
+    expect(first.container.firstElementChild).toHaveAttribute('data-card-size', 'small');
+    first.unmount();
+    const second = render(<App />);
+    openMenu();
+    expect(screen.getByLabelText('Размер карточек')).toHaveValue('small');
+    expect(second.container.firstElementChild).toHaveAttribute('data-card-size', 'small');
+    fireEvent.change(screen.getByLabelText('Размер карточек'), { target: { value: 'large' } });
+    expect(second.container.firstElementChild).toHaveAttribute('data-card-size', 'large');
     expect(fetch).not.toHaveBeenCalled();
   });
 
