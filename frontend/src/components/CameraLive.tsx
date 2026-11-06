@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
 type SafariVideo = HTMLVideoElement & {
   webkitPresentationMode?: string;
+  webkitEnterFullscreen?: () => void;
   webkitSupportsPresentationMode?: (mode: 'picture-in-picture') => boolean;
   webkitSetPresentationMode?: (mode: 'inline' | 'picture-in-picture') => void;
 };
@@ -25,8 +26,8 @@ function resolutionLabel(width:number, height:number) {
   return (Math.min(width,height) >= 720 ? 'HD' : 'SD') + ' · ' + width + '×' + height;
 }
 
-export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, autoStart = false, networkSignal, headingActions, overlay, viewingBlocked }: {
-  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode; viewingBlocked?:string;
+export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, sheet = false, autoStart = false, networkSignal, headingActions, overlay, viewingBlocked }: {
+  api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; sheet?:boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode; viewingBlocked?:string;
 }) {
   const video = useRef<SafariVideo>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
@@ -152,10 +153,10 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     }
   }
   useEffect(()=>{ if (viewingBlocked) stop(); },[viewingBlocked]);
-  // Inline instances mount only after the user expands the camera tile.
+  // Dashboard previews mount after the user opens live view.
   useEffect(() => { if (autoStart) void start(); }, [autoStart]);
-  return <section className={"camera-live" + (compact ? " camera-live-compact" : "")} aria-label={t("Видео камеры")}>
-    <div className="camera-live-heading"><h3>{t("Видео камеры")}</h3>
+  return <section className={"camera-live" + (compact ? " camera-live-compact" : "") + (sheet ? " camera-live-sheet" : "")} aria-label={t("Видео камеры")}>
+    <div className="camera-live-heading">{!sheet && <h3>{t("Видео камеры")}</h3>}
       <div className="camera-live-actions">{headingActions}
         {source && !viewingBlocked && !overlay && pipMode && <button type="button" className="secondary compact" aria-pressed={pipActive} onClick={() => void togglePictureInPicture()}>{t("Картинка в картинке")}</button>}
         {source || loading ? <button className="secondary compact" onClick={stop}>{t("Остановить")}</button> : <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t("Подключиться заново") : t("Смотреть видео")}</button>}
@@ -173,9 +174,17 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       <span title={networkSignal ? t("Последнее показание сигнала, сообщённое камерой.") : t("Подключение не предоставило уровень сигнала камеры.")}>Wi-Fi: {networkSignal || t("Нет данных")}</span>
       <p className="help">{!source ? t("Доступные варианты HD/SD появятся после запуска видео.") : levels.length < 2 ? t("Переключение HD/SD недоступно для этого потока.") : t("Качество выбирается из вариантов видеопотока.")}</p>
     </div>}
-    {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">▷</div>}
+    {compact && !source && !overlay && <div className="camera-preview-placeholder" aria-hidden="true">{sheet && viewingBlocked ? '▣' : '▷'}</div>}
     {(!viewingBlocked && source || overlay) && <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
       {source && !viewingBlocked ? <video ref={video} controls={!overlay} disablePictureInPicture={!!overlay} muted autoPlay playsInline preload="none" aria-label={t("Прямой эфир камеры")} /> : <div className="camera-area-placeholder">{viewingBlocked || t("Для изображения нажмите «Смотреть видео»")}</div>}{overlay}
+      {sheet && source && !viewingBlocked && <>
+        {playback === t("Воспроизводится") && <span className="camera-sheet-live-tag">{t("Прямой эфир")}</span>}
+        {(document.fullscreenEnabled || 'webkitEnterFullscreen' in HTMLVideoElement.prototype) && <button type="button" className="camera-sheet-fullscreen" aria-label={t("На весь экран")} onClick={() => {
+          const player = video.current;
+          if (player?.requestFullscreen && document.fullscreenEnabled) void player.requestFullscreen().catch(() => {});
+          else player?.webkitEnterFullscreen?.();
+        }}>⛶</button>}
+      </>}
     </div>}
     <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
     {source && !viewingBlocked && pipError && <p className="error" role="alert">{t("Не удалось переключить режим «Картинка в картинке».")}</p>}

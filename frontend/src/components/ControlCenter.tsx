@@ -1,5 +1,5 @@
 import { dateLocale, t } from "../i18n";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { localSpec } from '../controls';
@@ -16,8 +16,6 @@ import { useTopology } from '../use-topology';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
-import { CameraLive } from './CameraLive';
-import { cameraPrivacyBlock } from '../camera-controls';
 import type { MouseEvent } from 'react';
 import { deviceCardId } from '../device-links';
 import type { DeviceLink } from '../device-links';
@@ -44,18 +42,12 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
   const [quickBusy,setQuickBusy] = useState(false);
-  const [previewRoute,setPreviewRoute] = useState<DeviceRoute | null>(null);
-  const previewId = useId();
-  useEffect(() => { if (paused) setPreviewRoute(null); }, [paused]);
   const notifyBusy = useCallback((busy:boolean) => { setQuickBusy(busy); onCommandBusy(device.id,busy); },[device.id,onCommandBusy]);
   const route = chosen && routes.includes(chosen) ? chosen : routes[0];
   const [liveStatus,setLiveStatus] = useState<{route:DeviceRoute;status:CardStatus}>();
   const updateStatus = useCallback((status:CardStatus)=>setLiveStatus({route,status}),[route]);
   const live = liveStatus?.route === route ? liveStatus.status : undefined;
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
-  const [privacyView,setPrivacyView] = useState<{route:DeviceRoute;value:boolean | null | undefined}>();
-  const privacyChanged=useCallback((value:boolean | null | undefined)=>setPrivacyView({route,value}),[route]);
-  const privacyBlock=cameraPrivacyBlock(privacyView?.route===route ? privacyView.value : typeof cloud?.controls?.snapshot.status.basic_private==='boolean' ? cloud.controls.snapshot.status.basic_private : undefined);
   const local = device.local;
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
@@ -71,7 +63,7 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
     <header className="tw:flex tw:flex-col tw:gap-2">
       <div className="device-card-top tw:grid tw:min-h-11 tw:grid-cols-[36px_minmax(0,1fr)] tw:items-start tw:gap-x-2 tw:gap-y-0.5"><span className="device-symbol tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:grid tw:size-9 tw:place-items-center tw:rounded-lg tw:p-1.5"><DeviceIcon category={cloud?.category} codes={codes} /></span>
         <div className="device-card-context tw:col-start-2 tw:row-start-1 tw:flex tw:min-h-[18px] tw:min-w-0 tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-2 tw:gap-y-1"><p className="device-location">{room}</p><div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:justify-end tw:gap-1.5 tw:text-[11px]"><span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t("В сети") : t("Не в сети")) : local && !enabled ? t("Отключено в настройках") : online ? t("Доступно дома") : t("Состояние неизвестно")}</span><BatteryBadge reading={battery} /></div></div>
-        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} onPrivacyStateChange={privacyChanged} cameraAction={isCamera(cloud?.category) ? <button className={"secondary camera-open" + (previewRoute === route ? " tile-icon-action" : "")} title={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} onClick={() => setPreviewRoute(previewRoute === route ? null : route)} aria-label={previewRoute === route ? t("Свернуть видео камеры") : t("Показать видео камеры")} aria-expanded={previewRoute === route} aria-controls={previewId}>{previewRoute === route ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg> : t("▷ Видео")}</button> : undefined} />
+        <CardControls key={route} api={api} device={device} route={route} state={state} now={now} paused={paused} onAuthError={onAuthError} onBusy={notifyBusy} onStatus={updateStatus} />
       </div>
       <div className="device-card-identity tw:flex tw:min-w-0 tw:items-center tw:justify-between tw:gap-2"><div className="device-card-title tw:flex tw:min-w-0 tw:flex-1 tw:flex-wrap tw:items-center tw:gap-x-2 tw:gap-y-1"><h3>{device.name}</h3>
         {!!deviceAliases(device).length && <div className="capability-aliases tw:min-w-0 tw:max-w-full" role="group" aria-label={t("Алиасы устройства")}>{deviceAliases(device).map(alias => <span className="alias-tag" title={alias} key={alias}>{alias}</span>)}</div>}
@@ -79,9 +71,8 @@ function DeviceCard({ api, device, state, room, now, paused, onAuthError, onComm
         {!local && <button className="secondary tile-icon-action device-setup-action" aria-label={t("Настроить локальное подключение")} title={t("Настроить локальное подключение")} disabled={!onAdd || quickBusy} onClick={() => route !== 'local' && onAdd?.(route)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M3 9a15 15 0 0 1 18 0M6 13a10 10 0 0 1 12 0M9 17a5 5 0 0 1 6 0" /><circle cx="12" cy="21" r=".5" /></svg></button>}
       </div></div>
     </header>
-    <div id={previewId}>{previewRoute === route && !paused && cloud && isCamera(cloud.category) && route !== 'local' && <CameraLive key={route} api={api} deviceId={device.id} provider={route} onAuthError={onAuthError} compact autoStart viewingBlocked={privacyBlock} />}</div>
     {routes.length > 1 && <div className="device-card-footer tw:mt-2 tw:flex tw:flex-wrap tw:items-center tw:justify-between tw:gap-1.5">
-      {routes.length > 1 && <select className="device-route-select" aria-label={t("Способ управления: ") + device.name} value={route} disabled={quickBusy} onChange={event => { setPreviewRoute(null); setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>}
+      {routes.length > 1 && <select className="device-route-select" aria-label={t("Способ управления: ") + device.name} value={route} disabled={quickBusy} onChange={event => { setChosen(event.target.value as DeviceRoute); }}>{routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}</select>}
     </div>}
   </Card>;
 
