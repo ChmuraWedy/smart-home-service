@@ -26,6 +26,7 @@ export function App() {
   const [deviceTarget, setDeviceTarget] = useState(() => readDeviceLink(window.location.hash));
   const acceptedHash = useRef(window.location.hash);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dashboardPanel, setDashboardPanel] = useState<'search' | 'tools' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
   const [controlOpen, setControlOpen] = useState(false);
   const [status, setStatus] = useState<CloudStatus | null>(null);
@@ -185,12 +186,28 @@ export function App() {
   }, [menuOpen]);
 
   const regionName = REGIONS.find(item => item.value === developer.region)?.label;
-  return <div className="app-shell">
+  return <div className={"app-shell" + (view === 'control' ? " dashboard-view" : "")} data-dashboard-panel={dashboardPanel ?? undefined}>
     <header className="app-header"><div className="app-menu" ref={menuRef} onKeyDown={event => { if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); } }}>
       <button className="secondary app-menu-button" ref={menuButton} aria-label={t("Меню")} aria-expanded={menuOpen} aria-controls="app-sections" disabled={locked} onClick={() => setMenuOpen(value => !value)}><span aria-hidden="true">☰</span></button>
-      {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label={t("Раздел приложения")}>{([['control', t("Управление")], ['network', t("Сеть и пакеты")], ['local-connections', t("Локальные подключения")], ['connections', t("Подключения")]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => navigate(key)}>{label}</button>)}</nav>}
-    </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span>{t("Ваш дом под управлением")}</span></div></div>
-      <div className="appearance-settings"><ThemeSelector /><LanguageSelector /></div><span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t("API подключён") : t("API не подключён")}</span></header>
+      {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label={t("Раздел приложения")}>{([['control', t("Управление")], ['network', t("Сеть и пакеты")], ['local-connections', t("Локальные подключения")], ['connections', t("Подключения")]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => navigate(key)}>{label}</button>)}
+        {view === 'control' && status && <button className="secondary dashboard-tools-menu" disabled={locked} aria-expanded={dashboardPanel === 'tools'} onClick={() => {
+          setDashboardPanel(panel => panel === 'tools' ? null : 'tools');
+          setMenuOpen(false);
+          menuButton.current?.focus();
+        }}>{t("Настройки панели")}</button>}
+        <div className="app-menu-appearance"><ThemeSelector /><LanguageSelector /></div>
+      </nav>}
+    </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span className="brand-tagline">{t("Ваш дом под управлением")}</span>
+      {view === 'control' && <span className={"dashboard-connection" + (status ? " online" : "")}><i aria-hidden="true" />{status ? t("Подключено") : t("API не подключён")}</span>}
+    </div></div>
+      <span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t("API подключён") : t("API не подключён")}</span>
+      {view === 'control' && status && <button className="secondary dashboard-search-button" type="button" aria-label={t("Поиск")} aria-expanded={dashboardPanel === 'search'} aria-controls="dashboard-search" disabled={locked} onClick={() => {
+        setMenuOpen(false);
+        setDashboardPanel(panel => panel === 'search' ? null : 'search');
+      }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+      </button>}
+    </header>
     <main>
       <input id="access-token" type="hidden" value={connection.token} readOnly />
       {view === 'connections' ? <>
@@ -226,7 +243,7 @@ export function App() {
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>{t("User Code, реквизиты Tuya, токены и локальные ключи остаются на Python-сервисе.")}</p></div>
         </section>
       </div>
-      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} /> : <ControlCenter api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
+      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} /> : <ControlCenter dashboardPanel={dashboardPanel} api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setControlOpen} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />{t("Подождите…")}</> : t(notice.text)}</div>
       {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>

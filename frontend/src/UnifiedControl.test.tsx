@@ -36,19 +36,52 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
-  it.each(['name','surface'])('opens details from the card %s using the selected route',async target=>{
+  it('uses the bulb icon button to send a power command from the keyboard', async () => {
+    const calls = server({noLocal:true});
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{
+        ...shared, category:'dj', controls:{
+          ready:true,
+          definitions:{device_id:shared.id, functions:[{code:'switch_led', type:'Boolean', values:'{}'}]},
+          snapshot:{device_id:shared.id, online:true, source:'cloud', status:{switch_led:false}},
+        },
+      }]);
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    render(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} onLock={vi.fn()} />);
+    const card = await screen.findByRole('listitem',{name:shared.name});
+    const toggle = await within(card).findByRole('switch',{name:'Питание'});
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(card).toHaveAttribute('data-slot','card');
+    expect(toggle).toHaveAttribute('data-slot','power-button');
+    expect(toggle).not.toBeChecked();
+    toggle.focus();
+    await user.keyboard('[Space]');
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(calls.filter(call => call.method === 'POST').map(call => call.body)).toEqual([
+      {commands:[{code:'switch_led',value:true}]},
+    ]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens details only from the chevron on a card without a sheet, using the selected route',async()=>{
     const calls=server(),user=userEvent.setup();
     render(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} onLock={vi.fn()} />);
     const card=await screen.findByRole('listitem',{name:local.name});
     await user.selectOptions(within(card).getByRole('combobox'),'developer');
     expect(screen.queryByRole('dialog')).toBeNull();
-    await user.click(target==='name' ? within(card).getByRole('heading',{name:local.name}) : card);
+    await user.click(within(card).getByRole('heading',{name:local.name}));
+    await user.click(card);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(within(card).getByRole('button',{name:'Подробнее'}));
     expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
     await waitFor(()=>expect(calls.some(call=>call.path.endsWith('/functions?provider=developer'))).toBe(true));
     expect(calls.filter(call=>call.method==='POST')).toEqual([]);
   });
 
-  it('keeps quick controls, labels and refresh separate from card navigation and blocks opening during a command',async()=>{
+  it('keeps the power button and refresh separate from details and blocks opening during a command',async()=>{
     const calls=server(),original=vi.mocked(fetch).getMockImplementation()!,user=userEvent.setup();
     let finish!:(value:Response)=>void;
     const pending=new Promise<Response>(resolve=>{finish=resolve;});
@@ -64,14 +97,14 @@ describe('unified device identity and management', () => {
     await user.click(within(card).getByRole('button',{name:'Обновить параметры'}));
     await waitFor(()=>expect(power).toBeEnabled());
     expect(screen.queryByRole('dialog')).toBeNull();
-    await user.click(within(card).getByText('Питание',{exact:true}));
+    await user.click(power);
     await waitFor(()=>expect(power).toBeDisabled());
     await user.click(card);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(calls.filter(call=>call.method==='POST')).toHaveLength(1);
     await act(async()=>finish(json({acknowledged:true})));
     await waitFor(()=>expect(power).toBeEnabled());
-    await user.click(within(card).getByRole('heading',{name:local.name}));
+    await user.click(within(card).getByRole('button',{name:'Подробнее'}));
     expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
     expect(calls.filter(call=>call.method==='POST')).toHaveLength(1);
   });

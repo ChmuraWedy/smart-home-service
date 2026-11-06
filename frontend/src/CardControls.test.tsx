@@ -1,8 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
 import { HomeApi } from './home-api';
+import type { ComponentProps } from 'react';
 import { CardControls } from './components/CardControls';
 import { ControlDialog } from './components/DeviceControls';
 import { DeviceActivity } from './components/DeviceActivity';
@@ -20,8 +21,8 @@ const snapshot:CloudSnapshot = {device_id:'lamp',online:true,source:'cloud',stat
 const lamp:CloudDevice = {id:'lamp',name:'Лампа',online:true,has_local_key:false,controls:{ready:true,definitions,snapshot}};
 const json = (value:unknown,status=200) => new Response(JSON.stringify(value),{status});
 
-function mount(cloud=lamp, route:'sharing'|'developer'='sharing') {
-  return render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
+function mount(cloud=lamp, route:'sharing'|'developer'='sharing', sheet?:ComponentProps<typeof CardControls>['sheet']) {
+  return render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} sheet={sheet} />);
 }
 
 describe('main controls on device cards', () => {
@@ -72,14 +73,49 @@ describe('main controls on device cards', () => {
     expect(screen.queryByRole('region',{name:'Состояние после подачи питания'})).toBeNull();
     expect(screen.queryByRole('button',{name:'Настроить'})).toBeNull();
     await waitFor(() => expect(power).toBeEnabled());
-    expect(screen.queryByText('Выключено')).toBeNull();
+    expect(power).toHaveAttribute('data-slot','power-button');
+    expect(screen.getByText('Выключено')).toBeInTheDocument();
+    expect(screen.queryByText('10 %')).toBeNull();
     await user.click(power);
     await waitFor(() => expect(power).toBeEnabled());
     expect(screen.queryByRole('spinbutton')).toBeNull();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     expect(writes).toEqual([{commands:[{code:'switch_led',value:true}]}]);
     expect(power).toHaveAttribute('aria-checked','true');
+    expect(screen.getByText('10 %')).toBeInTheDocument();
     expect(screen.getByText('Ожидаем новое показание')).toBeInTheDocument();
+  });
+
+  it('commits quick lighting sliders once on release, with the reported device ranges', async () => {
+    const writes:unknown[]=[];
+    const functions=[...definitions.functions, {code:'temp_value_v2',type:'Integer',values:{min:0,max:1000,scale:0,step:10}}];
+    const latest={...snapshot,status:{...snapshot.status,switch_led:true,temp_value_v2:500}};
+    vi.mocked(fetch).mockImplementation(async (_input,init) => {
+      if (init?.method==='POST') { writes.push(JSON.parse(String(init.body))); return json({acknowledged:true}); }
+      return json(latest);
+    });
+    const close=vi.fn();
+    mount({...lamp,controls:{ready:true,definitions:{...definitions,functions},snapshot:latest}}, 'sharing', {open:true,close,trigger:{current:null}});
+    const user=userEvent.setup();
+    const sheet=await screen.findByRole('dialog',{name:'Лампа'});
+    const brightness=within(sheet).getByRole('slider',{name:'Яркость'});
+    const temperature=within(sheet).getByRole('slider',{name:'Цветовая температура'});
+    expect(brightness).toHaveValue('10');
+    expect(temperature).toHaveValue('50');
+    fireEvent.change(brightness,{target:{value:'55'}});
+    fireEvent.change(brightness,{target:{value:'65'}});
+    expect(writes).toEqual([]);
+    fireEvent.pointerUp(brightness);
+    await waitFor(()=>expect(brightness).toBeEnabled());
+    fireEvent.blur(brightness);
+    fireEvent.change(temperature,{target:{value:'35'}});
+    fireEvent.keyUp(temperature,{key:'ArrowLeft'});
+    await waitFor(()=>expect(writes).toEqual([
+      {commands:[{code:'bright_value_v2',value:650}]},
+      {commands:[{code:'temp_value_v2',value:350}]},
+    ]));
+    await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('sends once while awaiting an acknowledgement and clears waiting after a matching report', async () => {
@@ -169,10 +205,10 @@ describe('main controls on device cards', () => {
   it('shows sensor values with accessible labels and no settings editors', async () => {
     const sensorDefinitions:CloudFunctions={device_id:'lamp',functions:[{code:'temp_unit_convert',type:'Enum',values:{range:['c','f']}}],status_range:[{code:'va_temperature',type:'Integer',values:{unit:'℃',scale:1}},{code:'va_humidity',type:'Integer',values:{unit:'%',scale:0}}]};
     mount({...lamp,controls:{ready:true,definitions:sensorDefinitions,snapshot:{...snapshot,status:{va_temperature:225,va_humidity:48}}}});
-    expect(await screen.findByLabelText('Температура: 22.5 °C')).toHaveTextContent('22.5 °C');
-    expect(screen.getByLabelText('Влажность: 48 %')).toHaveTextContent('48 %');
-    expect(screen.queryByText('Температура')).toBeNull();
-    expect(screen.queryByText('Влажность')).toBeNull();
+    expect(await screen.findByTitle('Температура: 22.5 °C')).toHaveTextContent('Температура: 22.5 °C');
+    expect(screen.getByTitle('Влажность: 48 %')).toHaveTextContent('Влажность: 48 %');
+    expect(screen.getByText('Температура:')).toHaveClass('sr-only');
+    expect(screen.getByText('Влажность:')).toHaveClass('sr-only');
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     expect(fetch).not.toHaveBeenCalled();

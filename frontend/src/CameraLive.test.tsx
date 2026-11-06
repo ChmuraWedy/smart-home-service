@@ -185,51 +185,51 @@ describe('camera live viewing',()=>{
     expect(screen.getByText('Переключение HD/SD недоступно для этого потока.')).toBeInTheDocument();
     expect(screen.getByText('Wi-Fi: -55 dBm')).toBeInTheDocument();
   });
-  it('shows the privacy explanation instead of allocating a main tile preview',async()=>{
+  it('opens a privacy-blocked camera sheet without allocating a stream',async()=>{
     mountTiles(true); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
     const privacy=await within(card).findByRole('button',{name:'Приватность'});
     await waitFor(()=>expect(privacy).toHaveAttribute('aria-pressed','true'));
-    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
-    expect(within(card).getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
-    expect(card).toHaveTextContent('Выключите его для просмотра видео');
+    await user.click(card);
+    const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
+    expect(within(sheet).getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
+    expect(within(sheet).getByRole('button',{name:'Выключить приватность'})).toBeEnabled();
+    expect(sheet).toHaveTextContent('Выключите его для просмотра видео');
     expect(vi.mocked(fetch).mock.calls.some(([input])=>String(input).includes('/stream'))).toBe(false);
   });
-  it('expands a main tile into live video without opening details and destroys the player on collapse',async()=>{
+  it('opens live video in a sheet and destroys the player when dismissed',async()=>{
     mountTiles(); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
     expect(hls.attach).not.toHaveBeenCalled();
-    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
+    const liveView=within(card).getByRole('button',{name:'Sleep Cam'});
+    await user.click(liveView);
+    const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(card.querySelector('.camera-live-compact')).toBeInTheDocument();
-    await user.click(screen.getByLabelText('Прямой эфир камеры'));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(within(sheet).getByLabelText('Прямой эфир камеры')).toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream')).map(([input])=>String(input))).toEqual(['http://api.test/api/v1/cloud/devices/camera/stream?provider=sharing']);
-    await user.click(within(card).getByRole('button',{name:'Свернуть видео камеры'}));
+    await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
     expect(hls.destroy).toHaveBeenCalledTimes(1);
-    expect(within(card).queryByRole('region',{name:'Видео камеры'})).toBeNull();
-    expect(within(card).getByRole('button',{name:'Показать видео камеры'})).toHaveAttribute('aria-expanded','false');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const restoredTrigger=within(card).getByRole('button',{name:'Sleep Cam'});
+    expect(restoredTrigger).toHaveAttribute('aria-expanded','false');
+    expect(restoredTrigger).toHaveFocus();
   });
-  it('stops and collapses inline viewing on route changes and opening details without restarting on close',async()=>{
+  it('uses the selected route for the camera sheet and keeps details separate',async()=>{
     mountTiles(); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
-    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
-    await waitFor(()=>expect(hls.attach).toHaveBeenCalledTimes(1));
     await user.selectOptions(within(card).getByRole('combobox'),'developer');
-    expect(hls.destroy).toHaveBeenCalledTimes(1);
-    expect(within(card).queryByRole('region',{name:'Видео камеры'})).toBeNull();
-    await user.click(within(card).getByRole('button',{name:'Показать видео камеры'}));
-    await waitFor(()=>expect(hls.attach).toHaveBeenCalledTimes(2));
+    await user.click(card);
+    const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
+    await waitFor(()=>expect(hls.attach).toHaveBeenCalledTimes(1));
     const streams=()=>vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream'));
-    expect(String(streams()[1][0])).toContain('provider=developer');
+    expect(String(streams()[0][0])).toContain('provider=developer');
+    await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
     await user.click(within(card).getByRole('button',{name:'Подробнее'}));
-    expect(hls.destroy).toHaveBeenCalledTimes(2);
+    expect(hls.destroy).toHaveBeenCalledTimes(1);
     const dialog=screen.getByRole('dialog');
     expect(within(dialog).getByRole('button',{name:'Смотреть видео'})).toBeEnabled();
     await user.click(within(dialog).getByRole('button',{name:'Закрыть'}));
-    expect(within(card).queryByRole('region',{name:'Видео камеры'})).toBeNull();
-    expect(streams()).toHaveLength(2);
+    expect(streams()).toHaveLength(1);
   });
   it('does not allocate on opening; starts only the selected route and stops the HLS player',async()=>{
     const view=mount('developer'),user=userEvent.setup();

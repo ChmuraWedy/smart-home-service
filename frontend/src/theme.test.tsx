@@ -50,6 +50,7 @@ describe('appearance preferences', () => {
 
   it('accepts cross-tab changes and falls back to System when the preference is removed', () => {
     render(<App/>);
+    fireEvent.click(screen.getByRole('button',{name:'Меню'}));
     act(()=>window.dispatchEvent(new StorageEvent('storage', {key:theme.THEME_STORAGE_KEY,newValue:'dark'})));
     expect(screen.getByLabelText('Тема')).toHaveValue('dark');
     systemChange(true);
@@ -70,12 +71,16 @@ describe('appearance preferences', () => {
     } finally { read.mockRestore(); write.mockRestore(); }
   });
 
-  it('preserves a live API/key draft and translates the selector with the interface', () => {
+  it('offers both preferences in the menu before connecting and preserves a live API/key draft', () => {
     render(<App/>);
     const address=screen.getByLabelText('Адрес API');
     const key=screen.getByLabelText('Ключ доступа к сервису');
     fireEvent.change(address,{target:{value:'http://draft-api.test:8080'}});
     fireEvent.change(key,{target:{value:'чернавік-Łąka'}});
+    const menu = screen.getByRole('button',{name:'Меню'});
+    expect(screen.queryByLabelText('Тема')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Язык')).not.toBeInTheDocument();
+    fireEvent.click(menu);
     for (const choice of ['dark','day','system']) {
       fireEvent.change(screen.getByLabelText('Тема'),{target:{value:choice}});
       expect(screen.getByLabelText('Адрес API')).toBe(address);
@@ -88,6 +93,9 @@ describe('appearance preferences', () => {
     fireEvent.change(screen.getByLabelText('Język'),{target:{value:'be'}});
     expect(screen.getByLabelText('Тэма')).toHaveValue('system');
     expect(screen.getByRole('option',{name:'Цёмная'})).toHaveValue('dark');
+    fireEvent.keyDown(screen.getByLabelText('Тэма'),{key:'Escape'});
+    expect(menu).toHaveFocus();
+    expect(menu).toHaveAttribute('aria-expanded','false');
     expect(key).toHaveValue('чернавік-Łąka');
     expect(fetch).not.toHaveBeenCalled();
   });
