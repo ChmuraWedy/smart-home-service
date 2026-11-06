@@ -2,6 +2,12 @@ import { useEffect, useId, useRef } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { t } from '../i18n';
 
+export type DashboardSheetState = {
+  open: boolean;
+  close: () => void;
+  trigger: RefObject<HTMLButtonElement | null>;
+};
+
 export function DashboardSheet({ title, onClose, returnFocus, children }: { title: string; onClose: () => void; returnFocus?: RefObject<HTMLElement | null>; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const dragStart = useRef<number | null>(null);
