@@ -200,7 +200,7 @@
 .capability label { font-size:12px; }
 .power-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
 .power-actions button { flex:1; font-size:13px; }
-.power-actions button[aria-pressed=true] { outline:1px solid var(--success); outline-offset:2px; }
+.power-actions button[aria-pressed=true]:not(.dashboard-power-button) { outline:1px solid var(--success); outline-offset:2px; }
 .apply-control { margin-top:12px; width:100%; }
 input[type=range] { accent-color:var(--accent); cursor:pointer; width:100%; padding:0; border:0; margin:8px 0; min-height:24px; height:24px; background:transparent; }
 input[type=color] { width:100%; height:48px; cursor:pointer; padding:4px; }
@@ -1111,13 +1111,7 @@ input[type=hidden] {
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:var(--media-bg); border-radius:10px; color:var(--media-text); font-size:30px; }
 .camera-setting-group { margin:20px 0; }
 .camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:var(--muted); }
-.camera-quick-controls .capability-boolean > .capability-row { grid-template-columns:minmax(0,1fr) auto; align-items:center; }
-.camera-quick-controls .capability-heading h3 { font-size:12px; line-height:1.2; overflow-wrap:anywhere; }
 .camera-live-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
-.camera-card-privacy .capability { padding:0; }
-.camera-card-privacy .capability-label-line,.camera-card-privacy .pending-reading { display:none; }
-.camera-card-privacy .capability-row { display:flex; justify-content:flex-end; }
-.camera-card-privacy .mode-button { padding:6px 10px; font-size:12px; }
 .camera-header-privacy .capability { padding:0; }
 .camera-header-privacy .reading-meta { display:none; }
 .camera-header-privacy .capability-label-line h3 { font-size:12px; }
@@ -1326,21 +1320,34 @@ button.header-icon:hover:enabled { background:var(--hover); }
   padding-top:0;
   margin-inline-start:calc(-1 * var(--dashboard-card-inset));
 }
+.dashboard-card-footer:has(.camera-card-privacy) { @apply tw:pt-0; }
+.camera-card-privacy { margin-inline-start:calc(-1 * var(--dashboard-card-inset)); }
+.camera-card-privacy .capability { @apply tw:p-0; }
+.camera-card-switches { @apply tw:flex tw:gap-2; }
+.camera-card-privacy + .camera-card-switches { @apply tw:border-t tw:border-(--border) tw:pt-1; }
+.camera-card-switches > .channel-control { @apply tw:min-w-0 tw:flex-1; }
+.camera-card-switches .capability-boolean > .capability-row {
+  @apply tw:grid-cols-[minmax(0,1fr)] tw:justify-items-center tw:gap-0;
+}
+.camera-card-switches .capability-label-line { @apply tw:text-center; }
+.camera-card-switches .capability-row > .power-actions {
+  @apply tw:col-start-1 tw:row-start-2 tw:flex-col tw:items-center;
+}
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback)) {
   @apply tw:pb-0;
 }
 .dashboard-device [data-power-layout] .channel-control + .channel-control { border-top:1px solid var(--border); }
-.dashboard-device [data-power-layout] .capability-boolean > .capability-row {
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row {
   @apply tw:grid-cols-[64px_minmax(0,1fr)] tw:items-center tw:justify-normal tw:gap-x-3 tw:gap-y-0;
 }
-.dashboard-device [data-power-layout] .capability-heading { @apply tw:col-start-2 tw:row-start-1 tw:block tw:self-end tw:pt-1; }
-.dashboard-device [data-power-layout] .capability-heading h3 { @apply tw:text-sm tw:whitespace-normal; }
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-heading { @apply tw:col-start-2 tw:row-start-1 tw:block tw:self-end tw:pt-1; }
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-heading h3 { @apply tw:text-sm tw:whitespace-normal; }
 .dashboard-device [data-power-layout] .capability-aliases { @apply tw:max-w-full; }
 .dashboard-device [data-power-layout] .capability-aliases .alias-tag {
   @apply tw:rounded-none tw:border-0 tw:bg-transparent tw:p-0 tw:text-xs;
 }
-.dashboard-device [data-power-layout] .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-1; }
-.dashboard-device [data-power-layout] .capability-boolean > .capability-row > .power-actions {
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-1; }
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
   @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
 }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))

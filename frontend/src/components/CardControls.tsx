@@ -107,19 +107,23 @@ function QuickFields({ name, paused, sheet, preview, specs, reading, now, local,
     </DashboardSheet>;
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error && !preview) return null;
   const field = (spec:ControlSpec, headingActions?:ReactNode, showBrightness = true) => <CapabilityField headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
-    powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : powerLayout === 'channels' ? <ParameterIcon code={spec.key} /> : undefined}
-    powerOnText={showBrightness ? brightnessText : undefined} booleanButton={camera && spec.key==='basic_private'} buttonText={camera && spec.key==='basic_private' ? t("Приватность") : undefined} booleanActions={spec === privacy && preview ? cameraSheet : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
+    powerIcon={spec === privacy
+      ? <svg className="parameter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.2 3 7.5 7.5 9.5 4.5-2 7.5-5.3 7.5-9.5V6z" /></svg>
+      : powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : powerLayout === 'channels' ? <ParameterIcon code={spec.key} /> : undefined}
+    powerOnText={showBrightness ? brightnessText : undefined} booleanButton={spec === privacy} booleanActions={spec === privacy && preview ? cameraSheet : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
+  const channels = powers.filter(spec => spec !== privacy).map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />);
   const layout = camera
-    ? 'camera-quick-controls tw:grid tw:grid-cols-1 tw:gap-1'
+    ? 'tw:grid tw:grid-cols-1'
     : 'tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1';
   return <>
-    <div className={"card-primary-controls " + layout} data-power-layout={powerLayout}>{powers.filter(spec=>spec!==privacy).map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+    <div className={"card-primary-controls " + layout} data-power-layout={powerLayout}>
+      {privacy && <div className="camera-card-privacy">{field(privacy)}</div>}
+      {camera && channels.length ? <div className="camera-card-switches">{channels}</div> : channels}
       {!!sensors.length && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(" · Устарело") : '');
         return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t("Устарело")}</span>}</span>;
       })}</div>}
-      {privacy && <div className="camera-card-privacy">{field(privacy)}</div>}
       <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
     {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
