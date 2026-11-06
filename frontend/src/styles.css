@@ -1427,10 +1427,13 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-light-presets { @apply tw:m-0 tw:min-h-0 tw:w-full tw:cursor-default tw:px-2 tw:py-1 tw:text-xs; }
 .dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
-  @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
+  @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-stretch;
 }
-.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
-  [data-power-layout] .channel-control:last-of-type .power-actions { @apply tw:self-end; }
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .power-actions > .dashboard-power-button {
+  @apply tw:self-stretch;
+  height:auto;
+  min-height:var(--dashboard-power-size,64px);
+}
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
   [data-power-layout] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:11px; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
@@ -1458,6 +1461,15 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 @media (max-width:540px) {
   .dashboard-view[data-card-size="large"] .dashboard-device { --dashboard-card-inset:8px; }
   .dashboard-view[data-card-size="large"] .card-primary-controls { --dashboard-power-size:48px; }
+  .dashboard-view .dashboard-card-header .device-card-identity { @apply tw:contents; }
+  .dashboard-view .dashboard-card-header .device-card-title { @apply tw:col-span-full tw:row-start-1; }
+  .dashboard-view .dashboard-card-header .device-card-title h3 { @apply tw:max-w-full; }
+  .dashboard-view .dashboard-card-header :is(.device-card-title h3:not(:has(> button)), .device-card-sheet-trigger) {
+    @apply tw:block tw:max-w-full tw:truncate;
+  }
+  .dashboard-view .dashboard-card-header .device-symbol { @apply tw:col-start-1 tw:row-start-2; }
+  .dashboard-view .dashboard-card-header .device-card-context { @apply tw:col-start-2 tw:row-start-2; }
+  .dashboard-view .dashboard-card-header .device-card-actions { @apply tw:col-start-3 tw:row-start-2; }
 }
 .dashboard-view[data-card-size="small"] :is(.dashboard-card-footer, .dashboard-card-subheader) { @apply tw:mt-1; }
 .dashboard-view[data-card-size="small"] .card-primary-controls { --dashboard-power-size:44px; }

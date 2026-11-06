@@ -85,6 +85,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
         icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
         title={hasSheet ? (
           <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
+            title={device.name}
             aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}
           >{device.name}
           </button>
