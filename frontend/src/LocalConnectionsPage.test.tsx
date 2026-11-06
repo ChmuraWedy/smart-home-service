@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomeApi } from './home-api';
@@ -86,7 +87,7 @@ const tick = async (ms: number) => { await act(async () => { await vi.advanceTim
 function mount(extra: Partial<Parameters<typeof LocalConnectionsPage>[0]> = {}) {
   vi.useFakeTimers();
   const onAuthError = vi.fn(), onLock = vi.fn(), onConnections = vi.fn();
-  return { ...render(<LocalConnectionsPage api={api} ready sharingReady developerReady={false} onAuthError={onAuthError} onConnections={onConnections} onLock={onLock} {...extra} />), onAuthError, onLock, onConnections };
+  return { ...render(<LocalConnectionsPage api={api} ready sharingReady developerReady={false} onAuthError={onAuthError} onConnections={onConnections} onLock={onLock} {...extra} />, { wrapper: MemoryRouter }), onAuthError, onLock, onConnections };
 }
 async function start(include = false) {
   await flush();
@@ -148,7 +149,7 @@ describe('network configuration wizard', () => {
     fireEvent.click(screen.getByRole('checkbox')); expect(saves(calls)).toHaveLength(0);
     const button = screen.getByRole('button', { name: 'Сохранить подключения' }); fireEvent.click(button); fireEvent.click(button); await flush();
     expect(saves(calls)).toHaveLength(1); expect(saves(calls)[0].body).toEqual({ finding_id: 'lamp'.padEnd(32, '_'), confirmed: true });
-    expect(screen.getByRole('link', { name: cloud[0].name })).toHaveAttribute('href', '#device/lamp?route=local');
+    expect(screen.getByRole('link', { name: cloud[0].name })).toHaveAttribute('href', '/devices/lamp?route=local');
     expect(onLock).toHaveBeenCalledWith(true); expect(onLock).toHaveBeenLastCalledWith(false);
     expect(screen.getByRole('heading', { name: 'Ещё не настроены: 1' })).toBeInTheDocument();
     expect(screen.getByText('Датчик Zigbee')).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { MSG, localizeMessages, t, translateText } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { ApiError } from '../api';
 import type { CloudDevice, LanDevice, NetworkInterface, NetworkScan, Provider } from '../api';
 import type { ConnectionFinding, HomeApi, Inventory, LocalDevice } from '../home-api';
@@ -261,7 +262,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
     </>}
     {stage === 'done' && <>
       <h2>{t(MSG.SETUP_RESULTS)}</h2>
-      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}>{row.saved && row.connectionId ? <a href={deviceHref(row.connectionId, 'local')}>{row.name}</a> : <strong>{row.name}</strong>}<span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">{t(MSG.NO_CONNECTIONS_WERE_SAVED)}</p>}
+      {outcomes.length ? <ul className="connection-results">{outcomes.map(row => <li key={row.id}>{row.saved && row.connectionId ? <Link to={deviceHref(row.connectionId, 'local')}>{row.name}</Link> : <strong>{row.name}</strong>}<span className={row.saved ? 'online' : 'field-error'}>{row.message}</span></li>)}</ul> : <p className="help">{t(MSG.NO_CONNECTIONS_WERE_SAVED)}</p>}
       <h3>{t(MSG.STILL_UNCONFIGURED) + " "}{pending.length}</h3><p className="help">{t(MSG.THESE_ACCOUNT_DEVICES_LACK_COMPLETE_LOCAL_CONNECTIONS)}</p>
       <ul className="connection-results">{pending.map(device => <li key={device.id}><strong>{device.name}</strong>{device.aliases?.length ? <span>{device.aliases.join(' · ')}</span> : null}</li>)}</ul>
       {!pending.length && <p className="help">{t(MSG.ALL_DEVICES_HAVE_LOCAL_CONNECTIONS)}</p>}

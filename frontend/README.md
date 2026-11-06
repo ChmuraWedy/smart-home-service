@@ -29,7 +29,26 @@ The menu opens Devices, Network and packets, Local connections, and Connections.
 
 Cards expose the main power switches or sensor readings. Bulbs have immediate power controls; full cards add brightness, temperature, color, effects, and schedules where supported. Multi-channel switches expose each real channel. Sensors show compact values and icons; details provide labels, units, timestamps, battery, and activity logs. Clicking a card opens details; child buttons retain their own actions.
 
-Each card has a stable `device-<encoded Tuya ID>` HTML ID. Links of the form `#device/<encoded Tuya ID>?route=local|sharing|developer` open that device and preserve the chosen route on reload. Missing devices/routes produce an error rather than silently selecting another device. Closing details clears its address; navigation does not interrupt a running command.
+Each card has a stable `device-<encoded Tuya ID>` HTML ID. Device links preserve the chosen control method on reload. Missing devices and unavailable control methods display an error. Closing a device panel returns to the dashboard context, and browser navigation is blocked during a running command.
+
+### Frontend URLs
+
+| URL | Screen |
+| --- | --- |
+| `/` | All rooms |
+| `/rooms/:roomId` or `/rooms/none` | One room or devices without a room |
+| `/?page=2` or `/rooms/:roomId?page=2` | A page of dashboard cards |
+| `/devices/:deviceId?route=local` | Full device details. `route` accepts `local`, `sharing`, or `developer`. |
+| `/devices/:deviceId/quick?route=sharing` | The bulb quick controls or camera preview |
+| `/groups/:groupId` | Group controls |
+| `/settings` | Language, theme, and card size |
+| `/settings/dashboard` | Dashboard filters and tools |
+| `/settings/connections` | Service access and Smart Life connection |
+| `/settings/connections?provider=developer` | Tuya Developer connection |
+| `/network` | Network and packet observation |
+| `/local-connections` | Local connection wizard |
+
+Room and device URLs use stable IDs. An overlay opened from a filtered dashboard carries its room and page in the URL. Existing `#device/...`, `#network`, and `#local-connections` bookmarks redirect to the corresponding routes.
 
 If multiple routes exist, the selector explicitly chooses home-network, Smart Life, or Developer control. Cloud routes work without a local IP/key import. Local control needs verified inventory connection details; Zigbee uses its saved gateway and child address. The app never retries an uncertain command through another route.
 
@@ -75,7 +94,7 @@ The API also supports sampling before local registration, including manually ent
 
 ## Network and packets
 
-`#network` operates without Smart Life. Choose the interface/subnet, start observation, filter devices/sources, and inspect IP, Tuya ID, MAC, mDNS/SSDP services, and the event log. An explicit discovery action sends standard announcements requests, not switch commands. Export saves a JSON report locally. Leaving the page or hiding it stops observation. This is LAN discovery, not a Zigbee radio sniffer. See [network capture](../docs/packet-capture.md).
+`/network` operates without Smart Life. Choose the interface/subnet, start observation, filter devices/sources, and inspect IP, Tuya ID, MAC, mDNS/SSDP services, and the event log. An explicit discovery action sends standard announcements requests, not switch commands. Export saves a JSON report locally. Leaving the page or hiding it stops observation. This is LAN discovery, not a Zigbee radio sniffer. See [network capture](../docs/packet-capture.md).
 
 ## Cameras and connections
 

@@ -1,6 +1,9 @@
 import { MSG, t, useLocale, translateText } from "./i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Provider as StoreProvider } from 'react-redux';
+import { createBrowserRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext } from 'react-router';
+import type { RouteObject } from 'react-router';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
 import { loadConnection, saveConnection } from './connection';
@@ -12,14 +15,14 @@ import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
-import { deviceHref, readDeviceLink } from './device-links';
-import type { DeviceLink } from './device-links';
+import { appPaths, dashboardHref, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomPattern } from './navigation';
+import type { DashboardPanel } from './navigation';
 import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 import { rotateCloudAccountScope } from './cloud-account-scope';
 
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
-type View = 'connections' | 'control' | 'network' | 'local-connections';
+type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
 const CARD_SIZE_STORAGE_KEY = 'smart-home.ui.card-size.v1';
 
@@ -28,27 +31,57 @@ function savedCardSize(): CardSize {
   catch { return 'large'; }
 }
 
-export function App() {
+function App() {
   const [store] = useState(createAppStore);
   return <StoreProvider store={store}><AppContent /></StoreProvider>;
+}
+
+function screenRoute(path: string, view: View, id = path): RouteObject {
+  return { id, ...(path === '/' ? { index: true } : { path }), handle: view, element: <AppScreen view={view} /> };
+}
+
+function AppScreen({ view }: { view: View }) {
+  const { pages, needsAccess } = useOutletContext<{ pages: Record<View, ReactNode>; needsAccess: boolean }>();
+  return pages[needsAccess ? 'connections' : view];
+}
+
+export function createAppRouter() {
+  return createBrowserRouter([{ element: <App />, children: [
+    screenRoute(appPaths.control, 'control'),
+    screenRoute(roomPattern, 'control'),
+    screenRoute(devicePattern, 'control'),
+    screenRoute(quickPattern, 'control'),
+    screenRoute(groupPattern, 'control'),
+    screenRoute(dashboardToolsPath, 'control'),
+    screenRoute(appPaths.settings, 'settings'),
+    screenRoute(appPaths.connections, 'connections'),
+    screenRoute(appPaths.network, 'network'),
+    screenRoute(appPaths['local-connections'], 'local-connections'),
+    screenRoute('*', 'control'),
+  ] }]);
 }
 
 function AppContent() {
   const locale = useLocale();
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   const [connection, setConnection] = useState<Connection>(() => loadConnection());
-  const [view, setView] = useState<View>(() => connection.token ? window.location.hash === '#local-connections' ? 'local-connections' : window.location.hash === '#network' ? 'network' : 'control' : 'connections');
-  const [deviceTarget, setDeviceTarget] = useState(() => readDeviceLink(window.location.hash));
-  const acceptedHash = useRef(window.location.hash);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const matched = useMatches().at(-1)!;
+  const query = new URLSearchParams(location.search);
+  const requestedView = matched.handle as View;
+  const needsAccess = !connection.token && requestedView !== 'settings' && requestedView !== 'connections';
+  const view = needsAccess ? 'connections' : requestedView;
+  const panelParam = query.get('panel');
+  const dashboardPanel: DashboardPanel = matched.id === dashboardToolsPath || panelParam === 'tools' ? 'tools' : panelParam === 'search' ? 'search' : null;
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dashboardPanel, setDashboardPanel] = useState<'search' | 'tools' | null>(null);
   const [cardSize, setCardSize] = useState(savedCardSize);
   const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
   const [localConnectionLocked, setLocalConnectionLocked] = useState(false);
   const dashboardLocked = useAppSelector(selectDashboardLocked);
   const controlLocked = dashboardLocked || localConnectionLocked;
   const [status, setStatus] = useState<CloudStatus | null>(null);
-  const [provider, setProvider] = useState<Provider>('sharing');
+  const provider: Provider = query.get('provider') === 'developer' ? 'developer' : 'sharing';
   const [notice, setNotice] = useState<Notice>({ text: '' });
   const [busy, setBusy] = useState(Boolean(connection.token));
   const busyRef = useRef(busy);
@@ -65,12 +98,29 @@ function AppContent() {
   const showDeveloperForm = ready && (!developer.configured || editingDeveloper);
   const accountConnected = provider === 'sharing' ? Boolean(status?.connected) : developer.connected;
 
+  const blocker = useBlocker(({ historyAction }) => {
+    if (historyAction !== 'POP') return false;
+    const dialogs = document.querySelectorAll('dialog[open]');
+    return busyRef.current || !!document.querySelector('dialog[open][aria-busy="true"]') || dialogs.length > 1 || (controlLocked && !dialogs.length);
+  });
+  useEffect(() => { if (blocker.state === 'blocked') blocker.reset(); }, [blocker]);
+
+  useEffect(() => {
+    const legacy = location.pathname === '/' ? legacyHref(location.hash) : null;
+    if (needsAccess) {
+      const returnTo = legacy ?? (matched.id === '*' ? '/' : location.pathname + location.search);
+      void navigate(appPaths.connections, { replace: true, state: returnTo === '/' ? null : { returnTo } });
+    } else if (legacy || matched.id === '*') {
+      void navigate(legacy ?? appPaths.control, { replace: true });
+    }
+  }, [location, matched.id, needsAccess, navigate]);
+
   function invalidateConnection() {
     const next = { ...connection, token: '' };
     try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
     verified.current = next;
     setConnection(next); setStatus(null); setQR(null);
-    setLocalConnectionLocked(false); setView('connections');
+    setLocalConnectionLocked(false);
   }
 
   useEffect(() => {
@@ -127,6 +177,7 @@ function AppContent() {
     setConnection(next); setStatus(nextStatus); setQR(null);
     setEditingCode(false); setEditingDeveloper(false);
     setNotice({ text: t(MSG.CONNECTION_SAVED_NOTICE) });
+    if (location.state?.returnTo) void navigate(location.state.returnTo, { replace: true });
   });
 
   const saveCode = (code: string) => run(async () => {
@@ -172,8 +223,9 @@ function AppContent() {
   }, true);
 
   function chooseProvider(value: Provider) {
-    if (busyRef.current) return;
-    setProvider(value); setQR(null); setNotice({ text: '' });
+    if (busyRef.current || value === provider) return;
+    setQR(null); setNotice({ text: '' });
+    void navigate(appPaths.connections + (value === 'developer' ? '?provider=developer' : ''), { state: location.state });
   }
 
   function changeCardSize(next: CardSize) {
@@ -181,30 +233,17 @@ function AppContent() {
     try { localStorage.setItem(CARD_SIZE_STORAGE_KEY, next); } catch { /* The current view still updates. */ }
   }
 
-  function navigate(next: View) {
-    setView(next); setDeviceTarget(null); setMenuOpen(false); setNotice({ text: '' }); setQR(null);
-    acceptedHash.current = next === 'network' || next === 'local-connections' ? '#' + next : '';
-    window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
+  function goTo(next: View) {
+    setMenuOpen(false); setNotice({ text: '' });
+    if (location.pathname !== appPaths[next] || location.search || location.hash) void navigate(appPaths[next]);
   }
-  const changeDeviceTarget = useCallback((target: DeviceLink | null) => {
-    const hash = target ? deviceHref(target.id, target.route) : '';
-    setDeviceTarget(target); acceptedHash.current = hash;
-    if (window.location.hash !== hash) window.history[target ? 'pushState' : 'replaceState'](null, '', window.location.pathname + window.location.search + hash);
-  }, []);
-  useEffect(() => {
-    const changed = () => {
-      const dialogs = document.querySelectorAll('dialog[open]');
-      if (busyRef.current || document.querySelector('dialog[open][aria-busy="true"]') || dialogs.length > 1 || (controlLocked && !dialogs.length)) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search + acceptedHash.current);
-        return;
-      }
-      acceptedHash.current = window.location.hash;
-      setDeviceTarget(readDeviceLink(window.location.hash)); setMenuOpen(false); setNotice({ text: '' });
-      setView(window.location.hash === '#network' ? 'network' : window.location.hash === '#local-connections' ? 'local-connections' : 'control');
-    };
-    window.addEventListener('hashchange', changed);
-    return () => window.removeEventListener('hashchange', changed);
-  }, [controlLocked]);
+  function changeDashboardPanel(next: DashboardPanel) {
+    if (next !== 'search' && query.has('q')) { query.delete('q'); query.delete('page'); }
+    void navigate(dashboardHref(dashboardRoom(location.pathname, query), query, next));
+    setMenuOpen(false);
+  }
+  useEffect(() => { setMenuOpen(false); }, [location.key]);
+  useEffect(() => { setQR(null); }, [view, provider]);
   useEffect(() => {
     if (!menuOpen) return;
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !menuRef.current?.contains(event.target)) setMenuOpen(false); };
@@ -213,37 +252,36 @@ function AppContent() {
   }, [menuOpen]);
 
   const regionName = REGIONS.find(item => item.value === developer.region)?.label;
+  const appearance = <><ThemeSelector /><LanguageSelector />
+    <label><span>{t(MSG.CARD_SIZE)}</span><select value={cardSize} onChange={event => changeCardSize(event.target.value === 'small' ? 'small' : 'large')}>
+      <option value="large">{t(MSG.CARD_SIZE_LARGE)}</option>
+      <option value="small">{t(MSG.CARD_SIZE_SMALL)}</option>
+    </select></label>
+  </>;
   return <div className={"app-shell" + (view === 'control' ? " dashboard-view" : "")}
     data-dashboard-panel={dashboardPanel ?? undefined} data-card-size={cardSize}>
     <header className="app-header"><div className="app-menu" ref={menuRef} onKeyDown={event => { if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); } }}>
       <button className="secondary app-menu-button" ref={menuButton} aria-label={t(MSG.MENU)} aria-expanded={menuOpen} aria-controls="app-sections" disabled={locked} onClick={() => setMenuOpen(value => !value)}><span aria-hidden="true">☰</span></button>
-      {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>{([['control', t(MSG.CONTROL)], ['network', t(MSG.NETWORK_AND_PACKETS)], ['local-connections', t(MSG.LOCAL_CONNECTIONS)], ['connections', t(MSG.CONNECTIONS)]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => navigate(key)}>{label}</button>)}
+      {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>{([['control', t(MSG.CONTROL)], ['network', t(MSG.NETWORK_AND_PACKETS)], ['local-connections', t(MSG.LOCAL_CONNECTIONS)], ['settings', t(MSG.SETTINGS)], ['connections', t(MSG.CONNECTIONS)]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>{label}</button>)}
         {view === 'control' && status && <button className="secondary dashboard-tools-menu" disabled={locked} aria-expanded={dashboardPanel === 'tools'} onClick={() => {
-          setDashboardPanel(panel => panel === 'tools' ? null : 'tools');
-          setMenuOpen(false);
+          changeDashboardPanel(dashboardPanel === 'tools' ? null : 'tools');
           menuButton.current?.focus();
         }}>{t(MSG.DASHBOARD_SETTINGS)}</button>}
-        <div className="app-menu-appearance"><ThemeSelector /><LanguageSelector />
-          <label><span>{t(MSG.CARD_SIZE)}</span><select value={cardSize} onChange={event => changeCardSize(event.target.value === 'small' ? 'small' : 'large')}>
-            <option value="large">{t(MSG.CARD_SIZE_LARGE)}</option>
-            <option value="small">{t(MSG.CARD_SIZE_SMALL)}</option>
-          </select></label>
-        </div>
+        {view !== 'settings' && <div className="app-menu-appearance">{appearance}</div>}
       </nav>}
     </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span className="brand-tagline">{t(MSG.YOUR_HOME_UNDER_CONTROL)}</span>
       {view === 'control' && <span className={"dashboard-connection" + (status ? " online" : "")}><i aria-hidden="true" />{status ? t(MSG.CONNECTED) : t(MSG.API_DISCONNECTED)}</span>}
     </div></div>
       <span className={'api-presence ' + (status ? 'online' : '')}><i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}</span>
       {view === 'control' && status && <button className="secondary dashboard-search-button" type="button" aria-label={t(MSG.SEARCH)} aria-expanded={dashboardPanel === 'search'} aria-controls="dashboard-search" disabled={locked} onClick={() => {
-        setMenuOpen(false);
-        setDashboardPanel(panel => panel === 'search' ? null : 'search');
+        changeDashboardPanel(dashboardPanel === 'search' ? null : 'search');
       }}>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
       </button>}
     </header>
     <main>
       <input id="access-token" type="hidden" value={connection.token} readOnly />
-      {view === 'connections' ? <>
+      <Outlet context={{ needsAccess, pages: { connections: <>
       <div className="page-heading"><p className="eyebrow">{t(MSG.CONNECTIONS)}</p><h1>{ready && accountConnected ? t(MSG.TUYA_CONNECTED) : t(MSG.CONNECT_TUYA)}</h1><p className="muted">{ready && accountConnected ? t(MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES) : t(MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES)}</p></div>
       <div className="workspace connections-workspace">
         <section className="card setup" aria-label={t(MSG.TUYA_CONNECTION)}>
@@ -276,9 +314,14 @@ function AppContent() {
           <div className="privacy-note"><span aria-hidden="true">✓</span><p>{t(MSG.USER_CODE_TUYA_CREDENTIALS_TOKENS_AND_LOCAL_KEYS)}</p></div>
         </section>
       </div>
-      </> : view === 'network' ? <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} /> : view === 'local-connections' ? <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => navigate('connections')} /> : <ControlCenter dashboardPanel={dashboardPanel} api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onConnections={() => navigate('connections')} deviceLink={deviceTarget} onDeviceLinkChange={changeDeviceTarget} />}
+        <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
+      </>,
+        settings: <section className="card"><h1>{t(MSG.SETTINGS)}</h1><div className="app-menu-appearance">{appearance}</div></section>,
+        network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
+        'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
+        control: <ControlCenter dashboardPanel={dashboardPanel} api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onConnections={() => goTo('connections')} />,
+      } satisfies Record<View, ReactNode> }} />
       <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">{busy ? <><span className="spinner" aria-hidden="true" />{t(MSG.PLEASE_WAIT)}</> : translateText(notice.text)}</div>
-      {view === 'connections' && <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />}
     </main>
     <footer><span>Smart Home · Tuya</span></footer>
   </div>;
