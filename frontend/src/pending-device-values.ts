@@ -19,7 +19,7 @@ type Target = {
   protectsPrivacy: boolean;
 };
 
-type PendingValues = Record<string, { sequence: number; target?: Target; expired?: boolean } | undefined>;
+type PendingValues = Record<string, { sequence: number; target?: Target; expired?: boolean; protectsPrivacy?: true } | undefined>;
 type TargetIdentity = { key: string; sequence: number };
 
 const initialState: PendingValues = {};
@@ -37,22 +37,25 @@ const pendingDeviceValues = createSlice({
   reducers: {
     accepted(state, { payload: { key, target } }: PayloadAction<{ key: string; target: Target }>) {
       if ((state[key]?.sequence ?? 0) >= target.sequence) return;
-      state[key] = { sequence: target.sequence, target };
+      state[key] = { sequence: target.sequence, target, ...(target.protectsPrivacy && { protectsPrivacy: true }) };
     },
     reported(state, { payload: { key, sequence } }: PayloadAction<TargetIdentity>) {
       // Retain the sequence until expiry so an older acknowledgement cannot revive a target.
       const current = state[key];
       if (current?.sequence !== sequence) return;
-      if (current.expired) delete state[key];
-      else delete current.target;
+      delete current.target;
+      delete current.expired;
     },
     expired(state, { payload: { key, sequence } }: PayloadAction<TargetIdentity>) {
       const current = state[key];
       if (current?.sequence !== sequence) return;
       // A timed-out privacy command is still unconfirmed. Keep playback blocked
       // until a new privacy reading arrives, while restoring the normal editor.
-      if (current.target?.protectsPrivacy) current.expired = true;
-      else delete state[key];
+      if (current.protectsPrivacy) {
+        // Privacy acknowledgements can outlast the visible wait. Keep only the
+        // last sequence after reconciliation so an older one cannot block video.
+        if (current.target) current.expired = true;
+      } else delete state[key];
     },
   },
 });

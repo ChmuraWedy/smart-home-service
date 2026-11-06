@@ -110,6 +110,20 @@ describe('shared accepted targets', () => {
 });
 
 describe('privacy confirmation', () => {
+  it('does not let a very late privacy acknowledgement revive a resolved gate', () => {
+    vi.useFakeTimers();
+    const store = createAppStore();
+    const key = pendingValueKey('device', privacy.key);
+    const older = beginPendingValue(store.dispatch, key, true, known(false), true);
+    const newer = beginPendingValue(store.dispatch, key, false, known(true), true);
+    newer();
+    const sequence = store.getState().pendingDeviceValues[key]!.sequence;
+    store.dispatch(pendingReadingReported({ key, sequence }));
+    vi.advanceTimersByTime(PENDING_READING_TIMEOUT_MS + 1);
+    older();
+    expect(store.getState().pendingDeviceValues[key]).toEqual({ sequence, protectsPrivacy: true });
+  });
+
   function FieldWithPlayback({ reading, now, send }: { reading: Reading; now: number; send: (value: unknown) => Promise<boolean> }) {
     const status = usePendingPrivacyState(defaultProps.pendingScope, reading.value === true);
     return <>
