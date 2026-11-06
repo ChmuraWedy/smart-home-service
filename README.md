@@ -21,7 +21,7 @@ Controls depend on the functions exposed by the device and the selected connecti
 
 ## Screenshots
 
-Real views of connected lights, switches, and sensors in English. Device names, aliases, and room assignments remain as configured in the captured installation.
+Real views of connected lights, switches, sensors, and a camera in English. The camera is labeled **Security Camera** for its screenshot.
 
 ### Device overview
 
@@ -40,6 +40,12 @@ The phone dashboard shown here uses Large cards. Choose **Menu → Card size** t
 Tap a supported light card to open a bottom sheet for power, brightness, and warm-to-cool white temperature. Tap the card’s chevron to open full device details.
 
 ![Bulb quick controls open in a bottom sheet on the phone dashboard](docs/screenshots/mobile-bulb-quick-controls-day.png)
+
+### Phone camera preview
+
+Tap the camera card to open its live feed in a bottom sheet. From the sheet you can go full screen or stop playback. This example uses a frame from an earlier live capture.
+
+![Security Camera bottom sheet on the phone dashboard with a previously captured live frame](docs/screenshots/mobile-camera-bottom-sheet-dark.png)
 
 ### Bulb: brightness, white temperature, and schedules
 
