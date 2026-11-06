@@ -205,10 +205,10 @@ describe('main controls on device cards', () => {
   it('shows sensor values with accessible labels and no settings editors', async () => {
     const sensorDefinitions:CloudFunctions={device_id:'lamp',functions:[{code:'temp_unit_convert',type:'Enum',values:{range:['c','f']}}],status_range:[{code:'va_temperature',type:'Integer',values:{unit:'℃',scale:1}},{code:'va_humidity',type:'Integer',values:{unit:'%',scale:0}}]};
     mount({...lamp,controls:{ready:true,definitions:sensorDefinitions,snapshot:{...snapshot,status:{va_temperature:225,va_humidity:48}}}});
-    expect(await screen.findByLabelText('Температура: 22.5 °C')).toHaveTextContent('22.5 °C');
-    expect(screen.getByLabelText('Влажность: 48 %')).toHaveTextContent('48 %');
-    expect(screen.queryByText('Температура')).toBeNull();
-    expect(screen.queryByText('Влажность')).toBeNull();
+    expect(await screen.findByTitle('Температура: 22.5 °C')).toHaveTextContent('Температура: 22.5 °C');
+    expect(screen.getByTitle('Влажность: 48 %')).toHaveTextContent('Влажность: 48 %');
+    expect(screen.getByText('Температура:')).toHaveClass('sr-only');
+    expect(screen.getByText('Влажность:')).toHaveClass('sr-only');
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.queryByRole('button',{name:'Применить'})).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
