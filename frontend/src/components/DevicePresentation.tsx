@@ -25,10 +25,16 @@ export const isCamera = (category?: string) => category === 'sp' || category ===
 const isLight = (category: string | undefined, codes: string[]) =>
   category === 'dj' || codes.some(code => /^(switch_led|bright_value(?:_v2)?|colour_data(?:_v2)?)$/.test(code));
 
+type DeviceIconProps =
+  | { group: true; category?: never; codes?: never }
+  | { group?: false; category?: string; codes: string[] };
+
 // Use reported category/capability codes, never a guess from the device name.
-export function DeviceIcon({ category, codes }: { category?: string; codes: string[] }) {
+export function DeviceIcon({ category, codes, group }: DeviceIconProps) {
   let type = 'device', path = 'M5 3h14v18H5zM9 17h6';
-  if (isCamera(category)) {
+  if (group) {
+    type = 'group';
+  } else if (isCamera(category)) {
     type = 'camera'; path = 'M3 6h12v12H3zM15 10l6-3v10l-6-3M6 9h6';
   } else if (isLight(category, codes)) {
     type = 'light'; path = 'M9 18h6M10 21h4M8 14a6 6 0 1 1 8 0l-1 3H9z';
@@ -43,5 +49,36 @@ export function DeviceIcon({ category, codes }: { category?: string; codes: stri
   } else if (category === 'kg' || codes.some(code => /^switch(?:_[1-9][0-9]*)?$/.test(code))) {
     type = 'switch'; path = 'M4 3h16v18H4zM8 7h8v10H8zM12 9v3';
   }
-  return <svg className="device-type-icon" data-device-type={type} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={path} /></svg>;
+  return <svg className="device-type-icon" data-device-type={type} viewBox="0 0 24 24" aria-hidden="true">
+    {group ? <>
+      <rect
+        x="3"
+        y="3"
+        width="7"
+        height="7"
+        rx="1.5"
+      />
+      <rect
+        x="14"
+        y="3"
+        width="7"
+        height="7"
+        rx="1.5"
+      />
+      <rect
+        x="3"
+        y="14"
+        width="7"
+        height="7"
+        rx="1.5"
+      />
+      <rect
+        x="14"
+        y="14"
+        width="7"
+        height="7"
+        rx="1.5"
+      />
+    </> : <path d={path} />}
+  </svg>;
 }

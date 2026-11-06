@@ -146,10 +146,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 27
+      "count": 22
     },
     "@stylistic/max-len": {
-      "count": 32
+      "count": 31
     },
     "no-nested-ternary": {
       "count": 9
@@ -253,10 +253,10 @@
   },
   "src/components/DevicePresentation.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 2
+      "count": 1
     },
     "@stylistic/max-len": {
-      "count": 5
+      "count": 4
     },
     "no-nested-ternary": {
       "count": 6
