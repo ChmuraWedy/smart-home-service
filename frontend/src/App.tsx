@@ -19,6 +19,13 @@ import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
 type View = 'connections' | 'control' | 'network' | 'local-connections';
+type CardSize = 'large' | 'small';
+const CARD_SIZE_STORAGE_KEY = 'smart-home.ui.card-size.v1';
+
+function savedCardSize(): CardSize {
+  try { return localStorage.getItem(CARD_SIZE_STORAGE_KEY) === 'small' ? 'small' : 'large'; }
+  catch { return 'large'; }
+}
 
 export function App() {
   const [store] = useState(createAppStore);
@@ -34,6 +41,7 @@ function AppContent() {
   const acceptedHash = useRef(window.location.hash);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dashboardPanel, setDashboardPanel] = useState<'search' | 'tools' | null>(null);
+  const [cardSize, setCardSize] = useState(savedCardSize);
   const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
   const [localConnectionLocked, setLocalConnectionLocked] = useState(false);
   const dashboardLocked = useAppSelector(selectDashboardLocked);
@@ -163,6 +171,11 @@ function AppContent() {
     setProvider(value); setQR(null); setNotice({ text: '' });
   }
 
+  function changeCardSize(next: CardSize) {
+    setCardSize(next);
+    try { localStorage.setItem(CARD_SIZE_STORAGE_KEY, next); } catch { /* The current view still updates. */ }
+  }
+
   function navigate(next: View) {
     setView(next); setDeviceTarget(null); setMenuOpen(false); setNotice({ text: '' }); setQR(null);
     acceptedHash.current = next === 'network' || next === 'local-connections' ? '#' + next : '';
@@ -195,7 +208,8 @@ function AppContent() {
   }, [menuOpen]);
 
   const regionName = REGIONS.find(item => item.value === developer.region)?.label;
-  return <div className={"app-shell" + (view === 'control' ? " dashboard-view" : "")} data-dashboard-panel={dashboardPanel ?? undefined}>
+  return <div className={"app-shell" + (view === 'control' ? " dashboard-view" : "")}
+    data-dashboard-panel={dashboardPanel ?? undefined} data-card-size={cardSize}>
     <header className="app-header"><div className="app-menu" ref={menuRef} onKeyDown={event => { if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); } }}>
       <button className="secondary app-menu-button" ref={menuButton} aria-label={t(MSG.MENU)} aria-expanded={menuOpen} aria-controls="app-sections" disabled={locked} onClick={() => setMenuOpen(value => !value)}><span aria-hidden="true">☰</span></button>
       {menuOpen && <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>{([['control', t(MSG.CONTROL)], ['network', t(MSG.NETWORK_AND_PACKETS)], ['local-connections', t(MSG.LOCAL_CONNECTIONS)], ['connections', t(MSG.CONNECTIONS)]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => navigate(key)}>{label}</button>)}
@@ -204,7 +218,12 @@ function AppContent() {
           setMenuOpen(false);
           menuButton.current?.focus();
         }}>{t(MSG.DASHBOARD_SETTINGS)}</button>}
-        <div className="app-menu-appearance"><ThemeSelector /><LanguageSelector /></div>
+        <div className="app-menu-appearance"><ThemeSelector /><LanguageSelector />
+          <label><span>{t(MSG.CARD_SIZE)}</span><select value={cardSize} onChange={event => changeCardSize(event.target.value === 'small' ? 'small' : 'large')}>
+            <option value="large">{t(MSG.CARD_SIZE_LARGE)}</option>
+            <option value="small">{t(MSG.CARD_SIZE_SMALL)}</option>
+          </select></label>
+        </div>
       </nav>}
     </div><div className="brand"><span className="brand-icon" aria-hidden="true">⌂</span><div><strong>Smart Home</strong><span className="brand-tagline">{t(MSG.YOUR_HOME_UNDER_CONTROL)}</span>
       {view === 'control' && <span className={"dashboard-connection" + (status ? " online" : "")}><i aria-hidden="true" />{status ? t(MSG.CONNECTED) : t(MSG.API_DISCONNECTED)}</span>}

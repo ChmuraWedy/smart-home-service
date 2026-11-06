@@ -5,7 +5,7 @@ export function Switch({ powerIcon, ...props }: ComponentProps<typeof HeadlessSw
   return (
     <HeadlessSwitch
       data-slot={powerIcon ? 'power-button' : 'switch'}
-      className={powerIcon ? 'dashboard-power-button' : 'tw:group tw:relative tw:inline-flex tw:h-6 tw:w-11 tw:shrink-0 tw:items-center tw:rounded-full tw:max-[600px]:h-11 tw:pointer-coarse:h-11 tw:before:absolute tw:before:inset-x-0 tw:before:h-6 tw:before:rounded-full tw:before:bg-(--toggle-off) tw:data-checked:before:bg-(--accent)'}
+      className={powerIcon ? 'dashboard-power-button' : 'tw:group tw:relative tw:inline-flex tw:size-11 tw:shrink-0 tw:items-center tw:rounded-full tw:before:absolute tw:before:inset-x-0 tw:before:h-6 tw:before:rounded-full tw:before:bg-(--toggle-off) tw:data-checked:before:bg-(--accent)'}
       {...props}
       onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
         // Keep Enter activation alongside the Space handling built into Headless UI.
