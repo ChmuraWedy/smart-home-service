@@ -815,13 +815,13 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 15
+      "count": 14
     },
     "@stylistic/max-len": {
-      "count": 21
+      "count": 20
     },
     "arrow-parens": {
-      "count": 49
+      "count": 47
     },
     "arrow-spacing": {
       "count": 6
@@ -866,7 +866,7 @@
       "count": 1
     },
     "no-void": {
-      "count": 10
+      "count": 9
     },
     "object-curly-newline": {
       "count": 32
