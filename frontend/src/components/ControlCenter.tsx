@@ -1,4 +1,4 @@
-import { MSG, dateLocale, t, translateText } from "../i18n";
+import { MSG, t, translateText } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api';
@@ -14,6 +14,7 @@ import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
+import { TopologySummary } from './TopologySummary';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
@@ -364,14 +365,12 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
         <button type="button" className="secondary" aria-pressed={room === 'none'} onClick={() => selectRoom('none')}>{t(MSG.NO_ROOM)}</button>
       </div>
       <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
-      {sharingReady && <div className="topology-summary">
-        <div><h3>{t(MSG.ROOMS_FROM_SMART_LIFE)}</h3><p className={topology.busy ? 'help' : 'help topology-note'}>{topology.busy ? t(MSG.LOADING_HOME_STRUCTURE, [topology.data?.job.processed || 0, topology.data?.job.total || '…']) : topology.data?.synced_at ? t(MSG.SYNCED) + new Date(topology.data.synced_at).toLocaleString(dateLocale()) : t(MSG.BUILDINGS_AND_ROOMS_WILL_BE_USED_IN_DEVICE)}</p></div>
-        <button className="secondary compact" disabled={topology.busy} onClick={() => void topology.sync()}>{t(MSG.SYNC_SMART_LIFE)}</button>
-        {topology.busy && <p role="status" className="help">{t(MSG.SYNCHRONIZATION_RUNS_IN_THE_BACKGROUND)}</p>}
-        {(topology.error || topology.data?.job.message) && <p role="alert" className="field-error">{topology.error || topology.data?.job.message}</p>}
-        {Boolean(topology.data?.warnings) && <p className="help">{t(MSG.MANUAL_SETTINGS_WERE_PRESERVED_OR_PLACEMENT_LIMITATIONS_WERE) + " "}{topology.data?.warnings}{t(MSG.CHECK_THE_RELEVANT_DEVICES_ROOMS)}</p>}
-        <p className="help topology-note">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
-      </div>}
+      {sharingReady && <TopologySummary
+        data={topology.data}
+        error={topology.error}
+        busy={topology.busy}
+        onSync={() => void topology.sync()}
+      />}
       <div className="control-filters"><label>{t(MSG.BUILDING)}<select value={building} onChange={event => setBuilding(event.target.value)}><option value="">{t(MSG.ALL_BUILDINGS)}</option>{inventory?.buildings.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label>{t(MSG.ROOM)}<select value={room} onChange={event => selectRoom(event.target.value)}><option value="">{t(MSG.ALL_ROOMS)}</option><option value="none">{t(MSG.NO_ROOM)}</option>{filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label><label id="dashboard-search" className="dashboard-search-field"><span>{t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}</span><input ref={searchInput} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)} /></label></div>
       {busy && <p role="status" className="help">{t(MSG.LOADING_LIST)}</p>}{current?.errors.map(error => <p key={translateText(error)} role="alert" className="field-error">{translateText(error)}</p>)}
       {!busy && current && !entries.length && <div className="empty-state"><h3>{devices.length || inventory?.groups.length ? t(MSG.NOTHING_FOUND) : t(MSG.NO_DEVICES_YET)}</h3><p>{devices.length || inventory?.groups.length ? t(MSG.CHANGE_YOUR_FILTERS_OR_SEARCH_QUERY) : sharingReady || developerReady ? t(MSG.ADD_DEVICES_IN_SMART_LIFE_AND_REFRESH_THE) : t(MSG.CONNECT_A_TUYA_ACCOUNT_TO_SEE_YOUR_DEVICES)}</p>{!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t(MSG.SET_UP_CONNECTION)}</button>}</div>}
