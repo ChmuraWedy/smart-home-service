@@ -1,5 +1,5 @@
-import { renderWithStore as render } from './test/render-with-store';
-import { act, fireEvent, screen, within } from '@testing-library/react';
+import { renderWithStore } from './test/render-with-store';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi, type DeviceEvent } from './api';
@@ -55,7 +55,7 @@ describe('popup schedule wizards', () => {
     vi.mocked(fetch).mockImplementation(async input => json(String(input).includes('/functions')
       ? {device_id:'lamp',functions:[...functions,{code:'music_data',type:'Json',values:{}}]}
       : {device_id:'lamp',online:true,status:{}}));
-    render(<CloudControl api={new CloudApi(connection)} device={{id:'lamp',name:'Лампа',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{id:'lamp',name:'Лампа',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const schedules = await screen.findByRole('region',{name:'Расписания света'});
     for (const name of ['Суточный ритм света','Случайное расписание','Свет для пробуждения','Свет перед сном']) {
       expect(within(schedules).getByRole('region',{name})).toBeVisible();
@@ -72,7 +72,7 @@ describe('popup schedule wizards', () => {
       if (init?.method==='POST') { writes.push(JSON.parse(String(init.body))); return json({acknowledged:true}); }
       return json(new URL(String(input)).pathname.endsWith('/functions') ? {device_id:'lamp',functions:[{code:'rhythm_mode',type:'Raw',values:{}}]} : {device_id:'lamp',online:true,status:{rhythm_mode:original}});
     });
-    render(<CloudControl api={new CloudApi(connection)} device={{id:'lamp',name:'Лампа',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{id:'lamp',name:'Лампа',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     const user=userEvent.setup(); await screen.findByRole('region',{name:'Суточный ритм света'});
     expect(screen.getByRole('region',{name:'Расписания света'})).toBeVisible();
     expect(screen.queryByText('Эффекты и дополнительные параметры')).toBeNull();
@@ -159,7 +159,7 @@ describe('device activity and sensor presentation', () => {
   it('translates real va sensor codes, adds measurement icons and moves unitless battery to the header', async () => {
     const ranges=[{code:'va_temperature',type:'Integer',values:{min:-400,max:1200,scale:1,unit:'℃'}},{code:'va_humidity',type:'Integer',values:{min:0,max:100,scale:0,unit:'%'}},{code:'va_battery',type:'Integer',values:{min:0,max:100,scale:0,unit:''}}];
     vi.mocked(fetch).mockImplementation(async input => json(new URL(String(input)).pathname.endsWith('/functions') ? {device_id:'sensor',functions:[],status_range:ranges} : {device_id:'sensor',online:true,status:{va_temperature:205,va_humidity:58,va_battery:100}}));
-    render(<CloudControl api={new CloudApi(connection)} device={{id:'sensor',name:'Датчик',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<CloudControl api={new CloudApi(connection)} device={{id:'sensor',name:'Датчик',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
     expect(await screen.findByRole('region',{name:'Температура'})).toHaveTextContent('20.5 °C');
     expect(screen.getByRole('region',{name:'Влажность'})).toHaveTextContent('58 %');
     expect(screen.getByRole('region',{name:'Температура'}).querySelector('svg')).toBeInTheDocument();

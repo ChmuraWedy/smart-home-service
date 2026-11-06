@@ -37,6 +37,66 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it('shares an awaited cloud command and its confirmation between the card and details', async () => {
+    const calls = server({ noLocal: true });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const oldReport = new Date(Date.now() - 5000).toISOString();
+    const snapshot = (power: boolean, received: string) => ({
+      device_id: shared.id, online: true, source: 'cloud', status: { switch_led: power },
+      status_observations: { switch_led: { received_at: received } },
+    });
+    const inventorySnapshot = snapshot(false, oldReport);
+    let report = inventorySnapshot;
+    const cloudLists = () => calls.filter(call => call.path.startsWith('/api/v1/cloud/devices?')).length;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/cloud/devices')) {
+        calls.push({ path: url.pathname + url.search, method: 'GET' });
+        return json([{
+          ...shared, controls: {
+            ready: true,
+            definitions: { device_id: shared.id, functions: [{ code: 'switch_led', type: 'Boolean', values: '{}' }] },
+            snapshot: inventorySnapshot,
+          },
+        }]);
+      }
+      if (url.pathname.endsWith('/status')) return json(report);
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
+    const card = await screen.findByRole('listitem', { name: shared.name });
+    const power = await within(card).findByRole('switch', { name: 'Питание' });
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(power).not.toBeChecked();
+    await user.click(power);
+    expect(await within(card).findByText('Ожидаем новое показание')).toBeInTheDocument();
+    await user.click(within(card).getByRole('button', { name: 'Подробнее' }));
+    const details = await screen.findByRole('dialog', { name: shared.name });
+    const detailsPower = await within(details).findByRole('switch', { name: 'Питание' });
+    expect(detailsPower).toBeChecked();
+    expect(within(details).getByText('Ожидаем новое показание')).toBeInTheDocument();
+
+    report = snapshot(true, new Date().toISOString());
+    await user.click(within(details).getByRole('button', { name: 'Обновить статус' }));
+    await waitFor(() => {
+      expect(within(details).queryByText('Ожидаем новое показание')).toBeNull();
+      expect(within(card).queryByText('Ожидаем новое показание')).toBeNull();
+    });
+    expect(detailsPower).toBeChecked();
+    expect(power).toBeChecked();
+
+    const listsBeforeClose = cloudLists();
+    await user.click(within(details).getByRole('button', { name: 'Закрыть' }));
+    await waitFor(() => expect(cloudLists()).toBeGreaterThan(listsBeforeClose));
+    expect(power).toBeChecked();
+    expect(calls.filter(call => call.method === 'POST')).toEqual([{
+      path: '/api/v1/cloud/devices/physical-lamp/commands?provider=sharing',
+      method: 'POST',
+      body: { commands: [{ code: 'switch_led', value: true }] },
+    }]);
+  });
+
   it('uses the bulb icon button to send a power command from the keyboard', async () => {
     const calls = server({noLocal:true});
     const original = vi.mocked(fetch).getMockImplementation()!;

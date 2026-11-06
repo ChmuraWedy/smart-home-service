@@ -1,4 +1,4 @@
-import { renderWithStore as render } from './test/render-with-store';
+import { renderWithStore } from './test/render-with-store';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
@@ -18,7 +18,7 @@ it.each([
   const sentAt=Date.now(), send=vi.fn().mockResolvedValue(true), user=userEvent.setup();
   const reading:Reading={known:true,value:setup.initial,stale:false,observed_at:new Date(sentAt-10000).toISOString()};
   const props={pendingScope:'device',spec,reading,now:sentAt,local:false,disabled:false,onSend:send};
-  const view=render(<CapabilityField {...props}/>);
+  const view=renderWithStore(<CapabilityField {...props}/>);
   const input=screen.getByRole(setup.kind==='number'?'spinbutton':'combobox');
   if(setup.kind==='enum') await user.selectOptions(input,'0');
   else fireEvent.change(input,{target:{value:String(setup.target)}});
@@ -36,7 +36,7 @@ it.each([
 
 it('keeps the draft available when a command is rejected', async()=>{
   const send=vi.fn().mockResolvedValue(false), user=userEvent.setup();
-  render(<CapabilityField pendingScope="device" spec={{key:'timer',label:'Таймер',kind:'number',minimum:0,maximum:100,readable:true,writable:true}} reading={{known:true,value:0,stale:false}} now={Date.now()} local={false} disabled={false} onSend={send}/>);
+  renderWithStore(<CapabilityField pendingScope="device" spec={{key:'timer',label:'Таймер',kind:'number',minimum:0,maximum:100,readable:true,writable:true}} reading={{known:true,value:0,stale:false}} now={Date.now()} local={false} disabled={false} onSend={send}/>);
   fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'50'}});
   await user.click(screen.getByRole('button',{name:'Применить'}));
   expect(screen.queryByText('Ожидаем новое показание')).not.toBeInTheDocument();
@@ -48,7 +48,7 @@ it('puts switch configuration in collapsed additional settings and shows relativ
   const snapshot={device_id:'switch',online:true,status:{switch_1:true,relay_status:'last',switch_backlight:true,switch_inching:''},status_observations:{switch_1:{received_at:new Date(Date.now()-5000).toISOString()}}};
   const functions=[{code:'switch_1',type:'Boolean',values:'{}'},{code:'relay_status',type:'Enum',values:{range:['on','off','last']}},{code:'switch_backlight',type:'Boolean',values:'{}'},{code:'switch_inching',type:'String',values:'{}'}];
   vi.mocked(fetch).mockImplementation(async input=>new Response(JSON.stringify(String(input).includes('/functions')?{device_id:'switch',functions}:snapshot),{status:200}));
-  render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'key'})} device={{id:'switch',name:'Switch',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()}/>);
+  renderWithStore(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'key'})} device={{id:'switch',name:'Switch',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()}/>);
   const channel=await screen.findByRole('region',{name:'Канал 1'});
   expect(within(channel).getByText(/\d+ с назад/)).toBeInTheDocument();
   expect(within(channel).getByRole('button',{name:'Добавить алиас'})).toBeInTheDocument();

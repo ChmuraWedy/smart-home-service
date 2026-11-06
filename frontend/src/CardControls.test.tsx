@@ -309,6 +309,8 @@ it('updates the tile connection status and battery from cached reports',async()=
     await waitFor(()=>expect(onStatus).toHaveBeenCalledWith(expect.objectContaining({online:true})));
     await act(async()=>observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
     await act(async()=>{vi.advanceTimersByTime(1000);});
-    expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}});
+    expect(fetch).toHaveBeenCalledOnce();
+    await act(async()=>{vi.advanceTimersByTime(50);});
+    await waitFor(()=>expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}}));
   } finally {view.unmount();}
 });

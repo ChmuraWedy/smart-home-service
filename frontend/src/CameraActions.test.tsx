@@ -1,4 +1,4 @@
-import { renderWithStore as render } from './test/render-with-store';
+import { renderWithStore } from './test/render-with-store';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,11 +14,21 @@ function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise
     if (options?.method==='POST') {writes.push({path:String(input),body:JSON.parse(String(options.body))}); return pending || json({acknowledged:true});}
     return json(String(input).includes('/functions') ? {device_id:'camera',functions} : {device_id:'camera',online:true,source:'cloud',status:{basic_private:privacyStatus.value,humanoid_filter:false,sd_format:false,record_switch:false,sd_status:sdStatus,basic_nightvision:'0'}});
   });
-  render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
+  renderWithStore(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider={provider} onClose={vi.fn()} onAuthError={vi.fn()} />);
   return writes;
 }
 
 describe('camera action buttons',()=>{
+  it('blocks playback when a read-only privacy capability has no reading', async () => {
+    vi.mocked(fetch).mockImplementation(async input => json(String(input).includes('/functions')
+      ? { device_id: 'camera', functions: [], status_range: [{ code: 'basic_private', type: 'Boolean', values: {} }] }
+      : { device_id: 'camera', online: true, source: 'cloud', status: {} }));
+    renderWithStore(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Sleep Cam' })).toHaveAttribute('aria-busy', 'false'));
+    expect(screen.getByRole('button', { name: 'Смотреть видео' })).toBeDisabled();
+    expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
+  });
+
   it('sends privacy and other settings immediately without Apply',async()=>{
     const writes=mountSettings(),user=userEvent.setup();
     const privacy=await screen.findByRole('button',{name:'Режим приватности'});

@@ -1,4 +1,4 @@
-import { renderWithStore as render } from './test/render-with-store';
+import { renderWithStore } from './test/render-with-store';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -15,7 +15,7 @@ function mount(storage:unknown=5,area=original) {
     if (options?.method==='POST') {writes.push(JSON.parse(String(options.body))); return json({acknowledged:true});}
     return json(String(input).includes('/functions') ? {device_id:'camera',functions,status_range:[{code:'sd_status',type:'Integer',values:'{"scale":1,"min":0,"max":100}'}]} : {device_id:'camera',online:true,source:'cloud',status:{sd_status:storage,record_switch:true,record_mode:'1',sd_format:false,motion_area:area,motion_area_switch:true}});
   });
-  render(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+  renderWithStore(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
   return writes;
 }
 
