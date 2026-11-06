@@ -254,7 +254,9 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
     {powerIcon && <span className="dashboard-power-state">
       {powerKnown ? selectedPower ? powerOnText || t("Включено") : t("Выключено") : t("Нет данных")}
       {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t("Устарело")}</span>}
-      {awaiting && <span className="help pending-reading">{t("Ожидаем новое показание")}</span>}
+      <span role="status" className="dashboard-power-pending" title={awaiting ? t("Ожидаем новое показание") : undefined}>
+        {awaiting && <><span className="spinner" aria-hidden="true" /><span className="sr-only">{t("Ожидаем новое показание")}</span></>}
+      </span>
     </span>}
     {spec.kind === 'color' && <div className="color-tools">
       {spec.kind === 'color' && spec.writable && <input aria-label={t("Выбор цвета")} title={t("Выбор цвета")} className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}

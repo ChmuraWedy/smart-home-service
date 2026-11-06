@@ -90,7 +90,7 @@ function QuickFields({ specs, reading, now, local, busy, readOK, refresh, execut
       <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
     {camera && <div className="camera-card-actions">{privacy && <div className="camera-card-privacy">{field(privacy)}</div>}{cameraAction}</div>}
-    {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
+    {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
   </>;
 }
 

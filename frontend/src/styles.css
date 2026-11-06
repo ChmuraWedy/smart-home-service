@@ -1313,7 +1313,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device :is(.device-setup-action, .device-card-footer, .card-refresh) { @apply tw:hidden; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device .card-primary-controls { @apply tw:min-h-0 tw:pr-0; }
 .capability-row .power-actions .dashboard-power-button {
-  @apply tw:grid tw:size-full tw:min-h-16 tw:place-items-center tw:rounded-none tw:border-0 tw:bg-(--surface-raised) tw:p-0 tw:text-(--muted);
+  @apply tw:grid tw:size-16 tw:place-items-center tw:rounded-none tw:border-0 tw:bg-(--surface-raised) tw:p-0 tw:text-(--muted);
 }
 .capability-row .power-actions .dashboard-power-button[data-checked] {
   @apply tw:bg-(--toggle-on) tw:text-(--toggle-thumb-on);
@@ -1322,7 +1322,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .capability-row .power-actions .dashboard-power-button:focus-visible { outline-offset:-4px; }
 .dashboard-power-button :is(.parameter-icon, .device-type-icon) { @apply tw:size-7 tw:text-current; }
 .dashboard-power-state { @apply tw:min-w-0 tw:text-xs tw:text-(--muted); }
-.dashboard-power-state .pending-reading { @apply tw:block; }
+.dashboard-power-pending .spinner { @apply tw:ml-1.5 tw:inline-block tw:size-2.5 tw:align-baseline tw:motion-reduce:animate-none; }
 
 .dashboard-device [data-power-layout="channels"] {
   @apply tw:mt-2 tw:grid tw:w-full tw:grid-cols-1 tw:justify-normal tw:gap-0;
@@ -1340,7 +1340,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 }
 .dashboard-device [data-power-layout="channels"] .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-2; }
 .dashboard-device [data-power-layout="channels"] .capability-boolean > .capability-row > .power-actions {
-  @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:items-stretch tw:self-stretch;
+  @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-start;
 }
 .dashboard-device [data-power-layout="channels"] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:8px; }
 
@@ -1353,7 +1353,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-device [data-power-layout="single"] :is(.channel-control, .capability, .capability-row),
 .dashboard-device [data-power-layout="single"] { @apply tw:contents; }
 .dashboard-device [data-power-layout="single"] .capability-boolean > .capability-row > .power-actions {
-  @apply tw:col-start-1 tw:row-start-1 tw:row-end-4 tw:items-stretch tw:self-stretch;
+  @apply tw:col-start-1 tw:row-start-1 tw:row-end-4 tw:self-start;
 }
 .dashboard-device [data-power-layout="single"] .dashboard-power-button { border-start-start-radius:8px; border-end-start-radius:8px; }
 .dashboard-device [data-power-layout="single"] .dashboard-power-state { @apply tw:col-start-2 tw:col-end-4 tw:row-start-3 tw:self-start; }
