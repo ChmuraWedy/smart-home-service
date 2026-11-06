@@ -1337,6 +1337,9 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:pb-0;
 }
 .dashboard-device [data-power-layout] .channel-control + .channel-control { border-top:1px solid var(--border); }
+.dashboard-device [data-power-layout] + .card-sensor-values {
+  @apply tw:border-t tw:border-(--border) tw:ps-(--dashboard-card-inset) tw:pt-1.5;
+}
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row {
   @apply tw:grid-cols-[64px_minmax(0,1fr)] tw:items-center tw:justify-normal tw:gap-x-3 tw:gap-y-0;
 }

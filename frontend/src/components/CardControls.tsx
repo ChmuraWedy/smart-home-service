@@ -115,17 +115,21 @@ function QuickFields({ name, paused, sheet, preview, specs, reading, now, local,
   const layout = camera
     ? 'tw:grid tw:grid-cols-1'
     : 'tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1';
+  const sensorValues = sensors.length > 0 && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
+    {sensors.map(spec => {
+      const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
+      const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(" · Устарело") : '');
+      return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t("Устарело")}</span>}</span>;
+    })}
+  </div>;
   return <>
     <div className={"card-primary-controls " + layout} data-power-layout={powerLayout}>
       {privacy && <div className="camera-card-privacy">{field(privacy)}</div>}
       {camera && channels.length ? <div className="camera-card-switches">{channels}</div> : channels}
-      {!!sensors.length && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">{sensors.map(spec => {
-        const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
-        const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(" · Устарело") : '');
-        return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t("Устарело")}</span>}</span>;
-      })}</div>}
+      {!powerLayout && sensorValues}
       <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
+    {powerLayout && sensorValues}
     {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
         <div className="dashboard-sheet-power">{field(powers[0],undefined,false)}</div>
         {sliders.map(spec => <CapabilityField key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local}
