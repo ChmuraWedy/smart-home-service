@@ -731,7 +731,7 @@ input[type=hidden] {
   max-width:550px;
 }
 
-footer {
+.app-shell > footer {
   display:flex;
   justify-content:space-between;
   gap:15px;
@@ -1081,19 +1081,13 @@ footer {
   .device-control-header .device-alias-heading { grid-column:auto; grid-row:auto; }
 }
 
-/* Compact overrides for controls shared with device details. */
-.device-card-top .capability-label-line { gap:2px; }
-.device-card-top .card-primary-controls > .channel-control { flex:0 1 auto; min-width:0; }
-.device-card-top .channel-control > .capability { padding:0; }
-.device-card-top .card-primary-controls > .capability { flex:0 1 auto; padding:0; }
-.device-card-top .capability-boolean > .capability-row { gap:4px; }
-.device-card-top .card-quick-controls .capability-heading h3 { font-size:11px; white-space:nowrap; }
-.device-card-top .capability-aliases { max-width:135px; margin:0; }
-.device-card-top .capability-aliases .alias-tag { max-width:100%; font-size:10px; padding:3px 6px; overflow-wrap:anywhere; }
-.device-card-top .card-sensor-value { gap:4px; font-size:16px; }
-.device-card-top .card-sensor-caption { font-size:10px; }
+/* Compact controls and aliases inside dashboard cards. */
+.dashboard-card-footer .channel-control > .capability { padding:0; }
+.dashboard-card-footer .capability-boolean > .capability-row { gap:4px; }
+.dashboard-card-footer .capability-aliases { margin:0; }
+.dashboard-card-footer .card-sensor-value { gap:4px; font-size:16px; }
 .device-card-identity h3 { margin:0; font-size:14px; }
-.device-card-identity .capability-aliases { gap:4px; margin:0; }
+.device-card-identity .capability-aliases { gap:4px; margin:0; min-width:0; max-width:100%; }
 .device-card-identity .alias-tag { font-size:10px; padding:3px 6px; max-width:100%; overflow-wrap:anywhere; }
 .device-card-actions .tile-icon-action { display:grid; place-items:center; width:28px; height:28px; min-height:28px; padding:0; font-size:20px; border:0; background:transparent; color:var(--muted); }
 .device-card-context .device-location { font-size:11px; }
@@ -1117,14 +1111,12 @@ footer {
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:var(--media-bg); border-radius:10px; color:var(--media-text); font-size:30px; }
 .camera-setting-group { margin:20px 0; }
 .camera-setting-group > h3 { font-size:14px; margin:0 0 10px; color:var(--muted); }
-.device-card-top .camera-quick-controls .capability-row { grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; }
-.device-card-top .camera-quick-controls .capability-label-line { justify-content:flex-end; text-align:right; }
-.device-card-top .camera-quick-controls .capability-heading h3 { font-size:11px; line-height:1.2; white-space:normal; overflow-wrap:anywhere; }
-.camera-card-actions,.camera-live-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
-.camera-card-actions { margin-top:6px; }
+.camera-quick-controls .capability-boolean > .capability-row { grid-template-columns:minmax(0,1fr) auto; align-items:center; }
+.camera-quick-controls .capability-heading h3 { font-size:12px; line-height:1.2; overflow-wrap:anywhere; }
+.camera-live-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
 .camera-card-privacy .capability { padding:0; }
 .camera-card-privacy .capability-label-line,.camera-card-privacy .pending-reading { display:none; }
-.camera-card-privacy .capability-row { display:flex; }
+.camera-card-privacy .capability-row { display:flex; justify-content:flex-end; }
 .camera-card-privacy .mode-button { padding:6px 10px; font-size:12px; }
 .camera-header-privacy .capability { padding:0; }
 .camera-header-privacy .reading-meta { display:none; }
@@ -1283,20 +1275,19 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:py-2.5;
   padding-inline:var(--dashboard-card-inset);
 }
-.dashboard-device > header {
-  @apply tw:grid tw:grid-cols-[28px_minmax(0,1fr)_auto_auto] tw:items-center tw:gap-x-2 tw:gap-y-0.5;
+.dashboard-card-header {
+  @apply tw:grid tw:grid-cols-[28px_minmax(0,1fr)_auto] tw:items-center tw:gap-x-2;
 }
-.dashboard-device :is(.device-card-top, .device-card-identity) { @apply tw:contents; }
-.dashboard-device .device-symbol { @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:size-7 tw:p-1; }
-.dashboard-device .device-type-icon { @apply tw:size-5; }
-.dashboard-device .device-card-title { @apply tw:col-start-2 tw:col-end-4 tw:row-start-1 tw:self-end; }
-.dashboard-device .device-card-context {
-  @apply tw:col-start-2 tw:col-end-4 tw:row-start-2 tw:min-h-0 tw:justify-start tw:self-start tw:gap-x-1.5 tw:gap-y-0;
-}
-.dashboard-device .device-card-context .device-card-status { @apply tw:justify-start; }
-.dashboard-view .dashboard-device .device-card-actions { @apply tw:col-start-4 tw:row-start-1 tw:row-end-3; }
-.dashboard-device .device-card-actions .tile-icon-action { @apply tw:h-11 tw:min-h-11 tw:w-8; }
-.dashboard-view .dashboard-device .card-quick-controls { @apply tw:col-span-full tw:row-start-3; }
+.dashboard-card-header .device-symbol { @apply tw:grid tw:size-7 tw:place-items-center tw:rounded-lg tw:p-1; }
+.dashboard-card-header .device-type-icon { @apply tw:size-5; }
+.dashboard-card-header .device-card-identity { @apply tw:grid tw:min-w-0 tw:gap-0.5; }
+.dashboard-card-header .device-card-title { @apply tw:flex tw:min-w-0 tw:flex-wrap tw:items-center tw:gap-x-2 tw:gap-y-1; }
+.dashboard-card-header .device-card-context { @apply tw:flex tw:min-w-0 tw:flex-wrap tw:items-center tw:gap-x-1.5; }
+.dashboard-card-header .device-card-actions { @apply tw:flex tw:flex-none tw:items-center tw:gap-0.5; }
+.dashboard-card-header .tile-icon-action { @apply tw:h-11 tw:min-h-11 tw:w-8; }
+.dashboard-card-footer { @apply tw:mt-2 tw:border-t tw:border-(--border) tw:pt-1.5; }
+.dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-card-footer:has(> .card-quick-controls:empty),
+.dashboard-card-footer:not(:has(> :not(:empty))) { @apply tw:hidden; }
 
 .dashboard-device .card-primary-controls { @apply tw:relative tw:justify-start; }
 .dashboard-device .card-sensor-values { @apply tw:justify-start; }
@@ -1307,7 +1298,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
   top:50%;
   transform:translateY(-50%);
 }
-.dashboard-group-reading { @apply tw:col-span-full tw:row-start-3 tw:mt-1.5 tw:text-sm tw:text-(--muted); }
+.dashboard-group-reading { @apply tw:m-0 tw:text-sm tw:text-(--muted); }
 .dashboard-device .device-card-context .battery-badge { @apply tw:border-0 tw:p-0; }
 .dashboard-device .battery-badge .parameter-icon { @apply tw:size-4; }
 .dashboard-device .battery-value { @apply tw:sr-only; }
@@ -1329,10 +1320,10 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-power-pending .spinner { @apply tw:ml-1.5 tw:inline-block tw:size-2.5 tw:align-baseline tw:motion-reduce:animate-none; }
 
 .dashboard-device [data-power-layout] {
-  @apply tw:mt-2 tw:grid tw:w-full tw:grid-cols-1 tw:justify-normal tw:gap-0;
-  border-top:1px solid var(--border);
+  @apply tw:grid tw:w-full tw:grid-cols-1 tw:justify-normal tw:gap-0;
 }
-.dashboard-device:has([data-power-layout]) .card-quick-controls {
+.dashboard-card-footer:has([data-power-layout]) {
+  padding-top:0;
   margin-inline-start:calc(-1 * var(--dashboard-card-inset));
 }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback)) {
@@ -1357,11 +1348,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:not(:has(.card-sensor-values, .control-feedback))
   [data-power-layout] .channel-control:last-of-type .dashboard-power-button { border-end-start-radius:11px; }
 
-.dashboard-device[data-card-layout="climate"] .card-sensor-values {
-  @apply tw:mt-1.5 tw:w-full tw:pt-1.5;
-  border-top:1px solid var(--border);
-}
-.dashboard-device[data-card-layout="climate"] .card-sensor-values { @apply tw:grid tw:grid-cols-2 tw:gap-1.5; }
+.dashboard-device[data-card-layout="climate"] .card-sensor-values { @apply tw:grid tw:w-full tw:grid-cols-2 tw:gap-1.5; }
 .dashboard-device[data-card-layout="climate"] .card-sensor-value { @apply tw:justify-center; }
 .dashboard-device[data-card-layout="climate"] .card-sensor-value .parameter-icon { color:var(--accent); }
 .dashboard-device[data-card-layout="climate"] [data-reading*="humidity"] { border-inline-start:1px solid var(--border); }

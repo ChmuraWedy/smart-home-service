@@ -54,7 +54,7 @@ export function CardControls(props: CardProps) {
   const cloud = props.route !== 'local' ? props.device.cloud[props.route] : undefined;
   const cached = props.route === 'local' || cloud?.controls?.ready;
   const active = activated || cached;
-  return <div className="card-quick-controls tw:col-start-2 tw:row-start-2 tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t("Основные параметры: ") + props.device.name}>
+  return <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t("Основные параметры: ") + props.device.name}>
     {active || sheetOpen ? props.route === 'local' ? <LocalCardControls {...props} visible={visible && !props.paused} /> : cloud && <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={visible && !props.paused} /> : <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>{t("Показать состояние")}</button>}
   </div>;
 }
@@ -110,15 +110,16 @@ function QuickFields({ name, paused, sheet, preview, specs, reading, now, local,
     powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> : powerLayout === 'channels' ? <ParameterIcon code={spec.key} /> : undefined}
     powerOnText={showBrightness ? brightnessText : undefined} booleanButton={camera && spec.key==='basic_private'} buttonText={camera && spec.key==='basic_private' ? t("Приватность") : undefined} booleanActions={spec === privacy && preview ? cameraSheet : undefined} disabled={disabled} onSend={value => toggle(spec,value)} aliasEditor={spec.aliases?.length ? <div className="capability-aliases">{spec.aliases.map(alias => <span className="alias-tag" key={alias}>{alias}</span>)}</div> : undefined} />;
   const layout = camera
-    ? 'camera-quick-controls tw:grid tw:grid-cols-2 tw:justify-end tw:gap-x-2 tw:gap-y-1.5'
+    ? 'camera-quick-controls tw:grid tw:grid-cols-1 tw:gap-1'
     : 'tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1';
   return <>
     <div className={"card-primary-controls " + layout} data-power-layout={powerLayout}>{powers.filter(spec=>spec!==privacy).map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
       {!!sensors.length && <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">{sensors.map(spec => {
         const value = reading(spec), stale = !!value?.known && isStale(value,now,local);
         const label = spec.label + ': ' + displayReading(spec,value) + (stale ? t(" · Устарело") : '');
-        return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} aria-label={label} title={label}><ParameterIcon code={spec.key} /><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t("Устарело")}</span>}</span>;
+        return <span key={spec.key} data-reading={spec.key} className={'card-sensor-value' + (stale || !value?.known ? ' unknown' : '')} title={label}><ParameterIcon code={spec.key} /><span className="sr-only">{spec.label}: </span><span>{displayReading(spec,value)}</span>{stale && <span className="sr-only">{t("Устарело")}</span>}</span>;
       })}</div>}
+      {privacy && <div className="camera-card-privacy">{field(privacy)}</div>}
       <button className="secondary card-refresh" aria-label={t("Обновить параметры")} title={t("Обновить параметры")} disabled={busy || sending} onClick={() => void refresh()}>↻</button>
     </div>
     {hasSliders && sheet?.open && !paused && <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
@@ -128,7 +129,7 @@ function QuickFields({ name, paused, sheet, preview, specs, reading, now, local,
           onSend={value => toggle(spec,value)} />)}
         {notice.error && <ControlFeedback busy={false} notice={notice} />}
     </DashboardSheet>}
-    {camera && <div className="camera-card-actions">{privacy ? <div className="camera-card-privacy">{field(privacy)}</div> : cameraSheet(privacyStatus)}</div>}
+    {camera && !privacy && cameraSheet(privacyStatus)}
     {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
   </>;
 }
