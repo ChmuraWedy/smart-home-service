@@ -31,11 +31,9 @@ Large cards in the Day theme show power controls, independent switch channels, a
 
 ### Phone dashboard
 
-Choose **Menu → Card size** to switch between Large and Small. Small fits two cards per row on a phone, with the same direct access to power controls and device details. The browser remembers your choice.
+The phone dashboard shown here uses Large cards. Choose **Menu → Card size** to change the layout. The browser remembers your choice.
 
-| Large | Small |
-| --- | --- |
-| ![Phone dashboard with one large card per row](docs/screenshots/mobile-dashboard-large-day.png) | ![Phone dashboard with two small cards per row](docs/screenshots/mobile-dashboard-small-day.png) |
+![Phone dashboard with one large card per row](docs/screenshots/mobile-dashboard-large-day.png)
 
 ### Bulb: brightness, white temperature, and schedules
 
