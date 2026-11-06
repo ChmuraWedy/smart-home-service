@@ -23,7 +23,7 @@ const lamp:CloudDevice = {id:'lamp',name:'Лампа',online:true,has_local_key:
 const json = (value:unknown,status=200) => new Response(JSON.stringify(value),{status});
 
 function mount(cloud=lamp, route:'sharing'|'developer'='sharing', sheet?:ComponentProps<typeof CardControls>['sheet']) {
-  return render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} sheet={sheet} />);
+  return renderWithStore(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} sheet={sheet} />);
 }
 
 describe('main controls on device cards', () => {
@@ -303,12 +303,14 @@ it('updates the tile connection status and battery from cached reports',async()=
   const onStatus=vi.fn();
   const cloud={...lamp,controls:{ready:true,definitions,snapshot}};
   vi.mocked(fetch).mockImplementation(async()=>json({...snapshot,online:false,status:{...snapshot.status,battery_percentage:42}}));
-  const view=render(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{sharing:cloud}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} onStatus={onStatus}/>);
+  const view=renderWithStore(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{sharing:cloud}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} onStatus={onStatus}/>);
   try {
     await screen.findByRole('switch');
     await waitFor(()=>expect(onStatus).toHaveBeenCalledWith(expect.objectContaining({online:true})));
     await act(async()=>observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
     await act(async()=>{vi.advanceTimersByTime(1000);});
-    expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}});
+    expect(fetch).toHaveBeenCalledOnce();
+    await act(async()=>{vi.advanceTimersByTime(50);});
+    await waitFor(()=>expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}}));
   } finally {view.unmount();}
 });

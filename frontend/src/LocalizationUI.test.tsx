@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { renderWithStore } from './test/render-with-store';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudControl } from './components/CloudControl';
 import { CloudApi } from './api';
@@ -23,7 +24,7 @@ describe('localized device controls',()=>{
       if(String(input).includes('/functions'))return json({device_id:device.id,functions});
       return json({device_id:device.id,online:true,source:'cloud',status:{switch_led:true,bright_value_v2:500}});
     });
-    setLocale('en');render(<Harness/>);
+    setLocale('en');renderWithStore(<Harness/>);
     const brightness=await screen.findByRole('spinbutton',{name:'Brightness (%)'});
     await waitFor(()=>expect(brightness).toBeEnabled());
     await waitFor(()=>expect(brightness).toHaveValue(50));

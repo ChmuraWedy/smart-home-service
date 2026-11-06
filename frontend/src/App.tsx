@@ -15,6 +15,7 @@ import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 import { deviceHref, readDeviceLink } from './device-links';
 import type { DeviceLink } from './device-links';
 import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
+import { rotateCloudAccountScope } from './cloud-account-scope';
 
 type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
@@ -131,6 +132,7 @@ function AppContent() {
   const saveCode = (code: string) => run(async () => {
     if (!code.trim()) throw new Error(t(MSG.ENTER_YOUR_USER_CODE));
     const saved = await api.saveCode(code.trim());
+    rotateCloudAccountScope(api, 'sharing');
     setStatus(current => current ? { ...current, ...saved } : null);
     setEditingCode(false); setQR(null);
     setNotice({ text: saved.saved_user_code_requires_login ? t(MSG.USER_CODE_SAVED) : t(MSG.USER_CODE_SAVED_ON_THE_SERVER) });
@@ -139,6 +141,7 @@ function AppContent() {
   const saveDeveloper = (credentials: DeveloperCredentials) => run(async () => {
     if (!credentials.access_id || !credentials.access_secret) throw new Error(t(MSG.ENTER_YOUR_ACCESS_ID_AND_ACCESS_SECRET));
     const saved = await api.saveDeveloper(credentials);
+    rotateCloudAccountScope(api, 'developer');
     setStatus(current => current ? { ...current, developer: saved } : null);
     setEditingDeveloper(false);
     setNotice({ text: t(MSG.CREDENTIALS_SAVED_ON_THE_SERVER) });
@@ -146,6 +149,7 @@ function AppContent() {
 
   const connectDeveloper = () => run(async () => {
     const saved = await api.connectDeveloper();
+    rotateCloudAccountScope(api, 'developer');
     setStatus(current => current ? { ...current, developer: saved } : null);
     setNotice({ text: t(MSG.TUYA_DEVELOPER_CONNECTED_DEVICE_COUNT, [saved.device_count ?? 0]) });
   }, true);
@@ -162,6 +166,7 @@ function AppContent() {
   const confirmQR = () => run(async () => {
     if (!qr) return;
     await api.confirmQR(qr.session);
+    rotateCloudAccountScope(api, 'sharing');
     setQR(null); setStatus(await api.status());
     setNotice({ text: t(MSG.ACCOUNT_CONNECTED) });
   }, true);
