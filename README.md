@@ -35,6 +35,12 @@ The phone dashboard shown here uses Large cards. Choose **Menu → Card size** t
 
 ![Phone dashboard with one large card per row](docs/screenshots/mobile-dashboard-large-day.png)
 
+### Phone quick controls
+
+Tap a supported light card to open a bottom sheet for power, brightness, and warm-to-cool white temperature. Tap the card’s chevron to open full device details.
+
+![Bulb quick controls open in a bottom sheet on the phone dashboard](docs/screenshots/mobile-bulb-quick-controls-day.png)
+
 ### Bulb: brightness, white temperature, and schedules
 
 The example bulb exposes white/color modes, brightness, color temperature, a color picker, a timer, and lighting schedules. The main card provides immediate power control; the full card contains the lighting settings.

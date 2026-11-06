@@ -10,6 +10,7 @@ The gallery includes the Large phone layout, English device details, and Polish 
 | --- | --- | --- | --- | --- |
 | [device-overview-day.png](device-overview-day.png) | Main cards with bulbs and a two-channel switch | English | Day | 1180 × 662 |
 | [mobile-dashboard-large-day.png](mobile-dashboard-large-day.png) | Phone dashboard with Large cards | English | Day | 390 × 960 |
+| [mobile-bulb-quick-controls-day.png](mobile-bulb-quick-controls-day.png) | Phone bottom sheet with bulb power, brightness, and white temperature | English | Day | 390 × 960 |
 | [bulb-controls-day.png](bulb-controls-day.png) | Power, brightness, white temperature, color, and schedules | English | Day | 840 × 1008 |
 | [bulb-color-day.png](bulb-color-day.png) | Precise hue, saturation, and color brightness expanded | English | Day | 840 × 1008 |
 | [two-channel-switch-dark.png](two-channel-switch-dark.png) | Channels, existing aliases, timer, and additional settings | English | Dark | 840 × 1008 |
@@ -22,8 +23,8 @@ The gallery includes the Large phone layout, English device details, and Polish 
 ## Refreshing the screenshots
 
 1. Use a separate browser session so the user's language, theme, navigation, and connection settings remain unchanged. Prefer a read-only preview/proxy when connected to real hardware.
-2. Select the language and theme listed above. Use a 1440-pixel desktop viewport and a 390 × 960 CSS pixel phone viewport. Capture the app frame on desktop and the viewport on the phone. For the phone screenshot, choose Large in **Menu → Card size**.
-3. Filter the main screen to the relevant lights or sensor room. Use the installation's actual names without renaming records. Capture the viewport after device cards have loaded.
+2. Select the language and theme listed above. Use a 1440-pixel desktop viewport and a 390 × 960 CSS pixel phone viewport. Capture the app frame on desktop and the viewport on the phone. For the phone screenshots, choose Large in **Menu → Card size**.
+3. Filter the main screen to the relevant lights or sensor room. Use the installation's actual names without renaming records. Capture the viewport after device cards have loaded. For the quick controls screenshot, tap the bulb card’s name to open the bottom sheet, then capture the phone viewport.
 4. For detailed screenshots, open the appropriate bulb, two-channel switch, temperature/humidity sensor, or motion sensor. Capture the dialog element so browser chrome and device IDs in the address bar are excluded. Expand precise color settings without changing a value. For the switch, expand Channel 1's timer and Additional settings. For motion, select the Motion activity filter in the chosen language.
 5. For localization examples, choose Polish or Belarusian in **Menu → Language**. Check the document locale (`pl` or `be`) and translated labels before capture. Do not translate image pixels or replace device data.
 6. Leave all device values unchanged. Keep connection settings, account pages, network addresses, device IDs, local keys, API keys, QR login codes, and camera footage out of the images. Review every image visually before committing it.
