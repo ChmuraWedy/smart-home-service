@@ -1,5 +1,5 @@
 import { renderWithStore } from './test/render-with-store';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -17,8 +17,8 @@ it.each([
   const spec = {...setup,readable:true,writable:true} as unknown as ControlSpec;
   const sentAt=Date.now(), send=vi.fn().mockResolvedValue(true), user=userEvent.setup();
   const reading:Reading={known:true,value:setup.initial,stale:false,observed_at:new Date(sentAt-10000).toISOString()};
-  const props={spec,reading,now:sentAt,local:false,disabled:false,onSend:send};
-  const view=render(<CapabilityField {...props}/>);
+  const props={pendingScope:'device',spec,reading,now:sentAt,local:false,disabled:false,onSend:send};
+  const view=renderWithStore(<CapabilityField {...props}/>);
   const input=screen.getByRole(setup.kind==='number'?'spinbutton':'combobox');
   if(setup.kind==='enum') await user.selectOptions(input,'0');
   else fireEvent.change(input,{target:{value:String(setup.target)}});
@@ -29,14 +29,14 @@ it.each([
   expect(input).toHaveValue(setup.kind==='enum'?'0':setup.target);
   expect(send).toHaveBeenCalledTimes(1);
   const actual=setup.key==='countdown_1'?119:setup.target;
-  view.rerender(<CapabilityField {...props} now={sentAt+7000} reading={{...reading,value:actual,received_at:new Date(sentAt+7000).toISOString()}}/>);
+  view.rerender(<CapabilityField {...props} now={sentAt+7000} reading={{...reading,value:actual,observed_at:new Date(sentAt+7000).toISOString()}}/>);
   await waitFor(()=>expect(screen.queryByText('Ожидаем новое показание')).not.toBeInTheDocument());
   expect(input).toHaveValue(setup.kind==='enum'?'0':actual);
 });
 
 it('keeps the draft available when a command is rejected', async()=>{
   const send=vi.fn().mockResolvedValue(false), user=userEvent.setup();
-  render(<CapabilityField spec={{key:'timer',label:'Таймер',kind:'number',minimum:0,maximum:100,readable:true,writable:true}} reading={{known:true,value:0,stale:false}} now={Date.now()} local={false} disabled={false} onSend={send}/>);
+  renderWithStore(<CapabilityField pendingScope="device" spec={{key:'timer',label:'Таймер',kind:'number',minimum:0,maximum:100,readable:true,writable:true}} reading={{known:true,value:0,stale:false}} now={Date.now()} local={false} disabled={false} onSend={send}/>);
   fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'50'}});
   await user.click(screen.getByRole('button',{name:'Применить'}));
   expect(screen.queryByText('Ожидаем новое показание')).not.toBeInTheDocument();

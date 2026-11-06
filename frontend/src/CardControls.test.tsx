@@ -1,5 +1,5 @@
 import { renderWithStore } from './test/render-with-store';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
@@ -281,14 +281,14 @@ describe('main controls on device cards', () => {
 describe('card close action and relevant activity filters', () => {
   it('uses an accessible icon for closing and preserves the back action', async () => {
     const close=vi.fn(),user=userEvent.setup();
-    render(<ControlDialog title="Датчик" subtitle="Комната" busy={false} onClose={close}><p>Показания</p></ControlDialog>);
+    renderWithStore(<ControlDialog title="Датчик" subtitle="Комната" busy={false} onClose={close}><p>Показания</p></ControlDialog>);
     const button=screen.getByRole('button',{name:'Закрыть'});
     expect(button).toHaveAttribute('title','Закрыть'); expect(button.textContent).toBe('');
     await user.click(button); expect(close).toHaveBeenCalledTimes(1);
   });
   it('does not suggest motion or commands on a read-only temperature sensor', async () => {
     vi.mocked(fetch).mockResolvedValue(json({events:[{id:1,at:new Date().toISOString(),observed_at:null,kind:'report',code:'va_temperature',value:22,outcome:null}],next_before:null}));
-    render(<DeviceActivity api={new HomeApi(connection)} deviceId="temp" provider="sharing" specs={[cloudSpec({code:'va_temperature',type:'Integer',values:{unit:'℃',scale:0}},false)]} onAuthError={vi.fn()} />);
+    renderWithStore(<DeviceActivity api={new HomeApi(connection)} deviceId="temp" provider="sharing" specs={[cloudSpec({code:'va_temperature',type:'Integer',values:{unit:'℃',scale:0}},false)]} onAuthError={vi.fn()} />);
     await userEvent.setup().click(screen.getByText('Журнал устройства'));
     expect(await screen.findByText('Температура: 22 °C')).toBeInTheDocument();
     expect(screen.queryByRole('option',{name:'Движение'})).toBeNull();

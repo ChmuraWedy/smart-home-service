@@ -7,6 +7,7 @@ import { displayReading, hexToHsv, hsvToHex, isStale, motionState, optionLabel, 
 import type { ControlSpec, HSV } from '../controls';
 import type { Reading } from '../home-api';
 import type { DraftStage } from '../control-drafts';
+import { usePendingDeviceValue } from '../use-pending-device-value';
 import { defaultObject } from '../lighting';
 import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFields';
 import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWizard';
@@ -30,6 +31,8 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   const [readOK, setReadOK] = useState(false);
   const [notice, setNotice] = useState<ControlNotice>({ text: '' });
   const lock = useRef(true), alive = useRef(false), authError = useRef(onAuthError);
+  const generation = useRef(0);
+  const isCurrent = (version: number) => alive.current && generation.current === version;
   authError.current = onAuthError;
   const abort = useRef<AbortController | null>(null);
   const pollAbort = useRef<AbortController | null>(null), epoch = useRef(0), current = useRef(data);
@@ -38,7 +41,7 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
   const unauthorized = (error: unknown) => { if (error instanceof ApiError && error.status === 401) authError.current(); };
 
   useEffect(() => {
-    alive.current = true; lock.current = true;
+    generation.current++; alive.current = true; lock.current = true;
     setData(null); setBusy(true); setReadOK(false); setNotice({ text: '' });
     const controller = new AbortController(); abort.current = controller;
     void load(false, controller.signal).then(value => {
@@ -66,43 +69,45 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
     return () => { clearInterval(timer); cancelPoll(); };
   }, [poll]);
 
-  async function read() {
+  async function read(version: number) {
     const controller = new AbortController(); abort.current = controller;
     const value = await load(true, controller.signal);
-    if (alive.current && !controller.signal.aborted) { setData(value); setReadOK(true); }
+    if (isCurrent(version) && !controller.signal.aborted) { setData(value); setReadOK(true); }
   }
   async function refresh() {
     if (lock.current) return;
+    const version = generation.current;
     cancelPoll();
     lock.current = true; setBusy(true); setNotice({ text: '' });
-    try { await read(); if (alive.current) setNotice({ text: t(MSG.STATUS_REQUESTED_AGAIN) }); }
-    catch (error) { if (alive.current) { setReadOK(false); setNotice({ text: errorText(error), error: true }); unauthorized(error); } }
-    finally { if (alive.current) { lock.current = false; setBusy(false); } }
+    try { await read(version); if (isCurrent(version)) setNotice({ text: t(MSG.STATUS_REQUESTED_AGAIN) }); }
+    catch (error) { if (isCurrent(version)) { setReadOK(false); setNotice({ text: errorText(error), error: true }); unauthorized(error); } }
+    finally { if (isCurrent(version)) { lock.current = false; setBusy(false); } }
   }
   async function execute(send: () => Promise<Receipt>) {
     if (lock.current || !readOK) return false;
+    const version = generation.current;
     cancelPoll();
     lock.current = true; setBusy(true); setNotice({ text: '' });
     try {
       const receipt = await send();
-      if (!alive.current) return;
+      if (!isCurrent(version)) return true; // The command was acknowledged even if its view closed.
       if (poll) {
         setNotice({...receipt, text: receipt.text + t(MSG.WAITING_FOR_A_DEVICE_REPORT)});
         return true;
       }
       setNotice({ ...receipt, text: receipt.text + t(MSG.REQUESTING_STATUS) });
-      try { await read(); if (alive.current) setNotice({ ...receipt, text: receipt.text + t(MSG.STATUS_REQUESTED_AGAIN_READINGS_ARE_SHOWN_SEPARATELY) }); }
+      try { await read(version); if (isCurrent(version)) setNotice({ ...receipt, text: receipt.text + t(MSG.STATUS_REQUESTED_AGAIN_READINGS_ARE_SHOWN_SEPARATELY) }); }
       catch (error) {
-        if (alive.current) { setReadOK(false); setNotice({ text: receipt.text + t(MSG.COULD_NOT_REFRESH_STATUS) + errorText(error), error: true }); unauthorized(error); }
+        if (isCurrent(version)) { setReadOK(false); setNotice({ text: receipt.text + t(MSG.COULD_NOT_REFRESH_STATUS) + errorText(error), error: true }); unauthorized(error); }
       }
     } catch (error) {
-      if (alive.current) {
+      if (isCurrent(version)) {
         const rejected = error instanceof ApiError && [401, 403, 404, 409, 422].includes(error.status);
         setNotice({ text: (rejected ? t(MSG.COMMAND_REJECTED_PREFIX) : t(MSG.NO_ACKNOWLEDGEMENT_RECEIVED_THE_COMMAND_RESULT_IS_UNKNOWN)) + errorText(error), error: true });
         unauthorized(error);
       }
       return false;
-    } finally { if (alive.current) { lock.current = false; setBusy(false); } }
+    } finally { if (isCurrent(version)) { lock.current = false; setBusy(false); } }
     return true;
   }
   return { data, busy, readOK, notice, refresh, execute };
@@ -151,44 +156,37 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   </div>;
 }
 
-export function CapabilityField({ spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerOnText, quickRange, booleanActions, booleanButton = false, buttonText, onBooleanStateChange, valueEditor }: {
-  spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerOnText?:string; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); onBooleanStateChange?:(value:boolean | null)=>void; valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerOnText, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
+  pendingScope: string; spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerOnText?:string; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
   const motion = motionState(spec, reading);
-  const [draft, setDraft] = useState('');
+  const [draftInput, setDraft] = useState('');
+  const editRevision = useRef(0);
   const rangeEdit = useRef<string | null>(null);
   const initial = useRef<JsonValue | undefined>(undefined);
   const [preciseColor, setPreciseColor] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false), [effectOpen, setEffectOpen] = useState(false);
   const effectWizard = hasLightEffectWizard(spec);
-  const [color, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
-  const pendingTarget = useRef<{ value: JsonValue; baseline: JsonValue | undefined; sentAt: number } | null>(null);
-  const [awaiting, setAwaiting] = useState(false);
+  const [draftColor, setColor] = useState<HSV>({ h: 0, s: 1000, v: 1000 });
   const [dirty, setDirty] = useState(false), [error, setError] = useState('');
-  const fingerprint = JSON.stringify([reading?.value, reading?.known, reading?.stale, reading?.observed_at]);
-  useEffect(() => {
-    if (dirty) return; // A new report must not erase an unapplied user draft.
-    const target = pendingTarget.current;
-    if (target) {
-      const received = Date.parse(reading?.received_at || reading?.observed_at || '');
-      const confirmed = reading?.known && sameValue(reading.value, target.value);
-      const newerReport = reading?.known && Number.isFinite(received) && received >= target.sentAt;
-      const changedLater = now - target.sentAt >= 15000 && reading?.known && !sameValue(reading.value, target.baseline ?? null);
-      if (!confirmed && !newerReport && !changedLater) return;
-      pendingTarget.current = null; setAwaiting(false);
-    }
-    // Keep a selected target when Tuya has no fresh reading.
-    if (!fresh && draft !== '') return;
-    const value = reading?.known ? reading.value : null;
-    setDraft(value === null ? '' : spec.kind === 'enum' ? String(spec.choices?.findIndex(option => sameValue(option, value)) ?? -1) : spec.kind === 'json' ? JSON.stringify(value, null, 2) : String(value));
-    if (spec.kind === 'color' && value && typeof value === 'object' && !Array.isArray(value)) setColor(value as HSV);
-    setDirty(false); setError('');
-  }, [fingerprint, spec.key, dirty, now, awaiting]);
+  const { target, begin } = usePendingDeviceValue(pendingScope, spec.key, reading);
+  const awaiting = target !== undefined;
+  const lastKnown = useRef<{ scope: string; key: string; value: JsonValue } | undefined>(undefined);
+  if (lastKnown.current?.scope !== pendingScope || lastKnown.current.key !== spec.key) lastKnown.current = undefined;
+  if (reading?.known && (fresh || !lastKnown.current)) lastKnown.current = { scope: pendingScope, key: spec.key, value: reading.value };
+  const reported = spec.kind === 'boolean' ? (reading?.known ? reading.value : null) : lastKnown.current?.value ?? null;
+  const value = target ? target.value : reported;
+  const draft = dirty ? draftInput : value === null ? '' :
+    spec.kind === 'enum' ? String(spec.choices?.findIndex(option => sameValue(option, value)) ?? -1) :
+    spec.kind === 'json' ? JSON.stringify(value, null, 2) : String(value);
+  const color = !dirty && spec.kind === 'color' && value && typeof value === 'object' && !Array.isArray(value)
+    ? value as HSV : draftColor;
 
   function beginEdit() {
-    if (!dirty) initial.current = pendingTarget.current?.value ?? (reading?.known ? reading.value : undefined);
+    editRevision.current++;
+    if (!dirty) initial.current = target ? target.value : reading?.known ? reading.value : undefined;
   }
   const change = (value: string) => { beginEdit(); setDraft(value); setDirty(true); setError(''); };
   const changeColor = (value: HSV) => { beginEdit(); setColor(value); setDirty(true); setError(''); };
@@ -213,18 +211,17 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
     if (!invalid && value !== undefined && initial.current !== undefined && sameValue(value, initial.current)) {
       stage(spec.key, null); setDirty(false); return;
     }
-    stage(spec.key, { spec, value, error: invalid, accept: sentAt => {
-      pendingTarget.current = { value: value!, baseline: initial.current, sentAt };
-      setAwaiting(true); setDirty(false);
+    const revision = editRevision.current;
+    stage(spec.key, { spec, value, error: invalid, begin: () => {
+      const accept = begin(value!);
+      return () => {
+        accept();
+        if (revision === editRevision.current) setDirty(false);
+      };
     } });
-  }, [stage, spec.key, draft, color, dirty, error]);
+  }, [stage, spec.key, draftInput, draftColor, dirty, error, begin]);
   useEffect(() => () => { stage?.(spec.key, null); }, [stage, spec.key]);
-  const selectedPower = (stage || immediatePower) && (dirty || awaiting) ? draft === 'true' : Boolean(reading?.known && reading.value === true);
-  // A pending off command is not a confirmed off report. Consumers can keep
-  // dependent actions blocked until the device confirms the new state.
-  useEffect(()=>{
-    if (spec.kind==='boolean') onBooleanStateChange?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value==='boolean' ? reading.value : null);
-  },[onBooleanStateChange,spec.kind,awaiting,selectedPower,reading?.known,reading?.value]);
+  const selectedPower = dirty ? draft === 'true' : value === true;
   async function send(value?: JsonValue) {
     try {
       let parsed = value;
@@ -232,19 +229,15 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
         if (spec.kind === 'number') { if (!draft.trim()) throw new Error(t(MSG.ENTER_A_VALUE)); parsed = Number(draft); }
         else if (spec.kind === 'enum') parsed = spec.choices?.[Number(draft)] ?? null;
         else if (spec.kind === 'color') parsed = color;
-      else if (spec.kind === 'json') { try { parsed = JSON.parse(draft); } catch { throw new Error(t(MSG.ENTER_A_VALID_JSON_OBJECT)); } }
+        else if (spec.kind === 'json') { try { parsed = JSON.parse(draft); } catch { throw new Error(t(MSG.ENTER_A_VALID_JSON_OBJECT)); } }
         else parsed = draft;
       }
       validateControlValue(spec, parsed!);
-      const sentAt = Date.now();
+      const revision = editRevision.current;
+      const accept = begin(parsed!);
       const accepted = await onSend(parsed!);
-      if (accepted === false) {
-        if (quickRange) setDirty(false);
-        return;
-      }
-      pendingTarget.current = { value: parsed!, baseline: reading?.value, sentAt };
-      if (immediatePower) setDraft(String(parsed));
-      setAwaiting(true); setDirty(false);
+      if (accepted === true) accept();
+      if (revision === editRevision.current && (accepted === true || quickRange)) setDirty(false);
     } catch (failure) { setError(errorText(failure)); }
   }
   function changePower(checked: boolean) {
@@ -263,7 +256,7 @@ export function CapabilityField({ spec, reading, now, local, disabled, onSend, a
     };
     return <label className="dashboard-sheet-range">
       <span>{spec.label}</span>
-      <span className="dashboard-sheet-range-value">{value === undefined ? t(MSG.NO_DATA) : displayReading(spec, {known:true,stale:false,value})}</span>
+      <span className="dashboard-sheet-range-value">{value === undefined ? t(MSG.NO_DATA) : displayReading(spec, {known:true,stale:false,value})}{awaiting && <span className="sr-only" role="status">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>}</span>
       <input type="range" aria-label={spec.label} min={minimum} max={maximum} step={spec.step ?? 'any'}
         value={value ?? minimum} disabled={disabled || value === undefined}
         data-temperature={quickRange === 'temperature' || undefined}

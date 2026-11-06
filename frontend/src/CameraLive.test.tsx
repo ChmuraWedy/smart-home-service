@@ -295,8 +295,10 @@ describe('camera live viewing',()=>{
   it('places video in the full camera editor without allocating automatically',async()=>{
     vi.mocked(fetch).mockImplementation(async input=>json(String(input).includes('/functions') ? {device_id:'camera',functions:[]} : {device_id:'camera',online:true,source:'cloud',status:{}}));
     renderWithStore(<CloudControl api={new CloudApi(connection)} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
-    expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeEnabled();
+    const watch = screen.getByRole('button',{name:'Смотреть видео'});
+    expect(watch).toBeDisabled();
     await screen.findByText('Последнее известное состояние в облаке. Обновите статус для получения нового снимка.');
+    expect(watch).toBeEnabled();
     expect(vi.mocked(fetch).mock.calls.every(([,options])=>options?.method!=='POST')).toBe(true);
   });
   it('groups only advertised camera settings and sends edited original mode values automatically',async()=>{

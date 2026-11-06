@@ -7,7 +7,7 @@ export type Capability = {
   readable: boolean; writable: boolean; minimum?: number | null; maximum?: number | null;
   step?: number | null; enum?: JsonValue[] | null; unit?: string | null; encoding?: string;
 };
-export type Reading = { value: JsonValue; known: boolean; stale: boolean; observed_at?: string | null; received_at?:string; source?:string };
+export type Reading = { value: JsonValue; known: boolean; stale: boolean; observed_at?: string | null; received_at?:string; liveRequestAt?: number; source?:string };
 export type DeviceState = { device_id: number; name: string; enabled: boolean; available: boolean; values: Record<string, Reading> };
 export type LocalDevice = {
   id: number; device_id: string; name: string; aliases: string[]; building_id: number | null;

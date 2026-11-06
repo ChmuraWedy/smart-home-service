@@ -19,6 +19,16 @@ function mountSettings(provider:'sharing'|'developer'='sharing',pending?:Promise
 }
 
 describe('camera action buttons',()=>{
+  it('blocks playback when a read-only privacy capability has no reading', async () => {
+    vi.mocked(fetch).mockImplementation(async input => json(String(input).includes('/functions')
+      ? { device_id: 'camera', functions: [], status_range: [{ code: 'basic_private', type: 'Boolean', values: {} }] }
+      : { device_id: 'camera', online: true, source: 'cloud', status: {} }));
+    renderWithStore(<CloudControl api={new CloudApi({baseUrl:'http://api.test',token:'test-key'})} device={{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false}} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Sleep Cam' })).toHaveAttribute('aria-busy', 'false'));
+    expect(screen.getByRole('button', { name: 'Смотреть видео' })).toBeDisabled();
+    expect(vi.mocked(fetch).mock.calls.every(([, options]) => options?.method !== 'POST')).toBe(true);
+  });
+
   it('sends privacy and other settings immediately without Apply',async()=>{
     const writes=mountSettings(),user=userEvent.setup();
     const privacy=await screen.findByRole('button',{name:'Режим приватности'});

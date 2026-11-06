@@ -1,6 +1,7 @@
 import { MSG, t } from '../i18n';
 import type { JsonValue, Provider } from '../api';
 import { CAMERA_QUICK_LABELS, cameraPrivacyBlock } from '../camera-controls';
+import { usePendingPrivacyState } from '../use-pending-device-value';
 import type { ControlSpec } from '../controls';
 import type { HomeApi, Reading } from '../home-api';
 import { CameraLive } from './CameraLive';
@@ -11,10 +12,10 @@ import { CapabilityField, ControlFeedback } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
 
 export function CameraCardControls({
-  api, deviceId, name, provider, online, onAuthError, paused, sheet,
+  api, deviceId, name, pendingScope, provider, online, onAuthError, paused, sheet,
   specs, reading, now, busy, readOK, sending, refresh, toggle, notice,
 }: {
-  api: HomeApi; deviceId: string; name: string; provider: Provider; online: boolean; onAuthError: () => void;
+  api: HomeApi; deviceId: string; name: string; pendingScope: string; provider: Provider; online: boolean; onAuthError: () => void;
   paused: boolean; sheet?: DashboardSheetState; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
   now: number; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
   toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice;
@@ -31,7 +32,7 @@ export function CameraCardControls({
     return <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
       <span className={'presence ' + (online ? 'online' : '')}>{online ? t(MSG.ONLINE) : t(MSG.OFFLINE)}</span>
       <CameraLive api={api} deviceId={deviceId} provider={provider} onAuthError={onAuthError}
-        compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyState : null)}
+        compact sheet autoStart={readOK} viewingBlocked={cameraPrivacyBlock(readOK ? privacyStatus : null)}
         headingActions={changePrivacy && <button type="button" className="secondary" disabled={disabled || privacyState === null}
           onClick={changePrivacy}>{privacyState ? t(MSG.TURN_OFF_PRIVACY) : t(MSG.TURN_ON_PRIVACY)}</button>} />
       {notice.error && <ControlFeedback busy={false} notice={notice} />}
@@ -40,16 +41,17 @@ export function CameraCardControls({
 
   const privacySpec = specs.find(spec => spec.key === 'basic_private');
   const reportedPrivacy = privacySpec && reading(privacySpec);
-  const privacyStatus = privacySpec ? reportedPrivacy?.known && typeof reportedPrivacy.value === 'boolean' ? reportedPrivacy.value : null : undefined;
+  const privacyReading = privacySpec ? reportedPrivacy?.known && typeof reportedPrivacy.value === 'boolean' ? reportedPrivacy.value : null : undefined;
+  const privacyStatus = usePendingPrivacyState(pendingScope, privacyReading);
   if (!busy && readOK && !controls.length && !notice.error && !sheet?.open) return null;
 
-  const field = (spec: ControlSpec) => <CapabilityField spec={spec} reading={reading(spec)} now={now} local={false}
+  const field = (spec: ControlSpec) => <CapabilityField pendingScope={pendingScope} spec={spec} reading={reading(spec)} now={now} local={false}
     immediatePower dashboardSwitch disabled={disabled} onSend={value => toggle(spec, value)} />;
 
   return <>
     <div className="card-primary-controls tw:grid tw:grid-cols-1">
       {privacy && <div className="camera-card-privacy">
-        <CapabilityField spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
+        <CapabilityField pendingScope={pendingScope} spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
           powerIcon={<svg className="parameter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.2 3 7.5 7.5 9.5 4.5-2 7.5-5.3 7.5-9.5V6z" /></svg>}
           booleanActions={renderPreview} disabled={disabled} onSend={value => toggle(privacy, value)} />
       </div>}

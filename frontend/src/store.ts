@@ -3,6 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { localDeviceCache } from './local-device-cache';
 import { cloudDeviceCache } from './cloud-device-cache';
+import { pendingDeviceValuesReducer } from './pending-device-values';
 
 type DashboardControlState = {
   detailsOpen: boolean;
@@ -33,6 +34,7 @@ export function createAppStore() {
   return configureStore({
     reducer: {
       dashboardControls: dashboardControls.reducer,
+      pendingDeviceValues: pendingDeviceValuesReducer,
       [localDeviceCache.reducerPath]: localDeviceCache.reducer,
       [cloudDeviceCache.reducerPath]: cloudDeviceCache.reducer,
     },

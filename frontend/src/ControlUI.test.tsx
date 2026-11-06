@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -424,7 +424,7 @@ describe('manual device maps', () => {
       if(url.pathname.endsWith('/functions')) return json({device_id:target.id,functions:[targetSpec]});
       return json({device_id:cloudDevice.id,provider:'sharing',tuya_bindings_available:false,mappings:[]});
     });
-    render(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
     expect(fetch).not.toHaveBeenCalled();
     const user=userEvent.setup(); await user.click(screen.getByText('Ручные сопоставления в нашей базе'));
     await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
@@ -484,7 +484,7 @@ describe('local device and group controls', () => {
   });
   it('reports partial group acknowledgement by member and requests statuses separately', async () => {
     const server = localServer({ partial: true }); const user = userEvent.setup();
-    render(<GroupControl api={new HomeApi(connection)} group={group} onClose={vi.fn()} onDevice={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<GroupControl api={new HomeApi(connection)} group={group} onClose={vi.fn()} onDevice={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Включить группу' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Команда принята 1 из 2 устройств. Не подтверждено: Лампа Zigbee.');
     expect(server.writes).toEqual([{ path: '/api/v1/groups/1/commands/on', body: undefined }]);

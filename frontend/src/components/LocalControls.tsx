@@ -5,6 +5,7 @@ import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
 import { readLocalDevice } from '../local-device-cache';
 import { useAppDispatch } from '../store';
+import { localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceNetwork } from './DeviceNetwork';
@@ -35,6 +36,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
   const session = useControlSession(load, onAuthError, poll), now = useClock();
   const state = cached ?? session.data?.state;
   const item = session.data?.metadata || device;
+  const pendingScope = localPendingScope(api, item.id);
   const drafts = useAutomaticControls(changes => session.execute(async () => {
     for (const change of changes) validateControlValue(change.spec, change.value!);
     const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
@@ -46,7 +48,7 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
   return <ControlDialog onRefresh={session.refresh} information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />} statusContent={<BatteryBadge reading={state ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={item.name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel} titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={item.name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />} connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!state ? t(MSG.CHECKING_CONNECTION) : !state.enabled ? t(MSG.DISABLED_IN_SETTINGS) : state.available ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)} online={state?.enabled && state?.available} />}>
     {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
     {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
-    <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>{session.data && state && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => <CapabilityField key={key} spec={localSpec(key, cap)} stage={cap.type === 'boolean' ? undefined : drafts.stage} immediatePower reading={state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !state.enabled} onSend={value => session.execute(async () => {
+    <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>{session.data && state && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => <CapabilityField pendingScope={pendingScope} key={key} spec={localSpec(key, cap)} stage={cap.type === 'boolean' ? undefined : drafts.stage} immediatePower reading={state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !state.enabled} onSend={value => session.execute(async () => {
       const result = await api.setCapability(item.id, key, value);
       if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
       return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
