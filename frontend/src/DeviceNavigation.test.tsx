@@ -139,4 +139,31 @@ describe('device deep navigation', () => {
     act(() => hash('#local-connections'));
     expect(await screen.findByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
   });
+
+  it('reads local dashboard state once and shares a detail watch result with the card', async () => {
+    const device: LocalDevice = { ...devices[0],
+      capabilities: { switch: { type: 'boolean', readable: true, writable: true } } };
+    backend([device]);
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const reads: string[] = [];
+    vi.mocked(fetch).mockImplementation((input, options) => {
+      const url = new URL(String(input));
+      if (url.pathname !== '/api/v1/devices/1/state') return original(input, options);
+      reads.push(url.search);
+      return Promise.resolve(json({ device_id: 1, enabled: true, available: true,
+        values: { switch: { value: url.searchParams.get('watch') === 'true', known: true, stale: false } } }));
+    });
+    access('');
+    render(<App />);
+    const card = await screen.findByRole('listitem', { name: device.name });
+    const power = await within(card).findByRole('switch');
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(power).not.toBeChecked();
+    expect(reads).toEqual(['?refresh=false&max_age=60']);
+    fireEvent.click(within(card).getByRole('button', { name: 'Подробнее' }));
+    const dialog = await screen.findByRole('dialog', { name: device.name });
+    await waitFor(() => expect(within(dialog).getByRole('switch')).toBeChecked());
+    await waitFor(() => expect(power).toBeChecked());
+    expect(reads).toEqual(['?refresh=false&max_age=60', '?refresh=false&max_age=60&watch=true']);
+  });
 });

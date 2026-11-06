@@ -1,6 +1,7 @@
 import { configureStore, createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
+import { localDeviceCache } from './local-device-cache';
 
 type DashboardControlState = {
   detailsOpen: boolean;
@@ -29,14 +30,19 @@ export const { setDetailsOpen, setCommandPending } = dashboardControls.actions;
 
 export function createAppStore() {
   return configureStore({
-    reducer: { dashboardControls: dashboardControls.reducer },
+    reducer: {
+      dashboardControls: dashboardControls.reducer,
+      [localDeviceCache.reducerPath]: localDeviceCache.reducer,
+    },
+    middleware: defaults => defaults().concat(localDeviceCache.middleware),
     devTools: import.meta.env.DEV,
   });
 }
 
 type AppStore = ReturnType<typeof createAppStore>;
 type RootState = ReturnType<AppStore['getState']>;
-export const useAppDispatch = useDispatch.withTypes<AppStore['dispatch']>();
+export type AppDispatch = AppStore['dispatch'];
+export const useAppDispatch = useDispatch.withTypes<AppDispatch>();
 export const useAppSelector = useSelector.withTypes<RootState>();
 
 export const selectDashboardLocked = ({ dashboardControls }: RootState) =>

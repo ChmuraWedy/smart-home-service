@@ -452,7 +452,7 @@ describe('manual device maps', () => {
 describe('local device and group controls', () => {
   it.each([light, child])('addresses $transport device by its own inventory ID without parent/key in the browser command', async device => {
     const server = localServer(); const user = userEvent.setup();
-    render(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await user.click(await screen.findByRole('switch'));
 
     await screen.findByText(/Команда принята/);
@@ -462,7 +462,7 @@ describe('local device and group controls', () => {
   });
   it('applies a temperature step and typed enum while keeping measured temperature read-only', async () => {
     const server = localServer(); const user = userEvent.setup();
-    render(<LocalControl api={new HomeApi(connection)} device={thermostat} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={thermostat} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const target = await screen.findByRole('region', { name: 'Заданная температура' });
     fireEvent.change(within(target).getByRole('spinbutton'), { target: { value: '23' } });
 
@@ -477,7 +477,7 @@ describe('local device and group controls', () => {
   });
   it('shows stale humidity and unknown motion without false values or write controls', async () => {
     localServer({ stale: true });
-    render(<LocalControl api={new HomeApi(connection)} device={sensor} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={sensor} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await screen.findByText('Устарело');
     expect(within(screen.getByRole('region', { name: 'Движение' })).getByText('Нет данных')).toBeInTheDocument();
     expect(screen.queryByRole('switch')).toBeNull();
@@ -530,11 +530,11 @@ describe('local device and group controls', () => {
   });
   it('disables a locally disabled device and reports a command timeout without retry', async () => {
     localServer({ disabled: true });
-    const first = render(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const first = renderWithStore(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await screen.findByText('Устройство или его шлюз отключены в настройках сервиса.');
     expect(screen.getByRole('switch')).toBeDisabled(); first.unmount();
     const server = localServer({ postError: true });
-    render(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={light} onClose={vi.fn()} onAuthError={vi.fn()} />);
     const power = await screen.findByRole('switch');
     await waitFor(() => expect(power).toBeEnabled());
     fireEvent.click(power);

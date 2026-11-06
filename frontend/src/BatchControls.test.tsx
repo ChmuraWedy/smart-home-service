@@ -1,3 +1,4 @@
+import { renderWithStore } from './test/render-with-store';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -125,7 +126,7 @@ describe('automatic device controls', () => {
       } });
       return json(local);
     });
-    render(<LocalControl api={new HomeApi(connection)} device={local} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={local} onClose={vi.fn()} onAuthError={vi.fn()} />);
     await screen.findByRole('region', { name: 'Яркость' });
     edit('Яркость', '65');
     await waitFor(() => expect(writes).toEqual([{path:'/api/v1/devices/1/commands/capabilities',body:{values:{brightness:65}}}]));

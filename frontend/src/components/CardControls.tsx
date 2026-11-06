@@ -6,6 +6,9 @@ import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale, 
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
+import { readLocalDevice } from '../local-device-cache';
+import { useAppDispatch } from '../store';
+import { useLocalDeviceState } from '../use-local-device-state';
 import { CapabilityField, ControlFeedback, useControlSession } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
 import { batteryFromSpecs, DeviceIcon, isBattery, isCamera, ParameterIcon } from './DevicePresentation';
@@ -22,13 +25,13 @@ function sensorReading(spec: ControlSpec) {
   return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key) && ['number','boolean','enum','text'].includes(spec.kind);
 }
 
-export type CardStatus = {online:boolean;enabled?:boolean;battery?:BatteryReading};
+export type CardStatus = {online:boolean;battery?:BatteryReading};
 
 type QuickSheet = DashboardSheetState & {
   onLightAvailable?: (available: boolean) => void;
 };
 
-type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; state?: DeviceState; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void; sheet?: QuickSheet };
+type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void; sheet?: QuickSheet };
 
 // Only cards entering the viewport request missing metadata. Keep an activated
 // card mounted when it scrolls away so an accepted target is not discarded.
@@ -166,30 +169,23 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
     : <StandardCardControls {...controls} local={false} category={cloud.category} />;
 }
 
-function LocalCardControls({api,device,state,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {visible:boolean}) {
+function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBusy}: CardProps & {visible:boolean}) {
   const item = device.local!;
-  const initial = useRef(state);
-  const load = useCallback(async (refresh:boolean,signal?:AbortSignal) => {
-    const result = !refresh && initial.current ? initial.current : await api.state(item.id,refresh,signal);
-    if (result.device_id !== item.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
-    return result;
-  },[api,item.id]);
-  const poll = useCallback(async (_current:DeviceState,signal:AbortSignal) => {
-    const result = await api.state(item.id,false,signal,true);
-    if (result.device_id !== item.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
-    return result;
-  },[api,item.id]);
+  const dispatch = useAppDispatch();
+  const cached = useLocalDeviceState(api, item.id);
+  const load = useCallback((refresh: boolean, signal?: AbortSignal) =>
+    dispatch(readLocalDevice(api, item.id, refresh, signal)), [api, dispatch, item.id]);
+  const poll = useCallback((_current: DeviceState, signal: AbortSignal) =>
+    dispatch(readLocalDevice(api, item.id, false, signal, true)), [api, dispatch, item.id]);
   const session = useControlSession(load,onAuthError,visible ? poll : undefined);
+  const state = cached ?? session.data;
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
-  useEffect(() => {
-    if (session.data) onStatus?.({online:session.data.available, enabled:session.data.enabled, battery:batteryFromSpecs(Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(session.data.values).filter(([,reading])=>reading.known).map(([key,reading])=>[key,reading.value])))});
-  },[session.data,onStatus,item.capabilities]);
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
     const result = await api.setCapabilities(item.id, {[spec.key]:value});
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
   return <StandardCardControls name={device.name} paused={paused} sheet={sheet} specs={specs}
-    category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => session.data?.values[spec.key]}
-    now={now} local busy={session.busy} readOK={session.readOK && !!session.data?.enabled}
+    category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => state?.values[spec.key]}
+    now={now} local busy={session.busy} readOK={session.readOK && !!state?.enabled}
     refresh={session.refresh} notice={session.notice} {...commands} />;
 }
