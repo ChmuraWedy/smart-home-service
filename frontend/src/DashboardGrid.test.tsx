@@ -20,7 +20,9 @@ function mount(room = '3') {
       items={items}
       view={{ ...view, room }}
       editable
-      renderCard={({ id, title }, placement) => <li key={id} data-testid={id} {...placement}>{title}</li>}
+      renderCard={({ id, title }, { style, inert, slot, nudge }) => (
+        <li key={id} data-testid={id} data-layout-slot={slot} data-layout-nudge={nudge} style={style} inert={inert}>{title}</li>
+      )}
     />,
   );
 }
@@ -38,7 +40,7 @@ function cardAt(id: string, row: number, column: number) {
 beforeEach(() => {
   setLocale('en', false);
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-    .mockReturnValue({ width: 900 } as DOMRect);
+    .mockReturnValue({ width: 900, height: 64, top: 0, left: 0 } as DOMRect);
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -99,5 +101,33 @@ describe('dashboard layout', () => {
     expect(screen.getByTestId('device-a').style.gridRowStart).toBe('');
     expect(screen.getByTestId('device-a')).not.toHaveAttribute('inert');
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('drags the real card and previews a swap above or below the target center', () => {
+    mount();
+    click('Edit layout');
+    const source = screen.getByRole('button', { name: 'Move Card 1 (Row 1, column 1)' });
+    const transfer = { setData: vi.fn(), setDragImage: vi.fn() };
+    const drag = (element: HTMLElement, type: string, clientY: number) => {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 12, clientY });
+      Object.defineProperty(event, 'dataTransfer', { value: transfer });
+      fireEvent(element, event);
+    };
+    drag(source, 'dragstart', 15);
+    expect(transfer.setDragImage).toHaveBeenCalledWith(screen.getByTestId('device-a'), 12, 15);
+    const target = screen.getByRole('button', { name: 'Swap with Card 2 (Row 1, column 2)' });
+    drag(target, 'dragover', 8);
+    expect(screen.getByTestId('group-1')).toHaveAttribute('data-layout-nudge', 'down');
+    cardAt('group-1', 1, 2);
+    drag(target, 'dragover', 56);
+    expect(screen.getByTestId('group-1')).toHaveAttribute('data-layout-nudge', 'up');
+    drag(target, 'dragleave', 65);
+    expect(screen.getByTestId('group-1')).not.toHaveAttribute('data-layout-nudge');
+    drag(target, 'dragover', 8);
+    drag(target, 'drop', 8);
+    expect(screen.getByTestId('group-1')).not.toHaveAttribute('data-layout-nudge');
+    cardAt('group-1', 1, 1);
+    cardAt('device-a', 1, 2);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

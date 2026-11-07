@@ -90,6 +90,8 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
       data-card-layout={cardLayout}
       data-unavailable={!online || undefined}
       data-quick-sheet={hasSheet || undefined}
+      data-layout-slot={placement.slot}
+      data-layout-nudge={placement.nudge}
       aria-label={device.name}
       onClick={hasSheet ? (event) => openCard(event, showSheet) : undefined}
       style={placement.style}
@@ -353,6 +355,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           className="device-card dashboard-device"
           key={`group-${cardGroup.id}`}
           aria-label={cardGroup.name}
+          data-layout-slot={placement.slot}
+          data-layout-nudge={placement.nudge}
           onClick={(event) => openCard(event, () => choose(entry))}
           style={placement.style}
           inert={placement.inert}

@@ -10,7 +10,10 @@ import type { HomeApi } from '../home-api';
 import { MSG, t } from '../i18n';
 import { Icon } from './ui/icon';
 
-export type GridCardPlacement = { style?: CSSProperties; inert?: boolean };
+type Nudge = 'up' | 'down';
+export type GridCardPlacement = {
+  style?: CSSProperties; inert?: boolean; slot?: number; nudge?: Nudge;
+};
 type GridView = { building: string; room: string; page: number };
 type GridItem<T> = { id: string; cardName: string; entry: T };
 type SavedLayout = { api: HomeApi; view: string; slots?: LayoutSlots; error?: boolean };
@@ -52,7 +55,7 @@ function useGridColumns(density: string) {
 }
 
 function LayoutTarget({
-  slot, columns, cardName, selected, moving, disabled, onSelect, onDragStart, onDrop, onDragEnd,
+  slot, columns, cardName, selected, moving, disabled, over, onSelect, onDragStart, onHover, onLeave, onDrop, onDragEnd,
 }: {
   slot: number;
   columns: number;
@@ -60,8 +63,11 @@ function LayoutTarget({
   selected: boolean;
   moving: boolean;
   disabled: boolean;
+  over: boolean;
   onSelect: (slot: number) => void;
-  onDragStart: (slot: number) => void;
+  onDragStart: (slot: number, event: DragEvent<HTMLButtonElement>) => void;
+  onHover: (slot: number, nudge: Nudge) => void;
+  onLeave: (slot: number) => void;
   onDrop: (slot: number) => void;
   onDragEnd: () => void;
 }) {
@@ -75,13 +81,15 @@ function LayoutTarget({
     const { dataTransfer } = event;
     dataTransfer.effectAllowed = 'move';
     dataTransfer.setData('text/plain', cardName);
-    onDragStart(slot);
+    onDragStart(slot, event);
   }
 
   function allowDrop(event: DragEvent<HTMLButtonElement>) {
     event.preventDefault();
     const { dataTransfer } = event;
     dataTransfer.dropEffect = 'move';
+    const { top, height } = event.currentTarget.getBoundingClientRect();
+    onHover(slot, event.clientY < top + height / 2 ? 'down' : 'up');
   }
 
   function drop(event: DragEvent<HTMLButtonElement>) {
@@ -96,6 +104,7 @@ function LayoutTarget({
         className="dashboard-layout-target-button"
         data-occupied={Boolean(cardName) || undefined}
         data-selected={selected || undefined}
+        data-drop-over={over || undefined}
         aria-label={label}
         aria-pressed={cardName ? selected : undefined}
         title={label}
@@ -104,6 +113,7 @@ function LayoutTarget({
         onClick={() => onSelect(slot)}
         onDragStart={startDrag}
         onDragOver={allowDrop}
+        onDragLeave={() => onLeave(slot)}
         onDrop={drop}
         onDragEnd={onDragEnd}
       >
@@ -130,6 +140,7 @@ export default function DashboardGrid<T>({
   const [draft, setDraft] = useState<LayoutDraft>();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [dropPreview, setDropPreview] = useState<{ slot: number; nudge: Nudge }>();
   const dragSource = useRef<number | undefined>(undefined);
   const pendingSave = useRef<symbol | null>(null);
   const scope = view && new URLSearchParams({
@@ -142,6 +153,7 @@ export default function DashboardGrid<T>({
     setDraft(undefined);
     setSaving(false);
     setSaveError(false);
+    setDropPreview(undefined);
     dragSource.current = undefined;
     return () => { pendingSave.current = null; };
   }, [api, scope]);
@@ -166,6 +178,7 @@ export default function DashboardGrid<T>({
 
   function toggleEditing() {
     setSaveError(false);
+    setDropPreview(undefined);
     if (draft) setDraft(undefined);
     else if (current?.error) {
       setSaved(undefined);
@@ -180,13 +193,31 @@ export default function DashboardGrid<T>({
     else setDraft({ columns: activeColumns, slots: moveCard(slots, selected, slot) });
   }
 
-  function startDrag(slot: number) {
+  function startDrag(slot: number, event: DragEvent<HTMLButtonElement>) {
+    const card = grid.current?.querySelector<HTMLElement>(`[data-layout-slot="${slot}"]`);
+    if (card) {
+      const bounds = card.getBoundingClientRect();
+      const x = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left));
+      const y = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
+      event.dataTransfer.setDragImage(card, x, y);
+    }
     dragSource.current = slot;
+    setDropPreview(undefined);
     setDraft({ columns: activeColumns, slots, selected: slot });
+  }
+
+  function previewDrop(slot: number, nudge: Nudge) {
+    if (dragSource.current === undefined || dragSource.current === slot) return;
+    setDropPreview((previous) => (previous?.slot === slot && previous.nudge === nudge ? previous : { slot, nudge }));
+  }
+
+  function leaveDrop(slot: number) {
+    setDropPreview((previous) => (previous?.slot === slot ? undefined : previous));
   }
 
   function clearDrag() {
     dragSource.current = undefined;
+    setDropPreview(undefined);
     setDraft((currentDraft) => currentDraft && { ...currentDraft, selected: undefined });
   }
 
@@ -194,6 +225,7 @@ export default function DashboardGrid<T>({
     const source = dragSource.current;
     if (source === undefined) return;
     dragSource.current = undefined;
+    setDropPreview(undefined);
     setDraft({ columns: activeColumns, slots: moveCard(slots, source, slot) });
   }
 
@@ -257,7 +289,12 @@ export default function DashboardGrid<T>({
           const item = id ? cards.get(id) : undefined;
           if (!item) return null;
           const style = draft || hasSavedSlots ? slotPosition(index, activeColumns) : undefined;
-          return renderCard(item.entry, { style, inert: Boolean(draft) || undefined });
+          return renderCard(item.entry, {
+            style,
+            inert: Boolean(draft) || undefined,
+            slot: draft ? index : undefined,
+            nudge: dropPreview?.slot === index ? dropPreview.nudge : undefined,
+          });
         })}
         {Array.from({ length: targets }, (_, slot) => {
           const id = slots[slot];
@@ -270,8 +307,11 @@ export default function DashboardGrid<T>({
               selected={draft?.selected === slot}
               moving={draft?.selected !== undefined}
               disabled={saving}
+              over={dropPreview?.slot === slot}
               onSelect={(target) => selectSlot(target)}
-              onDragStart={(target) => startDrag(target)}
+              onDragStart={(target, event) => startDrag(target, event)}
+              onHover={(target, nudge) => previewDrop(target, nudge)}
+              onLeave={(target) => leaveDrop(target)}
               onDrop={(target) => dropCard(target)}
               onDragEnd={() => clearDrag()}
             />
