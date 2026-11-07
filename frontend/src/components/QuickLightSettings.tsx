@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
 import type { JsonValue } from '../api';
-import { useAutomaticControls } from '../control-drafts';
 import { optionLabel } from '../controls';
 import type { ControlSpec } from '../controls';
-import type { Reading } from '../home-api';
+import type { HomeApi, Reading } from '../home-api';
 import { MSG, t } from '../i18n';
 import { usePendingDeviceValue } from '../use-pending-device-value';
-import { supportsSimpleScenes } from '../light-scenes';
+import type { LightPresetLibrary } from '../use-light-presets';
 import QuickSceneSettings from './QuickSceneSettings';
 import QuickColorSettings from './QuickColorSettings';
 import { CapabilityField } from './DeviceControls';
@@ -23,10 +22,11 @@ function fallbackMode(white: ControlSpec[], color?: ControlSpec, scene?: Control
 }
 
 export default function QuickLightSettings({
-  power, deviceId, mode, white, color, scene, scope, reading, now, local, disabled, send,
+  power, library, tuyaApi, mode, white, color, scene, scope, reading, now, local, disabled, send,
 }: {
   power: ReactNode;
-  deviceId: string;
+  library: LightPresetLibrary;
+  tuyaApi?: HomeApi;
   mode?: ControlSpec;
   white: ControlSpec[];
   color?: ControlSpec;
@@ -45,31 +45,10 @@ export default function QuickLightSettings({
   const choices = (mode?.writable && mode.kind === 'enum' ? mode.choices ?? [] : [])
     .filter((value) => value === 'white' || value === 'colour' || value === 'color' || value === 'scene');
   const colorMode = active === 'colour' || active === 'color';
-  const { stage } = useAutomaticControls(async ([change]) => {
-    if (!change || change.value === undefined) return false;
-    return send(change.spec, change.value);
-  }, !disabled);
-
   async function selectMode(value: JsonValue) {
     if (!mode || active === value) return;
     const accept = begin(value);
     if (await send(mode, value)) accept();
-  }
-
-  function editor(spec: ControlSpec) {
-    return (
-      <CapabilityField
-        key={spec.key}
-        pendingScope={scope}
-        spec={spec}
-        reading={reading(spec)}
-        now={now}
-        local={local}
-        disabled={disabled}
-        stage={stage}
-        onSend={(value) => send(spec, value)}
-      />
-    );
   }
 
   return (
@@ -117,18 +96,17 @@ export default function QuickLightSettings({
           send={(value) => send(color, value)}
         />
       )}
-      {active === 'scene' && scene && (supportsSimpleScenes(scene) ? (
+      {active === 'scene' && scene && (
         <QuickSceneSettings
-          key={deviceId}
-          deviceId={deviceId}
+          library={library}
+          tuyaApi={tuyaApi}
           scope={scope}
           spec={scene}
           reading={reading(scene)}
           disabled={disabled}
           send={(value) => send(scene, value)}
-          advanced={editor(scene)}
         />
-      ) : editor(scene))}
+      )}
     </>
   );
 }

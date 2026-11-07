@@ -13,7 +13,9 @@ export type SceneUnit = HSV & {
   'unit_gradient_duration': number;
 };
 export type LightScene = { 'scene_num': number; 'scene_units': SceneUnit[] };
-export type SavedLightScene = { 'name': string; scene: LightScene };
+export type ScenePresetInput = { 'name': string; scene: LightScene; 'tuya_scene_id'?: string | null };
+export type SavedLightScene = ScenePresetInput & { id?: number };
+export type TuyaSceneReference = { id: string; 'name': string };
 
 export function supportsSimpleScenes(spec: ControlSpec) {
   const { schema } = spec;
@@ -78,7 +80,7 @@ export function sceneTiming(scene: LightScene, effect: SceneEffect, speed?: numb
 
 const keyFor = (device: string) => `smart-home.ui.light-scenes.v1.${encodeURIComponent(device)}`;
 
-export function readSavedLightScenes(device: string, spec: ControlSpec): SavedLightScene[] {
+export function readBrowserLightScenes(device: string, spec: ControlSpec): SavedLightScene[] {
   try {
     const stored = JSON.parse(localStorage.getItem(keyFor(device)) ?? '[]') as SavedLightScene[];
     if (!Array.isArray(stored)) return [];
@@ -88,6 +90,6 @@ export function readSavedLightScenes(device: string, spec: ControlSpec): SavedLi
   }
 }
 
-export function saveLightScenes(device: string, scenes: SavedLightScene[]) {
+export function saveBrowserLightScenes(device: string, scenes: SavedLightScene[]) {
   localStorage.setItem(keyFor(device), JSON.stringify(scenes));
 }

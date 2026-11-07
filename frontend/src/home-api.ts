@@ -1,6 +1,7 @@
 import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
+import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { LayoutSlots } from './dashboard-layout';
 
 export type Capability = {
@@ -57,6 +58,23 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
   key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  lightPresets(device: string, signal: AbortSignal) {
+    return this.request<SavedLightScene[]>(`/light-presets/${encodeURIComponent(device)}`, 'GET', undefined, signal);
+  }
+
+  saveLightPreset(device: string, preset: ScenePresetInput, id?: number) {
+    const base = `/light-presets/${encodeURIComponent(device)}`;
+    return this.request<SavedLightScene>(id === undefined ? base : `${base}/${id}`, id === undefined ? 'POST' : 'PUT', preset);
+  }
+
+  deleteLightPreset(device: string, id: number) {
+    return this.deleteResource(`/light-presets/${encodeURIComponent(device)}/${id}`);
+  }
+
+  tuyaSceneReferences(signal: AbortSignal) {
+    return this.request<TuyaSceneReference[]>('/cloud/scenes?provider=sharing', 'GET', undefined, signal);
+  }
+
   dashboardLayout(browser: string, view: string, signal: AbortSignal) {
     return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
   }

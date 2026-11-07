@@ -19,6 +19,17 @@ class DashboardLayout(Base):
     slots: Mapped[list[str | None]] = mapped_column(JSON)
 
 
+class LightPreset(Base):
+    __tablename__ = "light_presets"
+    __table_args__ = (UniqueConstraint("device_id", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128))
+    name: Mapped[str] = mapped_column(String(80))
+    scene: Mapped[dict] = mapped_column(JSON)
+    tuya_scene_id: Mapped[str | None] = mapped_column(String(128))
+
+
 class CloudChannelLabel(Base):
     __tablename__ = "cloud_channel_labels"
     scope: Mapped[str] = mapped_column(String(64), primary_key=True)

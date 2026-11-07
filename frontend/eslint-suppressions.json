@@ -532,10 +532,10 @@
       "count": 5
     },
     "@stylistic/max-len": {
-      "count": 5
+      "count": 3
     },
     "arrow-parens": {
-      "count": 15
+      "count": 10
     },
     "brace-style": {
       "count": 2
@@ -550,7 +550,7 @@
       "count": 3
     },
     "implicit-arrow-linebreak": {
-      "count": 3
+      "count": 2
     },
     "import/order": {
       "count": 1
@@ -577,7 +577,7 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 18
+      "count": 16
     },
     "object-curly-spacing": {
       "count": 14
@@ -592,7 +592,7 @@
       "count": 3
     },
     "operator-linebreak": {
-      "count": 3
+      "count": 2
     },
     "prefer-template": {
       "count": 5

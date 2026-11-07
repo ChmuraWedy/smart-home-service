@@ -58,6 +58,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const quickOpen = quickRoute !== undefined;
   const [lightFeatures, setLightFeatures] = useState<{ route: DeviceRoute; hasQuickSettings: boolean; hasPresets: boolean }>();
   const sheetTrigger = useRef<HTMLButtonElement>(null);
+  const [presetSlot, setPresetSlot] = useState<HTMLDivElement | null>(null);
   const notifyBusy = useCallback((pending: boolean) => {
     dispatch(setCommandPending({ deviceId: device.id, pending }));
   }, [device.id, dispatch]);
@@ -131,11 +132,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
 )}
           </>
 )}
-        secondary={currentLightFeatures?.hasPresets && (
-          <select className="dashboard-light-presets" aria-label={t(MSG.PRESETS)} disabled>
-            <option>{t(MSG.PRESETS)}</option>
-          </select>
-        )}
+        secondary={currentLightFeatures?.hasPresets && <div ref={setPresetSlot} />}
       />
       <DashboardCardFooter>
         <CardControls
@@ -148,7 +145,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           onAuthError={onAuthError}
           onBusy={notifyBusy}
           onStatus={updateStatus}
-          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, onLightFeatures }}
+          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, presetSlot, onLightFeatures }}
         />
         {routes.length > 1 && (
         <div className="device-card-footer tw:mt-2">

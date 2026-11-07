@@ -1,11 +1,15 @@
-import { useId, useRef, useState } from 'react';
+import {
+  useEffect, useId, useRef, useState,
+} from 'react';
 import { hsvToHex } from '../controls';
+import type { HomeApi } from '../home-api';
 import { MSG, t } from '../i18n';
 import { isWhiteUnit, sceneEffects, sceneTiming } from '../light-scenes';
 import type {
-  LightScene, SavedLightScene, SceneEffect, SceneUnit,
+  LightScene, SavedLightScene, SceneEffect, ScenePresetInput, SceneUnit, TuyaSceneReference,
 } from '../light-scenes';
 import { LightColorWheel, LightRange } from './LightColorWheel';
+import { Icon } from './ui/icon';
 import { WizardDialog } from './WizardDialog';
 
 export const effectLabels = {
@@ -22,10 +26,11 @@ export function SceneSwatch({ unit }: { unit: SceneUnit }) {
 }
 
 export default function BulbSceneEditor({
-  initial, onSave, onClose,
+  initial, tuyaApi, onSave, onClose,
 }: {
   initial: SavedLightScene;
-  onSave: (scene: SavedLightScene) => void;
+  tuyaApi?: HomeApi;
+  onSave: (scene: ScenePresetInput) => Promise<void>;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial.name);
@@ -35,10 +40,23 @@ export default function BulbSceneEditor({
   const [stepIds, setStepIds] = useState(() => initial.scene.scene_units.map((_, i) => i));
   const nextStepId = useRef(stepIds.length);
   const nameId = useId();
+  const linkId = useId();
+  const [references, setReferences] = useState<TuyaSceneReference[]>([]);
+  const [reference, setReference] = useState(initial.tuya_scene_id ?? '');
+  const [saving, setSaving] = useState(false);
   const [colorKinds, setColorKinds] = useState(() => initial.scene.scene_units.map(isWhiteUnit));
   const [error, setError] = useState('');
   const unit = scene.scene_units[index];
   const white = colorKinds[index];
+
+  useEffect(() => {
+    if (!tuyaApi) return undefined;
+    const controller = new AbortController();
+    tuyaApi.tuyaSceneReferences(controller.signal).then((rows) => {
+      if (!controller.signal.aborted && Array.isArray(rows)) setReferences(rows);
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [tuyaApi]);
 
   function setUnit(next: SceneUnit) {
     setScene({ ...scene, scene_units: scene.scene_units.map((item, i) => (i === index ? next : item)) });
@@ -53,12 +71,17 @@ export default function BulbSceneEditor({
     }
   }
 
-  function save() {
+  async function save() {
+    if (saving || !name.trim()) return;
+    setSaving(true);
+    setError('');
     const draft = effect === 'static' ? { ...scene, scene_units: [unit] } : scene;
     try {
-      onSave({ name: name.trim(), scene: sceneTiming(draft, effect) });
+      await onSave({ name: name.trim(), scene: sceneTiming(draft, effect), tuya_scene_id: reference || null });
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : t(MSG.COULD_NOT_COMPLETE_THE_ACTION));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -84,11 +107,11 @@ export default function BulbSceneEditor({
     setIndex(scene.scene_units.length);
   }
 
-  function removeStep() {
-    setScene({ ...scene, scene_units: scene.scene_units.filter((_, i) => i !== index) });
-    setColorKinds(colorKinds.filter((_, i) => i !== index));
-    setStepIds(stepIds.filter((_, i) => i !== index));
-    setIndex(Math.min(index, scene.scene_units.length - 2));
+  function removeStep(step: number) {
+    setScene({ ...scene, scene_units: scene.scene_units.filter((_, i) => i !== step) });
+    setColorKinds(colorKinds.filter((_, i) => i !== step));
+    setStepIds(stepIds.filter((_, i) => i !== step));
+    if (step < index || index >= scene.scene_units.length - 1) setIndex(index - 1);
   }
 
   return (
@@ -96,7 +119,7 @@ export default function BulbSceneEditor({
       title={t(initial.name ? MSG.EDIT_LIGHT_SCENE : MSG.ADD_LIGHT_SCENE)}
       onClose={onClose}
       actions={(
-        <button type="button" disabled={!name.trim()} onClick={() => save()}>
+        <button type="button" disabled={saving || !name.trim()} onClick={() => save()}>
           {t(MSG.SAVE)}
         </button>
       )}
@@ -105,6 +128,16 @@ export default function BulbSceneEditor({
         {t(MSG.NAME)}
         <input id={nameId} value={name} maxLength={80} onChange={(event) => setName(event.currentTarget.value)} />
       </label>
+      {(references.length > 0 || reference) && (
+        <label className="field" htmlFor={linkId}>
+          {t(MSG.LIGHT_SCENE_TUYA_REFERENCE)}
+          <select id={linkId} value={reference} onChange={(event) => setReference(event.currentTarget.value)}>
+            <option value="">{t(MSG.NOT_SET)}</option>
+            {reference && !references.some(({ id }) => id === reference) && <option value={reference}>{t(MSG.UNAVAILABLE)}</option>}
+            {references.map(({ id, name: label }) => <option value={id} key={id}>{label}</option>)}
+          </select>
+        </label>
+      )}
       <h3>{t(MSG.SCENE_EFFECT)}</h3>
       <div className="light-segments" role="group" aria-label={t(MSG.SCENE_EFFECT)}>
         {sceneEffects.map((option) => (
@@ -126,16 +159,27 @@ export default function BulbSceneEditor({
       {effect !== 'static' && (
         <div className="scene-steps" role="group" aria-label={t(MSG.EFFECT_STEPS)}>
           {scene.scene_units.map((step, i) => (
-            <button
-              key={stepIds[i]}
-              type="button"
-              className="secondary compact"
-              aria-label={`${t(MSG.STEP)} ${i + 1}`}
-              aria-pressed={index === i}
-              onClick={() => setIndex(i)}
-            >
-              <SceneSwatch unit={step} />
-            </button>
+            <div className="scene-step" key={stepIds[i]}>
+              <button
+                type="button"
+                className="secondary compact"
+                aria-label={`${t(MSG.STEP)} ${i + 1}`}
+                aria-pressed={index === i}
+                onClick={() => setIndex(i)}
+              >
+                <SceneSwatch unit={step} />
+              </button>
+              {scene.scene_units.length > 1 && (
+                <button
+                  type="button"
+                  className="scene-step-delete secondary"
+                  aria-label={`${t(MSG.DELETE_STEP)} ${i + 1}`}
+                  onClick={() => removeStep(i)}
+                >
+                  <Icon name="delete" />
+                </button>
+              )}
+            </div>
           ))}
           <button
             type="button"
@@ -146,7 +190,6 @@ export default function BulbSceneEditor({
           >
             +
           </button>
-          <button type="button" className="secondary compact" disabled={scene.scene_units.length <= 1} onClick={() => removeStep()}>{t(MSG.DELETE_STEP)}</button>
         </div>
       )}
       <div className="light-segments" role="group" aria-label={t(MSG.MODE)}>

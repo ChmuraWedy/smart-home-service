@@ -1,6 +1,7 @@
 import { MSG, t } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { CloudDevice, JsonValue, Provider } from '../api';
 import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, hsvToHex, isStale, limitsOf, localSpec, validateControlValue, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
@@ -23,7 +24,9 @@ import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
 import { IconGlyph } from './ui/icon';
 import QuickLightSettings from './QuickLightSettings';
-import { hasLightEffectWizard } from './LightEffectWizard';
+import LightPresetMenu from './LightPresetMenu';
+import lightControls from '../light-controls';
+import { useLightPresets } from '../use-light-presets';
 
 const CARD_CACHE_INTERVAL = 4000;
 
@@ -75,6 +78,7 @@ function LightCardReading({ code, label, value, tint, off }: { code: 'brightness
 export type CardStatus = {online:boolean;battery?:BatteryReading};
 
 type QuickSheet = DashboardSheetState & {
+  presetSlot?: HTMLDivElement | null;
   onLightFeatures?: (hasQuickSettings: boolean, hasPresets: boolean) => void;
 };
 
@@ -133,22 +137,21 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
   return { sending, toggle };
 }
 
-function StandardCardControls({ name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy, readOK, sending, refresh, toggle, notice, category }: {
-  name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
-  now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
-  toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice; category?: string;
+function StandardCardControls({
+  api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy, readOK, sending, refresh, toggle, notice, category, onAuthError,
+}: {
+  api: HomeApi; tuyaApi?: HomeApi; name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[];
+  reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean;
+  refresh: () => Promise<void>; toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice;
+  category?: string; onAuthError: () => void;
 }) {
   const powers = specs.filter(powerControl);
   const powerLayout = !powers.length ? undefined : powers.length === 1 && !powers[0].aliases?.length ? 'single' : 'channels';
-  const brightness = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'number' && spec.unit === '%' && /^(brightness|bright_value(?:_v2)?)$/.test(spec.key)) : undefined;
-  const temperature = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'number' && /^(temp_value(?:_v2)?|color_temperature)$/.test(spec.key)) : undefined;
-  const color = powerLayout === 'single' ? specs.find(spec => spec.readable && spec.kind === 'color' && /^(color|colour_data(?:_v2)?)$/.test(spec.key)) : undefined;
-  const sliders = [brightness, temperature].filter((spec): spec is ControlSpec =>
-    spec?.kind === 'number' && spec.readable && spec.writable && spec.minimum !== undefined &&
-    spec.maximum !== undefined && spec.minimum < spec.maximum);
-  const modeSpec = specs.find(spec => spec.key === 'work_mode' || spec.key === 'mode');
-  const scene = powerLayout === 'single' ? specs.find(spec => spec.writable && /^scene_data(?:_v2)?$/.test(spec.key) && hasLightEffectWizard(spec)) : undefined;
-  const hasQuickSettings = sliders.length > 0 || Boolean(color?.writable || scene);
+  const {
+    brightness, temperature, color, white, mode: modeSpec, scene,
+  } = lightControls(specs, powerLayout === 'single');
+  const library = useLightPresets(api, deviceId, scene, onAuthError);
+  const hasQuickSettings = white.length > 0 || Boolean(color?.writable || scene);
   const currentReading = (spec: ControlSpec | undefined) => {
     const value = spec && reading(spec);
     return isStale(value, now, local) ? undefined : value;
@@ -157,7 +160,8 @@ function StandardCardControls({ name, deviceId, pendingScope, paused, sheet, spe
   const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
   const hasSummary = Boolean(brightness || temperature || colorMode);
   const onLightFeatures = sheet?.onLightFeatures;
-  useEffect(() => { onLightFeatures?.(hasQuickSettings, hasSummary); }, [hasQuickSettings, hasSummary, onLightFeatures]);
+  const hasPresetMenu = hasSummary || Boolean(scene);
+  useEffect(() => { onLightFeatures?.(hasQuickSettings, hasPresetMenu); }, [hasQuickSettings, hasPresetMenu, onLightFeatures]);
   const whiteMode = mode === 'white' || mode === undefined;
   const { h, s, v } = limitsOf(colorMode ? currentReading(color)?.value : undefined);
   const hsv = typeof h === 'number' && h >= 0 && h <= 360 && typeof s === 'number' && s >= 0 && s <= 1000 &&
@@ -211,6 +215,17 @@ function StandardCardControls({ name, deviceId, pendingScope, paused, sheet, spe
 );
   return (
     <>
+      {sheet?.presetSlot && createPortal(
+        <LightPresetMenu
+          presets={library.presets}
+          scope={pendingScope}
+          capability={scene?.key}
+          reading={scene && reading(scene)}
+          disabled={paused || disabled || !online}
+          send={(value) => (scene ? toggle(scene, value) : Promise.resolve(false))}
+        />,
+        sheet.presetSlot,
+      )}
       <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
         {powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
         {!powerLayout && sensorValues}
@@ -223,9 +238,10 @@ function StandardCardControls({ name, deviceId, pendingScope, paused, sheet, spe
         <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
           <QuickLightSettings
             power={field(powers[0], undefined, false)}
-            deviceId={deviceId}
+            library={library}
+            tuyaApi={tuyaApi}
             mode={modeSpec}
-            white={sliders}
+            white={white}
             color={color?.writable ? color : undefined}
             scene={scene}
             scope={pendingScope}
@@ -300,7 +316,10 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
     : (
       <StandardCardControls
         {...controls}
+        api={api}
+        tuyaApi={provider === 'sharing' ? api : undefined}
         deviceId={cloud.id}
+        onAuthError={onAuthError}
         local={false}
         online={snapshot?.online ?? cloud.online}
         category={cloud.category}
@@ -325,6 +344,9 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
   });
   return (
     <StandardCardControls
+      api={api}
+      tuyaApi={device.cloud.sharing ? api : undefined}
+      onAuthError={onAuthError}
       name={device.name}
       deviceId={device.id}
       pendingScope={localPendingScope(api, item.id)}
