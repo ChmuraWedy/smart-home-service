@@ -2,7 +2,7 @@ import { MSG, t, useLocale, translateText } from "./i18n";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Provider as StoreProvider } from 'react-redux';
-import { createBrowserRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext } from 'react-router';
+import { createBrowserRouter, createHashRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext } from 'react-router';
 import type { RouteObject } from 'react-router';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
@@ -25,6 +25,7 @@ type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
 type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
+const demo = import.meta.env.MODE === 'demo';
 const CARD_SIZE_STORAGE_KEY = 'smart-home.ui.card-size.v1';
 
 function savedCardSize(): CardSize {
@@ -51,7 +52,8 @@ function AppScreen({ view }: { view: View }) {
 }
 
 export function createAppRouter() {
-  return createBrowserRouter([{ element: <App />, children: [
+  const createRouter = demo ? createHashRouter : createBrowserRouter;
+  return createRouter([{ element: <App />, children: [
     screenRoute(appPaths.control, 'control'),
     screenRoute(roomPattern, 'control'),
     screenRoute(devicePattern, 'control'),
@@ -59,9 +61,11 @@ export function createAppRouter() {
     screenRoute(groupPattern, 'control'),
     screenRoute(dashboardToolsPath, 'control'),
     screenRoute(appPaths.settings, 'settings'),
-    screenRoute(appPaths.connections, 'connections'),
-    screenRoute(appPaths.network, 'network'),
-    screenRoute(appPaths['local-connections'], 'local-connections'),
+    ...(!demo ? [
+      screenRoute(appPaths.connections, 'connections'),
+      screenRoute(appPaths.network, 'network'),
+      screenRoute(appPaths['local-connections'], 'local-connections'),
+    ] : []),
     screenRoute('*', 'control'),
   ] }]);
 }
@@ -69,7 +73,7 @@ export function createAppRouter() {
 function AppContent() {
   const locale = useLocale();
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
-  const [connection, setConnection] = useState<Connection>(() => loadConnection());
+  const [connection, setConnection] = useState<Connection>(() => (demo ? { baseUrl: 'https://smart-home-demo.invalid', token: 'demo' } : loadConnection()));
   const location = useLocation();
   const navigate = useNavigate();
   const matched = useMatches().at(-1)!;
@@ -281,7 +285,7 @@ function AppContent() {
           </button>
           {menuOpen && (
           <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>
-            {([['control', t(MSG.CONTROL)], ['network', t(MSG.NETWORK_AND_PACKETS)], ['local-connections', t(MSG.LOCAL_CONNECTIONS)], ['settings', t(MSG.SETTINGS)], ['connections', t(MSG.CONNECTIONS)]] as const).map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>{label}</button>)}
+            {([['control', t(MSG.CONTROL)], ['network', t(MSG.NETWORK_AND_PACKETS)], ['local-connections', t(MSG.LOCAL_CONNECTIONS)], ['settings', t(MSG.SETTINGS)], ['connections', t(MSG.CONNECTIONS)]] as const).filter(([key]) => !demo || key === 'control' || key === 'settings').map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>{label}</button>)}
             {view === 'control' && status && (
             <button className="secondary dashboard-tools-menu" disabled={locked} aria-expanded={dashboardPanel === 'tools'} onClick={() => {
           changeDashboardPanel(dashboardPanel === 'tools' ? null : 'tools');
@@ -319,6 +323,7 @@ function AppContent() {
 )}
       </header>
       <main>
+        {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
         <input id="access-token" type="hidden" value={connection.token} readOnly />
         <Outlet
           context={{ needsAccess, pages: { connections: <>
