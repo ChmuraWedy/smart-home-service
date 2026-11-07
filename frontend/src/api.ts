@@ -109,7 +109,8 @@ export class CloudApi {
     signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(abort, 120_000);
     try {
-      const response = await fetch(this.url(path), {
+      const transport = import.meta.env.MODE === 'demo' ? (await import('./demo/backend')).default : fetch;
+      const response = await transport(this.url(path), {
         method,
         headers: { 'X-API-Key': this.connection.token, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         body: body === undefined ? undefined : JSON.stringify(body),

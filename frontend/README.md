@@ -112,3 +112,14 @@ Camera tiles can expand a small video preview. Privacy, motion, sound, and siren
 Connection settings keep the service key separate from Tuya login. Saved fields are hidden behind an edit action, and secrets are not filled back into inputs. The Sharing User Code/QR flow and Developer credential flow have separate save/check actions. Seven Developer regions are supported. See [QR login](../docs/qr-login.md) and [Developer login](../docs/developer-login.md).
 
 Cloud account tokens and device local keys stay on the server. The browser stores the service access key for this origin. API key rotation requires reconnecting browsers; changing language or theme does not change credentials or device drafts.
+
+## GitHub Pages demo
+
+Run `pnpm dev --mode demo` from `frontend` to open the interactive apartment locally.
+Edit `src/demo/apartment.json` to change the sample rooms, device names, and starting readings.
+The demo runs the regular Redux dashboard with an in-memory API. Reload the page to reset simulated controls.
+
+`pnpm build --mode demo --base ./` builds the static site for a repository subpath.
+The **Smart Home demo** workflow builds and deploys it from the default branch
+after frontend changes or a manual run. Under **Settings → Pages**, select
+**GitHub Actions** as the publishing source.
