@@ -1060,5 +1060,14 @@
   "LAYOUT_CELL": "Строка {0}, столбец {1}",
   "LAYOUT_MOVE_HERE": "Переместить сюда ({0})",
   "LAYOUT_MOVE_CARD": "Переместить {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Вставить перед {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Вставить перед {0} ({1})",
+  "DEVICE_LABEL_DISPLAY": "Названия и алиасы устройств",
+  "DEVICE_LABELS_ORIGINAL": "Исходные названия и алиасы",
+  "DEVICE_LABELS_LOCALIZED": "На языке приложения",
+  "DEVICE_LABEL_TRANSLATIONS": "Переводы названия и алиасов",
+  "DEVICE_TRANSLATION_ORIGINAL": "Название или алиас для перевода",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Введите текст для нужных языков. Если поле пустое, показывается исходное название или алиас.",
+  "DEVICE_TRANSLATION_OUTDATED": "Название или алиас изменились. Откройте устройство заново и повторите попытку.",
+  "DEVICE_TRANSLATIONS_SAVED": "Переводы сохранены.",
+  "SAVE_DEVICE_TRANSLATIONS": "Сохранить переводы"
 }

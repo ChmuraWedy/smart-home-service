@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .device_translations import LOCAL_SCOPE, local_translations, prune_translations
 from .models import (
     Building,
     BuildingAlias,
@@ -69,6 +70,8 @@ def replace_aliases(session: Session, item, aliases: list[str]):
             existing[alias] if alias in existing else alias_model(alias=alias)
             for alias in sorted(aliases)
         ]
+        if isinstance(item, Device) and item.id is not None:
+            prune_translations(session, LOCAL_SCOPE, str(item.id), "alias", aliases)
 
 
 def create_aliased(session: Session, model, body):
@@ -165,6 +168,8 @@ def patch_device(session: Session, item: Device, body):
     item.building_id = values["building_id"]
     if aliases is not None:
         replace_aliases(session, item, aliases)
+    if "name" in delta:
+        prune_translations(session, LOCAL_SCOPE, str(item.id), "name", [item.name])
     return item
 
 
@@ -173,13 +178,14 @@ def effective_capabilities(session: Session, item: Device):
     return {**(kind.capabilities if kind else {}), **item.capabilities}
 
 
-def device_read(session: Session, item: Device):
+def device_read(session: Session, item: Device, translations=None):
     # Explicit whitelist: never serialize the ORM object's __dict__ or local_key.
     fields = {name: getattr(item, name) for name in DeviceRead.model_fields if hasattr(item, name)}
     fields.update(
         node_id=item.cid,
         has_local_key=bool(item.local_key),
         capabilities=effective_capabilities(session, item),
+        translations=local_translations(session, item, translations),
     )
     for key in ("created_at", "updated_at", "last_seen_at"):
         if fields[key] is not None and fields[key].tzinfo is None:

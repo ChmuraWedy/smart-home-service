@@ -1,9 +1,9 @@
 import { MSG, t, translateText } from "../i18n";
 import { useRef, useState } from 'react';
 import { Icon, IconGlyph } from './ui/icon';
-export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength = 64, validate, label }: {
+export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength = 64, validate, label, displayAlias }: {
   aliases: string[]; disabled: boolean; onSave: (values: string[]) => Promise<void>;
-  maxAliases?: number; maxLength?: number; validate?: (value: string) => boolean; label?: string;
+  maxAliases?: number; maxLength?: number; validate?: (value: string) => boolean; label?: string; displayAlias?: (alias: string) => string;
 }) {
   const [editing, setEditing] = useState<number | null>(null), [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false), [error, setError] = useState('');
@@ -42,8 +42,8 @@ export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength
     <div className="alias-row" role="group" aria-label={t(MSG.ALIASES)}>
       {label && <span className="alias-label">{label}</span>}
       {aliases.map((alias, index) => editing === index ? editor : (
-        <span className="alias-tag" key={alias}>{alias}
-          <button type="button" className="alias-icon" aria-label={t(MSG.EDIT_ALIAS_PREFIX) + alias} title={t(MSG.EDIT_ALIAS)} disabled={disabled || saving} onClick={() => { setEditing(index); setDraft(alias); setError(''); }}>
+        <span className="alias-tag" key={alias}>{displayAlias?.(alias) ?? alias}
+          <button type="button" className="alias-icon" aria-label={t(MSG.EDIT_ALIAS_PREFIX) + (displayAlias?.(alias) ?? alias)} title={t(MSG.EDIT_ALIAS)} disabled={disabled || saving} onClick={() => { setEditing(index); setDraft(alias); setError(''); }}>
             <Icon name="edit" />
           </button>
         </span>

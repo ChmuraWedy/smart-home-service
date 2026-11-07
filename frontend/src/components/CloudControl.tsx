@@ -14,6 +14,8 @@ import { useAutomaticControls } from '../control-drafts';
 import { cloudPendingScope } from '../pending-device-values';
 import { usePendingPrivacyState } from '../use-pending-device-value';
 import { DeviceAliases } from './DeviceAliases';
+import DeviceTranslationEditor from './DeviceTranslationEditor';
+import { translationFor, useDeviceText } from '../device-translations';
 import { BatteryBadge, batteryFromSpecs, isBattery, isCamera } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
@@ -38,7 +40,8 @@ export function CloudControl({
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; displayName?: string;
   localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; onClose: () => void; onAuthError: () => void;
 }) {
-  const name = displayName || device.name || t(MSG.TUYA_DEVICE);
+  const originalName = displayName || device.name || t(MSG.TUYA_DEVICE);
+  const localize = useDeviceText();
   const localTransport = localDevice?.transport;
   const [mappingBusy,setMappingBusy] = useState(false);
   const [aliasBusy, setAliasBusy] = useState(false);
@@ -48,6 +51,8 @@ export function CloudControl({
   const dispatch = useAppDispatch();
   const labelKey = cloudMetadataKey(cloudAccountScope(api, provider), device.id);
   const labels = useAppSelector(state => state.deviceMetadata.channels[labelKey]?.value);
+  const translations = useAppSelector((state) => state.deviceMetadata.devices[labelKey]?.translations?.value) ?? device.translations;
+  const name = localize(originalName, translationFor(translations, 'name', originalName));
   const metadata = useMemo(() => ({value:null as CloudFunctions|null}),[read]);
   const load = useCallback(async (_refresh: boolean, signal?: AbortSignal) => {
     const cached = metadata.value;
@@ -139,7 +144,7 @@ export function CloudControl({
     <ControlDialog onRefresh={session.refresh}
       information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
       statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={name} busy={session.busy || editingBusy} onClose={onClose}
-      titleContent={<DeviceAliases api={api} deviceId={device.id} name={name} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
+      titleContent={<DeviceAliases api={api} deviceId={device.id} name={originalName} translations={translations} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
       connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
     >
       {camera && (
@@ -187,6 +192,16 @@ export function CloudControl({
 )}
       {data && !specs.length && <p className="empty-state">{t(MSG.THE_DEVICE_PROVIDED_NO_READINGS_OR_CONTROLS)}</p>}
       {!primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} onAuthError={onAuthError} />}
+      <DeviceTranslationEditor
+        api={api}
+        deviceId={device.id}
+        originalName={originalName}
+        initialAliases={device.aliases}
+        translations={translations}
+        provider={provider}
+        localId={localDevice?.id}
+        onAuthError={onAuthError}
+      />
       <DeviceInformation
         api={api}
         deviceId={device.id}

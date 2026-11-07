@@ -743,3 +743,36 @@ def test_upstream_command_rejection_is_safe_and_not_retried(cloud_client, monkey
     assert detail in response.json()["detail"]
     assert SECRET not in response.text
     assert len(calls) == 1
+
+
+def test_cloud_display_translations_are_scoped_and_linked_aliases_follow_inventory(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway"
+    name = {"kind": "name", "original": "Gateway", "values": {"pl": "Brama"}}
+    alias = {"kind": "alias", "original": "bridge", "values": {"ru": "Шлюз"}}
+
+    def gateway():
+        return next(row for row in cloud_client.get(API + "/devices").json() if row["id"] == "gateway")
+
+    assert cloud_client.put(path + "/translations", json=name).json()["shared"] is False
+    assert cloud_client.put(path + "/aliases", json={"aliases": ["bridge"]}).status_code == 200
+    assert cloud_client.put(path + "/translations", json=alias).json()["shared"] is False
+    assert gateway()["name"] == "Gateway"
+    assert gateway()["translations"] == {"name": {"Gateway": {"pl": "Brama"}}, "alias": {"bridge": {"ru": "Шлюз"}}}
+    bridge = cloud_client.app.state.cloud
+    bridge.auth["token_info"]["uid"] = "other"
+    assert gateway()["translations"] == {"name": {}, "alias": {}}
+    bridge.auth["token_info"]["uid"] = "user"
+
+    local = cloud_client.post("/api/v1/devices", json={
+        "device_id": "gateway", "name": "Our bridge",
+    }).json()
+    assert cloud_client.put(path + "/aliases", json={"aliases": ["bridge"]}).status_code == 200
+    local_path = f"/api/v1/devices/{local['id']}"
+    assert cloud_client.get(local_path).json()["translations"]["alias"] == {"bridge": {"ru": "Шлюз"}}
+    local_name = {"kind": "name", "original": "Our bridge", "values": {"be": "Наш шлюз"}}
+    assert cloud_client.put(path + "/translations", json=local_name).json()["shared"] is True
+    assert gateway()["translations"]["name"]["Our bridge"] == {"be": "Наш шлюз"}
+    assert cloud_client.put(path + "/aliases", json={"aliases": []}).status_code == 200
+    assert cloud_client.put(path + "/translations", json=alias).status_code == 409
+    assert gateway()["translations"]["alias"] == {}
