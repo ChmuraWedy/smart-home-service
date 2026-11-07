@@ -56,8 +56,9 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const dispatch = useAppDispatch();
   const quickBusy = useAppSelector(state => selectCommandPending(state, device.id));
   const quickOpen = quickRoute !== undefined;
-  const [lightFeatures, setLightFeatures] = useState<{ route: DeviceRoute; hasSliders: boolean; hasPresets: boolean }>();
+  const [lightFeatures, setLightFeatures] = useState<{ route: DeviceRoute; hasQuickSettings: boolean; hasPresets: boolean }>();
   const sheetTrigger = useRef<HTMLButtonElement>(null);
+  const [presetSlot, setPresetSlot] = useState<HTMLDivElement | null>(null);
   const notifyBusy = useCallback((pending: boolean) => {
     dispatch(setCommandPending({ deviceId: device.id, pending }));
   }, [device.id, dispatch]);
@@ -67,9 +68,9 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const live = liveStatus?.route === route ? liveStatus.status : undefined;
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const currentLightFeatures = lightFeatures?.route === route ? lightFeatures : undefined;
-  const hasSheet = isCamera(cloud?.category) || Boolean(currentLightFeatures?.hasSliders);
-  const onLightFeatures = useCallback((hasSliders: boolean, hasPresets: boolean) => {
-    setLightFeatures({ route, hasSliders, hasPresets });
+  const hasSheet = isCamera(cloud?.category) || Boolean(currentLightFeatures?.hasQuickSettings);
+  const onLightFeatures = useCallback((hasQuickSettings: boolean, hasPresets: boolean) => {
+    setLightFeatures({ route, hasQuickSettings, hasPresets });
   }, [route]);
   const showSheet = () => { if (!paused && !quickBusy && hasSheet && !quickOpen) onQuickOpen(route); };
   const local = device.local;
@@ -131,11 +132,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
 )}
           </>
 )}
-        secondary={currentLightFeatures?.hasPresets && (
-          <select className="dashboard-light-presets" aria-label={t(MSG.PRESETS)} disabled>
-            <option>{t(MSG.PRESETS)}</option>
-          </select>
-        )}
+        secondary={currentLightFeatures?.hasPresets && <div ref={setPresetSlot} />}
       />
       <DashboardCardFooter>
         <CardControls
@@ -148,7 +145,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           onAuthError={onAuthError}
           onBusy={notifyBusy}
           onStatus={updateStatus}
-          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, onLightFeatures }}
+          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, presetSlot, onLightFeatures }}
         />
         {routes.length > 1 && (
         <div className="device-card-footer tw:mt-2">
@@ -273,6 +270,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const selected: Selection | null = activeSurvey ?? (!quick && linked && validRoute ? { kind: 'device', device: linked, route: validRoute, parent }
     : group ? { kind: 'group', group } : null);
   const detailDevice = selected?.kind === 'device' ? selected.device : undefined;
+  const detailProvider = selected?.kind === 'device' && selected.route !== 'local' ? selected.route : undefined;
+  const detailCloud = detailProvider && detailDevice?.cloud[detailProvider];
+  const knownGatewayId = detailCloud?.gateway_id || detailDevice?.cloud.developer?.gateway_id;
+  const detailGateway = inventory?.devices.find((device) => device.id === detailDevice?.local?.parent_id)
+    ?? inventory?.devices.find((device) => device.device_id === knownGatewayId);
   const detailsOpen = selected !== null;
   useEffect(() => {
     if (!detailsOpen) return;
@@ -345,6 +347,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   function close() {
     if (activeSurvey) setSurvey(null); else closeOverlay();
     setRevision(value => value + 1);
+  }
+  function setupDetailDevice() {
+    if (!detailDevice?.local) return;
+    const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
+    choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
   }
   function renderCard(entry: DashboardEntry, placement: GridCardPlacement) {
     if (entry.kind === 'group') {
@@ -519,13 +526,36 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         </>
   )}
       {selected?.kind === 'device' && selected.route === 'local' && detailDevice?.local && (
-      <LocalControl room={roomName(detailDevice)} key={detailDevice.local.id} api={api} device={detailDevice.local} onAuthError={onAuthError} onSetup={inventory ? () => {
-      const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
-      choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
-    } : undefined} closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined} onClose={close}
-      />
-)}
-      {selected?.kind === 'device' && selected.route !== 'local' && detailDevice?.cloud[selected.route] && <CloudControl room={roomName(detailDevice)} localTransport={detailDevice.local?.transport} localDeviceId={detailDevice.local?.id} key={selected.route + detailDevice.id} api={api} device={{ ...detailDevice.cloud[selected.route]!, name: detailDevice.name }} devices={cloud[selected.route]} provider={selected.route} onClose={close} onAuthError={onAuthError} />}
+        <LocalControl
+          key={detailDevice.local.id}
+          api={api}
+          room={roomName(detailDevice)}
+          device={detailDevice.local}
+          gateway={detailGateway}
+          cloudDevice={detailDevice.cloud.sharing ?? detailDevice.cloud.developer}
+          routes={deviceRoutes(detailDevice)}
+          onAuthError={onAuthError}
+          onSetup={inventory ? () => setupDetailDevice() : undefined}
+          closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined}
+          onClose={close}
+        />
+      )}
+      {detailDevice && detailProvider && detailCloud && (
+        <CloudControl
+          key={detailProvider + detailDevice.id}
+          api={api}
+          room={roomName(detailDevice)}
+          displayName={detailDevice.name}
+          device={detailCloud}
+          localDevice={detailDevice.local}
+          gateway={detailGateway}
+          routes={deviceRoutes(detailDevice)}
+          devices={cloud[detailProvider]}
+          provider={detailProvider}
+          onClose={close}
+          onAuthError={onAuthError}
+        />
+      )}
       {selected?.kind === 'group' && <GroupControl key={selected.group.id} api={api} group={selected.group} onAuthError={onAuthError} onClose={close} onDevice={device => choose({ kind: 'device', device: mergeDevices([device], cloud)[0], route: 'local', parent: selected.group })} />}
     </section>
   );

@@ -1,6 +1,7 @@
 import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
+import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { LayoutSlots } from './dashboard-layout';
 
 export type Capability = {
@@ -15,6 +16,8 @@ export type LocalDevice = {
   room_id: number | null; transport: 'wifi' | 'zigbee'; parent_id: number | null; cid: string | null;
   enabled: boolean; capabilities: Record<string, Capability>;
   is_gateway?: boolean; ip?: string | null; version?: string | null; has_local_key?: boolean;
+  mac?: string | null; 'product_id'?: string | null; category?: string | null;
+  description?: string | null; 'last_seen_at'?: string | null;
 };
 export type Building = { id: number; name: string; aliases: string[] };
 export type Room = { id: number; building_id: number; name: string; aliases: string[] };
@@ -55,6 +58,23 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
   key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  lightPresets(device: string, signal: AbortSignal) {
+    return this.request<SavedLightScene[]>(`/light-presets/${encodeURIComponent(device)}`, 'GET', undefined, signal);
+  }
+
+  saveLightPreset(device: string, preset: ScenePresetInput, id?: number) {
+    const base = `/light-presets/${encodeURIComponent(device)}`;
+    return this.request<SavedLightScene>(id === undefined ? base : `${base}/${id}`, id === undefined ? 'POST' : 'PUT', preset);
+  }
+
+  deleteLightPreset(device: string, id: number) {
+    return this.deleteResource(`/light-presets/${encodeURIComponent(device)}/${id}`);
+  }
+
+  tuyaSceneReferences(signal: AbortSignal) {
+    return this.request<TuyaSceneReference[]>('/cloud/scenes?provider=sharing', 'GET', undefined, signal);
+  }
+
   dashboardLayout(browser: string, view: string, signal: AbortSignal) {
     return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
   }

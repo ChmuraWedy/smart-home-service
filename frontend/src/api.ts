@@ -20,6 +20,9 @@ export type CloudDevice = {
   id: string;
   name: string;
   category?: string;
+  'product_id'?: string | null;
+  'support_local'?: boolean | null;
+  'gateway_id'?: string | null;
   online: boolean;
   sub?: boolean;
   has_local_key: boolean;

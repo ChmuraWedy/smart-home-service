@@ -529,19 +529,19 @@
   },
   "src/components/CardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 11
-    },
-    "@stylistic/max-len": {
       "count": 5
     },
+    "@stylistic/max-len": {
+      "count": 3
+    },
     "arrow-parens": {
-      "count": 17
+      "count": 10
     },
     "brace-style": {
       "count": 2
     },
     "comma-spacing": {
-      "count": 54
+      "count": 51
     },
     "consistent-return": {
       "count": 2
@@ -550,13 +550,13 @@
       "count": 3
     },
     "implicit-arrow-linebreak": {
-      "count": 3
+      "count": 2
     },
     "import/order": {
       "count": 1
     },
     "indent": {
-      "count": 11
+      "count": 9
     },
     "key-spacing": {
       "count": 9
@@ -577,7 +577,7 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 18
+      "count": 16
     },
     "object-curly-spacing": {
       "count": 14
@@ -592,7 +592,7 @@
       "count": 3
     },
     "operator-linebreak": {
-      "count": 3
+      "count": 2
     },
     "prefer-template": {
       "count": 5
@@ -610,10 +610,10 @@
       "count": 13
     },
     "react/jsx-first-prop-new-line": {
-      "count": 5
+      "count": 3
     },
     "react/jsx-max-props-per-line": {
-      "count": 10
+      "count": 4
     },
     "react/jsx-props-no-spreading": {
       "count": 5
@@ -679,7 +679,7 @@
       "count": 12
     },
     "@stylistic/max-len": {
-      "count": 16
+      "count": 14
     },
     "arrow-parens": {
       "count": 25
@@ -691,7 +691,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 22
+      "count": 20
     },
     "curly": {
       "count": 1
@@ -703,25 +703,25 @@
       "count": 1
     },
     "indent": {
-      "count": 8
+      "count": 7
     },
     "key-spacing": {
-      "count": 7
+      "count": 5
     },
     "no-confusing-arrow": {
       "count": 1
     },
     "no-nested-ternary": {
-      "count": 10
+      "count": 8
     },
     "no-restricted-syntax": {
       "count": 6
     },
     "object-curly-newline": {
-      "count": 12
+      "count": 10
     },
     "object-curly-spacing": {
-      "count": 10
+      "count": 8
     },
     "one-var": {
       "count": 1
@@ -800,10 +800,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 10
+      "count": 8
     },
     "@stylistic/max-len": {
-      "count": 17
+      "count": 16
     },
     "arrow-parens": {
       "count": 41
@@ -824,7 +824,7 @@
       "count": 1
     },
     "indent": {
-      "count": 11
+      "count": 7
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
@@ -842,7 +842,7 @@
       "count": 2
     },
     "no-restricted-syntax": {
-      "count": 2
+      "count": 1
     },
     "no-shadow": {
       "count": 5
@@ -878,10 +878,10 @@
       "count": 6
     },
     "react/jsx-first-prop-new-line": {
-      "count": 2
+      "count": 1
     },
     "react/jsx-max-props-per-line": {
-      "count": 4
+      "count": 3
     },
     "react/jsx-no-bind": {
       "count": 4
@@ -1827,7 +1827,7 @@
       "count": 2
     },
     "object-curly-newline": {
-      "count": 10
+      "count": 8
     },
     "object-curly-spacing": {
       "count": 4
@@ -2092,7 +2092,7 @@
   },
   "src/controls.ts": {
     "@stylistic/max-len": {
-      "count": 10
+      "count": 9
     },
     "arrow-parens": {
       "count": 7
@@ -2122,19 +2122,19 @@
       "count": 10
     },
     "no-nested-ternary": {
-      "count": 17
+      "count": 14
     },
     "no-restricted-syntax": {
       "count": 4
     },
     "object-curly-newline": {
-      "count": 28
+      "count": 26
     },
     "object-curly-spacing": {
       "count": 2
     },
     "object-property-newline": {
-      "count": 89
+      "count": 78
     },
     "one-var": {
       "count": 6

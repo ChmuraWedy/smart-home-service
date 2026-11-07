@@ -651,6 +651,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .dashboard_layout_api import router as dashboard_layout_router
 
     app.include_router(dashboard_layout_router)
+    from .light_presets import router as light_presets_router
+
+    app.include_router(light_presets_router)
     from .topology import router as cloud_router
 
     app.include_router(cloud_router)
