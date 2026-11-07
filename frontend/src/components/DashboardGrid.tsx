@@ -3,7 +3,7 @@ import {
 } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
-  dashboardBrowserId, ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards, trimSlots,
+  dashboardBrowserId, ensureDashboardBrowserId, moveCard, placeCards, trimSlots,
 } from '../dashboard-layout';
 import type { LayoutSlots } from '../dashboard-layout';
 import type { HomeApi } from '../home-api';
@@ -19,6 +19,7 @@ type GridView = { building: string; room: string; page: number };
 type GridItem<T> = { id: string; cardName: string; entry: T };
 type SavedLayout = { api: HomeApi; view: string; slots?: LayoutSlots; error?: boolean };
 type LayoutDraft = { columns: number; slots: LayoutSlots; selected?: number };
+const EDITOR_SLOTS = 20;
 
 function useGridColumns(density: string) {
   const grid = useRef<HTMLDivElement>(null);
@@ -176,7 +177,7 @@ export default function DashboardGrid<T>({
         nudge: dropPreview?.slot === slot ? dropPreview.nudge : undefined,
       }));
     }
-    if (draft) {
+    if (draft && (slot < EDITOR_SLOTS || item)) {
       content.push(
         <LayoutTarget
           key={`slot-${slot}`}
@@ -198,7 +199,7 @@ export default function DashboardGrid<T>({
   }
 
   function renderColumn(column: number) {
-    const limit = draft ? MAX_LAYOUT_SLOTS : slots.length;
+    const limit = draft ? Math.max(EDITOR_SLOTS, slots.length) : slots.length;
     const count = Math.max(0, Math.ceil((limit - column) / activeColumns));
     const columnSlots = Array.from({ length: count }, (_, row) => slots[row * activeColumns + column] ?? null);
     const visibleSlots = draft ? columnSlots : trimSlots(columnSlots);

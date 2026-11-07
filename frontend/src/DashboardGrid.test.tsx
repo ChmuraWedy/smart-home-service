@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardGrid from './components/DashboardGrid';
-import { MAX_LAYOUT_SLOTS, moveCard, placeCards } from './dashboard-layout';
+import { ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards } from './dashboard-layout';
 import type { LayoutSlots } from './dashboard-layout';
 import { HomeApi } from './home-api';
 import { setLocale } from './i18n';
@@ -70,29 +70,47 @@ describe('dashboard layout', () => {
     click('Edit layout');
     expect(screen.getByTestId('device-a')).toHaveAttribute('inert');
     click('Move Card 1 (Row 1, column 1)');
-    click('Move here (Row 32, column 3)');
-    cardAt('device-a', 32, 3);
+    click('Move here (Row 7, column 2)');
+    cardAt('device-a', 7, 2);
+    expect(screen.queryByRole('button', { name: 'Move here (Row 7, column 3)' })).toBeNull();
     click('Move Card 2 (Row 1, column 2)');
     click('Insert before Card 3 (Row 1, column 3)');
     cardAt('group-1', 1, 3);
     click('Save');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
     expect(screen.getByTestId('device-a')).not.toHaveAttribute('inert');
-    const expected: LayoutSlots = Array(MAX_LAYOUT_SLOTS).fill(null);
+    const expected: LayoutSlots = Array(20).fill(null);
     expected[2] = 'group-1';
     expected[5] = 'device-b';
-    expected[MAX_LAYOUT_SLOTS - 1] = 'device-a';
+    expected[19] = 'device-a';
     expect([...stored.values()]).toEqual([{ slots: expected }]);
     expect([...stored.keys()][0]).toMatch(/\/dashboard-layouts\/[0-9a-f]{32}\?building=all&room=3&page=1&columns=3$/);
 
     first.unmount();
     const reloaded = mount();
-    await waitFor(() => cardAt('device-a', 32, 3));
+    await waitFor(() => cardAt('device-a', 7, 2));
     cardAt('group-1', 1, 3);
     reloaded.unmount();
     mount('4');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
     cardAt('device-a', 1, 1);
+  });
+
+  it('keeps a previously saved card beyond the editor slots accessible', async () => {
+    ensureDashboardBrowserId();
+    const slots: LayoutSlots = Array(MAX_LAYOUT_SLOTS).fill(null);
+    slots[0] = 'group-1';
+    slots[1] = 'device-b';
+    slots[MAX_LAYOUT_SLOTS - 1] = 'device-a';
+    vi.mocked(fetch).mockImplementation(async () => Response.json({ slots }));
+    mount();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
+    click('Edit layout');
+    cardAt('device-a', 32, 3);
+    expect(screen.queryByRole('button', { name: 'Move here (Row 8, column 1)' })).toBeNull();
+    click('Move Card 1 (Row 32, column 3)');
+    click('Move here (Row 7, column 2)');
+    cardAt('device-a', 7, 2);
   });
 
   it('keeps the draft on save failure and discards it on cancel', async () => {
