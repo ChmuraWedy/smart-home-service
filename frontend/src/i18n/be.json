@@ -1182,5 +1182,19 @@
   "ADVANCED_SETTINGS": "Пашыраныя налады",
   "NETWORK_MONITORING": "Маніторынг сеткі",
   "NETWORK_MONITORING_DISABLED": "Уключыце маніторынг сеткі ў пашыраных наладах, каб праглядаць трафік лакальнай сеткі.",
-  "SMART_LIFE_NO_LOADED_ROOMS": "Пакоі са Smart Life яшчэ не загружаныя."
+  "SMART_LIFE_NO_LOADED_ROOMS": "Пакоі са Smart Life яшчэ не загружаныя.",
+  "HOUSEHOLD_ACCESS": "Доступ для дамачадцаў",
+  "HOUSEHOLD_ACCESS_HELP": "Дамачадцы кіруюць агульнымі прыладамі і захоўваюць уласную раскладку.",
+  "HOUSEHOLD_MEMBER_NAME": "Імя дамачадца",
+  "CREATE_HOUSEHOLD_ACCESS": "Стварыць ключ доступу",
+  "HOUSEHOLD_NEW_KEY": "Ключ доступу для {0}",
+  "HOUSEHOLD_NEW_KEY_HELP": "Скапіруйце ключ і перадайце яго асабіста. Ён паказваецца толькі адзін раз.",
+  "REVOKE_HOUSEHOLD_ACCESS": "Адазваць доступ для {0}",
+  "REVOKE_HOUSEHOLD_CONFIRM": "Адазваць доступ для {0} і выдаліць захаваныя раскладкі?",
+  "SIGNED_IN_AS": "Вы ўвайшлі як {0}",
+  "SIGN_OUT": "Выйсці",
+  "ACCOUNT_SIGN_IN": "Увайсці ў Smart Home",
+  "ACCOUNT_SIGN_IN_HELP": "Увядзіце ключ доступу, які выдаў уладальнік дома.",
+  "HOUSEHOLD_OWNER_REQUIRED": "Для гэтага дзеяння патрэбны ўліковы запіс уладальніка",
+  "HOUSEHOLD_OWNER": "Уладальнік"
 }

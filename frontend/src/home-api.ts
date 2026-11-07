@@ -1,6 +1,8 @@
 import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
-import type { JsonValue, Provider } from './api';
+import type {
+  HouseholdMember, IssuedMember, JsonValue, Provider,
+} from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { DeviceTranslations, TranslatedText } from './device-translations';
 import type { Locale } from './i18n';
@@ -120,11 +122,34 @@ export class HomeApi extends CloudApi {
   }
 
   roomNavigationLayout(browser: string, signal: AbortSignal) {
-    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'GET', undefined, signal);
+    const scope = this.isMember ? 'me' : browser;
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${scope}/room-navigation`, 'GET', undefined, signal);
   }
 
   saveRoomNavigationLayout(browser: string, layout: RoomNavigationLayout, signal: AbortSignal) {
-    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'PUT', layout, signal);
+    const scope = this.isMember ? 'me' : browser;
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${scope}/room-navigation`, 'PUT', layout, signal);
+  }
+
+  accountDashboardLayout(view: string, legacyBrowser: string | null, signal: AbortSignal) {
+    const browser = this.account?.role === 'owner' && legacyBrowser ? `&browser_id=${legacyBrowser}` : '';
+    return this.request<DashboardLayout>(`/dashboard-layouts/me?${view}${browser}`, 'GET', undefined, signal);
+  }
+
+  saveAccountDashboardLayout(view: string, layout: DashboardLayout) {
+    return this.request<DashboardLayout>(`/dashboard-layouts/me?${view}`, 'PUT', layout);
+  }
+
+  householdMembers(signal: AbortSignal) {
+    return this.request<HouseholdMember[]>('/accounts', 'GET', undefined, signal);
+  }
+
+  createHouseholdMember(name: string) {
+    return this.request<IssuedMember>('/accounts', 'POST', { name });
+  }
+
+  revokeHouseholdMember(id: string) {
+    return this.deleteResource(`/accounts/${encodeURIComponent(id)}`);
   }
 
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {

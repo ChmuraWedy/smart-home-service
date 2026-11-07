@@ -14,13 +14,16 @@ import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type {
   CloudStatus, Connection, DeveloperCredentials, Provider, RedroidCredentials,
 } from './api';
-import { loadConnection, saveConnection } from './connection';
+import {
+  clearConnection, loadConnection, saveConnection, STORAGE_KEY,
+} from './connection';
 import appIcon from './assets/home-power.svg?no-inline';
 import AiChatButton from './components/AiChat';
 import VoiceDemo from './demo/VoiceDemo';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import FirstRunWizard, { setupStep } from './components/FirstRunWizard';
 import type { SetupStep } from './components/FirstRunWizard';
+import HouseholdAccess from './components/HouseholdAccess';
 import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -61,10 +64,11 @@ function savedCardSize(): CardSize {
 }
 
 function App() {
-  const [store] = useState(createAppStore);
+  const [store, setStore] = useState(createAppStore);
+  const resetSessionStore = useCallback(() => setStore(createAppStore()), []);
   return (
     <StoreProvider store={store}>
-      <AppContent />
+      <AppContent resetSessionStore={resetSessionStore} />
     </StoreProvider>
   );
 }
@@ -78,6 +82,10 @@ function screenRoute(path: string, view: View, id = path): RouteObject {
 function AppScreen({ view }: { view: View }) {
   const { pages, accessView } = useOutletContext<{ pages: Record<View, ReactNode>; accessView: View | null }>();
   return pages[accessView ?? view];
+}
+
+function ownerPage(view: View) {
+  return ['network', 'local-connections', 'rooms', 'combined-devices', 'smart-life-rooms', 'setup'].includes(view);
 }
 
 export function createAppRouter() {
@@ -114,7 +122,7 @@ export function createAppRouter() {
   }]);
 }
 
-function AppContent() {
+function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const locale = useLocale();
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   const [connection, setConnection] = useState<Connection>(() => (demo ? { baseUrl: 'https://smart-home-demo.invalid', token: 'demo' } : loadConnection()));
@@ -125,9 +133,6 @@ function AppContent() {
   const requestedView = (matched?.handle as View | undefined) ?? 'control';
   const needsAccess = !connection.token && !['settings', 'connections', 'setup'].includes(requestedView);
   const initialSetup = needsAccess && location.pathname === '/' && !location.search && !location.hash;
-  let accessView: View | null = null;
-  if (needsAccess) accessView = initialSetup ? 'setup' : 'connections';
-  const view = accessView ?? requestedView;
   const panelParam = query.get('panel');
   const dashboardPanel: DashboardPanel = matched?.id === dashboardToolsPath || panelParam === 'tools' ? 'tools' : panelParam === 'search' ? 'search' : null;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -139,6 +144,15 @@ function AppContent() {
   const dashboardLocked = useAppSelector(selectDashboardLocked);
   const controlLocked = dashboardLocked || localConnectionLocked;
   const [status, setStatus] = useState<CloudStatus | null>(null);
+  const [sessionRevision, setSessionRevision] = useState(0);
+  const currentConnection = useRef(connection);
+  const member = status?.account?.role === 'member';
+  const owner = status?.account?.role === 'owner';
+  const ownerPageBlocked = member && ownerPage(requestedView);
+  let accessView: View | null = null;
+  if (needsAccess) accessView = initialSetup ? 'setup' : 'connections';
+  else if (ownerPageBlocked) accessView = 'control';
+  const view = accessView ?? requestedView;
   const searchOpen = view === 'control' && Boolean(status) && dashboardPanel === 'search';
   const dashboardSearchInput = useRef<HTMLInputElement>(null);
   useEffect(() => { if (searchOpen) dashboardSearchInput.current?.focus(); }, [searchOpen]);
@@ -154,7 +168,8 @@ function AppContent() {
   const [editingDeveloper, setEditingDeveloper] = useState(false);
   const [qr, setQR] = useState<QR | null>(null);
   const [remaining, setRemaining] = useState(0);
-  const api = useMemo(() => new HomeApi(connection), [connection]);
+  const api = useMemo(() => new HomeApi(connection, status?.account), [connection, status?.account]);
+  const verificationApi = useMemo(() => new CloudApi(connection), [connection]);
   const locked = busy || controlLocked;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
@@ -179,37 +194,68 @@ function AppContent() {
     } else if (needsAccess) {
       const returnTo = legacy ?? (matched?.id === '*' ? '/' : location.pathname + location.search);
       navigate(appPaths.connections, { replace: true, state: returnTo === '/' ? null : { returnTo } });
+    } else if (ownerPageBlocked) {
+      navigate(appPaths.control, { replace: true });
     } else if (legacy || matched?.id === '*') {
       navigate(legacy ?? appPaths.control, { replace: true });
     }
-  }, [location, matched?.id, needsAccess, initialSetup, navigate]);
+  }, [location, matched?.id, needsAccess, initialSetup, navigate, ownerPageBlocked]);
+
+  const installSession = useCallback((next: Connection, nextStatus: CloudStatus | null) => {
+    currentConnection.current = next;
+    verified.current = next;
+    setConnection(next);
+    setStatus(nextStatus);
+    setQR(null);
+    setEditingCode(false);
+    setEditingDeveloper(false);
+    setLocalConnectionLocked(false);
+    setSessionRevision((revision) => revision + 1);
+    busyRef.current = false;
+    setBusy(false);
+    resetSessionStore();
+  }, [resetSessionStore]);
 
   const invalidateConnection = useCallback(() => {
+    if (currentConnection.current !== connection) return;
     const next = { ...connection, token: '' };
-    try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
-    verified.current = next;
-    setConnection(next); setStatus(null); setQR(null);
-    setLocalConnectionLocked(false);
-  }, [connection]);
+    try { clearConnection(next.baseUrl); } catch { /* Still invalidate the in-memory token. */ }
+    installSession(next, null);
+  }, [connection, installSession]);
+
+  useEffect(() => {
+    if (demo) return undefined;
+    function onStorage(event: StorageEvent) {
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
+      const { current } = currentConnection;
+      const saved = loadConnection();
+      if (current.token && (current.baseUrl !== saved.baseUrl || current.token !== saved.token)) {
+        installSession({ ...current, token: '' }, null);
+        setNotice({ text: '' });
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [installSession]);
 
   useEffect(() => {
     if (!connection.token || verified.current === connection) return;
     const controller = new AbortController();
     let active = true;
     busyRef.current = true; setBusy(true);
-    api.status(controller.signal).then((value) => {
-      if (active) {
+    verificationApi.status(controller.signal).then((value) => {
+      if (active && currentConnection.current === connection) {
         setStatus(value); verified.current = connection; setNotice({ text: '' });
         busyRef.current = false; setBusy(false);
       }
     }).catch((error) => {
-      if (!active) return;
+      if (!active || currentConnection.current !== connection) return;
       busyRef.current = false; setBusy(false);
       setNotice({ text: error instanceof Error ? error.message : t(MSG.COULD_NOT_CONNECT), error: true });
       if (error instanceof ApiError && error.status === 401) invalidateConnection();
     });
     return () => { active = false; controller.abort(); };
-  }, [api, connection, invalidateConnection]);
+  }, [verificationApi, connection, invalidateConnection]);
 
   useEffect(() => {
     if (!qr) return;
@@ -227,20 +273,30 @@ function AppContent() {
     if (busyRef.current || controlLocked) return;
     busyRef.current = true; setBusy(true); setNotice({ text: '' });
     try { await work(); } catch (error) {
+      if (currentConnection.current !== connection) return;
       if (invalidateOn401 && error instanceof ApiError && error.status === 401) invalidateConnection();
       setNotice({ text: error instanceof Error ? error.message : t(MSG.COULD_NOT_COMPLETE_THE_ACTION), error: true });
-    } finally { busyRef.current = false; setBusy(false); }
-  }, [controlLocked, invalidateConnection]);
+    } finally {
+      if (currentConnection.current === connection) {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    }
+  }, [connection, controlLocked, invalidateConnection]);
 
   const acceptAccess = useCallback(async (next: Connection) => {
     const nextStatus = await new CloudApi(next).status();
+    if (currentConnection.current !== connection) return;
     saveConnection(next);
-    verified.current = next;
-    setConnection(next); setStatus(nextStatus); setQR(null);
-    setEditingCode(false); setEditingDeveloper(false);
+    installSession(next, nextStatus);
     setNotice({ text: t(MSG.CONNECTION_SAVED_NOTICE) });
-    if (location.state?.returnTo && view !== 'setup') navigate(location.state.returnTo, { replace: true });
-  }, [location.state, navigate, view]);
+    if (nextStatus.account?.role === 'member') {
+      const returnTo = location.state?.returnTo;
+      navigate(returnTo ?? appPaths.control, { replace: true });
+    } else if (location.state?.returnTo && view !== 'setup') {
+      navigate(location.state.returnTo, { replace: true });
+    }
+  }, [connection, installSession, location.state, navigate, view]);
 
   const saveAccess = (address: string, candidate: string) => run(async () => {
     const baseUrl = normalizeApiBase(address);
@@ -275,6 +331,7 @@ function AppContent() {
   const saveCode = (code: string) => run(async () => {
     if (!code.trim()) throw new Error(t(MSG.ENTER_YOUR_USER_CODE));
     const saved = await api.saveCode(code.trim());
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'sharing');
     setStatus((current) => (current ? { ...current, ...saved } : null));
     setEditingCode(false); setQR(null);
@@ -284,6 +341,7 @@ function AppContent() {
   const saveDeveloper = (credentials: DeveloperCredentials) => run(async () => {
     if (!credentials.access_id || !credentials.access_secret) throw new Error(t(MSG.ENTER_YOUR_ACCESS_ID_AND_ACCESS_SECRET));
     const saved = await api.saveDeveloper(credentials);
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'developer');
     setStatus((current) => (current ? { ...current, developer: saved } : null));
     setEditingDeveloper(false);
@@ -292,6 +350,7 @@ function AppContent() {
 
   const connectDeveloper = () => run(async () => {
     const saved = await api.connectDeveloper();
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'developer');
     setStatus((current) => (current ? { ...current, developer: saved } : null));
     setNotice({ text: t(MSG.TUYA_DEVELOPER_CONNECTED_DEVICE_COUNT, [saved.device_count ?? 0]) });
@@ -300,7 +359,9 @@ function AppContent() {
   const beginQR = () => run(async () => {
     setQR(null);
     const login = await api.beginQR();
+    if (currentConnection.current !== connection) return;
     const image = await api.qrImage(login);
+    if (currentConnection.current !== connection) return;
     const seconds = Number.isFinite(login.expires_in) ? Math.min(120, Math.max(1, login.expires_in)) : 120;
     setQR({ session: login.session_id, imageUrl: URL.createObjectURL(image), expiresAt: Date.now() + seconds * 1000 });
     setNotice({ text: t(MSG.SCAN_THE_CODE_IN_SMART_LIFE_TUYA_SMART) });
@@ -331,8 +392,12 @@ function AppContent() {
     if (!qr) return;
     if (qr.approvalReady) await api.confirmRedroidQR(qr.session);
     else await api.confirmQR(qr.session);
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'sharing');
-    setQR(null); setStatus(await api.status());
+    const nextStatus = await api.status();
+    if (currentConnection.current !== connection) return;
+    setQR(null);
+    setStatus(nextStatus);
     setNotice({ text: t(MSG.ACCOUNT_CONNECTED) });
   }, true);
 
@@ -378,8 +443,35 @@ function AppContent() {
     return () => document.removeEventListener('pointerdown', outside);
   }, [menuOpen]);
 
+  function signOut() {
+    invalidateConnection();
+    setNotice({ text: '' });
+    navigate(appPaths.connections, { replace: true });
+  }
+
+  let connectionTitle = t(MSG.ACCOUNT_SIGN_IN);
+  let connectionHint = t(MSG.ACCOUNT_SIGN_IN_HELP);
+  if (member) {
+    connectionTitle = t(MSG.SERVICE_ACCESS);
+    connectionHint = '';
+  } else if (status) {
+    connectionTitle = t(ready && accountConnected ? MSG.TUYA_CONNECTED : MSG.CONNECT_TUYA);
+    connectionHint = t(ready && accountConnected ? MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES : MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES);
+  }
+
+  const accountName = owner ? t(MSG.HOUSEHOLD_OWNER) : status?.account?.name;
+  const sessionControls = !demo && status && connection.token && (
+    <div className="actions">
+      {accountName && <span>{t(MSG.SIGNED_IN_AS, [accountName])}</span>}
+      <button type="button" className="secondary compact" disabled={locked} onClick={signOut}>
+        {t(MSG.SIGN_OUT)}
+      </button>
+    </div>
+  );
+
   const controlCenter = (
     <ControlCenter
+      key={sessionRevision}
       dashboardPanel={dashboardPanel}
       cardSize={cardSize}
       api={api}
@@ -387,7 +479,7 @@ function AppContent() {
       sharingReady={Boolean(ready && status?.connected)}
       developerReady={Boolean(ready && developer.connected)}
       onAuthError={invalidateConnection}
-      onConnections={() => goTo('connections')}
+      onConnections={member ? undefined : () => goTo('connections')}
     />
   );
   const regionName = REGIONS.find((item) => item.value === developer.region)?.label;
@@ -540,28 +632,34 @@ function AppContent() {
     <>
       <div className="page-heading">
         <p className="eyebrow">{t(MSG.CONNECTIONS)}</p>
-        <h1>{ready && accountConnected ? t(MSG.TUYA_CONNECTED) : t(MSG.CONNECT_TUYA)}</h1>
-        <p className="muted">{ready && accountConnected ? t(MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES) : t(MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES)}</p>
+        <h1>{connectionTitle}</h1>
+        {connectionHint && <p className="muted">{connectionHint}</p>}
       </div>
-      <div className="workspace connections-workspace">
-        {tuyaConnection}
-      </div>
+      {status && !member && (
+        <div className="workspace connections-workspace">
+          {tuyaConnection}
+        </div>
+      )}
       <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
-      <button type="button" className="secondary compact" disabled={locked} onClick={() => goTo('setup')}>
-        {t(MSG.SETUP_OPEN_WIZARD)}
-      </button>
-
+      {!member && (
+        <button type="button" className="secondary compact" disabled={locked} onClick={() => goTo('setup')}>
+          {t(MSG.SETUP_OPEN_WIZARD)}
+        </button>
+      )}
+      {sessionControls}
     </>
   );
   const navigationGroups = [
     [
       ['control', MSG.DASHBOARD_NAVIGATION],
-      ...(!demo ? [['combined-devices', MSG.COMBINED_DEVICES] as const] : []),
+      ...(!demo && !member ? [['combined-devices', MSG.COMBINED_DEVICES] as const] : []),
     ],
     ...(!demo ? [[
       ['connections', MSG.CONNECTIONS],
-      ['local-connections', MSG.LOCAL_CONNECTIONS],
-      ['smart-life-rooms', MSG.ROOMS_FROM_SMART_LIFE],
+      ...(!member ? [
+        ['local-connections', MSG.LOCAL_CONNECTIONS],
+        ['smart-life-rooms', MSG.ROOMS_FROM_SMART_LIFE],
+      ] as const : []),
     ] as const] : []),
     [['settings', MSG.SETTINGS]],
   ] as const;
@@ -572,7 +670,7 @@ function AppContent() {
       <section className="card settings-page">
         <h1>{t(MSG.SETTINGS)}</h1>
         <div className="app-menu-appearance settings-appearance">{appearance}</div>
-        {!demo && (
+        {!demo && !member && (
           <section className="settings-advanced" aria-labelledby="advanced-settings-heading">
             <h2 id="advanced-settings-heading">{t(MSG.ADVANCED_SETTINGS)}</h2>
             <div className="settings-feature">
@@ -582,6 +680,7 @@ function AppContent() {
             {networkMonitoring && <Link to={appPaths.network}>{t(MSG.NETWORK_AND_PACKETS)}</Link>}
           </section>
         )}
+        {sessionControls}
       </section>
     ),
     network: networkMonitoring ? <NetworkPage api={api} ready={setupHasAccess} onAuthError={invalidateConnection} /> : (
@@ -637,7 +736,7 @@ function AppContent() {
                   ))}
                 </div>
               ))}
-              {!demo && networkMonitoring && (
+              {!demo && !member && networkMonitoring && (
                 <div className="app-menu-group">
                   <span className="app-menu-group-heading">{t(MSG.ADVANCED_SETTINGS)}</span>
                   <button
@@ -687,7 +786,7 @@ function AppContent() {
         <span className={`api-presence ${status ? 'online' : ''}`}>
           <i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}
         </span>
-        {view === 'control' && status && connection.token && (
+        {view === 'control' && status && connection.token && !member && (
           <AiChatButton api={api} disabled={locked} onAuthError={invalidateConnection}>
             {demo ? <VoiceDemo api={api} /> : null}
           </AiChatButton>
@@ -722,8 +821,8 @@ function AppContent() {
       </header>
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
-        <input id="access-token" type="hidden" value={connection.token} readOnly />
         <Outlet context={{ accessView, pages }} />
+        {owner && view === 'settings' && <HouseholdAccess key={sessionRevision} api={api} onAuthError={invalidateConnection} />}
         <div className={`notice ${notice.error ? 'error' : ''}`} role={notice.error ? 'alert' : 'status'} aria-live="polite">
           {busy ? (
             <>

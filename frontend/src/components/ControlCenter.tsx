@@ -360,7 +360,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
       }
     };
-    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal)), readCombinations()];
+    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal))];
+    if (!api.isMember) requests.push(readCombinations());
     if (sharingReady) requests.push(handle('Smart Life', () => api.devices('sharing', controller.signal), 'sharing'));
     if (developerReady) requests.push(handle('Tuya Developer', () => api.devices('developer', controller.signal), 'developer'));
     void Promise.all(requests).finally(() => { if (!controller.signal.aborted) setBusy(false); });
@@ -426,7 +427,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       return { ...previous, cloud: { ...previous.cloud, [provider]: items } };
     });
   }, [api, detailDevice, mask]);
-  const detailRoomEditor = detailDevice && inventory && (
+  const detailRoomEditor = !api.isMember && detailDevice && inventory && (
     <DeviceRoomEditor
       key={detailDevice.id}
       rooms={inventory.rooms}
@@ -811,7 +812,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     );
   }
   let roomAction: ReactNode;
-  if (import.meta.env.MODE !== 'demo') {
+  if (!api.isMember && import.meta.env.MODE !== 'demo') {
     if (activeRoom) {
       roomAction = (
         <RoomLayoutSettings
@@ -914,7 +915,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
                 rooms={filteredRooms}
                 selected={room}
                 onSelect={selectRoom}
-                management={inventory && import.meta.env.MODE !== 'demo' ? {
+                management={!api.isMember && inventory && import.meta.env.MODE !== 'demo' ? {
                   buildings: inventory.buildings,
                   onSaved: updateRoom,
                   onDeleted: roomDeleted,
@@ -958,7 +959,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           cloudDevice={detailDevice.cloud.sharing ?? detailDevice.cloud.developer}
           routes={deviceRoutes(detailDevice)}
           onAuthError={onAuthError}
-          onSetup={inventory ? () => setupDetailDevice() : undefined}
+          onSetup={inventory && !api.isMember ? () => setupDetailDevice() : undefined}
           closeLabel={detailCloseLabel}
           onClose={close}
         />

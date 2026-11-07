@@ -43,14 +43,22 @@ export function DeviceAliases({ api, deviceId, name, translations, initialAliase
   return (
     <div className="device-alias-heading">
       <h2>{localize(name, translationFor(variants, 'name', name))}</h2>
-      <AliasRow
-        label={t(MSG.ALIASES_LABEL)}
-        aliases={custom(aliases)}
-        displayAlias={(alias) => localize(alias, translationFor(variants, 'alias', alias))}
-        disabled={disabled}
-        onSave={(values) => save(values)}
-        validate={validDeviceAlias}
-      />
+      {api.isMember ? (
+        <div className="alias-row">
+          {custom(aliases).map((alias) => (
+            <span key={alias} className="alias-tag">{localize(alias, translationFor(variants, 'alias', alias))}</span>
+          ))}
+        </div>
+      ) : (
+        <AliasRow
+          label={t(MSG.ALIASES_LABEL)}
+          aliases={custom(aliases)}
+          displayAlias={(alias) => localize(alias, translationFor(variants, 'alias', alias))}
+          disabled={disabled}
+          onSave={(values) => save(values)}
+          validate={validDeviceAlias}
+        />
+      )}
     </div>
   );
 }
