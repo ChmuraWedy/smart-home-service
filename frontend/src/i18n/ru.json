@@ -1085,5 +1085,14 @@
   "DISSOLVE_COMBINATION": "Разъединить устройства",
   "DISSOLVE_COMBINATION_QUESTION": "Вернуть устройства на отдельные карточки?",
   "COMBINATION_UNAVAILABLE": "Объединение по этой ссылке недоступно.",
-  "BACK_TO_COMBINATION": "К объединению"
+  "BACK_TO_COMBINATION": "К объединению",
+  "DEVICE_LABEL_DISPLAY": "Названия и алиасы устройств",
+  "DEVICE_LABELS_ORIGINAL": "Исходные названия и алиасы",
+  "DEVICE_LABELS_LOCALIZED": "На языке приложения",
+  "DEVICE_LABEL_TRANSLATIONS": "Переводы названия и алиасов",
+  "DEVICE_TRANSLATION_ORIGINAL": "Название или алиас для перевода",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Введите текст для нужных языков. Если поле пустое, показывается исходное название или алиас.",
+  "DEVICE_TRANSLATION_OUTDATED": "Название или алиас изменились. Откройте устройство заново и повторите попытку.",
+  "DEVICE_TRANSLATIONS_SAVED": "Переводы сохранены.",
+  "SAVE_DEVICE_TRANSLATIONS": "Сохранить переводы"
 }

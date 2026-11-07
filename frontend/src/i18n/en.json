@@ -1085,5 +1085,14 @@
   "DISSOLVE_COMBINATION": "Dissolve combination",
   "DISSOLVE_COMBINATION_QUESTION": "Return the members to separate cards?",
   "COMBINATION_UNAVAILABLE": "The linked combination is unavailable.",
-  "BACK_TO_COMBINATION": "Back to combination"
+  "BACK_TO_COMBINATION": "Back to combination",
+  "DEVICE_LABEL_DISPLAY": "Device names and aliases",
+  "DEVICE_LABELS_ORIGINAL": "Original names and aliases",
+  "DEVICE_LABELS_LOCALIZED": "Match the app language",
+  "DEVICE_LABEL_TRANSLATIONS": "Name and alias translations",
+  "DEVICE_TRANSLATION_ORIGINAL": "Name or alias to translate",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Enter display text for each language. A blank field uses the original name or alias.",
+  "DEVICE_TRANSLATION_OUTDATED": "This name or alias has changed. Reload the device and try again.",
+  "DEVICE_TRANSLATIONS_SAVED": "Translations saved.",
+  "SAVE_DEVICE_TRANSLATIONS": "Save translations"
 }

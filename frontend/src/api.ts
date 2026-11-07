@@ -1,4 +1,5 @@
 import { MSG, t, translateText } from "./i18n";
+import type { DeviceTranslations, TranslationEdit, TranslationSaved } from './device-translations';
 export type Provider = 'sharing' | 'developer';
 export type Region = 'eu' | 'eu-w' | 'us' | 'us-e' | 'cn' | 'in' | 'sg';
 export type Connection = { baseUrl: string; token: string };
@@ -28,6 +29,7 @@ export type CloudDevice = {
   has_local_key: boolean;
   node_id?: string | null;
   aliases?: string[];
+  translations?: DeviceTranslations;
   battery?: { code: string; value: JsonValue; unit?: string | null } | null;
   controls?: { ready: boolean; definitions: CloudFunctions; snapshot: CloudSnapshot };
 };
@@ -193,6 +195,14 @@ export class CloudApi {
   }
   saveLocalDeviceAliases(id: number, aliases: string[], signal?: AbortSignal) {
     return this.request<{ device_id: string; aliases: string[] }>('/devices/' + id, 'PATCH', { aliases }, signal);
+  }
+
+  saveDeviceTranslation(id: string, provider: Provider, body: TranslationEdit, signal?: AbortSignal) {
+    return this.json<TranslationSaved>(`/devices/${encodeURIComponent(id)}/translations?provider=${provider}`, 'PUT', body, signal);
+  }
+
+  saveLocalDeviceTranslation(id: number, body: TranslationEdit, signal?: AbortSignal) {
+    return this.request<TranslationSaved>(`/devices/${id}/translations`, 'PUT', body, signal);
   }
   deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true, watch = false) {
     const query = new URLSearchParams({ refresh: String(refresh), provider });

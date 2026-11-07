@@ -311,8 +311,11 @@ def list_devices(
             query = query.where(column == value)
     if unassigned:
         query = query.where(Device.building_id.is_(None), Device.room_id.is_(None))
+    from .device_translations import LOCAL_SCOPE, translations_for
+
     items = session.scalars(query.order_by(Device.id).offset(offset).limit(limit)).all()
-    return [device_read(session, item) for item in items]
+    translations = translations_for(session, LOCAL_SCOPE, [str(item.id) for item in items])
+    return [device_read(session, item, translations.get(str(item.id), {})) for item in items]
 
 
 @router.get("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
@@ -330,7 +333,11 @@ def edit_device(item_id: EntityRef, body: DevicePatch, session: Session = Depend
 @router.delete("/devices/{item_id}", status_code=204, tags=["Devices"])
 def delete_device(item_id: EntityRef, session: Session = Depends(get_session)):
     item = get_by_ref(session, Device, item_id)
+    from .device_translations import LOCAL_SCOPE, prune_translations
+
     assert_empty(session, Device, Device.parent_id == item.id)
+    for kind in ("name", "alias"):
+        prune_translations(session, LOCAL_SCOPE, str(item.id), kind, [])
     session.delete(item)
     commit(session)
     return Response(status_code=204)
@@ -679,6 +686,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .device_aliases import router as device_aliases_router
 
     app.include_router(device_aliases_router)
+    from .device_translations import router as device_translations_router
+
+    app.include_router(device_translations_router)
 
     from .activity import router as activity_router
     app.include_router(activity_router)

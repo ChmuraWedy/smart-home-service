@@ -211,6 +211,7 @@ This index is generated from the application's OpenAPI routes. Consult the live 
 | PATCH | `/api/v1/devices/{item_id}` | Edit Device |
 | DELETE | `/api/v1/devices/{item_id}` | Delete Device |
 | GET | `/api/v1/devices/{item_id}/children` | Children |
+| PUT | `/api/v1/devices/{item_id}/translations` | Save Local Translations |
 
 ### Control
 
@@ -316,6 +317,7 @@ This index is generated from the application's OpenAPI routes. Consult the live 
 | POST | `/api/v1/cloud/topology/sync` | Sync Topology |
 | GET | `/api/v1/cloud/devices/{device_id}/aliases` | Read Aliases |
 | PUT | `/api/v1/cloud/devices/{device_id}/aliases` | Save Aliases |
+| PUT | `/api/v1/cloud/devices/{device_id}/translations` | Save Cloud Translations |
 
 ### Camera
 

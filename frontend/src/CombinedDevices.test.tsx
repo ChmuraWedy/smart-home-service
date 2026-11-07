@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
 import type { CombinedDevice, CombinedInput } from './home-api';
 import { STORAGE_KEY } from './connection';
+import { setDeviceTextMode } from './device-translations';
 import { setLocale } from './i18n';
 import { App } from './test/App';
 
@@ -31,7 +32,9 @@ const bulbs: CloudDevice[] = Array.from({ length: 3 }, (_, index) => {
       scene_data_v2: { scene_num: 3 },
     },
   };
-  return { id, name: `Light Kitchen ${index + 1}`, online, has_local_key: false, controls: { ready: true, definitions, snapshot } };
+  const name = `Light Kitchen ${index + 1}`;
+  const translations = index === 0 ? { name: { [name]: { en: 'Evening bulb' } }, alias: {} } : undefined;
+  return { id, name, translations, online, has_local_key: false, controls: { ready: true, definitions, snapshot } };
 });
 
 function backend(initial?: CombinedDevice) {
@@ -174,6 +177,24 @@ describe('combined devices', () => {
     expect(await screen.findByRole('dialog', { name: bulbs[0].name })).toBeInTheDocument();
     expect(await screen.findByRole('listitem', { name: 'Kitchen Lights' })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: bulbs[0].name })).toBeNull();
+  });
+
+  it('uses the selected name language for combination members and their details picker', async () => {
+    backend({
+      id: 1, name: 'Kitchen Lights', room_id: room.id,
+      members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    });
+    openApp('/combined-devices/1?room=3');
+    const chooser = within(await screen.findByRole('dialog', { name: 'Kitchen Lights' }));
+    expect(chooser.getByRole('button', { name: bulbs[0].name })).toBeInTheDocument();
+    try {
+      act(() => setDeviceTextMode('localized', false));
+      expect(chooser.getByRole('button', { name: 'Evening bulb' })).toBeInTheDocument();
+      const card = within(screen.getByRole('listitem', { name: 'Kitchen Lights' }));
+      expect(card.getByRole('region', { name: 'Evening bulb' })).toBeInTheDocument();
+    } finally {
+      act(() => setDeviceTextMode('original', false));
+    }
   });
 
   it('opens an ordinary bulb header in details and gives quick settings their own button', async () => {

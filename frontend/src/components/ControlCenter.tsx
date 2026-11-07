@@ -4,7 +4,7 @@ import { matchPath, useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { localSpec } from '../controls';
-import { deviceAliases, deviceRoutes, matchesDevice, mergeDevices, routeLabel } from '../devices';
+import { deviceAliases, deviceRoutes, deviceTextVariants, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
 import type { CombinedDevice, Group, GroupState, Inventory, LocalDevice } from '../home-api';
@@ -37,6 +37,8 @@ import { readLocalDevice } from '../local-device-cache';
 import { cloudAccountScope } from '../cloud-account-scope';
 import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, localMetadataKey, nextDeviceMetadataRevision } from '../device-metadata';
 import { useLocalDeviceState } from '../use-local-device-state';
+import { useDeviceText } from '../device-translations';
+import type { DeviceTranslations } from '../device-translations';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
 type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice } | { kind: 'combined'; combined: CombinedDevice };
@@ -55,7 +57,9 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void; placement: GridCardPlacement;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
-  const aliases = useMemo(() => deviceAliases(device), [device]);
+  const localize = useDeviceText();
+  const name = localize(device.name, deviceTextVariants(device, 'name', device.name));
+  const aliases = [...new Set(deviceAliases(device).map((alias) => localize(alias, deviceTextVariants(device, 'alias', alias))))];
   const routes = deviceRoutes(device);
   const [chosen, setChosen] = useState<DeviceRoute | null>(null);
   const dispatch = useAppDispatch();
@@ -99,7 +103,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
       data-header-details
       data-layout-slot={placement.slot}
       data-layout-nudge={placement.nudge}
-      aria-label={device.name}
+      aria-label={name}
       onClick={(event) => {
         if (event.target instanceof Element) openCard(event, event.target.closest('.dashboard-card-header') ? openDetails : showSheet);
       }}
@@ -109,8 +113,8 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
       <DashboardCardHeader
         icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
         title={(
-          <button type="button" className="device-card-details-trigger" disabled={paused || quickBusy} title={device.name} onClick={openDetails}>
-            {device.name}
+          <button type="button" className="device-card-details-trigger" disabled={paused || quickBusy} title={name} onClick={openDetails}>
+            {name}
           </button>
         )}
         metadata={(
@@ -160,6 +164,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           key={route}
           api={api}
           device={device}
+          displayName={name}
           route={route}
           now={now}
           paused={paused}
@@ -170,7 +175,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
         />
         {routes.length > 1 && (
         <div className="device-card-footer tw:mt-2">
-          <select className="device-route-select" aria-label={t(MSG.CONTROL_METHOD) + device.name} value={route} disabled={quickBusy} onChange={event => setChosen(event.target.value as DeviceRoute)}>
+          <select className="device-route-select" aria-label={t(MSG.CONTROL_METHOD) + name} value={route} disabled={quickBusy} onChange={(event) => setChosen(event.target.value as DeviceRoute)}>
             {routes.map(value => <option key={value} value={value}>{routeLabel[value]}</option>)}
           </select>
         </div>
@@ -252,12 +257,19 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             const definitions = device.controls?.definitions;
             const channelLabels = device.controls?.ready && definitions?.device_id === device.id && Array.isArray(definitions.functions)
               ? labelsFromCloudDefinitions(definitions) : undefined;
-            return { key: cloudMetadataKey(scope, device.id), revision: metadataRevision, name: device.name ?? '', aliases: device.aliases, channelLabels };
+            return {
+              key: cloudMetadataKey(scope, device.id),
+              revision: metadataRevision,
+              name: device.name ?? '',
+              aliases: device.aliases,
+              translations: device.translations,
+              channelLabels,
+            };
           });
           if (updates.length) dispatch(cacheDeviceMetadata(updates));
         } else if (!Array.isArray(result) && result.devices.length) {
           dispatch(cacheDeviceMetadata(result.devices.map(device => ({
-            key: localMetadataKey(api, device.id), revision: metadataRevision, name: device.name, aliases: device.aliases,
+            key: localMetadataKey(api, device.id), revision: metadataRevision, name: device.name, aliases: device.aliases, translations: device.translations,
           }))));
         }
         setRecord(previous => previous?.api === api && previous.mask === mask ? {
@@ -285,9 +297,15 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     return () => controller.abort();
   }, [api, ready, mask, revision, dispatch]);
   const devices = useMemo(() => {
-    function applyIdentity<T extends { name: string; aliases?: string[] }>(device: T, key: string): T {
+    function applyIdentity<T extends { name: string; aliases?: string[]; translations?: DeviceTranslations }>(device: T, key: string): T {
       const stored = identity[key];
-      return stored ? { ...device, name: stored.name?.value ?? device.name, aliases: stored.aliases?.value ?? device.aliases } : device;
+      if (!stored) return device;
+      return {
+        ...device,
+        name: stored.name?.value ?? device.name,
+        aliases: stored.aliases?.value ?? device.aliases,
+        translations: stored.translations?.value ?? device.translations,
+      };
     }
     const localDevices = (inventory?.devices ?? []).map(device => applyIdentity(device, localMetadataKey(api, device.id)));
     const cloudDevices: typeof cloud = {};

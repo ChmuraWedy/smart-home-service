@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import type {
   CombinedDevice, CombinedMember, CombinedPowerOutcome, HomeApi,
 } from '../home-api';
+import { useDeviceDisplayName } from '../devices';
 import type { UnifiedDevice } from '../devices';
 import { ApiError } from '../api';
 import { cloudDeviceKey, readCloudDevice } from '../cloud-device-cache';
@@ -56,18 +57,20 @@ function MemberControls({
 }) {
   const { member, device } = entry;
   const id = member.device_id;
+  const displayName = useDeviceDisplayName()(device, id);
   const dispatch = useAppDispatch();
   const recordBusy = useCallback((pending: boolean) => {
     dispatch(setCommandPending({ deviceId: commandKey, pending }));
   }, [commandKey, dispatch]);
   const recordPower = useCallback((power: MemberPower) => onPower(id, power), [id, onPower]);
   return (
-    <section className="combined-member" aria-label={device?.name ?? id}>
-      <h3 className="combined-member-name">{device?.name ?? id}</h3>
+    <section className="combined-member" aria-label={displayName}>
+      <h3 className="combined-member-name">{displayName}</h3>
       {device ? (
         <CardControls
           api={api}
           device={device}
+          displayName={displayName}
           route={member.route}
           now={now}
           paused={paused}
@@ -98,6 +101,7 @@ export default function CombinedDeviceCard({
   onAuthError: () => void;
 }) {
   const id = `combined-${combined.id}`;
+  const displayName = useDeviceDisplayName();
   const trigger = useRef<HTMLButtonElement>(null);
   const dispatch = useAppDispatch();
   const sending = useRef(false);
@@ -172,7 +176,7 @@ export default function CombinedDeviceCard({
         <ul className="combined-results" aria-live="polite">
           {members.map(({ member, device }) => {
             const outcome = outcomes[member.device_id];
-            return outcome && <li key={member.device_id}>{device?.name ?? member.device_id} · {t(outcomeLabels[outcome])}</li>;
+            return outcome && <li key={member.device_id}>{displayName(device, member.device_id)} · {t(outcomeLabels[outcome])}</li>;
           })}
         </ul>
       )}

@@ -1,7 +1,9 @@
 import { useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api';
-import { deviceRoutes, matchesDevice, routeLabel } from '../devices';
+import {
+  deviceRoutes, matchesDevice, routeLabel, useDeviceDisplayName,
+} from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type {
   CombinedDevice, CombinedMemberInput, HomeApi, Room,
@@ -19,6 +21,7 @@ export function CombinedDeviceDetails({
   onEdit: () => void;
   onClose: () => void;
 }) {
+  const displayName = useDeviceDisplayName();
   return (
     <ControlDialog title={combined.name} busy={false} onClose={onClose}>
       <p>{t(MSG.CHOOSE_COMBINED_MEMBER)}</p>
@@ -31,7 +34,7 @@ export function CombinedDeviceDetails({
               disabled={!device}
               onClick={() => device && onChoose(device, member.route)}
             >
-              {device?.name ?? member.device_id}
+              {displayName(device, member.device_id)}
               {!device && ` · ${t(MSG.UNAVAILABLE)}`}
             </button>
           </li>
@@ -56,6 +59,7 @@ export function CombinedDeviceSettings({
   onAuthError: () => void;
 }) {
   const formId = useId();
+  const displayName = useDeviceDisplayName();
   const [name, setName] = useState(existing?.name ?? '');
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
   const [members, setMembers] = useState<CombinedMemberInput[]>(() => existing?.members.map(({ device_id: id, route }) => ({ device_id: id, route })) ?? []);
@@ -150,7 +154,7 @@ export function CombinedDeviceSettings({
             const device = byId.get(id);
             const choice = selected.get(id);
             const routes = device ? deviceRoutes(device) : [];
-            const label = device?.name ?? id;
+            const label = displayName(device, id);
             return (
               <div className="combined-member-option" key={id}>
                 <label htmlFor={`${formId}-member-${id}`}>

@@ -92,6 +92,7 @@ type EmbeddedControls = {
 type CardProps = EmbeddedControls & {
   api: HomeApi;
   device: UnifiedDevice;
+  displayName?: string;
   route: DeviceRoute;
   now: number;
   paused: boolean;
@@ -107,7 +108,7 @@ export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
   const {
-    device, route, paused, embeddedQuick, sheet,
+    device, displayName, route, paused, embeddedQuick, sheet,
   } = props;
   const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
@@ -135,7 +136,7 @@ export function CardControls(props: CardProps) {
     controls = <CloudCardControls {...props} cloud={cloud} provider={route} visible={pollingVisible} />;
   }
   return (
-    <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + device.name}>
+    <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + (displayName ?? device.name)}>
       {controls}
     </div>
   );
@@ -295,7 +296,7 @@ function StandardCardControls({
 }
 
 function CloudCardControls({
-  api, cloud, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
+  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
@@ -342,7 +343,7 @@ function CloudCardControls({
     ? { ...cloudReading(spec, snapshot.status[spec.key], snapshot.status_observations?.[spec.key]), liveRequestAt }
     : undefined;
   const pendingScope = cloudPendingScope(api, provider, cloud.id);
-  const controls = {name:cloud.name, pendingScope, paused, sheet, specs, reading, now, busy:session.busy, readOK:session.readOK && !!definitions && !!snapshot,
+  const controls = {name:displayName ?? cloud.name, pendingScope, paused, sheet, specs, reading, now, busy:session.busy, readOK:session.readOK && !!definitions && !!snapshot,
     refresh:session.refresh, notice:session.notice, ...commands};
   return isCamera(cloud.category)
     ? (
@@ -366,7 +367,9 @@ function CloudCardControls({
     );
 }
 
-function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBusy,embeddedQuick,onPower}: CardProps & {visible:boolean}) {
+function LocalCardControls({
+  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower,
+}: CardProps & { visible: boolean }) {
   const item = device.local!;
   const dispatch = useAppDispatch();
   const cached = useLocalDeviceState(api, item.id);
@@ -386,7 +389,7 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
       api={api}
       tuyaApi={device.cloud.sharing ? api : undefined}
       onAuthError={onAuthError}
-      name={device.name}
+      name={displayName ?? device.name}
       deviceId={device.id}
       pendingScope={localPendingScope(api, item.id)}
       paused={paused}

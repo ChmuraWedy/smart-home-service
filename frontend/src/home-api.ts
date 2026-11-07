@@ -2,6 +2,7 @@ import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
+import type { DeviceTranslations } from './device-translations';
 import type { LayoutSlots } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
@@ -19,6 +20,7 @@ export type LocalDevice = {
   is_gateway?: boolean; ip?: string | null; version?: string | null; has_local_key?: boolean;
   mac?: string | null; 'product_id'?: string | null; category?: string | null;
   description?: string | null; 'last_seen_at'?: string | null;
+  translations?: DeviceTranslations;
 };
 export type Building = { id: number; name: string; aliases: string[] };
 export type Room = { id: number; building_id: number; name: string; aliases: string[] };

@@ -541,7 +541,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 44
+      "count": 35
     },
     "consistent-return": {
       "count": 2
@@ -577,10 +577,10 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 14
+      "count": 12
     },
     "object-curly-spacing": {
-      "count": 12
+      "count": 10
     },
     "object-property-newline": {
       "count": 10
@@ -803,7 +803,7 @@
       "count": 14
     },
     "arrow-parens": {
-      "count": 36
+      "count": 35
     },
     "arrow-spacing": {
       "count": 2
@@ -845,7 +845,7 @@
       "count": 9
     },
     "object-curly-newline": {
-      "count": 32
+      "count": 30
     },
     "object-curly-spacing": {
       "count": 2
@@ -1049,11 +1049,8 @@
     }
   },
   "src/components/DeviceAliases.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 1
-    },
     "arrow-parens": {
-      "count": 5
+      "count": 4
     },
     "import/order": {
       "count": 1
@@ -1068,9 +1065,6 @@
       "count": 6
     },
     "quotes": {
-      "count": 1
-    },
-    "react/jsx-no-bind": {
       "count": 1
     }
   },
@@ -2144,9 +2138,6 @@
       "count": 1
     },
     "no-continue": {
-      "count": 2
-    },
-    "no-multi-assign": {
       "count": 1
     },
     "no-param-reassign": {
@@ -2158,12 +2149,6 @@
     "no-restricted-globals": {
       "count": 2
     },
-    "no-shadow": {
-      "count": 2
-    },
-    "no-use-before-define": {
-      "count": 2
-    },
     "object-curly-newline": {
       "count": 4
     },
@@ -2173,7 +2158,7 @@
   },
   "src/devices.ts": {
     "arrow-parens": {
-      "count": 6
+      "count": 5
     },
     "no-restricted-globals": {
       "count": 1

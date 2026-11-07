@@ -14,6 +14,8 @@ import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSe
 import DeviceInformation from './DeviceInformation';
 import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
+import DeviceTranslationEditor from './DeviceTranslationEditor';
+import { translationFor, useDeviceText } from '../device-translations';
 import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
@@ -27,7 +29,8 @@ export function LocalControl({
   const [aliasBusy, setAliasBusy] = useState(false);
   const dispatch = useAppDispatch();
   const metadataKey = localMetadataKey(api, device.id);
-  const savedName = useAppSelector(state => state.deviceMetadata.devices[metadataKey]?.name?.value);
+  const identity = useAppSelector(state => state.deviceMetadata.devices[metadataKey]);
+  const localize = useDeviceText();
   const cached = useLocalDeviceState(api, device.id);
   const load = useCallback(async (refresh: boolean, signal?: AbortSignal) => {
     const revision = nextDeviceMetadataRevision();
@@ -37,7 +40,7 @@ export function LocalControl({
     ]);
     if (metadata.id !== device.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
     if (!signal?.aborted) dispatch(cacheDeviceMetadata([{
-      key: metadataKey, revision, name: metadata.name, aliases: metadata.aliases,
+      key: metadataKey, revision, name: metadata.name, aliases: metadata.aliases, translations: metadata.translations,
     }]));
     return { metadata, state };
   }, [api, device.id, dispatch, metadataKey]);
@@ -48,7 +51,9 @@ export function LocalControl({
   const session = useControlSession(load, onAuthError, poll), now = useClock();
   const state = cached ?? session.data?.state;
   const item = session.data?.metadata || device;
-  const name = savedName ?? item.name;
+  const originalName = identity?.name?.value ?? item.name;
+  const translations = identity?.translations?.value ?? item.translations;
+  const name = localize(originalName, translationFor(translations, 'name', originalName));
   const pendingScope = localPendingScope(api, item.id);
   const drafts = useAutomaticControls(changes => session.execute(async () => {
     for (const change of changes) validateControlValue(change.spec, change.value!);
@@ -62,7 +67,7 @@ export function LocalControl({
     <ControlDialog onRefresh={session.refresh}
       information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />}
       statusContent={<BatteryBadge reading={state ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel}
-      titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={name} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
+      titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={originalName} translations={translations} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
       connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!state ? t(MSG.CHECKING_CONNECTION) : !state.enabled ? t(MSG.DISABLED_IN_SETTINGS) : state.available ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)} online={state?.enabled && state?.available} />}
     >
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
@@ -88,6 +93,15 @@ export function LocalControl({
       </div>
 )}
       {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
+      <DeviceTranslationEditor
+        api={api}
+        deviceId={item.device_id}
+        originalName={originalName}
+        initialAliases={item.aliases}
+        translations={translations}
+        localId={item.id}
+        onAuthError={onAuthError}
+      />
       <DeviceInformation
         api={api}
         deviceId={item.device_id}

@@ -289,6 +289,7 @@ def devices(
 ):
     from .cloud_mappings import scope_for
     from .device_aliases import aliases_for_devices
+    from .device_translations import cloud_translations
 
     response.headers["Cache-Control"] = "no-store"
     bridge = cloud_bridge(request, provider)
@@ -299,7 +300,9 @@ def devices(
         for device in snapshots:
             audit_cloud(request, bridge, provider, device)
         if rows:
-            aliases = aliases_for_devices(session, scope_for(bridge, provider), [row["id"] for row in rows])
+            scope = scope_for(bridge, provider)
+            aliases = aliases_for_devices(session, scope, [row["id"] for row in rows])
+            cloud_translations(session, scope, rows, aliases)
             labels = {(label.device_id, label.code): label.label for label in session.scalars(
                 select(CloudChannelLabel).where(CloudChannelLabel.scope == scope_for(bridge, provider), CloudChannelLabel.device_id.in_([row["id"] for row in rows]))
             )}

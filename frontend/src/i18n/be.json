@@ -1085,5 +1085,14 @@
   "DISSOLVE_COMBINATION": "Раз’яднаць прылады",
   "DISSOLVE_COMBINATION_QUESTION": "Вярнуць прылады на асобныя карткі?",
   "COMBINATION_UNAVAILABLE": "Аб’яднанне па гэтай спасылцы недаступнае.",
-  "BACK_TO_COMBINATION": "Назад да аб’яднання"
+  "BACK_TO_COMBINATION": "Назад да аб’яднання",
+  "DEVICE_LABEL_DISPLAY": "Назвы і псеўданімы прылад",
+  "DEVICE_LABELS_ORIGINAL": "Зыходныя назвы і псеўданімы",
+  "DEVICE_LABELS_LOCALIZED": "На мове праграмы",
+  "DEVICE_LABEL_TRANSLATIONS": "Пераклады назвы і псеўданімаў",
+  "DEVICE_TRANSLATION_ORIGINAL": "Назва ці псеўданім для перакладу",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Увядзіце тэкст для патрэбных моў. Калі поле пустое, паказваецца зыходная назва ці псеўданім.",
+  "DEVICE_TRANSLATION_OUTDATED": "Назва ці псеўданім змяніліся. Адкрыйце прыладу нанова і паўтарыце спробу.",
+  "DEVICE_TRANSLATIONS_SAVED": "Пераклады захаваныя.",
+  "SAVE_DEVICE_TRANSLATIONS": "Захаваць пераклады"
 }

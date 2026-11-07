@@ -13,3 +13,7 @@ Local cards save through `PATCH /api/v1/devices/{id}`. Cloud cards use `GET` and
 Registered devices use the inventory alias store. Cloud-only devices use an account/provider-scoped store without inventing local device records. If the device is later registered, the cloud card merges the aliases and migrates them into inventory on the next save. Conflicting aliases return 409 while preserving existing tags.
 
 Saving changes only aliases in this application's database. It does not send a device command or change network settings or keys.
+
+Under **Name and alias translations** in device details, choose the name or an alias and enter its display text in English, Russian, Polish, or Belarusian. **Settings → Device names and aliases** chooses between originals and matching the app language in the current browser. A missing translation uses the original text. Dashboard search accepts either form.
+
+Translations are saved separately from the original names and tags. Renamed or deleted aliases lose their previous translations. Local devices and cloud-only devices save through the corresponding `PUT .../translations` route, with `kind`, `original`, and `values` keyed by locale. An empty `values` object restores the original.
