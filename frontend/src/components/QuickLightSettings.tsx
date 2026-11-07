@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { JsonValue } from '../api';
 import { useAutomaticControls } from '../control-drafts';
 import { optionLabel } from '../controls';
@@ -5,7 +6,15 @@ import type { ControlSpec } from '../controls';
 import type { Reading } from '../home-api';
 import { MSG, t } from '../i18n';
 import { usePendingDeviceValue } from '../use-pending-device-value';
+import { supportsSimpleScenes } from '../light-scenes';
+import QuickSceneSettings from './QuickSceneSettings';
+import QuickColorSettings from './QuickColorSettings';
 import { CapabilityField } from './DeviceControls';
+
+function modeCaption(value: JsonValue) {
+  if (value === 'white') return MSG.LIGHT_MODE_WHITE;
+  return value === 'scene' ? MSG.SCENE : MSG.COLOR;
+}
 
 function fallbackMode(white: ControlSpec[], color?: ControlSpec, scene?: ControlSpec) {
   if (white.length) return 'white';
@@ -14,8 +23,10 @@ function fallbackMode(white: ControlSpec[], color?: ControlSpec, scene?: Control
 }
 
 export default function QuickLightSettings({
-  mode, white, color, scene, scope, reading, now, local, disabled, send,
+  power, deviceId, mode, white, color, scene, scope, reading, now, local, disabled, send,
 }: {
+  power: ReactNode;
+  deviceId: string;
   mode?: ControlSpec;
   white: ControlSpec[];
   color?: ControlSpec;
@@ -63,22 +74,26 @@ export default function QuickLightSettings({
 
   return (
     <>
-      {choices.length > 0 && (
-        <div className="dashboard-sheet-modes" role="group" aria-label={t(MSG.MODE)}>
-          {choices.map((value) => (
-            <button
-              key={String(value)}
-              type="button"
-              className="secondary compact"
-              aria-pressed={active === value}
-              disabled={disabled}
-              onClick={() => selectMode(value)}
-            >
-              {optionLabel(value, mode?.key)}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="dashboard-sheet-light-toolbar">
+        <div className="dashboard-sheet-power">{power}</div>
+        {choices.length > 0 && (
+          <div className="light-segments" role="group" aria-label={t(MSG.MODE)}>
+            {choices.map((value) => (
+              <button
+                key={String(value)}
+                type="button"
+                title={optionLabel(value, mode?.key)}
+                aria-label={optionLabel(value, mode?.key)}
+                aria-pressed={active === value}
+                disabled={disabled}
+                onClick={() => selectMode(value)}
+              >
+                {t(modeCaption(value))}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       {mode && active != null && !choices.some((value) => value === active) && <p className="help">{t(MSG.MODE)} · {optionLabel(active, mode.key)}</p>}
       {active === 'white' && white.map((spec) => (
         <CapabilityField
@@ -93,8 +108,27 @@ export default function QuickLightSettings({
           onSend={(value) => send(spec, value)}
         />
       ))}
-      {colorMode && color && editor(color)}
-      {active === 'scene' && scene && editor(scene)}
+      {colorMode && color && (
+        <QuickColorSettings
+          scope={scope}
+          capability={color.key}
+          reading={reading(color)}
+          disabled={disabled}
+          send={(value) => send(color, value)}
+        />
+      )}
+      {active === 'scene' && scene && (supportsSimpleScenes(scene) ? (
+        <QuickSceneSettings
+          key={deviceId}
+          deviceId={deviceId}
+          scope={scope}
+          spec={scene}
+          reading={reading(scene)}
+          disabled={disabled}
+          send={(value) => send(scene, value)}
+          advanced={editor(scene)}
+        />
+      ) : editor(scene))}
     </>
   );
 }

@@ -133,8 +133,8 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
   return { sending, toggle };
 }
 
-function StandardCardControls({ name, pendingScope, paused, sheet, specs, reading, now, local, online, busy, readOK, sending, refresh, toggle, notice, category }: {
-  name: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
+function StandardCardControls({ name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy, readOK, sending, refresh, toggle, notice, category }: {
+  name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
   now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
   toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice; category?: string;
 }) {
@@ -220,23 +220,24 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
       </div>
       {powerLayout && sensorValues}
       {hasQuickSettings && sheet?.open && !paused && (
-      <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
-        <div className="dashboard-sheet-power">{field(powers[0],undefined,false)}</div>
-        <QuickLightSettings
-          mode={modeSpec}
-          white={sliders}
-          color={color?.writable ? color : undefined}
-          scene={scene}
-          scope={pendingScope}
-          reading={reading}
-          now={now}
-          local={local}
-          disabled={disabled}
-          send={toggle}
-        />
-        {notice.error && <ControlFeedback busy={false} notice={notice} />}
-      </DashboardSheet>
-)}
+        <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
+          <QuickLightSettings
+            power={field(powers[0], undefined, false)}
+            deviceId={deviceId}
+            mode={modeSpec}
+            white={sliders}
+            color={color?.writable ? color : undefined}
+            scene={scene}
+            scope={pendingScope}
+            reading={reading}
+            now={now}
+            local={local}
+            disabled={disabled}
+            send={toggle}
+          />
+          {notice.error && <ControlFeedback busy={false} notice={notice} />}
+        </DashboardSheet>
+      )}
       {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
     </>
   );
@@ -296,7 +297,15 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
         online={snapshot?.online ?? cloud.online}
       />
 )
-    : <StandardCardControls {...controls} local={false} online={snapshot?.online ?? cloud.online} category={cloud.category} />;
+    : (
+      <StandardCardControls
+        {...controls}
+        deviceId={cloud.id}
+        local={false}
+        online={snapshot?.online ?? cloud.online}
+        category={cloud.category}
+      />
+    );
 }
 
 function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBusy}: CardProps & {visible:boolean}) {
@@ -315,10 +324,23 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
   return (
-    <StandardCardControls name={device.name} pendingScope={localPendingScope(api, item.id)} paused={paused} sheet={sheet} specs={specs}
-      category={device.cloud.sharing?.category || device.cloud.developer?.category} reading={spec => state?.values[spec.key]}
-      now={now} local online={!!state?.enabled && state.available} busy={session.busy} readOK={session.readOK && !!state?.enabled}
-      refresh={session.refresh} notice={session.notice} {...commands}
+    <StandardCardControls
+      name={device.name}
+      deviceId={device.id}
+      pendingScope={localPendingScope(api, item.id)}
+      paused={paused}
+      sheet={sheet}
+      specs={specs}
+      category={device.cloud.sharing?.category || device.cloud.developer?.category}
+      reading={(spec) => state?.values[spec.key]}
+      now={now}
+      local
+      online={!!state?.enabled && state.available}
+      busy={session.busy}
+      readOK={session.readOK && !!state?.enabled}
+      refresh={session.refresh}
+      notice={session.notice}
+      {...commands}
     />
   );
 }

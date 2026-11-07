@@ -154,21 +154,97 @@ describe('main controls on device cards', () => {
     const colorMode = sheet.getByRole('button', { name: 'Цветной свет' });
     await waitFor(() => expect(colorMode).toBeEnabled());
     await user.click(colorMode);
-    const picker = await sheet.findByLabelText('Выбор цвета');
-    expect(picker).toHaveValue('#ff0000');
-    fireEvent.change(picker, { target: { value: '#00ff00' } });
-    await waitFor(() => expect(writes[2]).toEqual({ commands: [{ code: 'colour_data_v2', value: { h: 120, s: 1000, v: 1000 } }] }));
+    const color = await sheet.findByRole('region', { name: 'Цвет' });
+    const brightness = within(color).getByRole('slider', { name: 'Яркость' });
+    expect(brightness).toHaveValue('100');
+    expect(color.querySelector('.light-color-wheel')).toBeInTheDocument();
+    const modes = colorMode.closest('.dashboard-sheet-light-toolbar');
+    expect(within(modes as HTMLElement).getByRole('switch', { name: 'Питание' })).toBeInTheDocument();
+    fireEvent.change(brightness, { target: { value: '64.8' } });
+    expect(writes).toHaveLength(2);
+    fireEvent.pointerUp(brightness);
+    await waitFor(() => expect(writes[2]).toEqual({ commands: [{ code: 'colour_data_v2', value: { h: 0, s: 1000, v: 648 } }] }));
     expect(sheet.queryByRole('slider', { name: 'Цветовая температура' })).toBeNull();
     const whiteMode = sheet.getByRole('button', { name: 'Белый свет' });
     await waitFor(() => expect(whiteMode).toBeEnabled());
     await user.click(whiteMode);
     expect(await sheet.findByRole('slider', { name: 'Цветовая температура' })).toHaveValue('50');
-    expect(sheet.queryByLabelText('Выбор цвета')).toBeNull();
+    expect(sheet.queryByRole('region', { name: 'Цвет' })).toBeNull();
     expect(writes.slice(1)).toEqual([
       { commands: [{ code: 'work_mode', value: 'colour' }] },
-      { commands: [{ code: 'colour_data_v2', value: { h: 120, s: 1000, v: 1000 } }] },
+      { commands: [{ code: 'colour_data_v2', value: { h: 0, s: 1000, v: 648 } }] },
       { commands: [{ code: 'work_mode', value: 'white' }] },
     ]);
+  });
+
+  it('saves distinct scenes with the same bulb slot, and applies only the selected scene', async () => {
+    const axis = (max: number) => ({ min: 0, max, step: 1 });
+    const functions = [
+      ...definitions.functions,
+      { code: 'work_mode', type: 'Enum', values: { range: ['white', 'colour', 'scene'] } },
+      { code: 'scene_data_v2', type: 'Json', values: {
+        scene_num: { min: 1, max: 8, step: 1 },
+        scene_units: {
+          unit_change_mode: { range: ['static', 'jump', 'gradient'] },
+          unit_switch_duration: axis(100),
+          unit_gradient_duration: axis(100),
+          bright: axis(1000), temperature: axis(1000), h: axis(360), s: axis(1000), v: axis(1000),
+        },
+      } },
+    ];
+    const staticWhite = {
+      scene_num: 8,
+      scene_units: [{ unit_change_mode: 'static', unit_switch_duration: 0, unit_gradient_duration: 0,
+        h: 0, s: 0, v: 0, bright: 775, temperature: 41 }],
+    };
+    const latest = { ...snapshot, status: {
+      ...snapshot.status, switch_led: true, work_mode: 'scene', scene_data_v2: JSON.stringify(staticWhite),
+    } };
+    const writes: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method === 'POST') {
+        writes.push(JSON.parse(String(init.body)));
+        return json({ acknowledged: true });
+      }
+      return json(latest);
+    });
+    const configured = { ...lamp, controls: { ready: true, definitions: { ...definitions, functions }, snapshot: latest } };
+    const view = mount(configured, 'sharing', { open: true, close: vi.fn(), trigger: { current: null } });
+    const sheet = within(await screen.findByRole('dialog', { name: 'Лампа' }));
+    const user = userEvent.setup();
+    await user.click(sheet.getByRole('button', { name: 'Добавить сцену' }));
+    let editor = within(await screen.findByRole('dialog', { name: /Добавить сцену/ }));
+    expect(editor.getByRole('button', { name: 'Статичный' })).toHaveAttribute('aria-pressed', 'true');
+    expect(editor.getByRole('slider', { name: 'Яркость' })).toHaveValue('77.5');
+    expect(editor.getByRole('slider', { name: 'Цветовая температура' })).toHaveValue('4.1');
+    expect(editor.queryByRole('slider', { name: 'Скорость' })).toBeNull();
+    await user.type(editor.getByRole('textbox', { name: 'Название' }), 'Warm static');
+    await user.click(editor.getByRole('button', { name: 'Сохранить' }));
+
+    await user.click(sheet.getByRole('button', { name: 'Добавить сцену' }));
+    editor = within(await screen.findByRole('dialog', { name: /Добавить сцену/ }));
+    await user.type(editor.getByRole('textbox', { name: 'Название' }), 'Color flash');
+    await user.click(editor.getByRole('button', { name: 'Вспышки' }));
+    fireEvent.change(editor.getByRole('slider', { name: 'Скорость' }), { target: { value: '49' } });
+    await user.click(editor.getByRole('button', { name: 'Добавить шаг' }));
+    await user.click(editor.getByRole('button', { name: 'Цвет' }));
+    fireEvent.change(editor.getByRole('slider', { name: 'Яркость' }), { target: { value: '65.8' } });
+    await user.click(editor.getByRole('button', { name: 'Сохранить' }));
+    expect(writes).toEqual([]);
+    view.unmount();
+    mount(configured, 'sharing', { open: true, close: vi.fn(), trigger: { current: null } });
+    const reopened = within(await screen.findByRole('dialog', { name: 'Лампа' }));
+    expect(reopened.getByText('Warm static')).toBeInTheDocument();
+    const flash = reopened.getByText('Color flash').closest('li') as HTMLElement;
+    await user.click(within(flash).getByRole('button', { name: 'Применить' }));
+    expect(writes).toEqual([{ commands: [{ code: 'scene_data_v2', value: {
+      scene_num: 8,
+      scene_units: [
+        { unit_change_mode: 'jump', unit_switch_duration: 49, unit_gradient_duration: 49, h: 0, s: 0, v: 0, bright: 775, temperature: 41 },
+        { unit_change_mode: 'jump', unit_switch_duration: 49, unit_gradient_duration: 49, h: 0, s: 0, v: 658, bright: 0, temperature: 0 },
+      ],
+    } }] }]);
+    localStorage.removeItem('smart-home.ui.light-scenes.v1.lamp');
   });
 
   it('shows two bulb readings, switching from white temperature to the reported active color', async () => {
