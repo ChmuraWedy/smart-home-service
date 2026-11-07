@@ -99,7 +99,7 @@
       "count": 2
     },
     "camelcase": {
-      "count": 64
+      "count": 63
     },
     "import/newline-after-import": {
       "count": 1
@@ -532,7 +532,7 @@
       "count": 5
     },
     "@stylistic/max-len": {
-      "count": 3
+      "count": 2
     },
     "arrow-parens": {
       "count": 10
@@ -541,7 +541,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 51
+      "count": 35
     },
     "consistent-return": {
       "count": 2
@@ -577,10 +577,10 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 16
+      "count": 12
     },
     "object-curly-spacing": {
-      "count": 14
+      "count": 10
     },
     "object-property-newline": {
       "count": 10
@@ -607,7 +607,7 @@
       "count": 2
     },
     "react/destructuring-assignment": {
-      "count": 13
+      "count": 12
     },
     "react/jsx-first-prop-new-line": {
       "count": 3
@@ -806,7 +806,7 @@
       "count": 16
     },
     "arrow-parens": {
-      "count": 41
+      "count": 40
     },
     "arrow-spacing": {
       "count": 2
@@ -854,7 +854,7 @@
       "count": 9
     },
     "object-curly-newline": {
-      "count": 32
+      "count": 30
     },
     "object-curly-spacing": {
       "count": 2
@@ -1082,11 +1082,8 @@
     }
   },
   "src/components/DeviceAliases.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 1
-    },
     "arrow-parens": {
-      "count": 5
+      "count": 4
     },
     "import/order": {
       "count": 1
@@ -1101,9 +1098,6 @@
       "count": 6
     },
     "quotes": {
-      "count": 1
-    },
-    "react/jsx-no-bind": {
       "count": 1
     }
   },
@@ -2177,9 +2171,6 @@
       "count": 1
     },
     "no-continue": {
-      "count": 2
-    },
-    "no-multi-assign": {
       "count": 1
     },
     "no-param-reassign": {
@@ -2191,14 +2182,8 @@
     "no-restricted-globals": {
       "count": 2
     },
-    "no-shadow": {
-      "count": 2
-    },
-    "no-use-before-define": {
-      "count": 2
-    },
     "object-curly-newline": {
-      "count": 4
+      "count": 2
     },
     "prefer-template": {
       "count": 2
@@ -2206,7 +2191,7 @@
   },
   "src/devices.ts": {
     "arrow-parens": {
-      "count": 6
+      "count": 5
     },
     "no-restricted-globals": {
       "count": 1

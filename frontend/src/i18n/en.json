@@ -1070,5 +1070,14 @@
   "LAYOUT_CELL": "Row {0}, column {1}",
   "LAYOUT_MOVE_HERE": "Move here ({0})",
   "LAYOUT_MOVE_CARD": "Move {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Insert before {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Insert before {0} ({1})",
+  "DEVICE_LABEL_DISPLAY": "Device names and aliases",
+  "DEVICE_LABELS_ORIGINAL": "Original names and aliases",
+  "DEVICE_LABELS_LOCALIZED": "Match the app language",
+  "DEVICE_LABEL_TRANSLATIONS": "Name and alias translations",
+  "DEVICE_TRANSLATION_ORIGINAL": "Name or alias to translate",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Enter display text for each language. A blank field uses the original name or alias.",
+  "DEVICE_TRANSLATION_OUTDATED": "This name or alias has changed. Reload the device and try again.",
+  "DEVICE_TRANSLATIONS_SAVED": "Translations saved.",
+  "SAVE_DEVICE_TRANSLATIONS": "Save translations"
 }

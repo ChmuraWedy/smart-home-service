@@ -1,5 +1,7 @@
 import { MSG, localizeMessages, t } from "./i18n";
 import type { CloudDevice, Provider } from './api';
+import { translationFor } from './device-translations';
+import type { TranslationKind } from './device-translations';
 import type { LocalDevice } from './home-api';
 
 export type DeviceRoute = Provider | 'local';
@@ -32,8 +34,20 @@ export function deviceRoutes(device: UnifiedDevice): DeviceRoute[] {
   return [...(['sharing', 'developer'] as const).filter(provider => Boolean(device.cloud[provider])), ...(device.local ? ['local' as const] : [])];
 }
 
+export function deviceTextVariants(device: UnifiedDevice, kind: TranslationKind, original: string) {
+  return {
+    ...translationFor(device.cloud.developer?.translations, kind, original),
+    ...translationFor(device.cloud.sharing?.translations, kind, original),
+    ...translationFor(device.local?.translations, kind, original),
+  };
+}
+
 export function matchesDevice(device: UnifiedDevice, search: string): boolean {
-  return [device.id, device.name, ...deviceAliases(device), ...Object.values(device.cloud).map(item => item?.name || '')]
+  const aliases = deviceAliases(device);
+  const names = [device.name, ...Object.values(device.cloud).map((item) => item?.name || '')];
+  const localizedNames = names.flatMap((name) => Object.values(deviceTextVariants(device, 'name', name)));
+  const localizedAliases = aliases.flatMap((alias) => Object.values(deviceTextVariants(device, 'alias', alias)));
+  return [device.id, ...names, ...aliases, ...localizedNames, ...localizedAliases]
     .join(' ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
 }
 

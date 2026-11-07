@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from . import __version__
 from .api_dependencies import authenticate, get_session
+from .auto_label_translations import translate_local_device
 from .config import Settings
 from .control import run_command
 from .db import init_db, make_engine
@@ -274,9 +275,10 @@ def delete_type(item_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/devices", response_model=DeviceRead, status_code=201, tags=["Devices"])
-def add_device(body: DeviceCreate, session: Session = Depends(get_session)):
+def add_device(body: DeviceCreate, request: Request, session: Session = Depends(get_session)):
     item = create_device(session, body)
     commit(session)
+    translate_local_device(session, request, item)
     return device_read(session, item)
 
 
@@ -311,8 +313,11 @@ def list_devices(
             query = query.where(column == value)
     if unassigned:
         query = query.where(Device.building_id.is_(None), Device.room_id.is_(None))
+    from .device_translations import LOCAL_SCOPE, translations_for
+
     items = session.scalars(query.order_by(Device.id).offset(offset).limit(limit)).all()
-    return [device_read(session, item) for item in items]
+    translations = translations_for(session, LOCAL_SCOPE, [str(item.id) for item in items])
+    return [device_read(session, item, translations.get(str(item.id), {})) for item in items]
 
 
 @router.get("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
@@ -321,16 +326,22 @@ def read_device(item_id: EntityRef, session: Session = Depends(get_session)):
 
 
 @router.patch("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
-def edit_device(item_id: EntityRef, body: DevicePatch, session: Session = Depends(get_session)):
+def edit_device(item_id: EntityRef, body: DevicePatch, request: Request, session: Session = Depends(get_session)):
     item = patch_device(session, get_by_ref(session, Device, item_id), body)
     commit(session)
+    if {"name", "aliases"} & body.model_fields_set:
+        translate_local_device(session, request, item)
     return device_read(session, item)
 
 
 @router.delete("/devices/{item_id}", status_code=204, tags=["Devices"])
 def delete_device(item_id: EntityRef, session: Session = Depends(get_session)):
     item = get_by_ref(session, Device, item_id)
+    from .device_translations import LOCAL_SCOPE, prune_translations
+
     assert_empty(session, Device, Device.parent_id == item.id)
+    for kind in ("name", "alias"):
+        prune_translations(session, LOCAL_SCOPE, str(item.id), kind, [])
     session.delete(item)
     commit(session)
     return Response(status_code=204)
@@ -548,7 +559,7 @@ def register_alias_routes(resource, model, read_schema):
         tags=["Aliases"],
         name=f"{resource}_add_alias",
     )
-    def add_alias(item_id: EntityRef, body: AliasCreate, session: Session = Depends(get_session)):
+    def add_alias(item_id: EntityRef, body: AliasCreate, request: Request, session: Session = Depends(get_session)):
         item = get_by_ref(session, model, item_id)
         if any(fold_name(body.alias) == fold_name(alias) for alias in item.aliases):
             raise HTTPException(409, "Alias already exists on this object")
@@ -556,7 +567,10 @@ def register_alias_routes(resource, model, read_schema):
             raise HTTPException(422, "Object cannot have more than 32 aliases")
         replace_aliases(session, item, [*item.aliases, body.alias])
         commit(session)
-        return device_read(session, item) if model is Device else read_schema.model_validate(item)
+        if model is Device:
+            translate_local_device(session, request, item)
+            return device_read(session, item)
+        return read_schema.model_validate(item)
 
     @router.delete(
         path + "/{alias}", status_code=204, tags=["Aliases"], name=f"{resource}_delete_alias"
@@ -675,6 +689,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .device_aliases import router as device_aliases_router
 
     app.include_router(device_aliases_router)
+    from .device_translations import router as device_translations_router
+
+    app.include_router(device_translations_router)
 
     from .activity import router as activity_router
     app.include_router(activity_router)

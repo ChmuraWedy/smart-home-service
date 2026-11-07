@@ -344,6 +344,7 @@ class DevicePatch(AliasedPatch):
 
 class DeviceRead(DeviceFields):
     id: int
+    translations: dict[str, dict[str, dict[str, str]]] = Field(default_factory=dict)
     aliases: list[str] = Field(default_factory=list, max_length=33)
     _normalize_aliases = field_validator("aliases")(lambda v: v)
     node_id: str | None

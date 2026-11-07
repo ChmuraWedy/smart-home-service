@@ -42,6 +42,16 @@ On the Dell, use both files for independent updates too. Host networking lets th
 
 Bridge networking sees container interfaces. See [Docker host networking](https://docs.docker.com/engine/network/drivers/host/) and [Compose merge rules](https://docs.docker.com/reference/compose-file/merge/#reset-value).
 
+## Automatic device label translations
+
+The optional Linux service generates display translations after saving device names and aliases. It preserves saved translations and falls back to the original when the model skips a label or the service is unavailable. Short labels can produce incorrect translations, particularly in Belarusian. Device settings let you correct the translations.
+
+```sh
+docker compose -f compose.yaml -f compose.lan.yaml -f compose.label-translator.yaml up -d --build --wait
+```
+
+Building the image downloads the model files. Device labels are processed on the host at runtime over loopback. The service uses [Meta's M2M100 418M](https://huggingface.co/facebook/m2m100_418M) in an [INT8 conversion](https://huggingface.co/auralmira/m2m100-418M-ct2-int8) and [fastText language identification](https://fasttext.cc/docs/en/language-identification.html).
+
 ## Upgrade an existing Dell installation
 
 Keep the existing project name `smart-home-service`, environment file, and volume. Save the previous release files and image tag for rollback. Back up SQLite with its backup API and copy the Tuya session files. Build both split images before stopping the old service.

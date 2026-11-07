@@ -1,5 +1,7 @@
 import { MSG, t, translateText } from "./i18n";
+import type { DeviceTranslations, TranslationSaved, TranslationWrite } from './device-translations';
 export type Provider = 'sharing' | 'developer';
+type SavedDeviceAliases = { device_id: string; aliases: string[]; translations?: DeviceTranslations };
 export type Region = 'eu' | 'eu-w' | 'us' | 'us-e' | 'cn' | 'in' | 'sg';
 export type Connection = { baseUrl: string; token: string };
 export type DeveloperStatus = {
@@ -28,6 +30,7 @@ export type CloudDevice = {
   has_local_key: boolean;
   node_id?: string | null;
   aliases?: string[];
+  translations?: DeviceTranslations;
   battery?: { code: string; value: JsonValue; unit?: string | null } | null;
   controls?: { ready: boolean; definitions: CloudFunctions; snapshot: CloudSnapshot };
 };
@@ -189,10 +192,18 @@ export class CloudApi {
     return this.json<{ device_id: string; aliases: string[] }>('/devices/' + encodeURIComponent(id) + '/aliases?provider=' + provider, 'GET', undefined, signal);
   }
   saveDeviceAliases(id: string, provider: Provider, aliases: string[], signal?: AbortSignal) {
-    return this.json<{ device_id: string; aliases: string[] }>('/devices/' + encodeURIComponent(id) + '/aliases?provider=' + provider, 'PUT', { aliases }, signal);
+    return this.json<SavedDeviceAliases>('/devices/' + encodeURIComponent(id) + '/aliases?provider=' + provider, 'PUT', { aliases }, signal);
   }
   saveLocalDeviceAliases(id: number, aliases: string[], signal?: AbortSignal) {
-    return this.request<{ device_id: string; aliases: string[] }>('/devices/' + id, 'PATCH', { aliases }, signal);
+    return this.request<SavedDeviceAliases>('/devices/' + id, 'PATCH', { aliases }, signal);
+  }
+
+  saveDeviceTranslation(id: string, provider: Provider, body: TranslationWrite, signal?: AbortSignal) {
+    return this.json<TranslationSaved>(`/devices/${encodeURIComponent(id)}/translations?provider=${provider}`, 'PUT', body, signal);
+  }
+
+  saveLocalDeviceTranslation(id: number, body: TranslationWrite, signal?: AbortSignal) {
+    return this.request<TranslationSaved>(`/devices/${id}/translations`, 'PUT', body, signal);
   }
   deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true, watch = false) {
     const query = new URLSearchParams({ refresh: String(refresh), provider });

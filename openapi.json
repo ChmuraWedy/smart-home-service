@@ -6315,6 +6315,140 @@
           }
         }
       }
+    },
+    "/api/v1/devices/{item_id}/translations": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Save Local Translations",
+        "operationId": "save_local_translations_api_v1_devices__item_id__translations_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 125,
+              "description": "Numeric ID, Unicode alias, or exact name reference: name:Розетка",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationSaved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cloud/devices/{device_id}/translations": {
+      "put": {
+        "tags": [
+          "Devices",
+          "Cloud"
+        ],
+        "summary": "Save Cloud Translations",
+        "operationId": "save_cloud_translations_api_v1_cloud_devices__device_id__translations_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S+$",
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "sharing",
+                "developer"
+              ],
+              "type": "string",
+              "default": "sharing",
+              "title": "Provider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslationSaved"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7781,6 +7915,19 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "translations": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Translations"
           }
         },
         "additionalProperties": false,
@@ -9408,6 +9555,118 @@
           "slots"
         ],
         "title": "LayoutSlots"
+      },
+      "TranslationWrite": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "name",
+              "alias"
+            ],
+            "title": "Kind"
+          },
+          "original": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Original"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "edited": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "en",
+                    "ru",
+                    "pl",
+                    "be"
+                  ]
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "original",
+          "values"
+        ],
+        "title": "TranslationWrite"
+      },
+      "TranslationSaved": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "name",
+              "alias"
+            ],
+            "title": "Kind"
+          },
+          "original": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Original"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "original",
+          "values",
+          "shared"
+        ],
+        "title": "TranslationSaved"
       }
     },
     "securitySchemes": {

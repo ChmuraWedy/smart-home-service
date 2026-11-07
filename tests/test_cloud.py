@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -6,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from smarthome import auto_label_translations
 from smarthome.cloud import CloudBridge
 from smarthome.config import Settings
 from smarthome.main import create_app
@@ -727,6 +729,23 @@ def test_unicode_cloud_aliases_persist_and_conflict_after_normalization(cloud_cl
     assert cloud_client.put(API + "/devices/child/aliases", json={"aliases": ["CAFÉ"]}).status_code == 409
 
 
+def test_cloud_alias_save_returns_generated_labels(cloud_client, monkeypatch):
+    login(cloud_client)
+    settings = replace(cloud_client.app.state.settings, label_translator_url="http://127.0.0.1:8093")
+    monkeypatch.setattr(cloud_client.app.state, "settings", settings)
+    variants = {"Gateway": {"pl": "Brama"}, "office gateway": {"pl": "Brama biurowa"}}
+    monkeypatch.setattr(
+        auto_label_translations, "translate_labels",
+        lambda _url, originals: {label: variants[label] for label in originals},
+    )
+    response = cloud_client.put(API + "/devices/gateway/aliases", json={"aliases": ["office gateway"]})
+    assert response.status_code == 200, response.text
+    assert response.json()["translations"] == {
+        "name": {"Gateway": variants["Gateway"]},
+        "alias": {"office gateway": variants["office gateway"]},
+    }
+
+
 @pytest.mark.parametrize("code,status,detail", [("2001", 409, "не в сети"), ("2003", 502, "code 2003"), (SECRET, 502, "physical outcome may be unknown")])
 def test_upstream_command_rejection_is_safe_and_not_retried(cloud_client, monkeypatch, code, status, detail):
     login(cloud_client)
@@ -743,3 +762,36 @@ def test_upstream_command_rejection_is_safe_and_not_retried(cloud_client, monkey
     assert detail in response.json()["detail"]
     assert SECRET not in response.text
     assert len(calls) == 1
+
+
+def test_cloud_display_translations_are_scoped_and_linked_aliases_follow_inventory(cloud_client):
+    login(cloud_client)
+    path = API + "/devices/gateway"
+    name = {"kind": "name", "original": "Gateway", "values": {"pl": "Brama"}}
+    alias = {"kind": "alias", "original": "bridge", "values": {"ru": "Шлюз"}}
+
+    def gateway():
+        return next(row for row in cloud_client.get(API + "/devices").json() if row["id"] == "gateway")
+
+    assert cloud_client.put(path + "/translations", json=name).json()["shared"] is False
+    assert cloud_client.put(path + "/aliases", json={"aliases": ["bridge"]}).status_code == 200
+    assert cloud_client.put(path + "/translations", json=alias).json()["shared"] is False
+    assert gateway()["name"] == "Gateway"
+    assert gateway()["translations"] == {"name": {"Gateway": {"pl": "Brama"}}, "alias": {"bridge": {"ru": "Шлюз"}}}
+    bridge = cloud_client.app.state.cloud
+    bridge.auth["token_info"]["uid"] = "other"
+    assert gateway()["translations"] == {"name": {}, "alias": {}}
+    bridge.auth["token_info"]["uid"] = "user"
+
+    local = cloud_client.post("/api/v1/devices", json={
+        "device_id": "gateway", "name": "Our bridge",
+    }).json()
+    assert cloud_client.put(path + "/aliases", json={"aliases": ["bridge"]}).status_code == 200
+    local_path = f"/api/v1/devices/{local['id']}"
+    assert cloud_client.get(local_path).json()["translations"]["alias"] == {"bridge": {"ru": "Шлюз"}}
+    local_name = {"kind": "name", "original": "Our bridge", "values": {"be": "Наш шлюз"}}
+    assert cloud_client.put(path + "/translations", json=local_name).json()["shared"] is True
+    assert gateway()["translations"]["name"]["Our bridge"] == {"be": "Наш шлюз"}
+    assert cloud_client.put(path + "/aliases", json={"aliases": []}).status_code == 200
+    assert cloud_client.put(path + "/translations", json=alias).status_code == 409
+    assert gateway()["translations"]["alias"] == {}

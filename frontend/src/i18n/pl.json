@@ -1070,5 +1070,14 @@
   "LAYOUT_CELL": "Wiersz {0}, kolumna {1}",
   "LAYOUT_MOVE_HERE": "Przenieś tutaj ({0})",
   "LAYOUT_MOVE_CARD": "Przenieś {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Wstaw przed {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Wstaw przed {0} ({1})",
+  "DEVICE_LABEL_DISPLAY": "Nazwy i aliasy urządzeń",
+  "DEVICE_LABELS_ORIGINAL": "Oryginalne nazwy i aliasy",
+  "DEVICE_LABELS_LOCALIZED": "W języku aplikacji",
+  "DEVICE_LABEL_TRANSLATIONS": "Tłumaczenia nazwy i aliasów",
+  "DEVICE_TRANSLATION_ORIGINAL": "Nazwa lub alias do przetłumaczenia",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Wpisz tekst dla wybranych języków. Puste pole oznacza użycie oryginalnej nazwy lub aliasu.",
+  "DEVICE_TRANSLATION_OUTDATED": "Nazwa lub alias uległy zmianie. Otwórz urządzenie ponownie i spróbuj jeszcze raz.",
+  "DEVICE_TRANSLATIONS_SAVED": "Zapisano tłumaczenia.",
+  "SAVE_DEVICE_TRANSLATIONS": "Zapisz tłumaczenia"
 }

@@ -1070,5 +1070,14 @@
   "LAYOUT_CELL": "Радок {0}, слупок {1}",
   "LAYOUT_MOVE_HERE": "Перамясціць сюды ({0})",
   "LAYOUT_MOVE_CARD": "Перамясціць {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Уставіць перад {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Уставіць перад {0} ({1})",
+  "DEVICE_LABEL_DISPLAY": "Назвы і псеўданімы прылад",
+  "DEVICE_LABELS_ORIGINAL": "Зыходныя назвы і псеўданімы",
+  "DEVICE_LABELS_LOCALIZED": "На мове праграмы",
+  "DEVICE_LABEL_TRANSLATIONS": "Пераклады назвы і псеўданімаў",
+  "DEVICE_TRANSLATION_ORIGINAL": "Назва ці псеўданім для перакладу",
+  "DEVICE_TRANSLATION_FALLBACK_HELP": "Увядзіце тэкст для патрэбных моў. Калі поле пустое, паказваецца зыходная назва ці псеўданім.",
+  "DEVICE_TRANSLATION_OUTDATED": "Назва ці псеўданім змяніліся. Адкрыйце прыладу нанова і паўтарыце спробу.",
+  "DEVICE_TRANSLATIONS_SAVED": "Пераклады захаваныя.",
+  "SAVE_DEVICE_TRANSLATIONS": "Захаваць пераклады"
 }

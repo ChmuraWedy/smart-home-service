@@ -8,7 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
+from .auto_label_translations import cloud_labels, generate_missing
 from .cloud_mappings import scope_for
+from .device_translations import cloud_translations, promote_alias_translations, prune_translations
 from .models import CloudDeviceAlias, Device
 from .schemas import Alias, Identifier, Schema, unique_aliases
 from .service import commit, replace_aliases
@@ -40,14 +42,14 @@ def context(request, provider, device_id):
 
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
-        bridge.device(device_id)  # Validate membership in the selected account.
-        return scope_for(bridge, provider)
+        device = bridge.device(device_id)
+        return scope_for(bridge, provider), getattr(device, "name", "") or ""
 
 
 @router.get("/devices/{device_id}/aliases")
 def read_aliases(device_id: Identifier, request: Request, response: Response,
                  provider: Literal["sharing", "developer"] = "sharing", session: Session = Depends(get_session)):
-    scope = context(request, provider, device_id)
+    scope, _ = context(request, provider, device_id)
     response.headers["Cache-Control"] = "no-store"
     return {"device_id": device_id, "aliases": aliases_for_devices(session, scope, [device_id])[device_id]}
 
@@ -55,7 +57,7 @@ def read_aliases(device_id: Identifier, request: Request, response: Response,
 @router.put("/devices/{device_id}/aliases")
 def save_aliases(device_id: Identifier, body: DeviceAliases, request: Request, response: Response,
                  provider: Literal["sharing", "developer"] = "sharing", session: Session = Depends(get_session)):
-    scope = context(request, provider, device_id)
+    scope, name = context(request, provider, device_id)
     aliases = body.aliases
     conflict = session.scalar(select(CloudDeviceAlias).where(
         CloudDeviceAlias.scope == scope, CloudDeviceAlias.alias.in_(aliases),
@@ -70,6 +72,7 @@ def save_aliases(device_id: Identifier, body: DeviceAliases, request: Request, r
     if local:
         # Reuse the existing alias model and validation rather than copying aliases.
         replace_aliases(session, local, aliases)
+        promote_alias_translations(session, scope, device_id, local, [entry.alias for entry in local.alias_entries])
         for row in existing:
             session.delete(row)
     else:
@@ -83,6 +86,15 @@ def save_aliases(device_id: Identifier, body: DeviceAliases, request: Request, r
                 session.delete(row)
         session.add_all(CloudDeviceAlias(scope=scope, device_id=device_id, alias=alias)
                         for alias in aliases if alias not in retained)
+    prune_translations(session, scope, device_id, "alias", [] if local else aliases)
     commit(session)
+    translator = request.app.state.settings.label_translator_url
+    generate_missing(session, translator, lambda: cloud_labels(session, scope, device_id, name))
     response.headers["Cache-Control"] = "no-store"
-    return {"device_id": device_id, "aliases": aliases_for_devices(session, scope, [device_id])[device_id]}
+    aliases = aliases_for_devices(session, scope, [device_id])
+    result = {"device_id": device_id, "aliases": aliases[device_id]}
+    if translator:
+        row = {"id": device_id, "name": name}
+        cloud_translations(session, scope, [row], aliases)
+        result["translations"] = row["translations"]
+    return result
