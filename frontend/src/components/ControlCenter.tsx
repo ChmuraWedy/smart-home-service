@@ -15,6 +15,7 @@ import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
 import { TopologySummary } from './TopologySummary';
+import RoomNavigation from './RoomNavigation';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
@@ -170,10 +171,13 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
   const [revision, setRevision] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
   useEffect(() => { if (dashboardPanel === 'search') searchInput.current?.focus(); }, [dashboardPanel]);
-  function selectRoom(value: string) { query.delete('page'); void navigate(dashboardHref(value, query, dashboardPanel)); }
+  const selectRoom = useCallback((value: string, params = new URLSearchParams(location.search)) => {
+    params.delete('page');
+    navigate(dashboardHref(value, params, dashboardPanel));
+  }, [dashboardPanel, location.search, navigate]);
   function setBuilding(value: string) {
     if (value) query.set('building', value); else query.delete('building');
-    selectRoom('');
+    selectRoom('', query);
   }
   function setSearch(value: string) {
     if (value) query.set('q', value); else query.delete('q');
@@ -260,7 +264,10 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     dispatch(setDetailsOpen(true));
     return () => { dispatch(setDetailsOpen(false)); };
   }, [detailsOpen, dispatch]);
-  const filteredRooms = inventory?.rooms.filter(item => !building || String(item.building_id) === building) || [];
+  const filteredRooms = useMemo(
+    () => inventory?.rooms.filter((item) => !building || String(item.building_id) === building) ?? [],
+    [building, inventory?.rooms],
+  );
   const entries = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
@@ -381,11 +388,7 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
       {!ready ? <p className="saved-summary">{t(MSG.SAVE_SERVICE_ACCESS_IN_CONNECTION_SETTINGS_FIRST)}</p> : (
         <>
           {linkError && <p className="field-error" role="alert">{linkError}</p>}
-          <div className="dashboard-room-chips" role="group" aria-label={t(MSG.ALL_ROOMS)}>
-            <button type="button" className="secondary" aria-pressed={!room} onClick={() => selectRoom('')}>{t(MSG.ALL)}</button>
-            {filteredRooms.map(item => <button type="button" key={item.id} className="secondary" aria-pressed={room === String(item.id)} onClick={() => selectRoom(String(item.id))}>{item.name}</button>)}
-            <button type="button" className="secondary" aria-pressed={room === 'none'} onClick={() => selectRoom('none')}>{t(MSG.NO_ROOM)}</button>
-          </div>
+          <RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />
           <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
           {sharingReady && (
           <TopologySummary

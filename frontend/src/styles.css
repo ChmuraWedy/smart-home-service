@@ -1267,18 +1267,55 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view:not([data-dashboard-panel="tools"]) .control-filters > label:not(.dashboard-search-field),
 .dashboard-view:not([data-dashboard-panel="search"]):not([data-dashboard-panel="tools"]) .control-filters { @apply tw:hidden; }
 .dashboard-view[data-dashboard-panel="search"] .dashboard-search-field > span { @apply tw:sr-only; }
-.dashboard-room-chips {
-  @apply tw:flex tw:min-w-0 tw:gap-2 tw:overflow-x-auto tw:py-2;
-  scrollbar-width:thin;
+.room-navigation-trigger { @apply tw:hidden; }
+.room-navigation-heading { @apply tw:my-3 tw:text-xl tw:font-semibold tw:text-(--text-strong); }
+.dashboard-view:has(.room-navigation-bar) { padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+.room-navigation-bar {
+  @apply tw:fixed tw:inset-x-0 tw:bottom-0 tw:z-20 tw:border-t tw:border-(--border) tw:bg-(--surface) tw:px-4 tw:pt-1.5;
+  padding-bottom:max(6px,env(safe-area-inset-bottom));
 }
-@media (pointer: coarse) {
-  .dashboard-room-chips { scrollbar-width:none; }
-  .dashboard-room-chips::-webkit-scrollbar { display:none; }
+.room-navigation-shortcuts { @apply tw:flex tw:min-w-0 tw:justify-center tw:gap-2; }
+.room-navigation-measure { @apply tw:invisible tw:pointer-events-none tw:absolute tw:inset-x-0 tw:top-0 tw:h-0 tw:overflow-hidden; }
+.room-navigation-measure .room-navigation-shortcuts { @apply tw:w-max; }
+.room-navigation-bar .room-choice {
+  @apply tw:inline-grid tw:h-14 tw:min-w-[84px] tw:max-w-56 tw:shrink-0 tw:place-items-center tw:gap-0.5 tw:rounded-lg tw:border tw:border-transparent tw:bg-transparent tw:px-3 tw:py-1.5 tw:text-sm tw:font-semibold tw:whitespace-nowrap tw:text-(--muted);
 }
-.dashboard-room-chips button { @apply tw:min-h-11 tw:shrink-0 tw:rounded-full tw:px-3 tw:py-1 tw:font-medium; }
-.dashboard-room-chips button[aria-pressed="true"],
-.dashboard-room-chips button[aria-pressed="true"]:hover:enabled {
-  @apply tw:border-(--accent) tw:bg-(--accent) tw:text-(--on-accent);
+.room-navigation-bar .room-choice > span { @apply tw:w-full tw:truncate; }
+.room-navigation-bar .room-choice .ui-icon { @apply tw:size-5; }
+.room-navigation-bar .room-choice-check { @apply tw:hidden; }
+.room-navigation-bar .room-choice:is([aria-pressed="true"], [data-active]),
+.room-picker-list .room-choice[aria-pressed="true"] {
+  @apply tw:border-(--accent) tw:bg-(--success-bg) tw:text-(--text-strong);
+}
+.room-picker { @apply tw:fixed tw:inset-0 tw:z-[110]; }
+.room-picker-backdrop { @apply tw:fixed tw:inset-0 tw:bg-(--backdrop); }
+.room-picker-panel {
+  @apply tw:fixed tw:inset-x-0 tw:bottom-4 tw:mx-auto tw:flex tw:max-h-[min(75dvh,640px)] tw:w-[min(92vw,440px)] tw:flex-col tw:rounded-2xl tw:border tw:border-(--border) tw:bg-(--dialog-bg) tw:p-3 tw:text-(--text) tw:shadow-xl;
+}
+.room-picker-heading { @apply tw:flex tw:shrink-0 tw:items-center tw:justify-between tw:gap-3 tw:px-2 tw:pb-2; }
+.room-picker-heading h2 { @apply tw:m-0 tw:text-xl; }
+.room-picker-close { @apply tw:grid tw:size-12 tw:shrink-0 tw:place-items-center tw:p-0; }
+.room-picker-close .ui-icon { @apply tw:size-6; }
+.room-picker-list { @apply tw:m-0 tw:grid tw:list-none tw:gap-1 tw:overflow-y-auto tw:overscroll-contain tw:p-1.5; }
+.room-picker-list .room-choice {
+  @apply tw:grid tw:min-h-12 tw:w-full tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:items-center tw:gap-3 tw:border-transparent tw:bg-transparent tw:px-3 tw:py-2 tw:text-start tw:wrap-anywhere;
+}
+.room-picker-list .room-choice .ui-icon { @apply tw:size-6; }
+.room-choice-check { @apply tw:text-(--success); }
+@media (max-width:760px), (pointer:coarse) {
+  .dashboard-view:has(.room-navigation-bar) { @apply tw:pb-0; }
+  .room-navigation-bar, .room-navigation-heading { @apply tw:hidden; }
+  .room-navigation-trigger {
+    @apply tw:my-2 tw:grid tw:min-h-14 tw:w-full tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:items-center tw:gap-3 tw:px-3 tw:text-start tw:text-lg tw:wrap-anywhere;
+  }
+  .room-navigation-trigger .ui-icon { @apply tw:size-6; }
+  .room-picker-panel {
+    @apply tw:inset-y-0 tw:right-auto tw:left-0 tw:m-0 tw:max-h-none tw:w-[min(82vw,360px)] tw:rounded-none;
+    padding-top:max(12px,env(safe-area-inset-top));
+    padding-bottom:max(12px,env(safe-area-inset-bottom));
+  }
+  .room-picker-list .room-choice { @apply tw:min-h-[60px] tw:text-lg; }
+  .room-picker-close { @apply tw:size-14; }
 }
 .dashboard-view .dashboard-device {
   --dashboard-card-inset:12px;

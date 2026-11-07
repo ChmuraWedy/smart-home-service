@@ -37,6 +37,33 @@ function server(options: { cloudFailure?: boolean; localFailure?: boolean; comma
 }
 
 describe('unified device identity and management', () => {
+  it('switches rooms through the drawer and the desktop bar while sharing the active filter', async () => {
+    server();
+    const user = userEvent.setup();
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
+    await screen.findByRole('listitem', { name: cloudOnly.name });
+
+    const trigger = screen.getByRole('button', { name: 'Выбрать комнату, сейчас выбрана Все комнаты' });
+    await user.click(trigger);
+    const drawer = await screen.findByRole('dialog', { name: 'Комнаты' });
+    expect(within(drawer).getByRole('button', { name: 'Все комнаты' })).toHaveAttribute('aria-pressed', 'true');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(drawer).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+
+    await user.click(trigger);
+    const reopened = await screen.findByRole('dialog', { name: 'Комнаты' });
+    await user.click(within(reopened).getByRole('button', { name: 'Кухня' }));
+    expect(screen.queryByRole('dialog', { name: 'Комнаты' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: cloudOnly.name })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Выбрать комнату, сейчас выбрана Кухня' })).toBeInTheDocument();
+
+    const bar = within(screen.getByRole('navigation', { name: 'Комнаты' }));
+    expect(bar.getByRole('button', { name: 'Кухня' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(bar.getByRole('button', { name: 'Все комнаты' }));
+    expect(await screen.findByRole('listitem', { name: cloudOnly.name })).toBeInTheDocument();
+  });
+
   it('puts the disabled presets dropdown in a second bulb header row above the readings', async () => {
     server({ noLocal: true });
     const original = vi.mocked(fetch).getMockImplementation()!;
