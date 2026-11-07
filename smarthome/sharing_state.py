@@ -2,12 +2,14 @@
 
 import copy
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from fastapi import HTTPException
 
 from .sharing_reports import SharingReports
+
+REPORT_SETTLE_TIME = timedelta(minutes=1)
 
 
 def now_iso():
@@ -46,7 +48,7 @@ class SharingState:
         self.watched = set()
         self.reports = {}
         self.online = {}
-        self.received = {}
+        self.http_readings = {}
         self.mq = None
         self.store = SharingReports(bridge)
         self.history_engine = None
@@ -82,7 +84,7 @@ class SharingState:
         self.metadata.clear()
         self.reports.clear()
         self.online.clear()
-        self.received.clear()
+        self.http_readings.clear()
         if mq is not None:
             mq.stop()  # Do not use Manager.unload(): it revokes the terminal.
             if self.bridge.manager is not None:
@@ -124,12 +126,12 @@ class SharingState:
                 devices[device.id] = device
         # Publish atomically only after every home succeeds. A failed refresh
         # must not leave half an account or silently remove authorized devices.
+        self.http_readings = {id: (received, dict(device.status)) for id, device in devices.items()}
         manager.device_map = devices
         manager.user_homes = homes
         self.metadata.intersection_update(devices)
         self.reports = {id: report for id, report in self.reports.items() if id in devices}
         self.online = {id: value for id, value in self.online.items() if id in devices}
-        self.received = dict.fromkeys(devices, received)
         for device in devices.values():
             self.watch(manager, device)
 
@@ -157,9 +159,11 @@ class SharingState:
             raise ValueError("Unexpected device detail")
         row = matches[0]
         values = status_values(row.get("status"))
+        # The SDK updates device.status before handing us each push, even when
+        # our listener rejects that push as too old.
+        self.http_readings[device.id] = (now_iso(), dict(values))
         device.status, device.online = values, row["online"]
         device.update_time = row.get("update_time")
-        self.received[device.id] = now_iso()
         return device
 
     def watch(self, manager, device):
@@ -218,6 +222,7 @@ class SharingState:
                         return
                     state.reports.pop(id, None)
                     state.online.pop(id, None)
+                    state.http_readings.pop(id, None)
                     state.stored("clear", id)
 
             manager.add_device_listener(Listener())
@@ -253,17 +258,27 @@ class SharingState:
 
     def snapshot(self, device):
         result = copy.copy(device)
-        result.status = dict(device.status)
+        received, base = self.http_readings.get(device.id, (None, device.status))
+        result.status = {**device.status, **base}
         reports = self.reports.get(device.id, {})
+        cutoff = (datetime.fromisoformat(received) - REPORT_SETTLE_TIME).isoformat() if received else None
+        observations = {}
         for code, report in reports.items():
+            # HTTP can lag a recent push. Once it has had time to catch up, a fresh
+            # snapshot can recover a change missed by the event stream.
+            if (
+                cutoff
+                and report["received_at"] <= cutoff
+                and code in base
+                and base[code] != report["value"]
+            ):
+                continue
             result.status[code] = report["value"]
+            observations[code] = {key: report[key] for key in ("observed_at", "received_at")}
         if device.id in self.online:
             result.online = self.online[device.id]
-        result.status_observations = {
-            code: {key: report[key] for key in ("observed_at", "received_at")}
-            for code, report in reports.items()
-        }
-        result.snapshot_received_at = self.received.get(device.id)
+        result.status_observations = observations
+        result.snapshot_received_at = received
         result.event_stream_connected = self.connected
         return result
 

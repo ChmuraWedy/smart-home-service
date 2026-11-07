@@ -1035,5 +1035,14 @@
   "GLOBAL_ANNOUNCEMENT_RECEPTION_IS_DISABLED_IN_THE_SERVICE": "Агульны прыём аб’яў адключаны ў наладах сэрвісу.",
   "TUYA_RECEPTION_RUNS_CONTINUOUSLY": "Прыём Tuya працуе пастаянна. Новае назіранне выкарыстоўвае ўжо атрыманыя аб’явы выбранай сеткі і дадае mDNS, SSDP і табліцу суседзяў. Спыненне назірання не выключае агульны прыёмнік.",
   "CACHED_TUYA_ANNOUNCEMENT": "Захаваная аб’ява Tuya",
-  "RECENT_IP_CHANGES": "Апошнія змены IP"
+  "RECENT_IP_CHANGES": "Апошнія змены IP",
+  "EDIT_DASHBOARD_LAYOUT": "Змяніць раскладку",
+  "RETRY_DASHBOARD_LAYOUT": "Паўтарыць загрузку раскладкі",
+  "DASHBOARD_LAYOUT_INSTRUCTIONS": "Перацягніце картку вышэй або ніжэй за іншую. На сэнсарным экране выберыце картку, а потым месца.",
+  "DASHBOARD_LAYOUT_LOAD_FAILED": "Не ўдалося загрузіць захаваную раскладку.",
+  "DASHBOARD_LAYOUT_SAVE_FAILED": "Не ўдалося захаваць раскладку. Вашы змены засталіся ў рэдактары.",
+  "LAYOUT_CELL": "Радок {0}, слупок {1}",
+  "LAYOUT_MOVE_HERE": "Перамясціць сюды ({0})",
+  "LAYOUT_MOVE_CARD": "Перамясціць {0} ({1})",
+  "LAYOUT_INSERT_BEFORE": "Уставіць перад {0} ({1})"
 }

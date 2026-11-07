@@ -4,7 +4,7 @@ import json
 from ipaddress import ip_address, ip_network
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import Field, JsonValue, SecretStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -367,13 +367,17 @@ def cloud_device_status(
     device_id: Identifier,
     request: Request,
     response: Response,
+    background_tasks: BackgroundTasks,
     refresh: bool = False,
     provider: Provider = "sharing",
+    watch: bool = False,
 ):
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
         device = bridge.device_status(device_id, refresh)
         audit_cloud(request, bridge, provider, device)
+        if watch and provider == "sharing" and not refresh:
+            bridge.schedule_inventory_refresh(background_tasks)
     response.headers["Cache-Control"] = "no-store"
     return safe_snapshot(device, provider)
 

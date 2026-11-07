@@ -191,8 +191,10 @@ export class CloudApi {
   saveLocalDeviceAliases(id: number, aliases: string[], signal?: AbortSignal) {
     return this.request<{ device_id: string; aliases: string[] }>('/devices/' + id, 'PATCH', { aliases }, signal);
   }
-  deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true) {
-    return this.json<CloudSnapshot>('/devices/' + encodeURIComponent(id) + '/status?refresh=' + refresh + '&provider=' + provider, 'GET', undefined, signal);
+  deviceSnapshot(id: string, provider: Provider, signal?: AbortSignal, refresh = true, watch = false) {
+    const query = new URLSearchParams({ refresh: String(refresh), provider });
+    if (watch) query.set('watch', 'true');
+    return this.json<CloudSnapshot>(`/devices/${encodeURIComponent(id)}/status?${query}`, 'GET', undefined, signal);
   }
   sendDeviceCommands(id: string, provider: Provider, commands: { code: string; value: JsonValue }[]) {
     return this.json<CloudCommandResult>('/devices/' + encodeURIComponent(id) + '/commands?provider=' + provider, 'POST', { commands });

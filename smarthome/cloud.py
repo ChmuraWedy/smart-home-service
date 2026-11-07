@@ -15,6 +15,8 @@ from fastapi import HTTPException
 
 from .sharing_state import SharingState
 
+INVENTORY_REFRESH_INTERVAL = 60
+
 
 class CloudBridge:
     def __init__(self, settings, login_factory=None, manager_factory=None, mq_factory=None):
@@ -27,6 +29,7 @@ class CloudBridge:
         self.auth = None
         self.saved_user_code = None
         self.manager = None
+        self.next_inventory_refresh = 0.0
         self.state = SharingState(self, mq_factory)
         if settings.cloud_enabled and self.path.exists():
             if self.path.is_symlink():
@@ -300,12 +303,31 @@ class CloudBridge:
             manager = self._manager()
             try:
                 if refresh or not manager.device_map:
+                    self.next_inventory_refresh = time.monotonic() + INVENTORY_REFRESH_INTERVAL
                     self.state.inventory(manager)
             except Exception:
                 raise HTTPException(
                     502, "Tuya cloud device query failed; reauthenticate if needed"
                 ) from None
             return list(manager.device_map.values())
+
+    def schedule_inventory_refresh(self, background_tasks):
+        with self.lock:
+            now = time.monotonic()
+            if self.auth is None or now < self.next_inventory_refresh:
+                return
+            self.next_inventory_refresh = now + INVENTORY_REFRESH_INTERVAL
+            background_tasks.add_task(self._refresh_visible_inventory, self.auth)
+
+    def _refresh_visible_inventory(self, authorization):
+        with self.lock:
+            if self.auth is not authorization:
+                return
+            try:
+                self.devices(refresh=True)
+            except HTTPException:
+                # The next heartbeat can retry after the cooldown. Keep the cache.
+                pass
 
     def device(self, id, refresh=False):
         with self.lock:

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
+from smarthome import sharing_state
 from smarthome.cloud import CloudBridge
 from smarthome.config import Settings
 from smarthome.main import create_app
@@ -172,6 +173,52 @@ def test_reported_channel_two_overrides_stale_http_and_late_reports(lazy_client)
     assert lazy_client.get(path).json()["status"]["switch_2"] is True
     mq.emit(value=False, timestamp=1791410000000)
     assert lazy_client.get(path).json()["status"]["switch_2"] is False
+
+
+@pytest.mark.parametrize("refresh", ["detail", "inventory"])
+def test_fresh_snapshot_recovers_missing_change_after_an_old_report(lazy_client, monkeypatch, refresh):
+    path = API + "/devices/switch-0/status"
+    clock = ["2026-10-07T21:46:00+00:00"]
+    monkeypatch.setattr(sharing_state, "now_iso", lambda: clock[0])
+    lazy_client.get(path)
+    bridge = lazy_client.app.state.cloud
+    mq = bridge.state.mq
+    mq.emit(value=True)
+    clock[0] = "2026-10-07T21:48:00+00:00"
+    assert lazy_client.get(path).json()["status"]["switch_2"] is True
+
+    if refresh == "detail":
+        snapshot = lazy_client.get(path + "?refresh=true").json()
+    else:
+        snapshot = lazy_client.get(API + "/devices?refresh=true").json()[0]["controls"]["snapshot"]
+
+    assert snapshot["status"] == {"switch_1": False, "switch_2": False}
+    assert "switch_2" not in snapshot["status_observations"]
+    assert lazy_client.get(path).json()["status"]["switch_2"] is False
+    mq.emit(value=True, timestamp=1791390000000)
+    assert lazy_client.get(path).json()["status"]["switch_2"] is False
+    mq.emit(value=True, timestamp=1791410000000)
+    assert lazy_client.get(path).json()["status"]["switch_2"] is True
+
+
+def test_visible_card_reads_share_one_background_inventory_refresh(lazy_client, monkeypatch):
+    path = API + "/devices/switch-0/status"
+    clock = ["2026-10-07T21:46:00+00:00"]
+    monkeypatch.setattr(sharing_state, "now_iso", lambda: clock[0])
+    lazy_client.get(path)
+    bridge = lazy_client.app.state.cloud
+    bridge.state.mq.emit(value=True)
+    clock[0] = "2026-10-07T21:48:00+00:00"
+    bridge.next_inventory_refresh = 0
+    calls = bridge.manager.customer_api.calls
+    calls.clear()
+    assert lazy_client.get(path).json()["status"]["switch_2"] is True
+    assert not calls
+    assert lazy_client.get(path + "?watch=true").json()["status"]["switch_2"] is True
+    assert lazy_client.get(path + "?watch=true").json()["status"]["switch_2"] is False
+    assert lazy_client.get(API + "/devices/switch-1/status?watch=true").status_code == 200
+    assert sum(query.endswith("/home/devices") for _, query, _ in calls) == 1
+    assert not any(query.endswith("/devices/detail") for _, query, _ in calls)
 
 
 def test_unknown_device_and_malformed_detail_never_replace_cached_state(lazy_client):

@@ -260,6 +260,18 @@ function AppContent() {
     return () => document.removeEventListener('pointerdown', outside);
   }, [menuOpen]);
 
+  const controlCenter = (
+    <ControlCenter
+      dashboardPanel={dashboardPanel}
+      cardSize={cardSize}
+      api={api}
+      ready={Boolean(status && connection.token)}
+      sharingReady={Boolean(ready && status?.connected)}
+      developerReady={Boolean(ready && developer.connected)}
+      onAuthError={invalidateConnection}
+      onConnections={() => goTo('connections')}
+    />
+  );
   const regionName = REGIONS.find(item => item.value === developer.region)?.label;
   const appearance = (
     <>
@@ -402,7 +414,7 @@ function AppContent() {
                   </section>,
         network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
         'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
-        control: <ControlCenter dashboardPanel={dashboardPanel} api={api} ready={Boolean(status && connection.token)} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onConnections={() => goTo('connections')} />,
+        control: controlCenter,
       } satisfies Record<View, ReactNode> }}
         />
         <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">

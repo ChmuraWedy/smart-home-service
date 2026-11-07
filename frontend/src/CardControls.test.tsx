@@ -203,9 +203,11 @@ describe('main controls on device cards', () => {
     try {
       await screen.findByRole('switch',{name:'Питание'});
       await act(async () => observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
-      await act(async () => { vi.advanceTimersByTime(1000); });
+      await act(async () => { vi.advanceTimersByTime(3999); });
+      expect(fetch).not.toHaveBeenCalled();
+      await act(async () => { vi.advanceTimersByTime(1); });
       expect(fetch).toHaveBeenCalledTimes(1);
-      expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('refresh=false');
+      expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('refresh=false&provider=sharing&watch=true');
       await act(async () => observers[0]([{isIntersecting:false} as IntersectionObserverEntry],{} as IntersectionObserver));
       await act(async () => { vi.advanceTimersByTime(6000); });
       expect(fetch).toHaveBeenCalledTimes(1);
@@ -283,7 +285,7 @@ describe('main controls on device cards', () => {
     const props = {api:new HomeApi(connection), device:{id:'physical', name:local.name, local, cloud:{}},
       route:'local' as const, now:Date.now(), onAuthError:vi.fn(), onBusy:vi.fn()};
     const view = renderWithStore(<CardControls {...props} paused={false} />);
-    const tick = () => act(async () => { vi.advanceTimersByTime(1000); });
+    const tick = () => act(async () => { vi.advanceTimersByTime(4000); });
     const intersect = (isIntersecting: boolean) =>
       act(async () => visibilityChanged([{isIntersecting} as IntersectionObserverEntry], {} as IntersectionObserver));
     const watches = () => vi.mocked(fetch).mock.calls.filter(([input]) => new URL(String(input)).searchParams.has('watch'));
@@ -349,7 +351,7 @@ it('updates the tile connection status and battery from cached reports',async()=
     await screen.findByRole('switch');
     await waitFor(()=>expect(onStatus).toHaveBeenCalledWith(expect.objectContaining({online:true})));
     await act(async()=>observers[0]([{isIntersecting:true} as IntersectionObserverEntry],{} as IntersectionObserver));
-    await act(async()=>{vi.advanceTimersByTime(1000);});
+    await act(async()=>{vi.advanceTimersByTime(4000);});
     expect(fetch).toHaveBeenCalledOnce();
     await act(async()=>{vi.advanceTimersByTime(50);});
     await waitFor(()=>expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}}));

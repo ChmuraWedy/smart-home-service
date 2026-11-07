@@ -17,6 +17,19 @@ function deferredResponse() {
 }
 
 describe('shared local device cache', () => {
+  it('returns the same reading when a watch reports identical cached data', async () => {
+    const store = createAppStore(), api = new HomeApi(connection);
+    vi.mocked(fetch).mockResolvedValueOnce(json(reading(true)))
+      .mockResolvedValueOnce(json(reading(true)))
+      .mockResolvedValueOnce(json(reading(false)));
+    const first = await store.dispatch(readLocalDevice(api, 7));
+    const identical = await store.dispatch(readLocalDevice(api, 7, false, undefined, true));
+    const changed = await store.dispatch(readLocalDevice(api, 7, false, undefined, true));
+    expect(identical).toBe(first);
+    expect(changed.values.switch.value).toBe(false);
+    expect(changed).not.toBe(first);
+  });
+
   it('coalesces concurrent reads and serves the same recent reading to later readers', async () => {
     const store = createAppStore(), api = new HomeApi(connection);
     const response = deferredResponse();

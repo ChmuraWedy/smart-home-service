@@ -32,6 +32,7 @@ const drawings = {
       <circle cx="19" cy="12" r="1" />
     </>
   ),
+  move: <path d="M12 3v18M3 12h18M9 6l3-3 3 3m-6 12 3 3 3-3M6 9l-3 3 3 3m12-6 3 3-3 3" />,
   room: <path d="M4 21h16M6 21V3h12v18m-4-8h1" />,
   'room-all': <path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z" />,
   'room-balcony': <path d="M5 10V4h14v6M3 11h18v9H3zm5 0v9m4-9v9m4-9v9M2 20h20" />,

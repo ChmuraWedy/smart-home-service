@@ -7,16 +7,18 @@ export function useCloudDeviceSnapshot(api: CloudApi, deviceId: string, provider
   const { scope } = cloudDeviceKey(api, deviceId, provider);
   const key = useMemo(() => ({ scope, deviceId, provider }), [scope, deviceId, provider]);
   const select = useMemo(() => cloudDeviceCache.endpoints.deviceSnapshot.select(key), [key]);
-  const reading = useAppSelector(state => select(state).data);
+  const snapshot = useAppSelector((state) => select(state).data?.snapshot);
+  const liveRequestAt = useAppSelector((state) => select(state).data?.liveRequestAt);
   const dispatch = useAppDispatch();
-  const loaded = reading !== undefined;
+  const loaded = snapshot !== undefined;
   useEffect(() => {
     if (!loaded) return;
     // Keep the last reading while either surface is mounted, even without polling.
     const subscription = dispatch(cloudDeviceCache.endpoints.deviceSnapshot.initiate(key));
     return () => subscription.unsubscribe();
   }, [dispatch, key, loaded]);
-  const read = useCallback((refresh: boolean, signal?: AbortSignal, seed?: CloudSnapshot) =>
-    dispatch(readCloudDevice(api, key, { refresh, signal, seed })), [api, dispatch, key]);
-  return { snapshot: reading?.snapshot, liveRequestAt: reading?.liveRequestAt, read };
+  const read = useCallback((refresh: boolean, signal?: AbortSignal, seed?: CloudSnapshot, watch = false) => dispatch(readCloudDevice(api, key, {
+    refresh, signal, seed, watch,
+  })), [api, dispatch, key]);
+  return { snapshot, liveRequestAt, read };
 }

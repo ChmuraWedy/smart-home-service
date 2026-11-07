@@ -1,6 +1,7 @@
 import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
+import type { LayoutSlots } from './dashboard-layout';
 
 export type Capability = {
   type: 'boolean' | 'integer' | 'number' | 'string' | 'object';
@@ -54,6 +55,14 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
   key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  dashboardLayout(browser: string, view: string, signal: AbortSignal) {
+    return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
+  }
+
+  saveDashboardLayout(browser: string, view: string, slots: LayoutSlots) {
+    return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'PUT', { slots });
+  }
+
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {
     return this.request<ObservationSession>('/commissioning/devices/' + id, 'POST', { provider: provider || null }, signal);
   }

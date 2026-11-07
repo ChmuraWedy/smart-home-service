@@ -13,7 +13,7 @@ from .models import Device, utcnow
 from .service import record_observations
 
 INTERVAL = 5.0
-LEASE = 3.0
+LEASE = 10.0
 MAX_WATCHES = 64
 WORKERS = 4
 

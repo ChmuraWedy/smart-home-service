@@ -27,7 +27,12 @@ export function useClock() {
   return now;
 }
 
-export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSignal) => Promise<T>, onAuthError: () => void, poll?: (current:T, signal:AbortSignal) => Promise<T>) {
+export function useControlSession<T>(
+  load: (refresh: boolean, signal?: AbortSignal) => Promise<T>,
+  onAuthError: () => void,
+  poll?: (current: T, signal: AbortSignal) => Promise<T>,
+  pollInterval = 1000,
+) {
   const [data, setData] = useState<T | null>(null);
   const [busy, setBusy] = useState(true);
   const [readOK, setReadOK] = useState(false);
@@ -67,9 +72,9 @@ export function useControlSession<T>(load: (refresh: boolean, signal?: AbortSign
       }).catch(error => {
         if (alive.current && !controller.signal.aborted && version === epoch.current) { setNotice({text:t(MSG.AUTO_REFRESH_UNAVAILABLE_PREFIX)+errorText(error),error:true}); unauthorized(error); }
       }).finally(() => { if (pollAbort.current === controller) pollAbort.current = null; });
-    },1000);
+    }, pollInterval);
     return () => { clearInterval(timer); cancelPoll(); };
-  }, [poll]);
+  }, [poll, pollInterval]);
 
   async function read(version: number) {
     const controller = new AbortController(); abort.current = controller;

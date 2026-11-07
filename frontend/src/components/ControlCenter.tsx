@@ -22,6 +22,8 @@ import { Card } from './ui/card';
 import { Icon } from './ui/icon';
 import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
 import DashboardCardFooter from './DashboardCardFooter';
+import DashboardGrid from './DashboardGrid';
+import type { GridCardPlacement } from './DashboardGrid';
 import type { MouseEvent } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
 import { dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery } from '../navigation';
@@ -33,6 +35,7 @@ import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, loca
 import { useLocalDeviceState } from '../use-local-device-state';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
+type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
 const PAGE_SIZE = 24;
 const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
@@ -42,9 +45,9 @@ function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
   open();
 }
 
-function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd }: {
+function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd, placement }: {
   api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
-  quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void;
+  quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void; placement: GridCardPlacement;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
   const aliases = useMemo(() => deviceAliases(device), [device]);
@@ -81,7 +84,19 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
     && !codes.some(code => /^switch(?:_|$)/.test(code));
   const cardLayout = climate && !isCamera(cloud?.category) ? 'climate' : undefined;
   return (
-    <Card id={deviceCardId(device.id)} className="device-card dashboard-device" data-card-layout={cardLayout} data-unavailable={!online || undefined} data-quick-sheet={hasSheet || undefined} aria-label={device.name} onClick={hasSheet ? event => openCard(event, showSheet) : undefined}>
+    <Card
+      id={deviceCardId(device.id)}
+      className="device-card dashboard-device"
+      data-card-layout={cardLayout}
+      data-unavailable={!online || undefined}
+      data-quick-sheet={hasSheet || undefined}
+      data-layout-slot={placement.slot}
+      data-layout-nudge={placement.nudge}
+      aria-label={device.name}
+      onClick={hasSheet ? (event) => openCard(event, showSheet) : undefined}
+      style={placement.style}
+      inert={placement.inert}
+    >
       <DashboardCardHeader
         icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
         title={hasSheet ? (
@@ -148,8 +163,8 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
 
 }
 
-export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady = false, developerReady = false, onAuthError, onConnections }: {
-  dashboardPanel?: DashboardPanel; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
+export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, ready, sharingReady = false, developerReady = false, onAuthError, onConnections }: {
+  dashboardPanel?: DashboardPanel; cardSize?: 'small' | 'large'; api: HomeApi; ready: boolean; sharingReady?: boolean; developerReady?: boolean;
   onAuthError: () => void; onConnections?: () => void;
 }) {
   const mask = `${sharingReady}:${developerReady}`;
@@ -331,6 +346,66 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
     if (activeSurvey) setSurvey(null); else closeOverlay();
     setRevision(value => value + 1);
   }
+  function renderCard(entry: DashboardEntry, placement: GridCardPlacement) {
+    if (entry.kind === 'group') {
+      const { group: cardGroup } = entry;
+      const state = groupStates[cardGroup.id];
+      return (
+        <Card
+          className="device-card dashboard-device"
+          key={`group-${cardGroup.id}`}
+          aria-label={cardGroup.name}
+          data-layout-slot={placement.slot}
+          data-layout-nudge={placement.nudge}
+          onClick={(event) => openCard(event, () => choose(entry))}
+          style={placement.style}
+          inert={placement.inert}
+        >
+          <DashboardCardHeader
+            title={cardGroup.name}
+            icon={<DeviceIcon group />}
+            metadata={(
+              <>
+                <span className="device-location">{t(MSG.GROUP)} {cardGroup.device_ids.length} {t(MSG.DEVICES)}</span>
+                <span className="device-location">{t(MSG.ON_YOUR_HOME_NETWORK)}</span>
+              </>
+            )}
+            actions={<CardDetailsButton label={t(MSG.OPEN_GROUP)} onClick={() => choose(entry)} />}
+          />
+          <DashboardCardFooter>
+            <p className="dashboard-group-reading">{state ? groupSummary(state.members, now) : t(MSG.STATUS_UNKNOWN)}</p>
+          </DashboardCardFooter>
+        </Card>
+      );
+    }
+
+    const { device } = entry;
+    const canAdd = inventory && !busy && (!sharingReady || topology.data || topology.error);
+    return (
+      <DeviceCard
+        key={`device-${device.id}`}
+        api={api}
+        device={device}
+        room={roomName(device)}
+        now={now}
+        paused={Boolean(selected || placement.inert)}
+        quickRoute={quick && device === linked ? validRoute : undefined}
+        onAuthError={onAuthError}
+        onOpen={(route) => choose({ ...entry, route })}
+        onQuickOpen={(route) => openOverlay(overlayHref(devicePath(device.id, true), route))}
+        onQuickClose={() => closeOverlay()}
+        onAdd={canAdd ? (provider) => choose({ kind: 'survey', device: device.cloud[provider], provider }) : undefined}
+        placement={placement}
+      />
+    );
+  }
+
+  const canUseLayout = !search.trim() && !(quick && linkedIndex < 0);
+  const gridItems = visible.map((entry) => {
+    if (entry.kind === 'group') return { id: `group-${entry.group.id}`, cardName: entry.group.name, entry };
+    return { id: `device-${entry.device.id}`, cardName: entry.device.name, entry };
+  });
+
   if (activeSurvey && inventory) {
     const { device, existing, provider } = activeSurvey;
 
@@ -426,32 +501,14 @@ export function ControlCenter({ dashboardPanel = null, api, ready, sharingReady 
             {!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t(MSG.SET_UP_CONNECTION)}</button>}
           </div>
 )}
-          <ul className="dashboard-device-grid tw:m-0 tw:grid tw:list-none tw:grid-cols-[repeat(auto-fill,minmax(min(100%,264px),1fr))] tw:items-start tw:gap-3 tw:p-0 tw:max-[600px]:gap-2">
-            {visible.map(entry => entry.kind === 'group' ? (
-              <Card className="device-card dashboard-device" key={'group-' + entry.group.id} aria-label={entry.group.name} onClick={event=>openCard(event,()=>choose(entry))}>
-                <DashboardCardHeader
-                  title={entry.group.name}
-                  icon={<DeviceIcon group />}
-                  metadata={(
-                    <>
-                  <span className="device-location">{t(MSG.GROUP)} {entry.group.device_ids.length} {t(MSG.DEVICES)}</span>
-                  <span className="device-location">{t(MSG.ON_YOUR_HOME_NETWORK)}</span>
-                </>
-)}
-                  actions={<CardDetailsButton label={t(MSG.OPEN_GROUP)} onClick={() => choose(entry)} />}
-                />
-                <DashboardCardFooter>
-                  <p className="dashboard-group-reading">{groupStates[entry.group.id] ? groupSummary(groupStates[entry.group.id].members, now) : t(MSG.STATUS_UNKNOWN)}</p>
-                </DashboardCardFooter>
-              </Card>
-) : (
-  <DeviceCard key={'device-' + entry.device.id} api={api} device={entry.device} room={roomName(entry.device)} now={now} paused={Boolean(selected)}
-    quickRoute={quick && entry.device === linked ? validRoute : undefined} onAuthError={onAuthError} onOpen={route => choose({ ...entry, route })}
-    onQuickOpen={route => openOverlay(overlayHref(devicePath(entry.device.id, true), route))} onQuickClose={closeOverlay}
-    onAdd={inventory && !busy && (!sharingReady || topology.data || topology.error) ? provider => choose({ kind: 'survey', device: entry.device.cloud[provider], provider }) : undefined}
-  />
-      ))}
-          </ul>
+          <DashboardGrid<DashboardEntry>
+            api={api}
+            density={cardSize}
+            items={gridItems}
+            view={canUseLayout ? { building, room, page: page + 1 } : undefined}
+            editable={Boolean(current && !busy && !selected && !quick)}
+            renderCard={(entry, placement) => renderCard(entry, placement)}
+          />
           {entries.length > PAGE_SIZE && (
           <div className="pagination">
             <button className="secondary compact" disabled={page === 0} onClick={() => setPage(page - 1)}>{t(MSG.BACK)}</button>
