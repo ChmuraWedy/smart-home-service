@@ -1,9 +1,9 @@
-import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query';
+import { copyWithStructuralSharing, createApi, fakeBaseQuery } from '@reduxjs/toolkit/query';
 import { ApiError } from './api';
 import type { CloudApi } from './api';
 import type { DeviceState, HomeApi } from './home-api';
 import { MSG, t } from './i18n';
-import type { AppDispatch } from './store';
+import type { AppDispatch, RootState } from './store';
 
 type DeviceKey = { scope: number; deviceId: number };
 type CacheEntry = { reading: DeviceState; sequence: number };
@@ -35,7 +35,7 @@ export const localDeviceCache = createApi({
   reducerPath: 'localDeviceCache',
   baseQuery: fakeBaseQuery<ReadError>(),
   keepUnusedDataFor: 15,
-  endpoints: build => ({
+  endpoints: (build) => ({
     deviceState: build.query<CacheEntry, DeviceKey>({
       async queryFn({ scope, deviceId }, { signal }) {
         const client = clients.get(scope);
@@ -43,15 +43,18 @@ export const localDeviceCache = createApi({
         try {
           return { data: await fetchReading(client.api, deviceId, false, signal) };
         } catch (failure) {
-          return { error: {
-            message: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_LOAD_DEVICES),
-            status: failure instanceof ApiError ? failure.status : undefined,
-          } };
+          return {
+            error: {
+              message: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_LOAD_DEVICES),
+              status: failure instanceof ApiError ? failure.status : undefined,
+            },
+          };
         }
       },
       merge(current, incoming) {
         // A slow initial cache read must not overwrite a newer watch or refresh.
-        if (incoming.sequence >= current.sequence) return incoming;
+        if (incoming.sequence < current.sequence) return undefined;
+        return { ...incoming, reading: copyWithStructuralSharing(current.reading, incoming.reading) };
       },
     }),
   }),
@@ -61,15 +64,15 @@ function checkAborted(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 }
 
-export const readLocalDevice = (api: HomeApi, deviceId: number, refresh = false, signal?: AbortSignal, watch = false) =>
-  async (dispatch: AppDispatch): Promise<DeviceState> => {
+export function readLocalDevice(api: HomeApi, deviceId: number, refresh = false, signal?: AbortSignal, watch = false) {
+  return async (dispatch: AppDispatch, getState: () => RootState): Promise<DeviceState> => {
     checkAborted(signal);
     const key = localDeviceKey(api, deviceId);
     if (refresh || watch) {
       const value = await fetchReading(api, deviceId, refresh, signal, watch);
       checkAborted(signal);
       dispatch(localDeviceCache.util.upsertQueryEntries([{ endpointName: 'deviceState', arg: key, value }]));
-      return value.reading;
+      return localDeviceCache.endpoints.deviceState.select(key)(getState()).data?.reading ?? value.reading;
     }
 
     let client = clients.get(key.scope);
@@ -101,3 +104,4 @@ export const readLocalDevice = (api: HomeApi, deviceId: number, refresh = false,
       if (--client.readers === 0) clients.delete(key.scope);
     }
   };
+}

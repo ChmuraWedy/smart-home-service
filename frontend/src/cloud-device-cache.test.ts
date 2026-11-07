@@ -19,6 +19,24 @@ function delayedResponse() {
 }
 
 describe('shared cloud readings', () => {
+  it('keeps identical snapshots and unchanged values stable across visible polls', async () => {
+    const store = createAppStore(), client = api();
+    const key = cloudDeviceKey(client, 'lamp', 'sharing');
+    vi.mocked(fetch).mockResolvedValueOnce(json(snapshot()))
+      .mockResolvedValueOnce(json(snapshot()))
+      .mockResolvedValueOnce(json({ ...snapshot(), snapshot_received_at: '2026-10-07T00:01:00Z' }))
+      .mockResolvedValueOnce(json(snapshot('lamp', true)));
+    const first = await store.dispatch(readCloudDevice(client, key));
+    const same = await store.dispatch(readCloudDevice(client, key, { watch: true }));
+    expect(same).toBe(first);
+    const newerTimestamp = await store.dispatch(readCloudDevice(client, key, { watch: true }));
+    expect(newerTimestamp.status).toBe(first.status);
+    const changed = await store.dispatch(readCloudDevice(client, key, { watch: true }));
+    expect(changed.status.switch_led).toBe(true);
+    expect(changed.status).not.toBe(first.status);
+    expect(cached(store, key)?.snapshot).toBe(changed);
+  });
+
   it('deduplicates passive reads without cancelling the remaining reader', async () => {
     const store = createAppStore(), client = api();
     const key = cloudDeviceKey(client, 'lamp', 'sharing');

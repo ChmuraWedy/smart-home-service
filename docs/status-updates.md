@@ -4,7 +4,7 @@ A reported value, an HTTP snapshot, and a command acknowledgement are different 
 
 ## Sharing reports
 
-The backend uses the official Sharing SDK's MQTT reports. Reports are stored in SQLite with per-DP timestamps; a newer reading for one DP does not refresh another DP. The browser reads our cache once per second while the relevant view is visible. These checks do not issue fresh Tuya HTTP requests.
+The backend uses the official Sharing SDK's MQTT reports. Reports are stored in SQLite with per-DP timestamps. Visible dashboard cards read the server cache every four seconds. Those reads can schedule one shared inventory refresh per minute to recover changes missed by the event stream. An older report yields to a conflicting HTTP reading once the report is at least a minute old.
 
 Definitions are fetched when a device needs them. Opening details or manually refreshing can request a selected-device HTTP snapshot. Newer reports take priority over older snapshots. Inventory subscriptions can continue receiving reports while details are closed. The Developer API route has no equivalent automatic report subscription; it retains explicit status refresh.
 
@@ -12,7 +12,7 @@ Late responses from cancelled views are ignored. Background cache reads preserve
 
 ## Local readings
 
-Local views read the SQLite cache once per second. Visible local cards add `watch=true` to the existing state request; this only renews a three-second collection lease and does not perform LAN I/O in the HTTP request. A shared background collector reads watched devices every five seconds. Multiple browsers watching the same device share one watch. Leaving, hiding, or scrolling away stops lease renewal, so abandoned watches expire automatically.
+Visible local cards read the SQLite cache every four seconds and use `watch=true` to renew a ten-second collection lease. A shared background collector reads watched devices directly over the LAN every five seconds. Multiple browsers watching the same device share one watch. Leaving, hiding, or scrolling away stops lease renewal, so abandoned watches expire automatically.
 
 The collector supports at most 64 watched devices and four concurrent reads, without a queued backlog or overlapping reads of one device. Slow devices can delay their next reading. Zigbee children use their saved gateway. Disabled or incomplete connections are skipped. Failed reads preserve existing observations and timestamps. Recent reports from commands, explicit reads, or room displays avoid an immediate duplicate background read.
 

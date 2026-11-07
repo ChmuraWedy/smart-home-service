@@ -76,16 +76,16 @@ describe('cloud readings in the dashboard and details', () => {
     try {
       await screen.findByRole('switch', { name: 'Питание' });
       await show();
-      await act(async () => vi.advanceTimersByTime(3000));
+      await act(async () => vi.advanceTimersByTime(8000));
       expect(fetch).not.toHaveBeenCalled();
       visibility.mockReturnValue('visible');
-      await act(async () => vi.advanceTimersByTime(1000));
+      await act(async () => vi.advanceTimersByTime(4000));
       await waitFor(() => expect(screen.getByRole('switch', { name: 'Питание' })).toHaveAttribute('aria-checked', 'true'));
       expect(fetch).toHaveBeenCalledOnce();
       view.rerender(<Card route="developer" />);
       await screen.findByRole('switch', { name: 'Питание' });
       await show();
-      await act(async () => vi.advanceTimersByTime(3000));
+      await act(async () => vi.advanceTimersByTime(8000));
       expect(fetch).toHaveBeenCalledOnce();
     } finally {
       view.unmount();

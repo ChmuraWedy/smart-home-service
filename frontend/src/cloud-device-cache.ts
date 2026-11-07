@@ -1,11 +1,11 @@
-import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query';
+import { copyWithStructuralSharing, createApi, fakeBaseQuery } from '@reduxjs/toolkit/query';
 import { ApiError } from './api';
 import type { CloudApi, CloudSnapshot, Provider } from './api';
 import { cloudAccountScope } from './cloud-account-scope';
 import { MSG, t } from './i18n';
 import type { AppDispatch, RootState } from './store';
 
-export type CloudDeviceKey = { scope: number; provider: Provider; deviceId: string };
+export type CloudDeviceKey = { scope: number; provider: Provider; deviceId: string; watch?: boolean };
 type CacheEntry = { snapshot: CloudSnapshot; sequence: number; liveRequestAt?: number };
 type ReadError = { message: string; status?: number };
 type Reader = { api: CloudApi; readers: number };
@@ -24,20 +24,24 @@ function checked(snapshot: CloudSnapshot, deviceId: string) {
   return snapshot;
 }
 
-async function queryReading({ scope, deviceId, provider }: CloudDeviceKey, refresh: boolean, signal: AbortSignal) {
+async function queryReading({
+  scope, deviceId, provider, watch,
+}: CloudDeviceKey, refresh: boolean, signal: AbortSignal) {
   const client = clients.get(scope);
   if (!client) return { error: { message: t(MSG.COULD_NOT_LOAD_DEVICES) } };
   const started = ++sequence;
   const liveRequestAt = refresh && provider === 'developer' ? Date.now() : undefined;
   try {
-    const snapshot = checked(await client.api.deviceSnapshot(deviceId, provider, signal, refresh), deviceId);
+    const snapshot = checked(await client.api.deviceSnapshot(deviceId, provider, signal, refresh, watch), deviceId);
     if (scope !== cloudAccountScope(client.api, provider)) throw new DOMException('Aborted', 'AbortError');
     return { data: { snapshot, sequence: started, liveRequestAt } };
   } catch (failure) {
-    return { error: {
-      message: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_LOAD_DEVICES),
-      status: failure instanceof ApiError ? failure.status : undefined,
-    } };
+    return {
+      error: {
+        message: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_LOAD_DEVICES),
+        status: failure instanceof ApiError ? failure.status : undefined,
+      },
+    };
   }
 }
 
@@ -45,11 +49,13 @@ export const cloudDeviceCache = createApi({
   reducerPath: 'cloudDeviceCache',
   baseQuery: fakeBaseQuery<ReadError>(),
   keepUnusedDataFor: 15,
-  endpoints: build => ({
+  endpoints: (build) => ({
     deviceSnapshot: build.query<CacheEntry, CloudDeviceKey>({
+      serializeQueryArgs: ({ queryArgs: { scope, provider, deviceId } }) => ({ scope, provider, deviceId }),
       queryFn: (key, { signal }) => queryReading(key, false, signal),
       merge(current, incoming) {
-        if (incoming.sequence >= current.sequence) return incoming;
+        if (incoming.sequence < current.sequence) return undefined;
+        return { ...incoming, snapshot: copyWithStructuralSharing(current.snapshot, incoming.snapshot) };
       },
     }),
     // A manual refresh may not join a cache-only poll already in flight.
@@ -82,20 +88,24 @@ function reconcileSharingInventory(current: CloudSnapshot, seed: CloudSnapshot) 
   });
   if (!newerSnapshot && newerReports.length === 0) return current;
 
-  const snapshotValues = newerSnapshot ? Object.entries(seed.status).filter(([code]) =>
-    !Object.hasOwn(currentReports, code) && !Object.hasOwn(seedReports, code)) : [];
+  const snapshotValues = newerSnapshot ? Object.entries(seed.status).filter(([code]) => !Object.hasOwn(currentReports, code) && !Object.hasOwn(seedReports, code)) : [];
   // Inventory can carry a newer privacy report alongside older readings for other controls.
   return {
     ...current,
     ...(newerSnapshot ? seed : {}),
-    status: { ...current.status, ...Object.fromEntries(snapshotValues),
-      ...Object.fromEntries(newerReports.map(([code]) => [code, seed.status[code]])) },
+    status: {
+      ...current.status,
+      ...Object.fromEntries(snapshotValues),
+      ...Object.fromEntries(newerReports.map(([code]) => [code, seed.status[code]])),
+    },
     status_observations: { ...currentReports, ...Object.fromEntries(newerReports) },
   };
 }
 
-export const readCloudDevice = (api: CloudApi, key: CloudDeviceKey, { refresh = false, signal, seed }: {
-  refresh?: boolean; signal?: AbortSignal; seed?: CloudSnapshot;
+export const readCloudDevice = (api: CloudApi, key: CloudDeviceKey, {
+  refresh = false, signal, seed, watch = false,
+}: {
+  refresh?: boolean; signal?: AbortSignal; seed?: CloudSnapshot; watch?: boolean;
 } = {}) => async (dispatch: AppDispatch, getState: () => RootState): Promise<CloudSnapshot> => {
   const checkActive = () => {
     checkAborted(signal);
@@ -125,7 +135,7 @@ export const readCloudDevice = (api: CloudApi, key: CloudDeviceKey, { refresh = 
     const fresh = refresh
       ? dispatch(cloudDeviceCache.endpoints.refreshSnapshot.initiate(key, { subscribe: false, forceRefetch: true }))
       : dispatch(cloudDeviceCache.util.getRunningQueryThunk('refreshSnapshot', key));
-    const result = await (fresh ?? dispatch(cloudDeviceCache.endpoints.deviceSnapshot.initiate(key, { subscribe: false, forceRefetch: true })));
+    const result = await (fresh ?? dispatch(cloudDeviceCache.endpoints.deviceSnapshot.initiate({ ...key, watch }, { subscribe: false, forceRefetch: true })));
     checkActive();
     if (result.error) {
       const message = result.error.message ?? t(MSG.COULD_NOT_LOAD_DEVICES);

@@ -5,7 +5,7 @@ from datetime import timedelta
 import pytest
 
 from smarthome.models import utcnow
-from smarthome.visible_status import MAX_WATCHES, VisibleStatusPoller
+from smarthome.visible_status import LEASE, MAX_WATCHES, VisibleStatusPoller
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ def test_cache_heartbeat_reads_lan_only_in_background_every_five_seconds(
     heartbeat(client, poller, clock, id, 5)
     assert len(factory.commands) == 2
     # Closing, hiding or scrolling away stops heartbeats. The lease expires.
-    clock[0] += 5
+    clock[0] += LEASE
     poller.tick()
     settle(poller)
     assert len(factory.commands) == 2 and not poller.watches
@@ -136,7 +136,7 @@ def test_visible_watches_are_bounded_and_expire(visible):
     with pytest.raises(HTTPException) as failure:
         poller.touch(MAX_WATCHES)
     assert failure.value.status_code == 503
-    clock[0] += 4
+    clock[0] += LEASE
     poller.touch(MAX_WATCHES)
     assert list(poller.watches) == [MAX_WATCHES]
 

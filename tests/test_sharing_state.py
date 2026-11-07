@@ -201,6 +201,26 @@ def test_fresh_snapshot_recovers_missing_change_after_an_old_report(lazy_client,
     assert lazy_client.get(path).json()["status"]["switch_2"] is True
 
 
+def test_visible_card_reads_share_one_background_inventory_refresh(lazy_client, monkeypatch):
+    path = API + "/devices/switch-0/status"
+    clock = ["2026-10-07T21:46:00+00:00"]
+    monkeypatch.setattr(sharing_state, "now_iso", lambda: clock[0])
+    lazy_client.get(path)
+    bridge = lazy_client.app.state.cloud
+    bridge.state.mq.emit(value=True)
+    clock[0] = "2026-10-07T21:48:00+00:00"
+    bridge.next_inventory_refresh = 0
+    calls = bridge.manager.customer_api.calls
+    calls.clear()
+    assert lazy_client.get(path).json()["status"]["switch_2"] is True
+    assert not calls
+    assert lazy_client.get(path + "?watch=true").json()["status"]["switch_2"] is True
+    assert lazy_client.get(path + "?watch=true").json()["status"]["switch_2"] is False
+    assert lazy_client.get(API + "/devices/switch-1/status?watch=true").status_code == 200
+    assert sum(query.endswith("/home/devices") for _, query, _ in calls) == 1
+    assert not any(query.endswith("/devices/detail") for _, query, _ in calls)
+
+
 def test_unknown_device_and_malformed_detail_never_replace_cached_state(lazy_client):
     path = API + "/devices/switch-0/status"
     lazy_client.get(path)

@@ -4898,6 +4898,16 @@
               "default": "sharing",
               "title": "Provider"
             }
+          },
+          {
+            "name": "watch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Watch"
+            }
           }
         ],
         "responses": {

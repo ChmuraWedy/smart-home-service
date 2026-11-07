@@ -23,6 +23,8 @@ import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
 import { IconGlyph } from './ui/icon';
 
+const CARD_CACHE_INTERVAL = 4000;
+
 function powerControl(spec: ControlSpec) {
   return spec.writable && spec.kind === 'boolean' && /^(switch|switch_led|switch_[1-9][0-9]*)$/.test(spec.key);
 }
@@ -258,10 +260,10 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
     return metadata;
   },[api,cloud.id,provider,metadata,read,dispatch,labelKey]);
   const poll = useCallback(async (current:typeof metadata,signal:AbortSignal) => {
-    await read(false, signal);
+    await read(false, signal, undefined, true);
     return current;
   },[read]);
-  const session = useControlSession(load,onAuthError,provider === 'sharing' && visible ? poll : undefined);
+  const session = useControlSession(load, onAuthError, provider === 'sharing' && visible ? poll : undefined, CARD_CACHE_INTERVAL);
   const baseDefinitions = session.data === metadata ? inventoryDefinitions ?? metadata.definitions : undefined;
   const definitions = useMemo(() => baseDefinitions && labels ? withChannelLabels(baseDefinitions, labels) : baseDefinitions, [baseDefinitions, labels]);
   const specs = definitions && snapshot ? cloudSpecs(definitions,snapshot) : [];
@@ -295,7 +297,7 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
     dispatch(readLocalDevice(api, item.id, refresh, signal)), [api, dispatch, item.id]);
   const poll = useCallback((_current: DeviceState, signal: AbortSignal) =>
     dispatch(readLocalDevice(api, item.id, false, signal, true)), [api, dispatch, item.id]);
-  const session = useControlSession(load,onAuthError,visible ? poll : undefined);
+  const session = useControlSession(load, onAuthError, visible ? poll : undefined, CARD_CACHE_INTERVAL);
   const state = cached ?? session.data;
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
