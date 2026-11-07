@@ -1,0 +1,17 @@
+# Optional, alongside compose.lan.yaml. The translator listens on loopback only.
+services:
+  backend:
+    environment:
+      SMART_HOME_LABEL_TRANSLATOR_URL: http://127.0.0.1:8093
+
+  label-translator:
+    build: ./deploy/label-translator
+    network_mode: host
+    restart: unless-stopped
+    cpus: 1.5
+    mem_limit: 1150m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8093/health', timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

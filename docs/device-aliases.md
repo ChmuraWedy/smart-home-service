@@ -16,4 +16,6 @@ Saving changes only aliases in this application's database. It does not send a d
 
 Under **Name and alias translations** in device details, choose the name or an alias and enter its display text in English, Russian, Polish, or Belarusian. **Settings → Device names and aliases** chooses between originals and matching the app language in the current browser. A missing translation uses the original text. Dashboard search accepts either form.
 
-Translations are saved separately from the original names and tags. Renamed or deleted aliases lose their previous translations. Local devices and cloud-only devices save through the corresponding `PUT .../translations` route, with `kind`, `original`, and `values` keyed by locale. An empty `values` object restores the original.
+Translations are saved separately from the original names and tags. Renamed or deleted aliases lose their previous translations. Local devices and cloud-only devices save through the corresponding `PUT .../translations` route, with `kind`, `original`, and `values` keyed by locale. Pass `edited` with the locales to update. An edited locale omitted from `values` falls back to the original. Omitting `edited` replaces all variants.
+
+The optional [local translation service](../deploy/docker.md#automatic-device-label-translations) can suggest variants when labels are saved. Manual corrections take precedence.

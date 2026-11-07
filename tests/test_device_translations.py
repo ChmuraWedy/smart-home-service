@@ -1,3 +1,62 @@
+from dataclasses import replace
+
+from smarthome import auto_label_translations
+
+
+def test_saving_labels_generates_variants_and_manual_edits_preserve_other_languages(client, monkeypatch):
+    settings = replace(client.app.state.settings, label_translator_url="http://127.0.0.1:8093")
+    monkeypatch.setattr(client.app.state, "settings", settings)
+    variants = {
+        "Hall lamp": {"pl": "Lampa w holu", "be": "Лямпа ў холе"},
+        "entry light": {"pl": "Światło przy wejściu"},
+        "side door light": {"pl": "Światło przy bocznych drzwiach"},
+    }
+    batches = []
+
+    def translate(_url, originals):
+        batches.append(originals)
+        return {label: variants[label] for label in originals}
+
+    monkeypatch.setattr(auto_label_translations, "translate_labels", translate)
+    created = client.post("/api/v1/devices", json={
+        "name": "Hall lamp", "device_id": "lamp-1", "aliases": ["entry light"],
+    })
+    assert created.status_code == 201, created.text
+    device = created.json()
+    assert device["name"] == "Hall lamp"
+    assert device["translations"] == {
+        "name": {"Hall lamp": variants["Hall lamp"]},
+        "alias": {"entry light": variants["entry light"]},
+    }
+    path = f"/api/v1/devices/{device['id']}"
+    body = {"kind": "name", "original": "Hall lamp", "edited": ["pl"]}
+    manual = client.put(path + "/translations", json={**body, "values": {"pl": "Lampa w przedpokoju"}})
+    assert manual.json()["values"] == {"pl": "Lampa w przedpokoju", "be": "Лямпа ў холе"}
+    updated = client.patch(path, json={"aliases": ["side door light"]})
+    assert updated.json()["translations"] == {
+        "name": {"Hall lamp": {"pl": "Lampa w przedpokoju", "be": "Лямпа ў холе"}},
+        "alias": {"side door light": variants["side door light"]},
+    }
+    cleared = client.put(path + "/translations", json={**body, "values": {}})
+    assert cleared.json()["values"] == {"be": "Лямпа ў холе"}
+    assert batches == [["Hall lamp", "entry light"], ["side door light"]]
+
+
+def test_original_is_saved_even_when_translator_is_unavailable(client, monkeypatch):
+    settings = replace(client.app.state.settings, label_translator_url="http://127.0.0.1:8093")
+    monkeypatch.setattr(client.app.state, "settings", settings)
+
+    def translate(_url, _originals):
+        raise TimeoutError
+
+    monkeypatch.setattr(auto_label_translations, "translate_labels", translate)
+    created = client.post("/api/v1/devices", json={"name": "Hall lamp", "device_id": "lamp-1"})
+    assert created.status_code == 201, created.text
+    assert created.json()["translations"] == {"name": {}, "alias": {}}
+    loaded = client.get("/api/v1/devices").json()
+    assert loaded[0]["name"] == "Hall lamp"
+
+
 def test_local_name_and_alias_translations_follow_the_originals(client):
     device = client.post("/api/v1/devices", json={
         "name": "Hall lamp", "device_id": "lamp-1", "aliases": ["entry light"],

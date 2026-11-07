@@ -8,7 +8,7 @@ import {
 } from '../device-metadata';
 import { translationFor } from '../device-translations';
 import type {
-  DeviceTranslations, TranslatedText, TranslationEdit, TranslationKind,
+  DeviceTranslations, TranslatedText, TranslationKind, TranslationWrite,
 } from '../device-translations';
 import {
   LANGUAGES, MSG, t, translateText,
@@ -32,27 +32,31 @@ function TranslationFields({
 }: {
   entry: Entry;
   values?: TranslatedText;
-  onSave: (edit: TranslationEdit) => Promise<void>;
+  onSave: (edit: TranslationWrite) => Promise<void>;
 }) {
   const formId = useId();
-  const [draft, setDraft] = useState<TranslatedText>(values ?? {});
+  const [draft, setDraft] = useState<TranslatedText>({});
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [failed, setFailed] = useState(false);
-  const normalized = Object.fromEntries(Object.entries(draft).map(([locale, value]) => [
-    locale, value.normalize('NFC').trim(),
-  ]).filter(([, value]) => value !== ''));
-  const changed = LANGUAGES.some(({ value }) => normalized[value] !== values?.[value]);
+  const edited = LANGUAGES.map(({ value }) => value).filter((locale) => (
+    draft[locale] !== undefined && draft[locale].normalize('NFC').trim() !== (values?.[locale] ?? '')
+  ));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || !changed) return;
+    if (busy || !edited.length) return;
     setBusy(true);
     setFailed(false);
     setNotice('');
     try {
-      await onSave({ kind: entry.kind, original: entry.original, values: normalized });
-      setDraft(normalized);
+      const normalized = Object.fromEntries(edited.map((locale) => [
+        locale, draft[locale]?.normalize('NFC').trim(),
+      ]).filter(([, value]) => value));
+      await onSave({
+        kind: entry.kind, original: entry.original, values: normalized, edited,
+      });
+      setDraft({});
       setNotice(t(MSG.DEVICE_TRANSLATIONS_SAVED));
     } catch (failure) {
       setFailed(true);
@@ -70,7 +74,7 @@ function TranslationFields({
             {label}
             <input
               id={`${formId}-${value}`}
-              value={draft[value] ?? ''}
+              value={draft[value] ?? values?.[value] ?? ''}
               maxLength={120}
               disabled={busy}
               placeholder={entry.original}
@@ -79,7 +83,7 @@ function TranslationFields({
           </label>
         ))}
       </div>
-      <button type="submit" className="secondary compact" disabled={busy || !changed}>{t(MSG.SAVE_DEVICE_TRANSLATIONS)}</button>
+      <button type="submit" className="secondary compact" disabled={busy || !edited.length}>{t(MSG.SAVE_DEVICE_TRANSLATIONS)}</button>
       {notice && <p className={failed ? 'field-error' : 'help'} role={failed ? 'alert' : 'status'}>{notice}</p>}
     </form>
   );
@@ -103,7 +107,7 @@ export default function DeviceTranslationEditor({
   const [target, setTarget] = useState('name');
   const selected = entries.find((entry) => entry.key === target) ?? entries[0];
 
-  async function save(edit: TranslationEdit) {
+  async function save(edit: TranslationWrite) {
     if (!key || (!provider && localId === undefined)) return;
     const scope = provider && cloudAccountScope(api, provider);
     const cloudKeys = (['sharing', 'developer'] as const).map((route) => cloudMetadataKey(cloudAccountScope(api, route), deviceId));

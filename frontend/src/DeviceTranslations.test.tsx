@@ -52,7 +52,8 @@ it('persists translations, edits original alias text, and removes old variants w
   setLocale('en', false);
   setDeviceTextMode('localized');
   const save = vi.spyOn(api, 'saveLocalDeviceTranslation').mockImplementation(async (_id, edit) => ({ ...edit, shared: true }));
-  vi.spyOn(api, 'saveLocalDeviceAliases').mockImplementation(async (_id, aliases) => ({ device_id: 'lamp', aliases }));
+  const saveAliases = vi.spyOn(api, 'saveLocalDeviceAliases')
+    .mockImplementation(async (_id, aliases) => ({ device_id: 'lamp', aliases }));
   const user = userEvent.setup();
   const props = { api, deviceId: 'lamp', localId: 7, initialAliases: fixture.aliases, onAuthError: vi.fn() };
   renderWithStore(
@@ -67,14 +68,21 @@ it('persists translations, edits original alias text, and removes old variants w
   await user.type(screen.getByLabelText('English'), 'Evening light');
   await user.click(screen.getByRole('button', { name: 'Save translations' }));
   expect(await screen.findByText('Translations saved.')).toBeVisible();
-  expect(save).toHaveBeenCalledWith(7, { kind: 'alias', original: 'dinner light', values: { en: 'Evening light' } });
+  expect(save).toHaveBeenCalledWith(7, {
+    kind: 'alias', original: 'dinner light', values: { en: 'Evening light' }, edited: ['en'],
+  });
   await user.click(screen.getByRole('button', { name: 'Edit alias Evening light' }));
   expect(screen.getByRole('textbox', { name: 'Edit alias' })).toHaveValue('dinner light');
   await user.click(screen.getByRole('button', { name: 'Delete' }));
   expect(screen.queryByRole('option', { name: 'dinner light' })).not.toBeInTheDocument();
+  saveAliases.mockResolvedValueOnce({
+    device_id: 'lamp',
+    aliases: ['dinner light'],
+    translations: { name: {}, alias: { 'dinner light': { en: 'Supper light' } } },
+  });
   await user.click(screen.getByRole('button', { name: 'Add alias' }));
   await user.type(screen.getByLabelText('New alias'), 'dinner light');
   await user.click(within(screen.getByRole('form', { name: 'Edit alias' })).getByRole('button', { name: 'Save' }));
-  expect(await screen.findByRole('button', { name: 'Edit alias dinner light' })).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Edit alias Supper light' })).toBeVisible();
   expect(screen.queryByText('Evening light')).not.toBeInTheDocument();
 });

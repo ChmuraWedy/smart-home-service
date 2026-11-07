@@ -99,7 +99,7 @@
       "count": 2
     },
     "camelcase": {
-      "count": 64
+      "count": 63
     },
     "import/newline-after-import": {
       "count": 1
@@ -2183,7 +2183,7 @@
       "count": 2
     },
     "object-curly-newline": {
-      "count": 4
+      "count": 2
     },
     "prefer-template": {
       "count": 2

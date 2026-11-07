@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -6,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from smarthome import auto_label_translations
 from smarthome.cloud import CloudBridge
 from smarthome.config import Settings
 from smarthome.main import create_app
@@ -725,6 +727,23 @@ def test_unicode_cloud_aliases_persist_and_conflict_after_normalization(cloud_cl
     assert result.json()["aliases"] == sorted(["свет кухни", "святло пакоя", "światło pokoju", "café"])
     assert cloud_client.get(path).json() == result.json()
     assert cloud_client.put(API + "/devices/child/aliases", json={"aliases": ["CAFÉ"]}).status_code == 409
+
+
+def test_cloud_alias_save_returns_generated_labels(cloud_client, monkeypatch):
+    login(cloud_client)
+    settings = replace(cloud_client.app.state.settings, label_translator_url="http://127.0.0.1:8093")
+    monkeypatch.setattr(cloud_client.app.state, "settings", settings)
+    variants = {"Gateway": {"pl": "Brama"}, "office gateway": {"pl": "Brama biurowa"}}
+    monkeypatch.setattr(
+        auto_label_translations, "translate_labels",
+        lambda _url, originals: {label: variants[label] for label in originals},
+    )
+    response = cloud_client.put(API + "/devices/gateway/aliases", json={"aliases": ["office gateway"]})
+    assert response.status_code == 200, response.text
+    assert response.json()["translations"] == {
+        "name": {"Gateway": variants["Gateway"]},
+        "alias": {"office gateway": variants["office gateway"]},
+    }
 
 
 @pytest.mark.parametrize("code,status,detail", [("2001", 409, "не в сети"), ("2003", 502, "code 2003"), (SECRET, 502, "physical outcome may be unknown")])

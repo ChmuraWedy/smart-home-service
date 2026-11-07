@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from . import __version__
 from .api_dependencies import authenticate, get_session
+from .auto_label_translations import translate_local_device
 from .config import Settings
 from .control import run_command
 from .db import init_db, make_engine
@@ -274,9 +275,10 @@ def delete_type(item_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/devices", response_model=DeviceRead, status_code=201, tags=["Devices"])
-def add_device(body: DeviceCreate, session: Session = Depends(get_session)):
+def add_device(body: DeviceCreate, request: Request, session: Session = Depends(get_session)):
     item = create_device(session, body)
     commit(session)
+    translate_local_device(session, request, item)
     return device_read(session, item)
 
 
@@ -324,9 +326,11 @@ def read_device(item_id: EntityRef, session: Session = Depends(get_session)):
 
 
 @router.patch("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
-def edit_device(item_id: EntityRef, body: DevicePatch, session: Session = Depends(get_session)):
+def edit_device(item_id: EntityRef, body: DevicePatch, request: Request, session: Session = Depends(get_session)):
     item = patch_device(session, get_by_ref(session, Device, item_id), body)
     commit(session)
+    if {"name", "aliases"} & body.model_fields_set:
+        translate_local_device(session, request, item)
     return device_read(session, item)
 
 
@@ -555,7 +559,7 @@ def register_alias_routes(resource, model, read_schema):
         tags=["Aliases"],
         name=f"{resource}_add_alias",
     )
-    def add_alias(item_id: EntityRef, body: AliasCreate, session: Session = Depends(get_session)):
+    def add_alias(item_id: EntityRef, body: AliasCreate, request: Request, session: Session = Depends(get_session)):
         item = get_by_ref(session, model, item_id)
         if any(fold_name(body.alias) == fold_name(alias) for alias in item.aliases):
             raise HTTPException(409, "Alias already exists on this object")
@@ -563,7 +567,10 @@ def register_alias_routes(resource, model, read_schema):
             raise HTTPException(422, "Object cannot have more than 32 aliases")
         replace_aliases(session, item, [*item.aliases, body.alias])
         commit(session)
-        return device_read(session, item) if model is Device else read_schema.model_validate(item)
+        if model is Device:
+            translate_local_device(session, request, item)
+            return device_read(session, item)
+        return read_schema.model_validate(item)
 
     @router.delete(
         path + "/{alias}", status_code=204, tags=["Aliases"], name=f"{resource}_delete_alias"

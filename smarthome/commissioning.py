@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
+from .auto_label_translations import translate_local_device
 from .cloud_api import Provider, cloud_bridge, safe_spec
 from .cloud_mappings import scope_for
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
@@ -719,6 +720,8 @@ def register(
                         datetime.fromisoformat(row["received_at"]),
                     )
         commit(session)
-        result = device_read(session, item)
+        newly_registered = entry.existing_id is None
         store.remove(token)
-        return result
+    if newly_registered:
+        translate_local_device(session, request, item)
+    return device_read(session, item)

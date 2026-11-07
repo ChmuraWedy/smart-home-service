@@ -39,6 +39,10 @@ class TranslationSaved(TranslationEdit):
     shared: bool
 
 
+class TranslationWrite(TranslationEdit):
+    edited: set[Locale] | None = None
+
+
 def translations_for(session, scope, identifiers):
     result = {}
     if identifiers:
@@ -102,9 +106,6 @@ def save_values(session, scope, identifier, kind, original, values, *, promote=F
     match = {
         "scope": scope, "device_id": identifier, "kind": kind, "original": original,
     }
-    if not values and scope != LOCAL_SCOPE:
-        session.execute(delete(DeviceTranslation).filter_by(**match))
-        return
     statement = insert(DeviceTranslation).values(**match, values=values)
     keys = list(match)
     if promote:
@@ -121,25 +122,42 @@ def promote_alias_translations(session, scope, device_id, device, aliases):
             save_values(session, LOCAL_SCOPE, str(device.id), "alias", original, values[original], promote=True)
 
 
+def save_edit(session, scope, identifier, body, *, previous_cloud_key=None):
+    values = body.values
+    if body.edited is not None:
+        row = session.get(DeviceTranslation, (scope, identifier, body.kind, body.original))
+        if row is None and previous_cloud_key is not None:
+            row = session.get(DeviceTranslation, (*previous_cloud_key, body.kind, body.original))
+        values = dict(row.values) if row else {}
+        for language in body.edited:
+            if language in body.values:
+                values[language] = body.values[language]
+            else:
+                values.pop(language, None)
+    save_values(session, scope, identifier, body.kind, body.original, values)
+    return TranslationSaved(kind=body.kind, original=body.original, values=values, shared=scope == LOCAL_SCOPE)
+
+
 @router.put("/devices/{item_id}/translations", response_model=TranslationSaved)
-def save_local_translations(item_id: EntityRef, body: TranslationEdit, response: Response, session: Session = Depends(get_session)):
+def save_local_translations(item_id: EntityRef, body: TranslationWrite, response: Response, session: Session = Depends(get_session)):
     from .service import commit, get_by_ref
 
+    session.connection().exec_driver_sql("BEGIN IMMEDIATE")
     device = get_by_ref(session, Device, item_id)
     valid = body.original == device.name if body.kind == "name" else any(
         entry.alias == body.original for entry in device.alias_entries
     )
     if not valid:
         raise HTTPException(409, "This name or alias has changed. Reload the device and try again.")
-    save_values(session, LOCAL_SCOPE, str(device.id), body.kind, body.original, body.values)
+    saved = save_edit(session, LOCAL_SCOPE, str(device.id), body)
     commit(session)
     response.headers["Cache-Control"] = "no-store"
-    return TranslationSaved(**body.model_dump(), shared=True)
+    return saved
 
 
 @router.put("/cloud/devices/{device_id}/translations", response_model=TranslationSaved, tags=["Cloud"])
 def save_cloud_translations(
-    device_id: Identifier, body: TranslationEdit, request: Request, response: Response,
+    device_id: Identifier, body: TranslationWrite, request: Request, response: Response,
     provider: Literal["sharing", "developer"] = "sharing", session: Session = Depends(get_session),
 ):
     from .cloud_api import cloud_bridge
@@ -151,6 +169,7 @@ def save_cloud_translations(
     with bridge.lock:
         cloud = bridge.device(device_id)
         scope = scope_for(bridge, provider)
+        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
         device = session.scalar(select(Device).where(Device.device_id == device_id))
         if body.kind == "name":
             shared = device is not None and body.original == device.name
@@ -163,10 +182,15 @@ def save_cloud_translations(
         if not valid:
             raise HTTPException(409, "This name or alias has changed. Reload the device and try again.")
         identifier = str(device.id) if shared else device_id
-        save_values(session, LOCAL_SCOPE if shared else scope, identifier, body.kind, body.original, body.values)
+        saved = save_edit(
+            session, LOCAL_SCOPE if shared else scope, identifier, body,
+            previous_cloud_key=(scope, device_id) if shared else None,
+        )
         if shared:
             # An earlier account-specific variant may predate local registration.
-            save_values(session, scope, device_id, body.kind, body.original, {})
+            session.execute(delete(DeviceTranslation).filter_by(
+                scope=scope, device_id=device_id, kind=body.kind, original=body.original
+            ))
         commit(session)
     response.headers["Cache-Control"] = "no-store"
-    return TranslationSaved(**body.model_dump(), shared=shared)
+    return saved

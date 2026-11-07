@@ -6346,7 +6346,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TranslationEdit"
+                "$ref": "#/components/schemas/TranslationWrite"
               }
             }
           }
@@ -6421,7 +6421,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TranslationEdit"
+                "$ref": "#/components/schemas/TranslationWrite"
               }
             }
           }
@@ -9556,7 +9556,7 @@
         ],
         "title": "LayoutSlots"
       },
-      "TranslationEdit": {
+      "TranslationWrite": {
         "properties": {
           "kind": {
             "type": "string",
@@ -9588,6 +9588,27 @@
             },
             "type": "object",
             "title": "Values"
+          },
+          "edited": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "en",
+                    "ru",
+                    "pl",
+                    "be"
+                  ]
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited"
           }
         },
         "additionalProperties": false,
@@ -9597,7 +9618,7 @@
           "original",
           "values"
         ],
-        "title": "TranslationEdit"
+        "title": "TranslationWrite"
       },
       "TranslationSaved": {
         "properties": {

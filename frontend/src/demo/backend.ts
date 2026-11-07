@@ -1,5 +1,5 @@
 import { withTranslation } from '../device-translations';
-import type { TranslationEdit } from '../device-translations';
+import type { TranslationWrite } from '../device-translations';
 import type { JsonValue } from '../api';
 import type {
   Capability, DeviceState, Group, Inventory, LocalDevice,
@@ -106,9 +106,18 @@ export default async function demoFetch(url: string, init: RequestInit): Promise
     const group = collection === 'groups' ? inventory.groups[id - 1] : undefined;
     if (device && method === 'GET' && !action) return Response.json(device);
     if (device && method === 'PUT' && action === '/translations') {
-      const edit = JSON.parse(String(init.body)) as TranslationEdit;
+      const { edited, ...edit } = JSON.parse(String(init.body)) as TranslationWrite;
       const matches = edit.kind === 'name' ? device.name === edit.original : device.aliases.includes(edit.original);
       if (!matches) return Response.json({ detail: 'This name or alias has changed. Reload the device and try again.' }, { status: 409 });
+      if (edited) {
+        const merged = { ...device.translations?.[edit.kind][edit.original] };
+        for (const locale of edited) {
+          const value = edit.values[locale];
+          if (value) merged[locale] = value;
+          else delete merged[locale];
+        }
+        edit.values = merged;
+      }
       device.translations = withTranslation(device.translations, edit);
       return Response.json({ ...edit, shared: true });
     }

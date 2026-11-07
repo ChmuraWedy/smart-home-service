@@ -6,6 +6,7 @@ export type TranslatedText = Partial<Record<Locale, string>>;
 export type TranslationKind = 'name' | 'alias';
 export type DeviceTranslations = Record<TranslationKind, Record<string, TranslatedText>>;
 export type TranslationEdit = { kind: TranslationKind; original: string; values: TranslatedText };
+export type TranslationWrite = TranslationEdit & { edited?: Locale[] };
 export type TranslationSaved = TranslationEdit & { shared: boolean };
 type DisplayMode = 'localized' | 'original';
 

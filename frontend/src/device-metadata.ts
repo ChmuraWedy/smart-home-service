@@ -34,6 +34,14 @@ export function labelsFromCloudDefinitions(definitions: CloudFunctions) {
   );
 }
 
+function aliasTranslations(previous: DeviceTranslations | undefined, saved: DeviceTranslations | undefined, aliases: string[], includeNames: boolean) {
+  if (!previous && !saved) return undefined;
+  return withoutRemovedAliases({
+    name: includeNames ? { ...previous?.name, ...saved?.name } : previous?.name ?? {},
+    alias: { ...previous?.alias, ...saved?.alias },
+  }, aliases);
+}
+
 const deviceMetadata = createSlice({
   name: 'deviceMetadata',
   initialState,
@@ -54,9 +62,11 @@ const deviceMetadata = createSlice({
       }
     },
     saveDeviceAliases(state, { payload }: PayloadAction<{
-      key: string; localKey?: string; linkedKeys: string[]; revision: number; aliases: string[];
+      key: string; localKey?: string; linkedKeys: string[]; revision: number; aliases: string[]; translations?: DeviceTranslations;
     }>) {
-      const { key, localKey, linkedKeys, revision, aliases } = payload;
+      const {
+        key, localKey, linkedKeys, revision, aliases, translations,
+      } = payload;
       const previousLocal = localKey ? state.devices[localKey]?.aliases?.value ?? [] : [];
       for (const linkedKey of linkedKeys) {
         const linked = state.devices[linkedKey];
@@ -64,15 +74,15 @@ const deviceMetadata = createSlice({
         // Cloud alias lists include local tags as well as provider-specific tags.
         const providerAliases = linked.aliases.value.filter(alias => !previousLocal.includes(alias));
         linked.aliases = { revision, value: [...new Set([...providerAliases, ...aliases])] };
-        if (linked.translations) {
-          linked.translations = { revision, value: withoutRemovedAliases(linked.translations.value, linked.aliases.value) };
-        }
+        const linkedValues = aliasTranslations(linked.translations?.value, translations, linked.aliases.value, false);
+        if (linkedValues) linked.translations = { revision, value: linkedValues };
       }
       for (const itemKey of new Set(localKey ? [key, localKey] : [key])) {
         const item = state.devices[itemKey] ?? {};
         item.aliases = { revision, value: aliases };
         state.devices[itemKey] = item;
-        if (item.translations) item.translations = { revision, value: withoutRemovedAliases(item.translations.value, aliases) };
+        const values = aliasTranslations(item.translations?.value, translations, aliases, itemKey === key);
+        if (values) item.translations = { revision, value: values };
       }
     },
     saveDeviceTranslation(state, { payload }: PayloadAction<{

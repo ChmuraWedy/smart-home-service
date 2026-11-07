@@ -48,6 +48,9 @@ class Settings:
     cloud_timeout: float = field(
         default_factory=lambda: float(os.getenv("SMART_HOME_CLOUD_TIMEOUT", "10"))
     )
+    label_translator_url: str = field(
+        default_factory=lambda: os.getenv("SMART_HOME_LABEL_TRANSLATOR_URL", "").strip()
+    )
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
             value.strip()
@@ -64,6 +67,14 @@ class Settings:
             raise ValueError("Timeouts must be positive: Tuya <=30s, lock <=60s")
         if not 0 < self.cloud_timeout <= 30:
             raise ValueError("Developer cloud timeout must be >0 and <=30s")
+        if self.label_translator_url:
+            endpoint = urlsplit(self.label_translator_url)
+            if (
+                endpoint.scheme != "http" or endpoint.hostname not in {"127.0.0.1", "::1"}
+                or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment
+                or endpoint.path not in {"", "/"}
+            ):
+                raise ValueError("Label translator must use a loopback HTTP URL")
         for origin in self.cors_origins:
             self._http_url(origin, origin_only=True)
         if self.frontend_url:

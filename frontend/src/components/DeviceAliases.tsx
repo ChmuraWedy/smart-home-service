@@ -33,7 +33,7 @@ export function DeviceAliases({ api, deviceId, name, translations, initialAliase
         : await api.saveLocalDeviceAliases(localId!, values, controller.signal);
       if (controller.signal.aborted) return;
       if (result.device_id !== deviceId || !Array.isArray(result.aliases)) throw new Error(t(MSG.THE_SERVICE_RETURNED_ANOTHER_DEVICES_ALIASES));
-      dispatch(saveDeviceAliases({ key, localKey, linkedKeys, revision: nextDeviceMetadataRevision(), aliases: result.aliases }));
+      dispatch(saveDeviceAliases({ key, localKey, linkedKeys, revision: nextDeviceMetadataRevision(), aliases: result.aliases, translations: result.translations }));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
       if (failure instanceof ApiError && failure.status === 409) throw new Error(t(MSG.THIS_ALIAS_IS_ALREADY_USED_BY_ANOTHER_DEVICE));
