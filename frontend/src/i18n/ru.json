@@ -1070,5 +1070,20 @@
   "LAYOUT_CELL": "Строка {0}, столбец {1}",
   "LAYOUT_MOVE_HERE": "Переместить сюда ({0})",
   "LAYOUT_MOVE_CARD": "Переместить {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Вставить перед {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Вставить перед {0} ({1})",
+  "QUICK_DEVICE_CONTROLS": "Быстрое управление",
+  "COMBINED_MIXED_POWER": "Разное состояние питания",
+  "COMBINED_NO_POWER_CONTROL": "Управление питанием недоступно",
+  "COMBINED_OUTCOME_UNKNOWN": "Результат команды неизвестен",
+  "COMBINED_POWER": "Питание всех устройств",
+  "COMBINED_MEMBER_COUNT": "Устройств: {0}",
+  "CHOOSE_COMBINED_MEMBER": "Выберите устройство, чтобы открыть его настройки.",
+  "EDIT_COMBINATION": "Изменить объединение",
+  "COMBINED_SAVE_FAILED": "Не удалось сохранить объединение.",
+  "COMBINE_DEVICES": "Объединить устройства",
+  "CHOOSE_COMBINED_DEVICES": "Выберите от 2 до 16 устройств",
+  "DISSOLVE_COMBINATION": "Разъединить устройства",
+  "DISSOLVE_COMBINATION_QUESTION": "Вернуть устройства на отдельные карточки?",
+  "COMBINATION_UNAVAILABLE": "Объединение по этой ссылке недоступно.",
+  "BACK_TO_COMBINATION": "К объединению"
 }

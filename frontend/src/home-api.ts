@@ -3,6 +3,7 @@ import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { LayoutSlots } from './dashboard-layout';
+import type { DeviceRoute } from './devices';
 
 export type Capability = {
   type: 'boolean' | 'integer' | 'number' | 'string' | 'object';
@@ -25,6 +26,12 @@ export type Group = { id: number; name: string; room_id: number; device_ids: num
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
 export type GroupResult = { all_acknowledged: boolean; results: { device_id: number; acknowledged: boolean }[] };
 export type Inventory = { buildings: Building[]; rooms: Room[]; devices: LocalDevice[]; groups: Group[] };
+export type CombinedMemberInput = { 'device_id': string; route: DeviceRoute };
+export type CombinedInput = { 'name': string; 'room_id': number | null; members: CombinedMemberInput[] };
+export type CombinedMember = CombinedMemberInput & { accessible: boolean };
+export type CombinedDevice = Omit<CombinedInput, 'members'> & { id: number; members: CombinedMember[] };
+export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 'unknown';
+export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
 export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
 export type TopologyJob = { status: 'idle' | 'running' | 'done' | 'failed'; processed: number; total: number; message: string | null };
 export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: false; placements: Placement[]; job: TopologyJob };
@@ -105,6 +112,23 @@ export class HomeApi extends CloudApi {
     }
     throw new Error(t(MSG.THE_LIST_IS_TOO_LARGE));
   }
+
+  combinations(signal: AbortSignal) {
+    return this.request<CombinedDevice[]>('/combined-devices', 'GET', undefined, signal);
+  }
+
+  saveCombination(input: CombinedInput, id?: number) {
+    return this.request<CombinedDevice>(id === undefined ? '/combined-devices' : `/combined-devices/${id}`, id === undefined ? 'POST' : 'PUT', input);
+  }
+
+  async removeCombination(id: number) {
+    await this.deleteResource(`/combined-devices/${id}`);
+  }
+
+  combinationPower(id: number, value: boolean) {
+    return this.request<CombinedPowerResult>(`/combined-devices/${id}/power/${value ? 'on' : 'off'}`, 'POST');
+  }
+
   async inventory(signal?: AbortSignal): Promise<Inventory> {
     const [buildings, rooms, devices, groups] = await Promise.all([
       this.list<Building>('/buildings', signal), this.list<Room>('/rooms', signal),

@@ -82,40 +82,60 @@ type QuickSheet = DashboardSheetState & {
   onLightFeatures?: (hasQuickSettings: boolean, hasPresets: boolean) => void;
 };
 
-type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void; sheet?: QuickSheet };
+export type MemberPower = 'on' | 'off' | 'mixed' | 'unknown';
+
+type EmbeddedControls = {
+  embeddedQuick?: boolean;
+  onPower?: (power: MemberPower) => void;
+};
+
+type CardProps = EmbeddedControls & {
+  api: HomeApi;
+  device: UnifiedDevice;
+  route: DeviceRoute;
+  now: number;
+  paused: boolean;
+  onAuthError: () => void;
+  onBusy: (busy: boolean) => void;
+  onStatus?: (status: CardStatus) => void;
+  sheet?: QuickSheet;
+};
 
 // Only cards entering the viewport request missing metadata. Keep an activated
 // card mounted when it scrolls away so the controls remain available.
 export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
-  const sheetOpen = Boolean(props.sheet?.open && !props.paused);
+  const {
+    device, route, paused, embeddedQuick, sheet,
+  } = props;
+  const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
   useEffect(() => {
     if (!window.IntersectionObserver) return;
     const observer = new IntersectionObserver(entries => {
       const inView = entries.some(entry => entry.isIntersecting);
       setVisible(inView);
-      if (inView && !props.paused) setActivated(true);
+      if (inView && !paused) setActivated(true);
     });
     const controls = container.current!;
     // Observe the card so visibility remains stable when its controls load or collapse.
     observer.observe(controls.closest('.dashboard-device') || controls);
     return () => observer.disconnect();
-  }, [props.paused]);
-  const cloud = props.route !== 'local' ? props.device.cloud[props.route] : undefined;
-  const active = activated || props.route === 'local' || cloud?.controls?.ready || sheetOpen;
-  const pollingVisible = visible && !props.paused;
+  }, [paused]);
+  const cloud = route !== 'local' ? device.cloud[route] : undefined;
+  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick;
+  const pollingVisible = visible && !paused;
   let controls: ReactNode;
   if (!active) {
-    controls = <button className="secondary compact full-width" disabled={props.paused} onClick={() => setActivated(true)}>{t(MSG.SHOW_STATE)}</button>;
-  } else if (props.route === 'local') {
+    controls = <button className="secondary compact full-width" disabled={paused} onClick={() => setActivated(true)}>{t(MSG.SHOW_STATE)}</button>;
+  } else if (route === 'local') {
     controls = <LocalCardControls {...props} visible={pollingVisible} />;
   } else if (cloud) {
-    controls = <CloudCardControls {...props} cloud={cloud} provider={props.route} visible={pollingVisible} />;
+    controls = <CloudCardControls {...props} cloud={cloud} provider={route} visible={pollingVisible} />;
   }
   return (
-    <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + props.device.name}>
+    <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + device.name}>
       {controls}
     </div>
   );
@@ -138,8 +158,9 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
 }
 
 function StandardCardControls({
-  api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy, readOK, sending, refresh, toggle, notice, category, onAuthError,
-}: {
+  api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy,
+  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower,
+}: EmbeddedControls & {
   api: HomeApi; tuyaApi?: HomeApi; name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[];
   reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean;
   refresh: () => Promise<void>; toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice;
@@ -156,6 +177,14 @@ function StandardCardControls({
     const value = spec && reading(spec);
     return isStale(value, now, local) ? undefined : value;
   };
+  const knownPowers = online ? powers.map((spec) => currentReading(spec)) : [];
+  let reportedPower: MemberPower = 'unknown';
+  if (knownPowers.length && knownPowers.every((value) => value?.known && typeof value.value === 'boolean')) {
+    if (knownPowers.every((value) => value?.value === true)) reportedPower = 'on';
+    else if (knownPowers.every((value) => value?.value === false)) reportedPower = 'off';
+    else reportedPower = 'mixed';
+  }
+  useEffect(() => { onPower?.(reportedPower); }, [onPower, reportedPower]);
   const mode = currentReading(modeSpec)?.value;
   const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
   const hasSummary = Boolean(brightness || temperature || colorMode);
@@ -184,7 +213,7 @@ function StandardCardControls({
     </span>
   ) : undefined;
   const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
-  const disabled = busy || !readOK || sending || (!!summary && !online);
+  const disabled = paused || busy || !readOK || sending || (!!summary && !online);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
   const field = (spec:ControlSpec, headingActions?:ReactNode, showSummary = true) => (
     <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
@@ -213,6 +242,27 @@ function StandardCardControls({
     })}
   </div>
 );
+  const quickEditor = hasQuickSettings && (embeddedQuick || (sheet?.open && !paused)) && (
+    <>
+      <QuickLightSettings
+        power={field(powers[0], undefined, false)}
+        library={library}
+        tuyaApi={tuyaApi}
+        mode={modeSpec}
+        white={white}
+        color={color?.writable ? color : undefined}
+        scene={scene}
+        scope={pendingScope}
+        reading={reading}
+        now={now}
+        local={local}
+        disabled={disabled}
+        send={toggle}
+      />
+      {notice.error && <ControlFeedback busy={false} notice={notice} />}
+    </>
+  );
+  if (embeddedQuick && quickEditor) return quickEditor;
   return (
     <>
       {sheet?.presetSlot && createPortal(
@@ -234,24 +284,9 @@ function StandardCardControls({
         </button>
       </div>
       {powerLayout && sensorValues}
-      {hasQuickSettings && sheet?.open && !paused && (
+      {quickEditor && sheet && (
         <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
-          <QuickLightSettings
-            power={field(powers[0], undefined, false)}
-            library={library}
-            tuyaApi={tuyaApi}
-            mode={modeSpec}
-            white={white}
-            color={color?.writable ? color : undefined}
-            scene={scene}
-            scope={pendingScope}
-            reading={reading}
-            now={now}
-            local={local}
-            disabled={disabled}
-            send={toggle}
-          />
-          {notice.error && <ControlFeedback busy={false} notice={notice} />}
+          {quickEditor}
         </DashboardSheet>
       )}
       {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
@@ -259,7 +294,9 @@ function StandardCardControls({
   );
 }
 
-function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthError,onBusy,onStatus}: CardProps & {cloud:CloudDevice;provider:Provider;visible:boolean}) {
+function CloudCardControls({
+  api, cloud, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
+}: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
   const labelKey = cloudMetadataKey(cloudAccountScope(api, provider), cloud.id);
@@ -323,11 +360,13 @@ function CloudCardControls({api,cloud,provider,now,visible,paused,sheet,onAuthEr
         local={false}
         online={snapshot?.online ?? cloud.online}
         category={cloud.category}
+        embeddedQuick={embeddedQuick}
+        onPower={onPower}
       />
     );
 }
 
-function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBusy}: CardProps & {visible:boolean}) {
+function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBusy,embeddedQuick,onPower}: CardProps & {visible:boolean}) {
   const item = device.local!;
   const dispatch = useAppDispatch();
   const cached = useLocalDeviceState(api, item.id);
@@ -362,6 +401,8 @@ function LocalCardControls({api,device,now,visible,paused,sheet,onAuthError,onBu
       readOK={session.readOK && !!state?.enabled}
       refresh={session.refresh}
       notice={session.notice}
+      embeddedQuick={embeddedQuick}
+      onPower={onPower}
       {...commands}
     />
   );

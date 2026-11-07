@@ -33,10 +33,10 @@ import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, next
 import { useAppDispatch, useAppSelector } from '../store';
 
 export function CloudControl({
-  api, device, provider, devices, room, displayName, localDevice, gateway, routes, onClose, onAuthError,
+  api, device, provider, devices, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError,
 }: {
   api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; displayName?: string;
-  localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; onClose: () => void; onAuthError: () => void;
+  localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; closeLabel?: string; onClose: () => void; onAuthError: () => void;
 }) {
   const name = displayName || device.name || t(MSG.TUYA_DEVICE);
   const localTransport = localDevice?.transport;
@@ -137,6 +137,7 @@ export function CloudControl({
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
   return (
     <ControlDialog onRefresh={session.refresh}
+      closeLabel={closeLabel}
       information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
       statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={name} busy={session.busy || editingBusy} onClose={onClose}
       titleContent={<DeviceAliases api={api} deviceId={device.id} name={name} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}

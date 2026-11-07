@@ -12,7 +12,7 @@ from .service import commit
 router = APIRouter(prefix="/api/v1/dashboard-layouts", dependencies=[Depends(authenticate)])
 
 BrowserID = Annotated[str, Path(pattern=r"^[0-9a-f]{32}$")]
-CardID = Annotated[str, StringConstraints(pattern=r"^(device|group)-.+$", max_length=140)]
+CardID = Annotated[str, StringConstraints(pattern=r"^(device|group|combined)-.+$", max_length=140)]
 
 
 class LayoutView(BaseModel):

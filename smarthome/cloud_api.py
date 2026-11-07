@@ -441,16 +441,22 @@ def cloud_commands(
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
         device = bridge.writable_device(device_id)
-        validate_cloud_commands(device, body.commands)
-        commands = [command.model_dump() for command in body.commands]
-        audit_cloud(request, bridge, provider, device, commands=commands, outcome="sent")
-        try:
-            result = bridge.send_commands(device_id, commands)
-        except HTTPException as error:
-            audit_cloud(request, bridge, provider, device, commands=commands, outcome="rejected" if error.status_code in {400, 403, 404, 409, 422} else "unknown")
-            raise
-        audit_cloud(request, bridge, provider, device, commands=commands, outcome="accepted" if result.get("acknowledged") else "unknown")
-        return result
+        return execute_cloud_commands(request, bridge, provider, device, body.commands)
+
+
+def execute_cloud_commands(request, bridge, provider, device, commands):
+    validate_cloud_commands(device, commands)
+    values = [command.model_dump() for command in commands]
+    audit_cloud(request, bridge, provider, device, commands=values, outcome="sent")
+    try:
+        result = bridge.send_commands(device.id, values)
+    except HTTPException as error:
+        outcome = "rejected" if error.status_code in {400, 403, 404, 409, 422} else "unknown"
+        audit_cloud(request, bridge, provider, device, commands=values, outcome=outcome)
+        raise
+    outcome = "accepted" if result.get("acknowledged") else "unknown"
+    audit_cloud(request, bridge, provider, device, commands=values, outcome=outcome)
+    return result
 
 
 def validate_cloud_commands(device, commands):

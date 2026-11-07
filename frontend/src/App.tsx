@@ -16,7 +16,10 @@ import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 import { Icon, IconGlyph } from './components/ui/icon';
-import { appPaths, dashboardHref, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomPattern } from './navigation';
+import {
+  appPaths, combinationEditPattern, combinationNewPath, combinationPattern, combinationQuickPattern,
+  dashboardHref, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomPattern,
+} from './navigation';
 import type { DashboardPanel } from './navigation';
 import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 import { rotateCloudAccountScope } from './cloud-account-scope';
@@ -59,6 +62,10 @@ export function createAppRouter() {
     screenRoute(devicePattern, 'control'),
     screenRoute(quickPattern, 'control'),
     screenRoute(groupPattern, 'control'),
+    screenRoute(combinationNewPath, 'control'),
+    screenRoute(combinationPattern, 'control'),
+    screenRoute(combinationQuickPattern, 'control'),
+    screenRoute(combinationEditPattern, 'control'),
     screenRoute(dashboardToolsPath, 'control'),
     screenRoute(appPaths.settings, 'settings'),
     ...(!demo ? [
