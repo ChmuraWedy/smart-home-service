@@ -46,10 +46,14 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('dashboard layout', () => {
   it('preserves explicit holes and appends new cards, including after inventory changes', () => {
-    expect(moveCard(['device-a', 'group-1'], 0, 2)).toEqual([null, 'group-1', 'device-a']);
-    expect(moveCard([null, 'group-1', 'device-a'], 2, 1)).toEqual([null, 'device-a', 'group-1']);
+    expect(moveCard(['device-a', 'group-1'], 0, 2, 3)).toEqual([null, 'group-1', 'device-a']);
+    expect(moveCard([null, 'group-1', 'device-a'], 2, 1, 3)).toEqual([null, 'device-a', null, null, 'group-1']);
+    expect(moveCard(['device-a', 'group-1', null, null, 'device-b'], 0, 1, 3))
+      .toEqual([null, 'device-a', null, null, 'group-1', null, null, 'device-b']);
+    expect(moveCard(['device-a', 'group-1', null, null, 'device-b'], 0, 1, 3, true))
+      .toEqual([null, 'group-1', null, null, 'device-a', null, null, 'device-b']);
     expect(placeCards(['device-a', 'device-b'], [null, 'group-1', 'device-a'])).toEqual([null, null, 'device-a', 'device-b']);
-    const lastSlot = moveCard(['device-a'], 0, MAX_LAYOUT_SLOTS - 1);
+    const lastSlot = moveCard(['device-a'], 0, MAX_LAYOUT_SLOTS - 1, 3);
     const filled = placeCards(['device-a', 'group-1'], lastSlot);
     expect(filled[0]).toBe('group-1');
     expect(filled.at(-1)).toBe('device-a');
@@ -69,17 +73,17 @@ describe('dashboard layout', () => {
     click('Move here (Row 2, column 3)');
     cardAt('device-a', 2, 3);
     click('Move Card 2 (Row 1, column 2)');
-    click('Swap with Card 3 (Row 1, column 3)');
+    click('Insert before Card 3 (Row 1, column 3)');
     cardAt('group-1', 1, 3);
     click('Save');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
     expect(screen.getByTestId('device-a')).not.toHaveAttribute('inert');
-    expect([...stored.values()]).toEqual([{ slots: [null, 'device-b', 'group-1', null, null, 'device-a'] }]);
+    expect([...stored.values()]).toEqual([{ slots: [null, null, 'group-1', null, null, 'device-b', null, null, 'device-a'] }]);
     expect([...stored.keys()][0]).toMatch(/\/dashboard-layouts\/[0-9a-f]{32}\?building=all&room=3&page=1&columns=3$/);
 
     first.unmount();
     const reloaded = mount();
-    await waitFor(() => cardAt('device-a', 2, 3));
+    await waitFor(() => cardAt('device-a', 3, 3));
     cardAt('group-1', 1, 3);
     reloaded.unmount();
     mount('4');
@@ -103,31 +107,42 @@ describe('dashboard layout', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('drags the real card and previews a swap above or below the target center', () => {
+  it('shows a floating copy and inserts ahead of the target without swapping', () => {
     mount();
     click('Edit layout');
     const source = screen.getByRole('button', { name: 'Move Card 1 (Row 1, column 1)' });
-    const transfer = { setData: vi.fn(), setDragImage: vi.fn() };
-    const drag = (element: HTMLElement, type: string, clientY: number) => {
-      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 12, clientY });
-      Object.defineProperty(event, 'dataTransfer', { value: transfer });
-      fireEvent(element, event);
+    const target = screen.getByRole('button', { name: 'Move Card 2 (Row 1, column 2)' });
+    Object.defineProperty(source, 'setPointerCapture', { value: vi.fn() });
+    const hit = vi.fn<() => HTMLElement | null>().mockReturnValue(target);
+    const original = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
+    Object.defineProperty(document, 'elementFromPoint', { value: hit, configurable: true });
+    const drag = (type: string, clientX: number, clientY: number) => {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY });
+      Object.defineProperties(event, { pointerType: { value: 'mouse' }, pointerId: { value: 1 } });
+      fireEvent(source, event);
     };
-    drag(source, 'dragstart', 15);
-    expect(transfer.setDragImage).toHaveBeenCalledWith(screen.getByTestId('device-a'), 12, 15);
-    const target = screen.getByRole('button', { name: 'Swap with Card 2 (Row 1, column 2)' });
-    drag(target, 'dragover', 8);
-    expect(screen.getByTestId('group-1')).toHaveAttribute('data-layout-nudge', 'down');
-    cardAt('group-1', 1, 2);
-    drag(target, 'dragover', 56);
-    expect(screen.getByTestId('group-1')).toHaveAttribute('data-layout-nudge', 'up');
-    drag(target, 'dragleave', 65);
-    expect(screen.getByTestId('group-1')).not.toHaveAttribute('data-layout-nudge');
-    drag(target, 'dragover', 8);
-    drag(target, 'drop', 8);
-    expect(screen.getByTestId('group-1')).not.toHaveAttribute('data-layout-nudge');
-    cardAt('group-1', 1, 1);
-    cardAt('device-a', 1, 2);
-    expect(fetch).not.toHaveBeenCalled();
+
+    try {
+      drag('pointerdown', 12, 15);
+      drag('pointermove', 60, 8);
+      const preview = document.querySelector('.dashboard-layout-drag-layer');
+      expect(preview).toHaveTextContent('Card 1');
+      expect(target).toHaveAttribute('data-drop-over', 'down');
+      cardAt('group-1', 1, 2);
+      drag('pointermove', 60, 56);
+      expect(target).toHaveAttribute('data-drop-over', 'up');
+      hit.mockReturnValue(null);
+      drag('pointermove', 60, 65);
+      expect(target).not.toHaveAttribute('data-drop-over');
+      hit.mockReturnValue(target);
+      drag('pointerup', 60, 8);
+      expect(preview).toBeEmptyDOMElement();
+      cardAt('group-1', 2, 2);
+      cardAt('device-a', 1, 2);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      if (original) Object.defineProperty(document, 'elementFromPoint', original);
+      else Reflect.deleteProperty(document, 'elementFromPoint');
+    }
   });
 });

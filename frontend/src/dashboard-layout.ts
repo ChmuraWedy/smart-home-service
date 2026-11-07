@@ -38,11 +38,17 @@ export function placeCards(cards: string[], saved: LayoutSlots): LayoutSlots {
   return slots;
 }
 
-export function moveCard(slots: LayoutSlots, from: number, to: number): LayoutSlots {
+export function moveCard(slots: LayoutSlots, from: number, to: number, columns: number, after = false): LayoutSlots {
   const card = slots[from];
   if (!card || from === to || to < 0 || to >= MAX_LAYOUT_SLOTS) return slots;
-  const next = Array.from({ length: Math.max(slots.length, to + 1) }, (_, index) => slots[index] ?? null);
-  next[from] = next[to];
-  next[to] = card;
+  const destination = after && slots[to] ? to + columns : to;
+  let empty = destination;
+  while (empty < MAX_LAYOUT_SLOTS && empty !== from && slots[empty]) empty += columns;
+  if (empty >= MAX_LAYOUT_SLOTS) return slots;
+
+  const next = Array.from({ length: Math.max(slots.length, empty + 1) }, (_, index) => slots[index] ?? null);
+  next[from] = null;
+  for (let slot = empty; slot > destination; slot -= columns) next[slot] = next[slot - columns];
+  next[destination] = card;
   return trimSlots(next);
 }

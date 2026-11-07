@@ -831,7 +831,7 @@ input[type=hidden] {
   @apply tw:flex tw:h-full tw:min-h-16 tw:w-full tw:items-center tw:justify-center tw:rounded-xl tw:border tw:border-dashed tw:border-(--border-strong) tw:bg-transparent tw:p-0 tw:text-(--text);
 }
 .dashboard-layout-target-button[data-occupied] {
-  @apply tw:cursor-grab tw:items-start tw:justify-end tw:border-transparent tw:p-1;
+  @apply tw:cursor-grab tw:items-start tw:justify-end tw:border-transparent tw:p-1 tw:select-none;
 }
 .dashboard-layout-target-button .ui-icon {
   @apply tw:pointer-events-none tw:box-content tw:size-5 tw:rounded-md tw:bg-(--surface) tw:p-1;
@@ -841,6 +841,17 @@ input[type=hidden] {
 }
 .dashboard-layout-target-button[data-drop-over]:not([data-occupied]) {
   @apply tw:border-(--text) tw:bg-(--surface-soft);
+}
+.dashboard-layout-target-button[data-occupied][data-drop-over]::after {
+  @apply tw:absolute tw:inset-x-2 tw:h-0.5 tw:rounded-full tw:bg-(--text) tw:content-[''];
+}
+.dashboard-layout-target-button[data-drop-over="down"]::after { top:0; }
+.dashboard-layout-target-button[data-drop-over="up"]::after { bottom:0; }
+.dashboard-layout-drag-layer {
+  @apply tw:pointer-events-none tw:fixed tw:top-0 tw:left-0 tw:z-50 tw:m-0 tw:list-none tw:p-0;
+}
+.dashboard-layout-drag-layer > .device-card {
+  @apply tw:absolute tw:top-0 tw:left-0 tw:m-0 tw:shadow-lg;
 }
 .dashboard-layout-target-button:focus-visible {
   @apply tw:outline-2 tw:outline-(--text) tw:-outline-offset-2;

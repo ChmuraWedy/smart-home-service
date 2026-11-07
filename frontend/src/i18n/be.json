@@ -1038,11 +1038,11 @@
   "RECENT_IP_CHANGES": "Апошнія змены IP",
   "EDIT_DASHBOARD_LAYOUT": "Змяніць раскладку",
   "RETRY_DASHBOARD_LAYOUT": "Паўтарыць загрузку раскладкі",
-  "DASHBOARD_LAYOUT_INSTRUCTIONS": "Перацягніце картку або выберыце яе, а потым месца. Выбар іншай карткі памяняе іх месцамі.",
+  "DASHBOARD_LAYOUT_INSTRUCTIONS": "Перацягніце картку вышэй або ніжэй за іншую. На сэнсарным экране выберыце картку, а потым месца.",
   "DASHBOARD_LAYOUT_LOAD_FAILED": "Не ўдалося загрузіць захаваную раскладку.",
   "DASHBOARD_LAYOUT_SAVE_FAILED": "Не ўдалося захаваць раскладку. Вашы змены засталіся ў рэдактары.",
   "LAYOUT_CELL": "Радок {0}, слупок {1}",
   "LAYOUT_MOVE_HERE": "Перамясціць сюды ({0})",
   "LAYOUT_MOVE_CARD": "Перамясціць {0} ({1})",
-  "LAYOUT_SWAP_WITH": "Памяняць месцамі з {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Уставіць перад {0} ({1})"
 }

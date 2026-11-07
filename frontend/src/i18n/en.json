@@ -1038,11 +1038,11 @@
   "RECENT_IP_CHANGES": "Recent IP changes",
   "EDIT_DASHBOARD_LAYOUT": "Edit layout",
   "RETRY_DASHBOARD_LAYOUT": "Retry loading layout",
-  "DASHBOARD_LAYOUT_INSTRUCTIONS": "Drag a card, or select it and choose a spot. Selecting another card swaps them.",
+  "DASHBOARD_LAYOUT_INSTRUCTIONS": "Drag above or below a card to insert it. On touch screens, select a card and then a spot.",
   "DASHBOARD_LAYOUT_LOAD_FAILED": "Could not load the saved layout.",
   "DASHBOARD_LAYOUT_SAVE_FAILED": "Could not save the layout. Your edits are still here.",
   "LAYOUT_CELL": "Row {0}, column {1}",
   "LAYOUT_MOVE_HERE": "Move here ({0})",
   "LAYOUT_MOVE_CARD": "Move {0} ({1})",
-  "LAYOUT_SWAP_WITH": "Swap with {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Insert before {0} ({1})"
 }
