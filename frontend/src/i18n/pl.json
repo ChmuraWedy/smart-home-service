@@ -1060,5 +1060,20 @@
   "LAYOUT_CELL": "Wiersz {0}, kolumna {1}",
   "LAYOUT_MOVE_HERE": "Przenieś tutaj ({0})",
   "LAYOUT_MOVE_CARD": "Przenieś {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Wstaw przed {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Wstaw przed {0} ({1})",
+  "QUICK_DEVICE_CONTROLS": "Szybkie sterowanie",
+  "COMBINED_MIXED_POWER": "Różne stany zasilania",
+  "COMBINED_NO_POWER_CONTROL": "Sterowanie zasilaniem niedostępne",
+  "COMBINED_OUTCOME_UNKNOWN": "Wynik polecenia nieznany",
+  "COMBINED_POWER": "Zasilanie wszystkich urządzeń",
+  "COMBINED_MEMBER_COUNT": "Urządzenia: {0}",
+  "CHOOSE_COMBINED_MEMBER": "Wybierz urządzenie, aby otworzyć jego ustawienia.",
+  "EDIT_COMBINATION": "Edytuj połączenie urządzeń",
+  "COMBINED_SAVE_FAILED": "Nie udało się zapisać połączenia urządzeń.",
+  "COMBINE_DEVICES": "Połącz urządzenia",
+  "CHOOSE_COMBINED_DEVICES": "Wybierz od 2 do 16 urządzeń",
+  "DISSOLVE_COMBINATION": "Rozłącz urządzenia",
+  "DISSOLVE_COMBINATION_QUESTION": "Przywrócić osobne karty urządzeń?",
+  "COMBINATION_UNAVAILABLE": "Połączenie urządzeń z tego linku jest niedostępne.",
+  "BACK_TO_COMBINATION": "Wróć do połączenia urządzeń"
 }

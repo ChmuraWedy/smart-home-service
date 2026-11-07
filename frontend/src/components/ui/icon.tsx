@@ -61,6 +61,7 @@ const drawings = {
       <circle cx="12" cy="12" r="3" />
     </>
   ),
+  sliders: <path d="M4 7h6m4 0h6M4 12h10m4 0h2M4 17h2m4 0h10M10 5v4m4 1v4m-8 1v4" />,
   shield: <path d="M12 3 4.5 6v5.5c0 4.2 3 7.5 7.5 9.5 4.5-2 7.5-5.3 7.5-9.5V6z" />,
   wifi: (
     <>

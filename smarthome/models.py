@@ -19,6 +19,18 @@ class DashboardLayout(Base):
     slots: Mapped[list[str | None]] = mapped_column(JSON)
 
 
+class CombinedDevice(Base):
+    """Dashboard-only virtual device. Each member pins a physical identity and route."""
+
+    __tablename__ = "combined_devices"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
+    members: Mapped[list[dict[str, str | None]]] = mapped_column(JSON)
+
+
 class CloudChannelLabel(Base):
     __tablename__ = "cloud_channel_labels"
     scope: Mapped[str] = mapped_column(String(64), primary_key=True)

@@ -294,16 +294,15 @@ describe('unified device identity and management', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('opens details only from the chevron on a card without a sheet, using the selected route',async()=>{
+  it('opens details from the card header using the selected route',async()=>{
     const calls=server(),user=userEvent.setup();
     renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
     const card=await screen.findByRole('listitem',{name:local.name});
     await user.selectOptions(within(card).getByRole('combobox'),'developer');
     expect(screen.queryByRole('dialog')).toBeNull();
-    await user.click(within(card).getByRole('heading',{name:local.name}));
     await user.click(card);
     expect(screen.queryByRole('dialog')).toBeNull();
-    await user.click(within(card).getByRole('button',{name:'Подробнее'}));
+    await user.click(within(card).getByRole('heading',{name:local.name}));
     expect(await screen.findByRole('dialog',{name:local.name})).toBeInTheDocument();
     await waitFor(()=>expect(calls.some(call=>call.path.endsWith('/functions?provider=developer'))).toBe(true));
     expect(calls.filter(call=>call.method==='POST')).toEqual([]);

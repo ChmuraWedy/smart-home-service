@@ -651,6 +651,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .dashboard_layout_api import router as dashboard_layout_router
 
     app.include_router(dashboard_layout_router)
+    from .combined_devices import router as combined_router
+
+    app.include_router(combined_router)
     from .topology import router as cloud_router
 
     app.include_router(cloud_router)

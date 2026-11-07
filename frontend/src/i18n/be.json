@@ -1060,5 +1060,20 @@
   "LAYOUT_CELL": "Радок {0}, слупок {1}",
   "LAYOUT_MOVE_HERE": "Перамясціць сюды ({0})",
   "LAYOUT_MOVE_CARD": "Перамясціць {0} ({1})",
-  "LAYOUT_INSERT_BEFORE": "Уставіць перад {0} ({1})"
+  "LAYOUT_INSERT_BEFORE": "Уставіць перад {0} ({1})",
+  "QUICK_DEVICE_CONTROLS": "Хуткае кіраванне",
+  "COMBINED_MIXED_POWER": "Розны стан сілкавання",
+  "COMBINED_NO_POWER_CONTROL": "Кіраванне сілкаваннем недаступнае",
+  "COMBINED_OUTCOME_UNKNOWN": "Вынік каманды невядомы",
+  "COMBINED_POWER": "Сілкаванне ўсіх прылад",
+  "COMBINED_MEMBER_COUNT": "Прылад: {0}",
+  "CHOOSE_COMBINED_MEMBER": "Выберыце прыладу, каб адкрыць яе налады.",
+  "EDIT_COMBINATION": "Змяніць аб’яднанне",
+  "COMBINED_SAVE_FAILED": "Не ўдалося захаваць аб’яднанне.",
+  "COMBINE_DEVICES": "Аб’яднаць прылады",
+  "CHOOSE_COMBINED_DEVICES": "Выберыце ад 2 да 16 прылад",
+  "DISSOLVE_COMBINATION": "Раз’яднаць прылады",
+  "DISSOLVE_COMBINATION_QUESTION": "Вярнуць прылады на асобныя карткі?",
+  "COMBINATION_UNAVAILABLE": "Аб’яднанне па гэтай спасылцы недаступнае.",
+  "BACK_TO_COMBINATION": "Назад да аб’яднання"
 }
