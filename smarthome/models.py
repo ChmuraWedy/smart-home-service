@@ -45,6 +45,15 @@ class CloudDeviceAlias(Base):
     device_id: Mapped[str] = mapped_column(String(128), index=True)
 
 
+class DeviceTranslation(Base):
+    __tablename__ = "device_translations"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(8), primary_key=True)
+    original: Mapped[str] = mapped_column(String(256), primary_key=True)
+    values: Mapped[dict[str, str]] = mapped_column(JSON)
+
+
 class CloudDeviceMapping(Base):
     """User-maintained map; never presented as an applied Tuya association."""
 

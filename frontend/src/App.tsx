@@ -9,6 +9,7 @@ import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './
 import { loadConnection, saveConnection } from './connection';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { LanguageSelector } from './components/LanguageSelector';
+import DeviceTextModeSelector from './components/DeviceTextModeSelector';
 import { ThemeSelector } from './components/ThemeSelector';
 import { DeveloperForm, REGIONS, UserCodeForm } from './components/CredentialForms';
 import { ControlCenter } from './components/ControlCenter';
@@ -277,6 +278,7 @@ function AppContent() {
     <>
       <ThemeSelector />
       <LanguageSelector />
+      <DeviceTextModeSelector />
       <label>
         <span>{t(MSG.CARD_SIZE)}</span>
         <select value={cardSize} onChange={event => changeCardSize(event.target.value === 'small' ? 'small' : 'large')}>

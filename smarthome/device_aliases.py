@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .cloud_mappings import scope_for
+from .device_translations import promote_alias_translations, prune_translations
 from .models import CloudDeviceAlias, Device
 from .schemas import Alias, Identifier, Schema, unique_aliases
 from .service import commit, replace_aliases
@@ -70,6 +71,7 @@ def save_aliases(device_id: Identifier, body: DeviceAliases, request: Request, r
     if local:
         # Reuse the existing alias model and validation rather than copying aliases.
         replace_aliases(session, local, aliases)
+        promote_alias_translations(session, scope, device_id, local, [entry.alias for entry in local.alias_entries])
         for row in existing:
             session.delete(row)
     else:
@@ -83,6 +85,7 @@ def save_aliases(device_id: Identifier, body: DeviceAliases, request: Request, r
                 session.delete(row)
         session.add_all(CloudDeviceAlias(scope=scope, device_id=device_id, alias=alias)
                         for alias in aliases if alias not in retained)
+    prune_translations(session, scope, device_id, "alias", [] if local else aliases)
     commit(session)
     response.headers["Cache-Control"] = "no-store"
     return {"device_id": device_id, "aliases": aliases_for_devices(session, scope, [device_id])[device_id]}
