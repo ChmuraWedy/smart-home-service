@@ -1,10 +1,10 @@
 {
   "src/App.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 10
+      "count": 9
     },
     "@stylistic/max-len": {
-      "count": 7
+      "count": 6
     },
     "arrow-parens": {
       "count": 11
@@ -815,19 +815,19 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 14
+      "count": 10
     },
     "@stylistic/max-len": {
-      "count": 20
+      "count": 17
     },
     "arrow-parens": {
-      "count": 47
+      "count": 41
     },
     "arrow-spacing": {
-      "count": 6
+      "count": 2
     },
     "comma-spacing": {
-      "count": 11
+      "count": 10
     },
     "consistent-return": {
       "count": 2
@@ -839,13 +839,13 @@
       "count": 1
     },
     "indent": {
-      "count": 13
+      "count": 11
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
     },
     "no-confusing-arrow": {
-      "count": 5
+      "count": 4
     },
     "no-continue": {
       "count": 1
@@ -881,7 +881,7 @@
       "count": 1
     },
     "prefer-template": {
-      "count": 6
+      "count": 4
     },
     "quotes": {
       "count": 1
@@ -892,20 +892,14 @@
     "react/button-has-type": {
       "count": 6
     },
-    "react/jsx-closing-tag-location": {
-      "count": 1
-    },
     "react/jsx-first-prop-new-line": {
-      "count": 3
-    },
-    "react/jsx-indent": {
-      "count": 3
+      "count": 2
     },
     "react/jsx-max-props-per-line": {
-      "count": 7
+      "count": 4
     },
     "react/jsx-no-bind": {
-      "count": 5
+      "count": 4
     }
   },
   "src/components/CredentialForms.tsx": {

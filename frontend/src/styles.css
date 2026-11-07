@@ -816,7 +816,30 @@ input[type=hidden] {
 .topology-summary > p { flex-basis: 100%; margin: 0; }
 .topology-summary h3 { margin-top: 0; }
 .topology-summary button { white-space: normal; }
+.dashboard-device-grid {
+  --dashboard-grid-minimum:264px;
+  @apply tw:m-0 tw:grid tw:list-none tw:items-start tw:gap-3 tw:p-0 tw:max-[600px]:gap-2;
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--dashboard-grid-minimum)),1fr));
+}
+.dashboard-device-grid[data-positioned] { grid-auto-rows:minmax(64px,auto); }
 .dashboard-device-grid > .device-card { @apply tw:w-full tw:min-w-0 tw:max-w-[420px] tw:justify-self-center; }
+.dashboard-layout-toolbar { @apply tw:my-2 tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
+.dashboard-layout-toolbar button { @apply tw:inline-flex tw:min-h-11 tw:items-center tw:gap-1.5; }
+.dashboard-layout-toolbar .help, .dashboard-layout-toolbar .field-error { @apply tw:m-0 tw:basis-full; }
+.dashboard-layout-target { @apply tw:relative tw:z-10 tw:w-full tw:max-w-[420px] tw:self-stretch tw:justify-self-center; }
+.dashboard-layout-target-button {
+  @apply tw:flex tw:h-full tw:min-h-16 tw:w-full tw:items-center tw:justify-center tw:rounded-xl tw:border tw:border-dashed tw:border-(--border-strong) tw:bg-transparent tw:p-0 tw:text-(--text);
+}
+.dashboard-layout-target-button[data-occupied] {
+  @apply tw:cursor-grab tw:items-start tw:justify-end tw:p-1;
+}
+.dashboard-layout-target-button .ui-icon {
+  @apply tw:box-content tw:size-5 tw:rounded-md tw:bg-(--surface) tw:p-1;
+}
+.dashboard-layout-target-button[data-selected],
+.dashboard-layout-target-button:focus-visible {
+  @apply tw:border-solid tw:border-(--accent) tw:outline-2 tw:outline-(--accent) tw:-outline-offset-2;
+}
 .ui-icon { width:1em; height:1em; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; }
 .ui-icon:is([data-icon="settings"], [data-icon="clock"], [data-icon="edit"]) { stroke-width:1.7; }
 .ui-icon:is([data-icon="add"], [data-icon="clock"], [data-icon="refresh-list"], [data-icon="search"]),
@@ -1485,14 +1508,20 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-device[data-card-layout="climate"] [data-reading="temp_current"] { @apply tw:order-first; }
 
 .dashboard-view[data-card-size="small"] .dashboard-device-grid {
-  @apply tw:grid-cols-[repeat(auto-fill,minmax(min(100%,132px),1fr))] tw:gap-2;
+  --dashboard-grid-minimum:132px;
+  @apply tw:gap-2;
 }
+.dashboard-view[data-card-size="small"] .dashboard-layout-target { @apply tw:max-w-[210px]; }
 .dashboard-view[data-card-size="small"] .dashboard-device-grid > .device-card {
   --dashboard-card-inset:5px;
   @apply tw:max-w-[210px] tw:py-1.5;
 }
 @media (max-width:600px) {
-  .dashboard-view[data-card-size] .dashboard-device-grid { @apply tw:grid-cols-2; }
+  .dashboard-view[data-card-size] .dashboard-device-grid {
+    --dashboard-grid-forced-columns:2;
+    @apply tw:grid-cols-2;
+  }
+  .dashboard-view[data-card-size="small"] .dashboard-layout-target { @apply tw:max-w-none; }
   .dashboard-view[data-card-size="small"] .dashboard-device-grid > .device-card { @apply tw:max-w-none; }
 }
 @media (max-width:540px) {

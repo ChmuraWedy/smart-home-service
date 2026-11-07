@@ -36,6 +36,8 @@ The menu opens Devices, Network and packets, Local connections, and Connections.
 
 Cards expose the main power switches or sensor readings. Bulbs have immediate power controls; full cards add brightness, temperature, color, effects, and schedules where supported. Multi-channel switches expose each real channel. Sensors show compact values and icons; details provide labels, units, timestamps, battery, and activity logs. Clicking a card opens details; child buttons retain their own actions.
 
+Choose **Edit layout** above the grid to drag a card or tap it and select a destination. Choosing an occupied spot swaps the cards. **Save** keeps empty spots and stores the layout on the server for this browser, room and building selection, page, and number of columns. **Cancel** discards the draft. Search results use their own temporary order.
+
 Each card has a stable `device-<encoded Tuya ID>` HTML ID. Device links preserve the chosen control method on reload. Missing devices and unavailable control methods display an error. Closing a device panel returns to the dashboard context, and browser navigation is blocked during a running command.
 
 ### Frontend URLs

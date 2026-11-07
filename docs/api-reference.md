@@ -96,6 +96,12 @@ curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json' \
 
 The batch endpoint validates conflicting values for the same DP before sending. Hardware may require separate writes even when a combined packet is valid. Read-only definitions cannot be written. Raw `set_dps` is a low-level interface for known device commands, not a guarantee of support for every vendor format.
 
+## Dashboard layouts
+
+`GET` and `PUT /api/v1/dashboard-layouts/{browser_id}` use the usual service authentication. The browser keeps a random 32-character hexadecimal identifier. SQLite stores the layout separately for each identifier and combination of `building`, `room`, `columns`, and `page`.
+
+Read or replace the layout as `{"slots":[null,"device-physical-id","group-2"]}`. Slots are ordered row by row, with `null` for empty cells. An unconfigured view returns `{"slots":[]}`.
+
 ## Smart Life topology
 
 **Sync Smart Life** reads homes and each device's room through Sharing. Homes become buildings; rooms and device placement are matched by Tuya IDs. Cloud cards can use this placement before local registration.

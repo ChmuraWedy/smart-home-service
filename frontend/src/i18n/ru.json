@@ -1035,5 +1035,14 @@
   "GLOBAL_ANNOUNCEMENT_RECEPTION_IS_DISABLED_IN_THE_SERVICE": "Общий приём объявлений отключён в настройках сервиса.",
   "TUYA_RECEPTION_RUNS_CONTINUOUSLY": "Общий приём Tuya работает постоянно. Новое наблюдение использует уже полученные объявления выбранной сети и добавляет mDNS, SSDP и таблицу соседей. Остановка наблюдения не выключает общий приёмник.",
   "CACHED_TUYA_ANNOUNCEMENT": "Сохранённое объявление Tuya",
-  "RECENT_IP_CHANGES": "Последние изменения IP"
+  "RECENT_IP_CHANGES": "Последние изменения IP",
+  "EDIT_DASHBOARD_LAYOUT": "Изменить раскладку",
+  "RETRY_DASHBOARD_LAYOUT": "Повторить загрузку раскладки",
+  "DASHBOARD_LAYOUT_INSTRUCTIONS": "Перетащите карточку или выберите её, а затем место. Выбор другой карточки поменяет их местами.",
+  "DASHBOARD_LAYOUT_LOAD_FAILED": "Не удалось загрузить сохранённую раскладку.",
+  "DASHBOARD_LAYOUT_SAVE_FAILED": "Не удалось сохранить раскладку. Ваши изменения остались в редакторе.",
+  "LAYOUT_CELL": "Строка {0}, столбец {1}",
+  "LAYOUT_MOVE_HERE": "Переместить сюда ({0})",
+  "LAYOUT_MOVE_CARD": "Переместить {0} ({1})",
+  "LAYOUT_SWAP_WITH": "Поменять местами с {0} ({1})"
 }

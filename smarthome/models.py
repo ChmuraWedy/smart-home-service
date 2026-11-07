@@ -12,6 +12,13 @@ class Base(DeclarativeBase):
     pass
 
 
+class DashboardLayout(Base):
+    __tablename__ = "dashboard_layouts"
+    browser_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    view: Mapped[str] = mapped_column(String(64), primary_key=True)
+    slots: Mapped[list[str | None]] = mapped_column(JSON)
+
+
 class CloudChannelLabel(Base):
     __tablename__ = "cloud_channel_labels"
     scope: Mapped[str] = mapped_column(String(64), primary_key=True)
