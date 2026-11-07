@@ -1,8 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import { ApiError, CloudApi } from './api';
 import type { NetworkObservation } from './api';
 import { DeviceNetwork } from './components/DeviceNetwork';
+import DeviceInformation from './components/DeviceInformation';
+import type { LocalDevice } from './home-api';
+import { setLocale } from './i18n';
 
 const observation:NetworkObservation={
   device_id:'child',target_id:'gateway',route:'gateway',configured_ip:'192.168.1.10',observed_ip:'192.168.1.20',version:'3.5',
@@ -45,4 +48,35 @@ it('explains unknown gateways and handles authentication failures without creati
   expand(false);expand();
   await waitFor(()=>expect(auth).toHaveBeenCalledOnce());
   expect(read).toHaveBeenCalledTimes(2);
+});
+
+it('combines device identity, routes, and saved and observed gateway addresses', async () => {
+  setLocale('en', false);
+  const api = new CloudApi({ baseUrl: 'http://api.test', token: 'fixture-key' });
+  const read = vi.spyOn(api, 'deviceNetworkObservation').mockResolvedValue(observation);
+  const local: LocalDevice = { id: 2, device_id: 'child', name: 'Hall light', aliases: [],
+    building_id: null, room_id: null, transport: 'zigbee', parent_id: 1, cid: 'node-17', enabled: true, capabilities: {} };
+  const gateway: LocalDevice = { ...local, id: 1, device_id: 'gateway', name: 'Hall bridge', transport: 'wifi',
+    parent_id: null, cid: null, ip: '192.168.1.10', mac: '00:11:22:33:44:55', version: '3.5' };
+  const cloud = { id: 'child', name: 'Cloud light', online: true, sub: true, has_local_key: true, product_id: 'product-1' };
+  render(<DeviceInformation api={api} deviceId="child" displayName={local.name} route="sharing"
+    routes={['sharing', 'local']} local={local} cloud={cloud} gateway={gateway} onAuthError={vi.fn()} />);
+  const details = screen.getByText('Device properties').closest('details')!;
+  expect(read).not.toHaveBeenCalled();
+  details.open = true;
+  fireEvent(details, new Event('toggle'));
+  const facts = within(details);
+  const entry = (label: string) => facts.getByText(label, { selector: 'dt' }).nextElementSibling;
+  expect(entry('Name')).toHaveTextContent('Hall light');
+  expect(entry('Tuya name')).toHaveTextContent('Cloud light');
+  expect(entry('Device ID')).toHaveTextContent('child');
+  expect(entry('Gateway')).toHaveTextContent('Hall bridge');
+  expect(entry('Gateway device ID')).toHaveTextContent('gateway');
+  expect(entry('Configured gateway IP')).toHaveTextContent('192.168.1.10');
+  expect(entry('Gateway MAC address')).toHaveTextContent('00:11:22:33:44:55');
+  expect(entry('MAC address')).toHaveTextContent('Not set');
+  expect(entry('Available control routes')).toHaveTextContent('Smart Life');
+  expect(entry('Available control routes')).toHaveTextContent('home network');
+  await facts.findByText('192.168.1.20');
+  expect(entry('Observed gateway IP')).toHaveTextContent('192.168.1.20');
 });

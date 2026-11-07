@@ -1,4 +1,6 @@
 import { MSG, t } from "../i18n";
+import type { CloudDevice } from '../api';
+import type { DeviceRoute } from '../devices';
 import { useCallback, useState } from 'react';
 import { displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import { HomeApi } from '../home-api';
@@ -9,15 +11,18 @@ import { cacheDeviceMetadata, localMetadataKey, nextDeviceMetadataRevision } fro
 import { localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
-import { DeviceNetwork } from './DeviceNetwork';
+import DeviceInformation from './DeviceInformation';
 import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import { BatteryBadge, batteryFromSpecs, isBattery } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 
-export function LocalControl({ api, device, onClose, onAuthError, closeLabel, room, onSetup }: {
-  api: HomeApi; device: LocalDevice; onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
+export function LocalControl({
+  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup,
+}: {
+  api: HomeApi; device: LocalDevice; gateway?: LocalDevice; cloudDevice?: CloudDevice; routes?: DeviceRoute[];
+  onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
   const dispatch = useAppDispatch();
@@ -83,7 +88,17 @@ export function LocalControl({ api, device, onClose, onAuthError, closeLabel, ro
       </div>
 )}
       {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
-      <DeviceNetwork api={api} deviceId={item.device_id} provider="local" onAuthError={onAuthError} />
+      <DeviceInformation
+        api={api}
+        deviceId={item.device_id}
+        displayName={name}
+        route="local"
+        routes={routes ?? ['local']}
+        local={item}
+        cloud={cloudDevice}
+        gateway={gateway}
+        onAuthError={onAuthError}
+      />
       <ControlFeedback busy={session.busy} notice={session.notice} />
     </ControlDialog>
   );

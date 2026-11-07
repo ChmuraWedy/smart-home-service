@@ -40,8 +40,22 @@ const LIGHT_COMMAND_HELP: Record<string, string> = localizeMessages({
   music_data: MSG.COMMANDS_THAT_CHANGE_THE_LIGHT_IN_TIME_WITH,
   control_data: MSG.COMMAND_FOR_AN_IMMEDIATE_OR_SMOOTH_LIGHTING_CHANGE,
 });
-const OPTIONS: Record<string, string> = localizeMessages({ white: MSG.WHITE_LIGHT, colour: MSG.COLOR_LIGHT, scene: MSG.SCENE, music: MSG.MUSIC,
-  auto: MSG.AUTO, manual: MSG.MANUAL, open: MSG.OPEN, close: MSG.CLOSE, stop: MSG.STOP_LABEL, low: MSG.LOW, medium: MSG.MEDIUM, high: MSG.HIGH, dock: MSG.RETURN_TO_DOCK });
+const OPTIONS: Record<string, string> = localizeMessages({
+  white: MSG.WHITE_LIGHT,
+  colour: MSG.COLOR_LIGHT,
+  color: MSG.COLOR_LIGHT,
+  scene: MSG.SCENE,
+  music: MSG.MUSIC,
+  auto: MSG.AUTO,
+  manual: MSG.MANUAL,
+  open: MSG.OPEN,
+  close: MSG.CLOSE,
+  stop: MSG.STOP_LABEL,
+  low: MSG.LOW,
+  medium: MSG.MEDIUM,
+  high: MSG.HIGH,
+  dock: MSG.RETURN_TO_DOCK,
+});
 export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? t(MSG.CHANNEL, [key.slice(7)]) : /^countdown_[1-9][0-9]*$/.test(key) ? t(MSG.CHANNEL_TIMER, [key.slice(10)]) : /^relay_status_[1-9][0-9]*$/.test(key) ? t(MSG.CHANNEL_POWER_ON_STATE, [key.slice(13)]) : key.replaceAll('_', ' '));
 const RELAY_OPTIONS: Record<string, string> = localizeMessages({ power_off: MSG.OFF, off: MSG.OFF, power_on: MSG.ON, on: MSG.ON, last: MSG.RESTORE_PREVIOUS_STATE, memory: MSG.RESTORE_PREVIOUS_STATE });
 export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key ? CAMERA_OPTIONS[key]?.[value] : undefined) || (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? t(MSG.YES) : t(MSG.NO)) : JSON.stringify(value);
@@ -248,9 +262,14 @@ export function cloudCommands(spec: ControlSpec, value: JsonValue, definitions: 
   }
   const commands = [{ code: spec.key, value: raw }];
   const mode = definitions.functions.find(fn => fn.code === 'work_mode' && fn.type === 'Enum');
-  const wanted = spec.kind === 'color' ? 'colour' : spec.key === 'music_data' ? 'music' : spec.key === 'scene_data_v2' ? 'scene' : ['bright_value', 'bright_value_v2', 'temp_value', 'temp_value_v2'].includes(spec.key) ? 'white' : undefined;
   const modes = mode ? limitsOf(mode.values).range : undefined;
-  if (wanted && Array.isArray(modes) && modes.includes(wanted)) commands.unshift({ code: 'work_mode', value: wanted });
+  if (!Array.isArray(modes)) return commands;
+  let wanted;
+  if (spec.kind === 'color') wanted = modes.includes('colour') ? 'colour' : 'color';
+  else if (spec.key === 'music_data') wanted = 'music';
+  else if (/^scene_data(?:_v2)?$/.test(spec.key)) wanted = 'scene';
+  else if (/^(?:bright|temp)_value(?:_v2)?$/.test(spec.key)) wanted = 'white';
+  if (wanted && modes.includes(wanted)) commands.unshift({ code: 'work_mode', value: wanted });
   return commands;
 }
 

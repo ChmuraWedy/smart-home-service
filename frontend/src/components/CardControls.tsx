@@ -22,6 +22,8 @@ import { CameraCardControls } from './CameraCardControls';
 import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
 import { IconGlyph } from './ui/icon';
+import QuickLightSettings from './QuickLightSettings';
+import { hasLightEffectWizard } from './LightEffectWizard';
 
 const CARD_CACHE_INTERVAL = 4000;
 
@@ -73,7 +75,7 @@ function LightCardReading({ code, label, value, tint, off }: { code: 'brightness
 export type CardStatus = {online:boolean;battery?:BatteryReading};
 
 type QuickSheet = DashboardSheetState & {
-  onLightFeatures?: (hasSliders: boolean, hasPresets: boolean) => void;
+  onLightFeatures?: (hasQuickSettings: boolean, hasPresets: boolean) => void;
 };
 
 type CardProps = { api: HomeApi; device: UnifiedDevice; route: DeviceRoute; now: number; paused: boolean; onAuthError: () => void; onBusy: (busy: boolean) => void; onStatus?:(status:CardStatus)=>void; sheet?: QuickSheet };
@@ -144,16 +146,18 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
   const sliders = [brightness, temperature].filter((spec): spec is ControlSpec =>
     spec?.kind === 'number' && spec.readable && spec.writable && spec.minimum !== undefined &&
     spec.maximum !== undefined && spec.minimum < spec.maximum);
-  const hasSliders = sliders.length > 0;
+  const modeSpec = specs.find(spec => spec.key === 'work_mode' || spec.key === 'mode');
+  const scene = powerLayout === 'single' ? specs.find(spec => spec.writable && /^scene_data(?:_v2)?$/.test(spec.key) && hasLightEffectWizard(spec)) : undefined;
+  const hasQuickSettings = sliders.length > 0 || Boolean(color?.writable || scene);
   const currentReading = (spec: ControlSpec | undefined) => {
     const value = spec && reading(spec);
     return isStale(value, now, local) ? undefined : value;
   };
-  const mode = currentReading(specs.find(spec => spec.key === 'work_mode' || spec.key === 'mode'))?.value;
+  const mode = currentReading(modeSpec)?.value;
   const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
   const hasSummary = Boolean(brightness || temperature || colorMode);
   const onLightFeatures = sheet?.onLightFeatures;
-  useEffect(() => { onLightFeatures?.(hasSliders, hasSummary); }, [hasSliders, hasSummary, onLightFeatures]);
+  useEffect(() => { onLightFeatures?.(hasQuickSettings, hasSummary); }, [hasQuickSettings, hasSummary, onLightFeatures]);
   const whiteMode = mode === 'white' || mode === undefined;
   const { h, s, v } = limitsOf(colorMode ? currentReading(color)?.value : undefined);
   const hsv = typeof h === 'number' && h >= 0 && h <= 360 && typeof s === 'number' && s >= 0 && s <= 1000 &&
@@ -167,7 +171,7 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
       <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === false ? t(MSG.OFF) : power ? brightnessText : undefined} />
       {colorMode
         ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
-        : temperature && (
+        : whiteMode && temperature && (
         <LightCardReading code="color_temperature" label={temperature.label}
           value={power && temperatureReading ? displayReading(temperature, temperatureReading) : undefined}
           tint={power ? temperatureTint(temperature, temperatureReading?.value) : undefined}
@@ -215,15 +219,21 @@ function StandardCardControls({ name, pendingScope, paused, sheet, specs, readin
         </button>
       </div>
       {powerLayout && sensorValues}
-      {hasSliders && sheet?.open && !paused && (
+      {hasQuickSettings && sheet?.open && !paused && (
       <DashboardSheet title={name} onClose={sheet.close} returnFocus={sheet.trigger}>
         <div className="dashboard-sheet-power">{field(powers[0],undefined,false)}</div>
-        {sliders.map(spec => (
-          <CapabilityField pendingScope={pendingScope} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local}
-            immediatePower quickRange={spec === brightness ? 'brightness' : 'temperature'} disabled={disabled}
-            onSend={value => toggle(spec,value)}
-          />
-))}
+        <QuickLightSettings
+          mode={modeSpec}
+          white={sliders}
+          color={color?.writable ? color : undefined}
+          scene={scene}
+          scope={pendingScope}
+          reading={reading}
+          now={now}
+          local={local}
+          disabled={disabled}
+          send={toggle}
+        />
         {notice.error && <ControlFeedback busy={false} notice={notice} />}
       </DashboardSheet>
 )}

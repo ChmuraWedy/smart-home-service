@@ -119,6 +119,58 @@ describe('main controls on device cards', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it('opens the reported scene, edits it, and switches between color and white controls', async () => {
+    const functions = [...definitions.functions,
+      { code: 'work_mode', type: 'Enum', values: { range: ['white', 'colour', 'scene', 'music'] } },
+      { code: 'temp_value_v2', type: 'Integer', values: { min: 0, max: 1000, scale: 0, step: 1 } },
+      { code: 'scene_data_v2', type: 'Json', values: { scene_num: { min: 1, max: 8, scale: 0, step: 1 } } },
+    ];
+    const writes: { commands: { code: string; value: unknown }[] }[] = [];
+    const status = { ...snapshot.status, switch_led: true, work_mode: 'scene', temp_value_v2: 500, scene_data_v2: { scene_num: 5 } };
+    let latest = { ...snapshot, status };
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method === 'POST') {
+        const body = JSON.parse(String(init.body));
+        writes.push(body);
+        const mode = body.commands.find((command: { code: string }) => command.code === 'work_mode');
+        if (mode) latest = { ...latest, status: { ...latest.status, work_mode: mode.value } };
+        return json({ acknowledged: true });
+      }
+      return json(latest);
+    });
+    mount({ ...lamp, controls: { ready: true, definitions: { ...definitions, functions }, snapshot: latest } },
+      'sharing', { open: true, close: vi.fn(), trigger: { current: null } });
+    const sheet = within(await screen.findByRole('dialog', { name: 'Лампа' }));
+    const user = userEvent.setup();
+    expect(sheet.getByRole('button', { name: 'Сцена' })).toHaveAttribute('aria-pressed', 'true');
+    expect(sheet.queryByRole('slider', { name: 'Цветовая температура' })).toBeNull();
+    expect(sheet.queryByRole('button', { name: 'Музыка' })).toBeNull();
+    await user.click(sheet.getByRole('button', { name: 'Настроить' }));
+    fireEvent.change(screen.getByLabelText('scene_data_v2.scene_num'), { target: { value: '6' } });
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    expect(writes).toEqual([]);
+    await user.click(screen.getByRole('button', { name: 'Готово' }));
+    await waitFor(() => expect(writes).toEqual([{ commands: [{ code: 'scene_data_v2', value: { scene_num: 6 } }] }]));
+    const colorMode = sheet.getByRole('button', { name: 'Цветной свет' });
+    await waitFor(() => expect(colorMode).toBeEnabled());
+    await user.click(colorMode);
+    const picker = await sheet.findByLabelText('Выбор цвета');
+    expect(picker).toHaveValue('#ff0000');
+    fireEvent.change(picker, { target: { value: '#00ff00' } });
+    await waitFor(() => expect(writes[2]).toEqual({ commands: [{ code: 'colour_data_v2', value: { h: 120, s: 1000, v: 1000 } }] }));
+    expect(sheet.queryByRole('slider', { name: 'Цветовая температура' })).toBeNull();
+    const whiteMode = sheet.getByRole('button', { name: 'Белый свет' });
+    await waitFor(() => expect(whiteMode).toBeEnabled());
+    await user.click(whiteMode);
+    expect(await sheet.findByRole('slider', { name: 'Цветовая температура' })).toHaveValue('50');
+    expect(sheet.queryByLabelText('Выбор цвета')).toBeNull();
+    expect(writes.slice(1)).toEqual([
+      { commands: [{ code: 'work_mode', value: 'colour' }] },
+      { commands: [{ code: 'colour_data_v2', value: { h: 120, s: 1000, v: 1000 } }] },
+      { commands: [{ code: 'work_mode', value: 'white' }] },
+    ]);
+  });
+
   it('shows two bulb readings, switching from white temperature to the reported active color', async () => {
     const functions = [...definitions.functions,
       { code: 'work_mode', type: 'Enum', values: { range: ['white', 'colour', 'scene'] } },

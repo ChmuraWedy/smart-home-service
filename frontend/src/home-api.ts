@@ -15,6 +15,8 @@ export type LocalDevice = {
   room_id: number | null; transport: 'wifi' | 'zigbee'; parent_id: number | null; cid: string | null;
   enabled: boolean; capabilities: Record<string, Capability>;
   is_gateway?: boolean; ip?: string | null; version?: string | null; has_local_key?: boolean;
+  mac?: string | null; 'product_id'?: string | null; category?: string | null;
+  description?: string | null; 'last_seen_at'?: string | null;
 };
 export type Building = { id: number; name: string; aliases: string[] };
 export type Room = { id: number; building_id: number; name: string; aliases: string[] };

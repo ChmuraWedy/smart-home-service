@@ -2,19 +2,21 @@ import { MSG, dateLocale, t } from "../i18n";
 import { useCallback, useMemo, useState } from 'react';
 import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, JsonValue, Provider } from '../api';
+import type { DeviceRoute } from '../devices';
+import type { LocalDevice } from '../home-api';
 import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { DeviceMappings } from './DeviceMappings';
 import { ChannelAliases } from './ChannelAliases';
-import { DeviceNetwork } from './DeviceNetwork';
+import DeviceInformation from './DeviceInformation';
 import { useAutomaticControls } from '../control-drafts';
 import { cloudPendingScope } from '../pending-device-values';
 import { usePendingPrivacyState } from '../use-pending-device-value';
 import { DeviceAliases } from './DeviceAliases';
 import { BatteryBadge, batteryFromSpecs, isBattery, isCamera } from './DevicePresentation';
 import { DeviceActivity } from './DeviceActivity';
-import { connectionLabel, DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
+import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 import { hasLightEffectWizard } from './LightEffectWizard';
 import { hasScheduleWizard } from './ScheduleWizard';
 import { ChannelControl, channelTimer } from './ChannelControl';
@@ -30,9 +32,14 @@ import { cloudAccountScope } from '../cloud-account-scope';
 import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, nextDeviceMetadataRevision } from '../device-metadata';
 import { useAppDispatch, useAppSelector } from '../store';
 
-export function CloudControl({ api, device, provider, devices, room, localTransport, localDeviceId, onClose, onAuthError }: {
-  api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; localTransport?: 'wifi' | 'zigbee'; localDeviceId?: number; onClose: () => void; onAuthError: () => void;
+export function CloudControl({
+  api, device, provider, devices, room, displayName, localDevice, gateway, routes, onClose, onAuthError,
+}: {
+  api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; displayName?: string;
+  localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; onClose: () => void; onAuthError: () => void;
 }) {
+  const name = displayName || device.name || t(MSG.TUYA_DEVICE);
+  const localTransport = localDevice?.transport;
   const [mappingBusy,setMappingBusy] = useState(false);
   const [aliasBusy, setAliasBusy] = useState(false);
   const [labelBusy, setLabelBusy] = useState(false);
@@ -131,8 +138,8 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
   return (
     <ControlDialog onRefresh={session.refresh}
       information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
-      statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={device.name || t(MSG.TUYA_DEVICE)} busy={session.busy || editingBusy} onClose={onClose}
-      titleContent={<DeviceAliases api={api} deviceId={device.id} name={device.name} initialAliases={device.aliases} provider={provider} localId={localDeviceId} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
+      statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={name} busy={session.busy || editingBusy} onClose={onClose}
+      titleContent={<DeviceAliases api={api} deviceId={device.id} name={name} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
       connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
     >
       {camera && (
@@ -180,32 +187,18 @@ export function CloudControl({ api, device, provider, devices, room, localTransp
 )}
       {data && !specs.length && <p className="empty-state">{t(MSG.THE_DEVICE_PROVIDED_NO_READINGS_OR_CONTROLS)}</p>}
       {!primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} onAuthError={onAuthError} />}
-      <DeviceNetwork api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} />
-      {data && (
-      <details className="cloud-properties">
-        <summary>{t(MSG.DEVICE_PROPERTIES)}</summary>
-        <dl>
-          <div>
-            <dt>{t(MSG.DEVICE_ID)}</dt>
-            <dd>
-              <code>{device.id}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>{t(MSG.TYPE)}</dt>
-            <dd>{isCamera(device.category) ? t(MSG.CAMERA) : device.category === 'pir' ? t(MSG.MOTION_SENSOR) : device.category === 'dj' ? t(MSG.LIGHT_BULB) : device.category || t(MSG.NOT_SPECIFIED)}</dd>
-          </div>
-          <div>
-            <dt>{t(MSG.CONNECTION)}</dt>
-            <dd>{connectionLabel({route:provider,throughGateway:device.sub,localTransport})}</dd>
-          </div>
-          <div>
-            <dt>{t(MSG.CONTROL)}</dt>
-            <dd>{data.definitions.functions.length ? t(MSG.VIA_TUYA) : t(MSG.READINGS_ONLY)}</dd>
-          </div>
-        </dl>
-      </details>
-)}
+      <DeviceInformation
+        api={api}
+        deviceId={device.id}
+        displayName={name}
+        route={provider}
+        routes={routes ?? [provider]}
+        local={localDevice}
+        cloud={device}
+        gateway={gateway}
+        writable={data ? specs.some((spec) => spec.writable) : undefined}
+        onAuthError={onAuthError}
+      />
       {data && (
       <details className="cloud-properties">
         <summary>{t(MSG.TECHNICAL_DATA_FOR_DEVICE_MAPPINGS)}</summary>

@@ -203,6 +203,7 @@
 .cloud-properties dl>div { display:flex; flex-wrap:wrap; gap:6px 16px; padding:4px 0; }
 .cloud-properties dt { color:var(--muted); min-width:120px; }
 .cloud-properties dd { margin:0; }
+.device-information dd { min-width:0; overflow-wrap:anywhere; }
 .stale-tag { display:inline-block; font-size:10px; border:1px solid var(--warning-border); border-radius:5px; padding:1px 5px; margin-left:7px; color:var(--warning-text); }
 .capability label { font-size:12px; }
 .power-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
@@ -1649,6 +1650,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-sheet-power .capability-heading { @apply tw:hidden; }
 .dashboard-sheet-power .capability-boolean > .capability-row > .power-actions { @apply tw:col-start-1 tw:row-start-1; }
 .dashboard-sheet-power .dashboard-power-state { @apply tw:col-start-2 tw:row-start-1; }
+.dashboard-sheet-modes { @apply tw:my-2 tw:flex tw:flex-wrap tw:gap-2; }
+.dashboard-sheet-modes button[aria-pressed="true"] { @apply tw:border-(--accent) tw:bg-(--success-bg) tw:text-(--text-strong); }
 .dashboard-sheet-range {
   @apply tw:my-3 tw:grid tw:grid-cols-[1fr_auto] tw:items-center tw:gap-x-3 tw:text-sm tw:font-medium;
 }
