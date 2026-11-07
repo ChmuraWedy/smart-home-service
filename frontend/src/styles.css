@@ -830,14 +830,21 @@ input[type=hidden] {
 .dashboard-layout-target-button {
   @apply tw:flex tw:h-full tw:min-h-16 tw:w-full tw:items-center tw:justify-center tw:rounded-xl tw:border tw:border-dashed tw:border-(--border-strong) tw:bg-transparent tw:p-0 tw:text-(--text);
 }
+.dashboard-layout-target-button:hover:enabled {
+  @apply tw:bg-(--surface-soft);
+}
 .dashboard-layout-target-button[data-occupied] {
   @apply tw:cursor-grab tw:items-start tw:justify-end tw:border-transparent tw:p-1 tw:select-none;
+}
+.dashboard-layout-target-button[data-occupied]:hover:enabled {
+  @apply tw:bg-transparent;
 }
 .dashboard-layout-target-button .ui-icon {
   @apply tw:pointer-events-none tw:box-content tw:size-5 tw:rounded-md tw:bg-(--surface) tw:p-1;
 }
+.dashboard-layout-target-button[data-occupied]:hover:enabled .ui-icon,
 .dashboard-layout-target-button[data-selected] .ui-icon {
-  @apply tw:bg-(--text-strong) tw:text-(--surface);
+  @apply tw:bg-(--accent) tw:text-(--on-accent);
 }
 .dashboard-layout-target-button[data-drop-over]:not([data-occupied]) {
   @apply tw:border-(--text) tw:bg-(--surface-soft);
@@ -855,6 +862,12 @@ input[type=hidden] {
 }
 .dashboard-layout-target-button:focus-visible {
   @apply tw:outline-2 tw:outline-(--text) tw:-outline-offset-2;
+}
+.dashboard-layout-target-button[data-occupied]:focus-visible {
+  @apply tw:outline-none;
+}
+.dashboard-layout-target-button[data-occupied]:focus-visible .ui-icon {
+  @apply tw:outline-2 tw:outline-(--text) tw:outline-offset-2;
 }
 .dashboard-device-grid > [data-layout-slot] {
   transition:transform 120ms ease-out;
