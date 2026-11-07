@@ -11,6 +11,15 @@ type PointerDrag = {
   source: HTMLElement;
   active: boolean;
 };
+type ScrollPointer = { grid: HTMLDivElement; x: number; y: number };
+
+function edgeScrollDelta(y: number) {
+  const edge = Math.min(120, window.innerHeight / 4);
+  const bottom = window.innerHeight - edge;
+  if (y < edge) return -Math.ceil(16 * ((edge - y) / edge));
+  if (y > bottom) return Math.ceil(16 * ((y - bottom) / edge));
+  return 0;
+}
 
 function dropTarget(grid: HTMLDivElement, x: number, y: number): DropTarget | undefined {
   const target = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-layout-target]');
@@ -22,11 +31,18 @@ function dropTarget(grid: HTMLDivElement, x: number, y: number): DropTarget | un
 export default function useDashboardDrag(scope: string | undefined, onDrop: (from: number, target: DropTarget) => void) {
   const layer = useRef<HTMLUListElement>(null);
   const gesture = useRef<PointerDrag | undefined>(undefined);
+  const edgePointer = useRef<ScrollPointer | undefined>(undefined);
+  const scrollFrame = useRef<number | undefined>(undefined);
   const suppressClick = useRef(false);
   const [over, setOver] = useState<DropTarget>();
 
   function cancel() {
     gesture.current = undefined;
+    edgePointer.current = undefined;
+    if (scrollFrame.current !== undefined) {
+      window.cancelAnimationFrame(scrollFrame.current);
+      scrollFrame.current = undefined;
+    }
     layer.current?.replaceChildren();
     setOver(undefined);
   }
@@ -36,6 +52,11 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
     suppressClick.current = false;
     layer.current?.replaceChildren();
     setOver(undefined);
+    return () => {
+      if (scrollFrame.current !== undefined) window.cancelAnimationFrame(scrollFrame.current);
+      scrollFrame.current = undefined;
+      edgePointer.current = undefined;
+    };
   }, [scope]);
 
   function begin(event: PointerEvent<HTMLDivElement>) {
@@ -52,6 +73,26 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
       pointer, slot, x, y, source, bounds: source.getBoundingClientRect(), active: false,
     };
     handle.setPointerCapture(pointer);
+  }
+
+  function showTarget({ grid, x, y }: ScrollPointer, sourceSlot: number) {
+    const target = dropTarget(grid, x, y);
+    const next = target?.slot !== sourceSlot ? target : undefined;
+    setOver((previous) => (previous?.slot === next?.slot && previous?.nudge === next?.nudge ? previous : next));
+  }
+
+  function scrollAtEdge() {
+    scrollFrame.current = undefined;
+    const pointer = edgePointer.current;
+    const drag = gesture.current;
+    if (!pointer || !drag?.active) return;
+    const delta = edgeScrollDelta(pointer.y);
+    if (!delta) return;
+    const previous = window.scrollY;
+    window.scrollBy({ top: delta, behavior: 'instant' });
+    if (window.scrollY === previous) return;
+    showTarget(pointer, drag.slot);
+    scrollFrame.current = window.requestAnimationFrame(scrollAtEdge);
   }
 
   function move(event: PointerEvent<HTMLDivElement>) {
@@ -73,9 +114,12 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
     }
     event.preventDefault();
     preview.style.transform = `translate(${drag.bounds.left + dx}px, ${drag.bounds.top + dy}px)`;
-    const target = dropTarget(event.currentTarget, event.clientX, event.clientY);
-    const next = target?.slot !== drag.slot ? target : undefined;
-    setOver((previous) => (previous?.slot === next?.slot && previous?.nudge === next?.nudge ? previous : next));
+    const pointer = { grid: event.currentTarget, x: event.clientX, y: event.clientY };
+    showTarget(pointer, drag.slot);
+    edgePointer.current = pointer;
+    if (scrollFrame.current === undefined && edgeScrollDelta(pointer.y)) {
+      scrollFrame.current = window.requestAnimationFrame(scrollAtEdge);
+    }
   }
 
   function finish(event: PointerEvent<HTMLDivElement>) {

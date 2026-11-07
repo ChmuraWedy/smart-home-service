@@ -139,7 +139,6 @@ export default function DashboardGrid<T>({
   const slots = placeCards(items.map(({ id }) => id), draft?.slots ?? current?.slots ?? []);
   const cards = new Map(items.map((item) => [item.id, item]));
   const showEditor = Boolean(viewKey && (draft || (editable && items.length)));
-  const targets = draft ? Math.min(MAX_LAYOUT_SLOTS, (Math.ceil(slots.length / activeColumns) + 1) * activeColumns) : 0;
 
   const drag = useDashboardDrag(scope, (from, target) => {
     setDraft({ columns: activeColumns, slots: moveCard(slots, from, target.slot, activeColumns, target.nudge === 'up') });
@@ -199,7 +198,8 @@ export default function DashboardGrid<T>({
   }
 
   function renderColumn(column: number) {
-    const count = Math.max(0, Math.ceil(((draft ? targets : slots.length) - column) / activeColumns));
+    const limit = draft ? MAX_LAYOUT_SLOTS : slots.length;
+    const count = Math.max(0, Math.ceil((limit - column) / activeColumns));
     const columnSlots = Array.from({ length: count }, (_, row) => slots[row * activeColumns + column] ?? null);
     const visibleSlots = draft ? columnSlots : trimSlots(columnSlots);
     return (
@@ -239,7 +239,7 @@ export default function DashboardGrid<T>({
   return (
     <>
       {showEditor && (
-        <div className="dashboard-layout-toolbar">
+        <div className="dashboard-layout-toolbar" data-editing={Boolean(draft) || undefined}>
           <button
             type="button"
             className="secondary compact"

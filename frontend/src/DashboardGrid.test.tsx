@@ -70,20 +70,24 @@ describe('dashboard layout', () => {
     click('Edit layout');
     expect(screen.getByTestId('device-a')).toHaveAttribute('inert');
     click('Move Card 1 (Row 1, column 1)');
-    click('Move here (Row 2, column 3)');
-    cardAt('device-a', 2, 3);
+    click('Move here (Row 32, column 3)');
+    cardAt('device-a', 32, 3);
     click('Move Card 2 (Row 1, column 2)');
     click('Insert before Card 3 (Row 1, column 3)');
     cardAt('group-1', 1, 3);
     click('Save');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
     expect(screen.getByTestId('device-a')).not.toHaveAttribute('inert');
-    expect([...stored.values()]).toEqual([{ slots: [null, null, 'group-1', null, null, 'device-b', null, null, 'device-a'] }]);
+    const expected: LayoutSlots = Array(MAX_LAYOUT_SLOTS).fill(null);
+    expected[2] = 'group-1';
+    expected[5] = 'device-b';
+    expected[MAX_LAYOUT_SLOTS - 1] = 'device-a';
+    expect([...stored.values()]).toEqual([{ slots: expected }]);
     expect([...stored.keys()][0]).toMatch(/\/dashboard-layouts\/[0-9a-f]{32}\?building=all&room=3&page=1&columns=3$/);
 
     first.unmount();
     const reloaded = mount();
-    await waitFor(() => cardAt('device-a', 3, 3));
+    await waitFor(() => cardAt('device-a', 32, 3));
     cardAt('group-1', 1, 3);
     reloaded.unmount();
     mount('4');

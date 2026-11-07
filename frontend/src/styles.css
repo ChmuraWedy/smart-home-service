@@ -834,6 +834,7 @@ input[type=hidden] {
 .dashboard-layout-target { @apply tw:w-full tw:min-w-0 tw:max-w-[420px] tw:justify-self-center; }
 .dashboard-layout-gap { @apply tw:min-h-16; }
 .dashboard-layout-toolbar { @apply tw:my-2 tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
+.dashboard-layout-toolbar[data-editing] { @apply tw:sticky tw:top-0 tw:z-20 tw:bg-(--page-bg) tw:py-2; }
 .dashboard-layout-toolbar button { @apply tw:inline-flex tw:min-h-11 tw:items-center tw:gap-1.5; }
 .dashboard-layout-toolbar .help, .dashboard-layout-toolbar .field-error { @apply tw:m-0 tw:basis-full; }
 .dashboard-layout-target { @apply tw:relative tw:z-10; }
@@ -1331,6 +1332,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view .app-menu-button,
 .dashboard-view .dashboard-search-button { @apply tw:border-transparent tw:bg-transparent; }
 .dashboard-view .control-center { @apply tw:border-0 tw:bg-transparent tw:p-0; }
+.dashboard-view .control-center:has(.dashboard-layout-toolbar[data-editing]) { @apply tw:overflow-visible; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .control-center > .card-heading > :first-child { @apply tw:sr-only; }
 .dashboard-view:not([data-dashboard-panel="tools"]) :is(.dashboard-actions, .dashboard-intro) { @apply tw:hidden; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .topology-summary:not(:has([role="status"], [role="alert"])),
