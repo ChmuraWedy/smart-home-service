@@ -12,7 +12,7 @@ type PointerDrag = {
   active: boolean;
 };
 
-function dropTarget(grid: HTMLUListElement, x: number, y: number): DropTarget | undefined {
+function dropTarget(grid: HTMLDivElement, x: number, y: number): DropTarget | undefined {
   const target = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-layout-target]');
   if (!target || !grid.contains(target)) return undefined;
   const { top, height } = target.getBoundingClientRect();
@@ -38,7 +38,7 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
     setOver(undefined);
   }, [scope]);
 
-  function begin(event: PointerEvent<HTMLUListElement>) {
+  function begin(event: PointerEvent<HTMLDivElement>) {
     suppressClick.current = false;
     if (event.button !== 0 || event.pointerType === 'touch' || gesture.current) return;
     if (!(event.target instanceof Element)) return;
@@ -54,7 +54,7 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
     handle.setPointerCapture(pointer);
   }
 
-  function move(event: PointerEvent<HTMLUListElement>) {
+  function move(event: PointerEvent<HTMLDivElement>) {
     const drag = gesture.current;
     const preview = layer.current;
     if (!drag || drag.pointer !== event.pointerId || !preview) return;
@@ -78,7 +78,7 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
     setOver((previous) => (previous?.slot === next?.slot && previous?.nudge === next?.nudge ? previous : next));
   }
 
-  function finish(event: PointerEvent<HTMLUListElement>) {
+  function finish(event: PointerEvent<HTMLDivElement>) {
     const drag = gesture.current;
     if (!drag || drag.pointer !== event.pointerId) return;
     const target = drag.active ? dropTarget(event.currentTarget, event.clientX, event.clientY) : undefined;
@@ -86,7 +86,7 @@ export default function useDashboardDrag(scope: string | undefined, onDrop: (fro
     if (target) onDrop(drag.slot, target);
   }
 
-  function ignoreDragClick(event: MouseEvent<HTMLUListElement>) {
+  function ignoreDragClick(event: MouseEvent<HTMLDivElement>) {
     if (!suppressClick.current || !event.detail) return;
     event.stopPropagation();
     suppressClick.current = false;

@@ -3,7 +3,7 @@ import {
 } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
-  dashboardBrowserId, ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards,
+  dashboardBrowserId, ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards, trimSlots,
 } from '../dashboard-layout';
 import type { LayoutSlots } from '../dashboard-layout';
 import type { HomeApi } from '../home-api';
@@ -20,12 +20,8 @@ type GridItem<T> = { id: string; cardName: string; entry: T };
 type SavedLayout = { api: HomeApi; view: string; slots?: LayoutSlots; error?: boolean };
 type LayoutDraft = { columns: number; slots: LayoutSlots; selected?: number };
 
-function slotPosition(slot: number, columns: number): CSSProperties {
-  return { gridColumnStart: (slot % columns) + 1, gridRowStart: Math.floor(slot / columns) + 1 };
-}
-
 function useGridColumns(density: string) {
-  const grid = useRef<HTMLUListElement>(null);
+  const grid = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(1);
 
   useLayoutEffect(() => {
@@ -56,10 +52,11 @@ function useGridColumns(density: string) {
 }
 
 function LayoutTarget({
-  slot, columns, cardName, selected, moving, disabled, over, onSelect,
+  slot, row, column, cardName, selected, moving, disabled, over, onSelect,
 }: {
   slot: number;
-  columns: number;
+  row: number;
+  column: number;
   cardName?: string;
   selected: boolean;
   moving: boolean;
@@ -67,13 +64,16 @@ function LayoutTarget({
   over?: DropTarget['nudge'];
   onSelect: (slot: number) => void;
 }) {
-  const position = slotPosition(slot, columns);
-  const cell = t(MSG.LAYOUT_CELL, [position.gridRowStart, position.gridColumnStart]);
+  const cell = t(MSG.LAYOUT_CELL, [row, column]);
   let label = t(MSG.LAYOUT_MOVE_HERE, [cell]);
   if (cardName) label = moving && !selected ? t(MSG.LAYOUT_INSERT_BEFORE, [cardName, cell]) : t(MSG.LAYOUT_MOVE_CARD, [cardName, cell]);
 
   return (
-    <li className="dashboard-layout-target" style={position}>
+    <li
+      className="dashboard-layout-target"
+      style={{ gridColumnStart: 1, gridRowStart: row }}
+      data-occupied={Boolean(cardName) || undefined}
+    >
       <button
         type="button"
         className="dashboard-layout-target-button"
@@ -136,7 +136,6 @@ export default function DashboardGrid<T>({
   }, [api, browserId, readAttempt, viewKey]);
 
   const current = saved?.api === api && saved.view === viewKey ? saved : undefined;
-  const hasSavedSlots = Boolean(current?.slots?.length);
   const slots = placeCards(items.map(({ id }) => id), draft?.slots ?? current?.slots ?? []);
   const cards = new Map(items.map((item) => [item.id, item]));
   const showEditor = Boolean(viewKey && (draft || (editable && items.length)));
@@ -162,6 +161,52 @@ export default function DashboardGrid<T>({
     const { selected } = draft;
     if (selected === undefined) setDraft({ ...draft, selected: slot });
     else setDraft({ columns: activeColumns, slots: moveCard(slots, selected, slot, activeColumns) });
+  }
+
+  function renderSlot(id: string | null, column: number, index: number) {
+    const slot = index * activeColumns + column;
+    const row = index + 1;
+    const item = id ? cards.get(id) : undefined;
+    const style = { gridColumnStart: 1, gridRowStart: row };
+    const content = [];
+    if (item) {
+      content.push(renderCard(item.entry, {
+        style,
+        inert: Boolean(draft) || undefined,
+        slot: draft ? slot : undefined,
+        nudge: dropPreview?.slot === slot ? dropPreview.nudge : undefined,
+      }));
+    }
+    if (draft) {
+      content.push(
+        <LayoutTarget
+          key={`slot-${slot}`}
+          slot={slot}
+          row={row}
+          column={column + 1}
+          cardName={item?.cardName}
+          selected={draft.selected === slot}
+          moving={draft.selected !== undefined}
+          disabled={saving}
+          over={dropPreview?.slot === slot ? dropPreview.nudge : undefined}
+          onSelect={(target) => selectSlot(target)}
+        />,
+      );
+    } else if (!item) {
+      content.push(<li key={`empty-${slot}`} className="dashboard-layout-gap" aria-hidden="true" style={style} />);
+    }
+    return content;
+  }
+
+  function renderColumn(column: number) {
+    const count = Math.max(0, Math.ceil(((draft ? targets : slots.length) - column) / activeColumns));
+    const columnSlots = Array.from({ length: count }, (_, row) => slots[row * activeColumns + column] ?? null);
+    const visibleSlots = draft ? columnSlots : trimSlots(columnSlots);
+    return (
+      <ul key={column} className="dashboard-device-column" data-dashboard-column={column + 1}>
+        {visibleSlots.flatMap((id, row) => renderSlot(id, column, row))}
+      </ul>
+    );
   }
 
   async function saveLayout() {
@@ -214,7 +259,7 @@ export default function DashboardGrid<T>({
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
         </div>
       )}
-      <ul
+      <div
         className="dashboard-device-grid"
         ref={grid}
         onPointerDown={(event) => drag.begin(event)}
@@ -223,37 +268,10 @@ export default function DashboardGrid<T>({
         onPointerCancel={() => drag.cancel()}
         onLostPointerCapture={() => drag.cancel()}
         onClickCapture={(event) => drag.ignoreDragClick(event)}
-        data-positioned={Boolean(draft || hasSavedSlots) || undefined}
-        style={draft || hasSavedSlots ? { gridTemplateColumns: `repeat(${activeColumns}, minmax(0, 1fr))` } : undefined}
+        style={{ gridTemplateColumns: `repeat(${activeColumns}, minmax(0, 1fr))` }}
       >
-        {slots.map((id, index) => {
-          const item = id ? cards.get(id) : undefined;
-          if (!item) return null;
-          const style = draft || hasSavedSlots ? slotPosition(index, activeColumns) : undefined;
-          return renderCard(item.entry, {
-            style,
-            inert: Boolean(draft) || undefined,
-            slot: draft ? index : undefined,
-            nudge: dropPreview?.slot === index ? dropPreview.nudge : undefined,
-          });
-        })}
-        {Array.from({ length: targets }, (_, slot) => {
-          const id = slots[slot];
-          return (
-            <LayoutTarget
-              key={`slot-${slot}`}
-              slot={slot}
-              columns={activeColumns}
-              cardName={id ? cards.get(id)?.cardName : undefined}
-              selected={draft?.selected === slot}
-              moving={draft?.selected !== undefined}
-              disabled={saving}
-              over={dropPreview?.slot === slot ? dropPreview.nudge : undefined}
-              onSelect={(target) => selectSlot(target)}
-            />
-          );
-        })}
-      </ul>
+        {Array.from({ length: activeColumns }, (_, column) => renderColumn(column))}
+      </div>
       <ul className="dashboard-layout-drag-layer" ref={drag.layer} aria-hidden="true" inert />
     </>
   );

@@ -34,7 +34,7 @@ function click(name: string) {
 function cardAt(id: string, row: number, column: number) {
   const card = screen.getByTestId(id);
   expect(card.style.gridRowStart).toBe(String(row));
-  expect(card.style.gridColumnStart).toBe(String(column));
+  expect(card.closest('[data-dashboard-column]')).toHaveAttribute('data-dashboard-column', String(column));
 }
 
 beforeEach(() => {
@@ -88,7 +88,7 @@ describe('dashboard layout', () => {
     reloaded.unmount();
     mount('4');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
-    expect(screen.getByTestId('device-a').style.gridColumnStart).toBe('');
+    cardAt('device-a', 1, 1);
   });
 
   it('keeps the draft on save failure and discards it on cancel', async () => {
@@ -102,7 +102,7 @@ describe('dashboard layout', () => {
     cardAt('device-a', 2, 1);
     click('Cancel');
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByTestId('device-a').style.gridRowStart).toBe('');
+    cardAt('device-a', 1, 1);
     expect(screen.getByTestId('device-a')).not.toHaveAttribute('inert');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
