@@ -8,7 +8,7 @@ ADD --chmod=0644 --checksum=sha256:d8f7c76ed2a5e0822be39f0a4f95a55eb19c78f4593ce
 ADD --chmod=0644 ${MODEL}/config.json /models/config.json
 ADD --chmod=0644 ${MODEL}/shared_vocabulary.json /models/shared_vocabulary.json
 ADD --chmod=0644 https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz /models/lid.176.ftz
-COPY server.py .
+COPY --chmod=0644 server.py .
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 CT2_USE_MKL=0
 USER 1000:1000
 CMD ["python", "/app/server.py"]
