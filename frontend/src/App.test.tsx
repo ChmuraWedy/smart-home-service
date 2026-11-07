@@ -99,7 +99,7 @@ describe('cloud UI journeys', () => {
     expect(backend.calls.filter(call => call.path === '/api/v1/cloud/status')).toEqual([{ path: '/api/v1/cloud/status', method: 'GET', body: undefined, token: TOKEN }]);
     expect(backend.calls.every(call => call.method === 'GET')).toBe(true);
     expect(screen.queryByLabelText('User Code')).not.toBeInTheDocument();
-    expect(document.querySelector('#access-token')).toHaveAttribute('type', 'hidden');
+    expect(document.querySelector('#access-token')).toBeNull();
     await user.click(within(screen.getByRole('region', { name: 'Подключение Tuya' })).getByRole('link', { name: 'Хочу изменить' }));
     expect(screen.getByLabelText('User Code')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Отменить изменение' }));
@@ -262,14 +262,14 @@ describe('cloud UI journeys', () => {
     fakeApi(); render(<App />);
     await screen.findByRole('alert');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).token).toBe('');
-    expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Получить QR-код' })).toBeNull();
   });
 
   it('starts without credentials and never sends a request before access is entered', () => {
     fakeApi(); render(<App />);
     expect(screen.getByLabelText('Адрес API')).toHaveValue(DEFAULT_API_BASE);
     expect(fetch).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Получить QR-код' })).toBeNull();
   });
 });
 

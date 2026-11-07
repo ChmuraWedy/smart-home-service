@@ -177,6 +177,45 @@ def test_migration_removes_only_manual_cloud_mapping_storage(tmp_path):
     engine.dispose()
 
 
+def test_household_cloud_permissions_block_camera_and_advanced_commands(cloud_client):
+    login(cloud_client)
+    issued = cloud_client.post("/api/v1/accounts", json={"name": "Alex"}).json()
+    member = {"X-API-Key": issued["access_key"]}
+    bridge = cloud_client.app.state.cloud
+    lamp = bridge.device("gateway")
+    lamp.category = "dj"
+    lamp.function["work_mode"] = SimpleNamespace(
+        code="work_mode", type="Enum", values='{"range":["white","colour","scene","music"]}',
+    )
+    lamp.function["power_memory"] = SimpleNamespace(code="power_memory", type="Raw", values='{"maxlen":12}')
+    camera = bridge.device("child")
+    camera.category = "sp"
+    camera.function["sd_format"] = SimpleNamespace(code="sd_format", type="Boolean", values="{}")
+    camera.function["switch"] = SimpleNamespace(code="switch", type="Boolean", values="{}")
+
+    cards = cloud_client.get(API + "/devices", headers=member).json()
+    assert [card["id"] for card in cards] == ["gateway"]
+    functions = cards[0]["controls"]["definitions"]["functions"]
+    assert [spec["code"] for spec in functions] == ["switch", "work_mode"]
+    assert json.loads(functions[1]["values"])["range"] == ["white", "colour", "scene"]
+    camera_path = API + "/devices/child"
+    for path in ("/status", "/functions"):
+        assert cloud_client.get(camera_path + path, headers=member).status_code == 403
+    for code in ("switch", "sd_format"):
+        assert cloud_client.post(camera_path + "/commands", headers=member, json={
+            "commands": [{"code": code, "value": True}],
+        }).status_code == 403
+    lamp_path = API + "/devices/gateway/commands"
+    for extra in ({"code": "power_memory", "value": "AAAA"}, {"code": "work_mode", "value": "music"}):
+        assert cloud_client.post(lamp_path, headers=member, json={
+            "commands": [{"code": "switch", "value": True}, extra],
+        }).status_code == 403
+    assert not bridge.manager.customer_api.calls
+    response = cloud_client.post(lamp_path, headers=member, json={"commands": [{"code": "switch", "value": True}]})
+    assert response.status_code == 200, response.text
+    assert len(bridge.manager.customer_api.calls) == 1
+
+
 def test_channel_names_persist_without_commands_and_are_scoped(cloud_client):
     login(cloud_client)
     bridge = cloud_client.app.state.cloud

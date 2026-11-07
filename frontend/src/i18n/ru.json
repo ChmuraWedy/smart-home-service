@@ -1141,5 +1141,19 @@
   "ROOM_BACKGROUND_UPLOAD_LIMIT": "Размер загружаемого фона превышает 1 МиБ",
   "ROOM_CARD_OPACITY": "Непрозрачность фона карточек",
   "ROOM_OPACITY_HINT": "При меньшем значении фон комнаты виден лучше.",
-  "ROOM_VIEW_DASHBOARD": "Открыть панель комнаты"
+  "ROOM_VIEW_DASHBOARD": "Открыть панель комнаты",
+  "HOUSEHOLD_ACCESS": "Доступ для домочадцев",
+  "HOUSEHOLD_ACCESS_HELP": "Домочадцы управляют общими устройствами и сохраняют собственную раскладку.",
+  "HOUSEHOLD_MEMBER_NAME": "Имя домочадца",
+  "CREATE_HOUSEHOLD_ACCESS": "Создать ключ доступа",
+  "HOUSEHOLD_NEW_KEY": "Ключ доступа для {0}",
+  "HOUSEHOLD_NEW_KEY_HELP": "Скопируйте ключ и передайте его лично. Он показывается только один раз.",
+  "REVOKE_HOUSEHOLD_ACCESS": "Отозвать доступ для {0}",
+  "REVOKE_HOUSEHOLD_CONFIRM": "Отозвать доступ для {0} и удалить сохранённые раскладки?",
+  "SIGNED_IN_AS": "Вы вошли как {0}",
+  "SIGN_OUT": "Выйти",
+  "ACCOUNT_SIGN_IN": "Войти в Smart Home",
+  "ACCOUNT_SIGN_IN_HELP": "Введите ключ доступа, который выдал владелец дома.",
+  "HOUSEHOLD_OWNER_REQUIRED": "Для этого действия нужна учётная запись владельца",
+  "HOUSEHOLD_OWNER": "Владелец"
 }

@@ -138,3 +138,23 @@ def test_adds_room_appearance_to_a_version_three_database_without_changing_rooms
         connection.exec_driver_sql("DELETE FROM rooms WHERE id = 1")
         assert connection.exec_driver_sql("SELECT room_id FROM room_appearances").fetchall() == []
     engine.dispose()
+
+
+def test_upgrades_existing_home_to_household_accounts_without_losing_layouts():
+    engine = db.make_engine(":memory:")
+    db.init_db(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version = 8")
+        connection.exec_driver_sql("DROP TABLE account_dashboard_layouts")
+        connection.exec_driver_sql("DROP TABLE household_members")
+        connection.exec_driver_sql(
+            "INSERT INTO dashboard_layouts (browser_id, view, slots, hidden_devices) VALUES (?, ?, ?, ?)",
+            ("b" * 32, "all/all/3/1", '["device-light"]', '["device-light"]'),
+        )
+    db.init_db(engine)
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM household_members").scalar_one() == 0
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM account_dashboard_layouts").scalar_one() == 0
+        assert connection.exec_driver_sql("SELECT hidden_devices FROM dashboard_layouts").scalar_one() == '["device-light"]'
+    engine.dispose()

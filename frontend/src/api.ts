@@ -10,7 +10,11 @@ export type DeveloperStatus = {
   region?: Region;
   device_count?: number;
 };
+export type HouseholdMember = { id: string; 'name': string };
+export type AccountIdentity = HouseholdMember & { role: 'owner' | 'member' };
+export type IssuedMember = HouseholdMember & { 'access_key': string };
 export type CloudStatus = {
+  account?: AccountIdentity;
   enabled: boolean;
   connected: boolean;
   has_saved_user_code: boolean;
@@ -97,9 +101,11 @@ export function normalizeApiBase(input: string): string {
 
 export class CloudApi {
   readonly baseUrl: string;
-  constructor(private readonly connection: Connection) {
+  constructor(private readonly connection: Connection, readonly account?: AccountIdentity) {
     this.baseUrl = normalizeApiBase(connection.baseUrl);
   }
+
+  get isMember() { return this.account?.role === 'member'; }
 
   private url(path: string): string {
     if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {

@@ -74,7 +74,7 @@ export function LocalControl({
     >
       {roomEditor}
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
-      {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
+      {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
       <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>
         {session.data && state && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => (
           <CapabilityField pendingScope={pendingScope} key={key} spec={localSpec(key, cap)} stage={cap.type === 'boolean' ? undefined : drafts.stage} immediatePower reading={state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !state.enabled} onSend={value => session.execute(async () => {
@@ -95,7 +95,8 @@ export function LocalControl({
     )}
       </div>
 )}
-      {!primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
+      {!api.isMember && !primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} onAuthError={onAuthError} />}
+      {!api.isMember && (
       <DeviceTranslationEditor
         api={api}
         deviceId={item.device_id}
@@ -105,6 +106,8 @@ export function LocalControl({
         localId={item.id}
         onAuthError={onAuthError}
       />
+      )}
+      {!api.isMember && (
       <DeviceInformation
         api={api}
         deviceId={item.device_id}
@@ -116,6 +119,7 @@ export function LocalControl({
         gateway={gateway}
         onAuthError={onAuthError}
       />
+      )}
       <ControlFeedback busy={session.busy} notice={session.notice} />
     </ControlDialog>
   );

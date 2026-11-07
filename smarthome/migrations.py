@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 from sqlalchemy.engine import Connection
 
-from .models import CloudRoomOverride, RoomAppearance
+from .models import AccountDashboardLayout, CloudRoomOverride, HouseholdMember, RoomAppearance
 
 
 def add_combined_power_visibility(connection: Connection) -> None:
@@ -54,6 +54,16 @@ def add_generated_room_names(connection: Connection) -> None:
         connection.exec_driver_sql("ALTER TABLE rooms ADD COLUMN generated_name_translations JSON NOT NULL DEFAULT '{}'")
 
 
+def add_household_accounts(connection: Connection) -> None:
+    HouseholdMember.__table__.create(connection, checkfirst=True)
+    AccountDashboardLayout.__table__.create(connection, checkfirst=True)
+    columns = {column[1] for column in connection.exec_driver_sql("PRAGMA table_info(account_dashboard_layouts)")}
+    if "hidden_devices" not in columns:
+        connection.exec_driver_sql(
+            "ALTER TABLE account_dashboard_layouts ADD COLUMN hidden_devices JSON NOT NULL DEFAULT '[]'"
+        )
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
@@ -64,4 +74,5 @@ MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     remove_manual_cloud_mappings,
     add_room_name_translations,
     add_generated_room_names,
+    add_household_accounts,
 )

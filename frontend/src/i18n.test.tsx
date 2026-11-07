@@ -33,7 +33,7 @@ describe('Interface localization', () => {
     fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'unsaved-draft'}});
     fireEvent.click(screen.getByRole('button',{name:'Меню'}));
     fireEvent.change(screen.getByLabelText('Язык'),{target:{value:'en'}});
-    expect(screen.getByRole('heading',{name:'Connect Tuya'})).toBeInTheDocument();
+    expect(screen.getByRole('heading',{name:'Sign in to Smart Home'})).toBeInTheDocument();
     expect(screen.getByLabelText('API address')).toHaveValue('http://another-api.test:8080');
     expect(screen.getByLabelText('Service access key')).toHaveValue('unsaved-draft');
     expect(document.documentElement.lang).toBe('en');
@@ -41,7 +41,7 @@ describe('Interface localization', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText('Language'),{target:{value:'ru'}});
-    expect(screen.getByRole('heading',{name:'Подключить Tuya'})).toBeInTheDocument();
+    expect(screen.getByRole('heading',{name:'Войти в Smart Home'})).toBeInTheDocument();
     expect(screen.getByLabelText('Ключ доступа к сервису')).toHaveValue('unsaved-draft');
     expect(document.documentElement.lang).toBe('ru');
   });
@@ -105,7 +105,7 @@ describe('Interface localization', () => {
   it('updates another open tab from the saved language preference', () => {
     render(<App/>);
     act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:'en'})));
-    expect(screen.getByRole('heading',{name:'Connect Tuya'})).toBeInTheDocument();
+    expect(screen.getByRole('heading',{name:'Sign in to Smart Home'})).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -147,10 +147,10 @@ describe('Interface localization', () => {
   });
 
   it.each([
-    {locale:'pl', language:'Polish', heading:'Połącz Tuya', address:'Adres API', key:'Klucz dostępu do usługi',
+    {locale:'pl', language:'Polish', heading:'Zaloguj się do Smart Home', address:'Adres API', key:'Klucz dostępu do usługi',
       channel:'Kanał 2', timer:'Timer kanału 2', privacy:'Tryb prywatności', on:'Włączone', temperature:'Temperatura',
       error:'Wybrana sieć nie jest już dostępna. Odśwież listę sieci.', date:'pl-PL'},
-    {locale:'be', language:'Belarusian', heading:'Падключыць Tuya', address:'Адрас API', key:'Ключ доступу да сэрвісу',
+    {locale:'be', language:'Belarusian', heading:'Увайсці ў Smart Home', address:'Адрас API', key:'Ключ доступу да сэрвісу',
       channel:'Канал 2', timer:'Таймер канала 2', privacy:'Рэжым прыватнасці', on:'Уключана', temperature:'Тэмпература',
       error:'Выбраная сетка больш недаступная. Абнавіце спіс сетак.', date:'be-BY'},
   ] as const)('supports $language preferences, dates, controls and service errors', async (language) => {

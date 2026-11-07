@@ -1,13 +1,24 @@
-import { MSG, t, useLocale, translateText } from "./i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import type { ReactNode } from 'react';
 import { Provider as StoreProvider } from 'react-redux';
-import { createBrowserRouter, createHashRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext } from 'react-router';
+import {
+  createBrowserRouter, createHashRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext,
+} from 'react-router';
 import type { RouteObject } from 'react-router';
+import {
+  MSG, t, useLocale, translateText,
+} from './i18n';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
-import type { CloudStatus, Connection, DeveloperCredentials, Provider } from './api';
-import { loadConnection, saveConnection } from './connection';
+import type {
+  CloudStatus, Connection, DeveloperCredentials, Provider,
+} from './api';
+import {
+  clearConnection, loadConnection, saveConnection, STORAGE_KEY,
+} from './connection';
 import { ConnectionSettings } from './components/ConnectionSettings';
+import HouseholdAccess from './components/HouseholdAccess';
 import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -30,6 +41,7 @@ type Notice = { text: string; error?: boolean };
 type QR = { session: string; imageUrl: string; expiresAt: number };
 type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
+type ViewContext = { pages: Record<View, ReactNode>; view: View };
 const demo = import.meta.env.MODE === 'demo';
 const CARD_SIZE_STORAGE_KEY = 'smart-home.ui.card-size.v1';
 
@@ -39,21 +51,28 @@ function savedCardSize(): CardSize {
 }
 
 function App() {
-  const [store] = useState(createAppStore);
+  const [store, setStore] = useState(createAppStore);
+  const resetSessionStore = useCallback(() => setStore(createAppStore()), []);
   return (
     <StoreProvider store={store}>
-      <AppContent />
+      <AppContent resetSessionStore={resetSessionStore} />
     </StoreProvider>
   );
 }
 
 function screenRoute(path: string, view: View, id = path): RouteObject {
-  return { id, ...(path === '/' ? { index: true } : { path }), handle: view, element: <AppScreen view={view} /> };
+  return {
+    id, ...(path === '/' ? { index: true } : { path }), handle: view, element: <AppScreen />,
+  };
 }
 
-function AppScreen({ view }: { view: View }) {
-  const { pages, needsAccess } = useOutletContext<{ pages: Record<View, ReactNode>; needsAccess: boolean }>();
-  return pages[needsAccess ? 'connections' : view];
+function ownerPage(view: View) {
+  return view === 'network' || view === 'local-connections' || view === 'rooms' || view === 'combined-devices';
+}
+
+function AppScreen() {
+  const { pages, view } = useOutletContext<ViewContext>();
+  return pages[view];
 }
 
 export function createAppRouter() {
@@ -85,7 +104,7 @@ export function createAppRouter() {
   ] }]);
 }
 
-function AppContent() {
+function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const locale = useLocale();
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
   const [connection, setConnection] = useState<Connection>(() => (demo ? { baseUrl: 'https://smart-home-demo.invalid', token: 'demo' } : loadConnection()));
@@ -95,16 +114,24 @@ function AppContent() {
   const query = new URLSearchParams(location.search);
   const requestedView = matched.handle as View;
   const needsAccess = !connection.token && requestedView !== 'settings' && requestedView !== 'connections';
-  const view = needsAccess ? 'connections' : requestedView;
   const panelParam = query.get('panel');
   const dashboardPanel: DashboardPanel = matched.id === dashboardToolsPath || panelParam === 'tools' ? 'tools' : panelParam === 'search' ? 'search' : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [cardSize, setCardSize] = useState(savedCardSize);
-  const menuRef = useRef<HTMLDivElement>(null), menuButton = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null); const
+    menuButton = useRef<HTMLButtonElement>(null);
   const [localConnectionLocked, setLocalConnectionLocked] = useState(false);
   const dashboardLocked = useAppSelector(selectDashboardLocked);
   const controlLocked = dashboardLocked || localConnectionLocked;
   const [status, setStatus] = useState<CloudStatus | null>(null);
+  const [sessionRevision, setSessionRevision] = useState(0);
+  const currentConnection = useRef(connection);
+  const member = status?.account?.role === 'member';
+  const owner = status?.account?.role === 'owner';
+  const showIntegration = Boolean(status && !member);
+  let view = requestedView;
+  if (needsAccess) view = 'connections';
+  else if (member && ownerPage(requestedView)) view = 'control';
   const provider: Provider = query.get('provider') === 'developer' ? 'developer' : 'sharing';
   const [notice, setNotice] = useState<Notice>({ text: '' });
   const [busy, setBusy] = useState(Boolean(connection.token));
@@ -114,7 +141,8 @@ function AppContent() {
   const [editingDeveloper, setEditingDeveloper] = useState(false);
   const [qr, setQR] = useState<QR | null>(null);
   const [remaining, setRemaining] = useState(0);
-  const api = useMemo(() => new HomeApi(connection), [connection]);
+  const api = useMemo(() => new HomeApi(connection, status?.account), [connection, status?.account]);
+  const verificationApi = useMemo(() => new CloudApi(connection), [connection]);
   const locked = busy || controlLocked;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
@@ -134,37 +162,68 @@ function AppContent() {
     if (needsAccess) {
       const returnTo = legacy ?? (matched.id === '*' ? '/' : location.pathname + location.search);
       void navigate(appPaths.connections, { replace: true, state: returnTo === '/' ? null : { returnTo } });
+    } else if (member && ownerPage(requestedView)) {
+      navigate(appPaths.control, { replace: true });
     } else if (legacy || matched.id === '*') {
       void navigate(legacy ?? appPaths.control, { replace: true });
     }
-  }, [location, matched.id, needsAccess, navigate]);
+  }, [location, matched.id, member, needsAccess, navigate, requestedView]);
+
+  const installSession = useCallback((next: Connection, nextStatus: CloudStatus | null) => {
+    currentConnection.current = next;
+    verified.current = next;
+    setConnection(next);
+    setStatus(nextStatus);
+    setQR(null);
+    setEditingCode(false);
+    setEditingDeveloper(false);
+    setLocalConnectionLocked(false);
+    setSessionRevision((revision) => revision + 1);
+    busyRef.current = false;
+    setBusy(false);
+    resetSessionStore();
+  }, [resetSessionStore]);
 
   const invalidateConnection = useCallback(() => {
+    if (currentConnection.current !== connection) return;
     const next = { ...connection, token: '' };
-    try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
-    verified.current = next;
-    setConnection(next); setStatus(null); setQR(null);
-    setLocalConnectionLocked(false);
-  }, [connection]);
+    try { clearConnection(next.baseUrl); } catch { /* Still invalidate the in-memory token. */ }
+    installSession(next, null);
+  }, [connection, installSession]);
+
+  useEffect(() => {
+    if (demo) return undefined;
+    function onStorage(event: StorageEvent) {
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
+      const { current } = currentConnection;
+      const saved = loadConnection();
+      if (current.token && (current.baseUrl !== saved.baseUrl || current.token !== saved.token)) {
+        installSession({ ...current, token: '' }, null);
+        setNotice({ text: '' });
+      }
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [installSession]);
 
   useEffect(() => {
     if (!connection.token || verified.current === connection) return;
     const controller = new AbortController();
     let active = true;
     busyRef.current = true; setBusy(true);
-    void api.status(controller.signal).then(value => {
-      if (active) {
+    void verificationApi.status(controller.signal).then((value) => {
+      if (active && currentConnection.current === connection) {
         setStatus(value); verified.current = connection; setNotice({ text: '' });
         busyRef.current = false; setBusy(false);
       }
-    }).catch(error => {
-      if (!active) return;
+    }).catch((error) => {
+      if (!active || currentConnection.current !== connection) return;
       busyRef.current = false; setBusy(false);
       setNotice({ text: error instanceof Error ? error.message : t(MSG.COULD_NOT_CONNECT), error: true });
       if (error instanceof ApiError && error.status === 401) invalidateConnection();
     });
     return () => { active = false; controller.abort(); };
-  }, [api, connection, invalidateConnection]);
+  }, [verificationApi, connection, invalidateConnection]);
 
   useEffect(() => {
     if (!qr) return;
@@ -181,11 +240,16 @@ function AppContent() {
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
     if (busyRef.current || controlLocked) return;
     busyRef.current = true; setBusy(true); setNotice({ text: '' });
-    try { await work(); }
-    catch (error) {
+    try { await work(); } catch (error) {
+      if (currentConnection.current !== connection) return;
       if (invalidateOn401 && error instanceof ApiError && error.status === 401) invalidateConnection();
       setNotice({ text: error instanceof Error ? error.message : t(MSG.COULD_NOT_COMPLETE_THE_ACTION), error: true });
-    } finally { busyRef.current = false; setBusy(false); }
+    } finally {
+      if (currentConnection.current === connection) {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    }
   }
 
   const saveAccess = (address: string, candidate: string) => run(async () => {
@@ -196,19 +260,20 @@ function AppContent() {
     if (!token) throw new Error(t(MSG.ENTER_THE_ACCESS_KEY_FOR_THIS_API));
     const next = { baseUrl, token };
     const nextStatus = await new CloudApi(next).status();
+    if (currentConnection.current !== connection) return;
     saveConnection(next);
-    verified.current = next;
-    setConnection(next); setStatus(nextStatus); setQR(null);
-    setEditingCode(false); setEditingDeveloper(false);
+    installSession(next, nextStatus);
     setNotice({ text: t(MSG.CONNECTION_SAVED_NOTICE) });
     if (location.state?.returnTo) void navigate(location.state.returnTo, { replace: true });
+    else if (nextStatus.account?.role === 'member') navigate(appPaths.control, { replace: true });
   });
 
   const saveCode = (code: string) => run(async () => {
     if (!code.trim()) throw new Error(t(MSG.ENTER_YOUR_USER_CODE));
     const saved = await api.saveCode(code.trim());
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'sharing');
-    setStatus(current => current ? { ...current, ...saved } : null);
+    setStatus((current) => (current ? { ...current, ...saved } : null));
     setEditingCode(false); setQR(null);
     setNotice({ text: saved.saved_user_code_requires_login ? t(MSG.USER_CODE_SAVED) : t(MSG.USER_CODE_SAVED_ON_THE_SERVER) });
   }, true);
@@ -216,23 +281,27 @@ function AppContent() {
   const saveDeveloper = (credentials: DeveloperCredentials) => run(async () => {
     if (!credentials.access_id || !credentials.access_secret) throw new Error(t(MSG.ENTER_YOUR_ACCESS_ID_AND_ACCESS_SECRET));
     const saved = await api.saveDeveloper(credentials);
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'developer');
-    setStatus(current => current ? { ...current, developer: saved } : null);
+    setStatus((current) => (current ? { ...current, developer: saved } : null));
     setEditingDeveloper(false);
     setNotice({ text: t(MSG.CREDENTIALS_SAVED_ON_THE_SERVER) });
   }, true);
 
   const connectDeveloper = () => run(async () => {
     const saved = await api.connectDeveloper();
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'developer');
-    setStatus(current => current ? { ...current, developer: saved } : null);
+    setStatus((current) => (current ? { ...current, developer: saved } : null));
     setNotice({ text: t(MSG.TUYA_DEVELOPER_CONNECTED_DEVICE_COUNT, [saved.device_count ?? 0]) });
   }, true);
 
   const beginQR = () => run(async () => {
     setQR(null);
     const login = await api.beginQR();
+    if (currentConnection.current !== connection) return;
     const image = await api.qrImage(login);
+    if (currentConnection.current !== connection) return;
     const seconds = Number.isFinite(login.expires_in) ? Math.min(120, Math.max(1, login.expires_in)) : 120;
     setQR({ session: login.session_id, imageUrl: URL.createObjectURL(image), expiresAt: Date.now() + seconds * 1000 });
     setNotice({ text: t(MSG.SCAN_THE_CODE_IN_SMART_LIFE_TUYA_SMART) });
@@ -241,8 +310,12 @@ function AppContent() {
   const confirmQR = () => run(async () => {
     if (!qr) return;
     await api.confirmQR(qr.session);
+    if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'sharing');
-    setQR(null); setStatus(await api.status());
+    const nextStatus = await api.status();
+    if (currentConnection.current !== connection) return;
+    setQR(null);
+    setStatus(nextStatus);
     setNotice({ text: t(MSG.ACCOUNT_CONNECTED) });
   }, true);
 
@@ -275,8 +348,35 @@ function AppContent() {
     return () => document.removeEventListener('pointerdown', outside);
   }, [menuOpen]);
 
+  function signOut() {
+    invalidateConnection();
+    setNotice({ text: '' });
+    navigate(appPaths.connections, { replace: true });
+  }
+
+  let connectionTitle = t(MSG.ACCOUNT_SIGN_IN);
+  let connectionHint = t(MSG.ACCOUNT_SIGN_IN_HELP);
+  if (member) {
+    connectionTitle = t(MSG.SERVICE_ACCESS);
+    connectionHint = '';
+  } else if (showIntegration) {
+    connectionTitle = t(ready && accountConnected ? MSG.TUYA_CONNECTED : MSG.CONNECT_TUYA);
+    connectionHint = t(ready && accountConnected ? MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES : MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES);
+  }
+
+  const accountName = owner ? t(MSG.HOUSEHOLD_OWNER) : status?.account?.name;
+  const sessionControls = !demo && status && connection.token && (
+    <div className="actions">
+      {accountName && <span>{t(MSG.SIGNED_IN_AS, [accountName])}</span>}
+      <button type="button" className="secondary compact" disabled={locked} onClick={signOut}>
+        {t(MSG.SIGN_OUT)}
+      </button>
+    </div>
+  );
+
   const controlCenter = (
     <ControlCenter
+      key={sessionRevision}
       dashboardPanel={dashboardPanel}
       cardSize={cardSize}
       api={api}
@@ -284,10 +384,10 @@ function AppContent() {
       sharingReady={Boolean(ready && status?.connected)}
       developerReady={Boolean(ready && developer.connected)}
       onAuthError={invalidateConnection}
-      onConnections={() => goTo('connections')}
+      onConnections={member ? undefined : () => goTo('connections')}
     />
   );
-  const regionName = REGIONS.find(item => item.value === developer.region)?.label;
+  const regionName = REGIONS.find((item) => item.value === developer.region)?.label;
   const appearance = (
     <>
       <ThemeSelector />
@@ -295,13 +395,13 @@ function AppContent() {
       <DeviceTextModeSelector />
       <label>
         <span>{t(MSG.CARD_SIZE)}</span>
-        <select value={cardSize} onChange={event => changeCardSize(event.target.value === 'small' ? 'small' : 'large')}>
+        <select value={cardSize} onChange={(event) => changeCardSize(event.target.value === 'small' ? 'small' : 'large')}>
           <option value="large">{t(MSG.CARD_SIZE_LARGE)}</option>
           <option value="small">{t(MSG.CARD_SIZE_SMALL)}</option>
         </select>
       </label>
     </>
-);
+  );
   return (
     <div className={"app-shell" + (view === 'control' ? " dashboard-view" : "")}
       data-dashboard-panel={dashboardPanel ?? undefined} data-card-size={cardSize}
@@ -320,7 +420,7 @@ function AppContent() {
               ['local-connections', t(MSG.LOCAL_CONNECTIONS)],
               ['settings', t(MSG.SETTINGS)],
               ['connections', t(MSG.CONNECTIONS)],
-            ] as const).filter(([key]) => !demo || key === 'control' || key === 'settings').map(([key, label]) => (
+            ] as const).filter(([key]) => (!demo || key === 'control' || key === 'settings') && (!member || !ownerPage(key))).map(([key, label]) => (
               <button type="button" key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>
                 {label}
               </button>
@@ -363,14 +463,14 @@ function AppContent() {
       </header>
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
-        <input id="access-token" type="hidden" value={connection.token} readOnly />
         <Outlet
-          context={{ needsAccess, pages: { connections: <>
+          context={{ view, pages: { connections: <>
             <div className="page-heading">
               <p className="eyebrow">{t(MSG.CONNECTIONS)}</p>
-              <h1>{ready && accountConnected ? t(MSG.TUYA_CONNECTED) : t(MSG.CONNECT_TUYA)}</h1>
-              <p className="muted">{ready && accountConnected ? t(MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES) : t(MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES)}</p>
+              <h1>{connectionTitle}</h1>
+              {connectionHint && <p className="muted">{connectionHint}</p>}
             </div>
+            {showIntegration && (
             <div className="workspace connections-workspace">
               <section className="card setup" aria-label={t(MSG.TUYA_CONNECTION)}>
                 <div className="method-tabs" role="group" aria-label={t(MSG.CONNECTION_METHOD)}>
@@ -389,12 +489,12 @@ function AppContent() {
                           <a href="#user-code" aria-controls="user-code" aria-expanded={false} aria-disabled={busy} onClick={event => {
                 event.preventDefault(); if (!busyRef.current) { setEditingCode(true); setQR(null); setNotice({ text: '' }); }
               }}
-                      >{t(MSG.EDIT)}
-                      </a>
+                        >{t(MSG.EDIT)}
+                          </a>
                         </p>
             )}
                       {status?.saved_user_code_requires_login && !showCodeForm && <p className="help">{t(MSG.CONFIRM_QR_SIGN_IN_FOR_THIS_USER_CODE)}</p>}
-                    </>
+                  </>
           )}
                     <button className="full-width" disabled={busy || !ready || !status?.has_saved_user_code || showCodeForm} onClick={beginQR}>{t(MSG.GET_QR_CODE)}</button>
                     {qr && (
@@ -433,12 +533,15 @@ function AppContent() {
                 </div>
               </section>
             </div>
+            )}
             <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
-                                                        </>,
+            {sessionControls}
+          </>,
         settings: <section className="card">
           <h1>{t(MSG.SETTINGS)}</h1>
           <div className="app-menu-appearance">{appearance}</div>
-                  </section>,
+          {sessionControls}
+        </section>,
         network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
         'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
         control: controlCenter,
@@ -446,6 +549,7 @@ function AppContent() {
           'combined-devices': controlCenter,
       } satisfies Record<View, ReactNode> }}
         />
+        {owner && view === 'settings' && <HouseholdAccess key={sessionRevision} api={api} onAuthError={invalidateConnection} />}
         <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">
           {busy ? (
             <>

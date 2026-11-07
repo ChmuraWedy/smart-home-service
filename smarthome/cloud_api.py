@@ -10,8 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
-from .api_dependencies import authenticate, get_session
+from .api_dependencies import Account, authenticate, get_session
 from .importer import import_tinytuya
+from .member_controls import (
+    is_cloud_camera,
+    member_cloud_functions,
+    require_cloud_commands,
+    require_cloud_device,
+)
 from .models import CloudChannelLabel, CloudRoomOverride, Room
 from .schemas import Identifier, ImportRequest, PositiveID, Schema
 from .service import commit, get_or_404
@@ -210,7 +216,9 @@ def safe_snapshot(device, provider):
 
 
 @router.get("/status")
-def cloud_status(request: Request, response: Response):
+def cloud_status(
+    request: Request, response: Response, account: Account | None = Depends(authenticate),
+):
     bridge = request.app.state.cloud
     response.headers["Cache-Control"] = "no-store"
     with bridge.lock:
@@ -223,6 +231,7 @@ def cloud_status(request: Request, response: Response):
             "transport": "internet",
             "scene_edit_supported": False,
             "developer": request.app.state.developer_cloud.status(),
+            **({"account": {"id": account.id, "name": account.name, "role": account.role}} if account else {}),
         }
 
 
@@ -291,6 +300,7 @@ def logout(request: Request):
 @router.get("/devices")
 def devices(
     request: Request, response: Response, refresh: bool = False, provider: Provider = "sharing",
+    account: Account | None = Depends(authenticate),
     session: Session = Depends(get_session),
 ):
     from .cloud_scope import scope_for
@@ -302,6 +312,12 @@ def devices(
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
         account_devices = bridge.devices(refresh)
+        member = bool(account and account.role == "member")
+        if member:
+            account_devices = [
+                device for device in account_devices
+                if not is_cloud_camera(device)
+            ]
         snapshots = [bridge.state.snapshot(device) if provider == "sharing" else device for device in account_devices]
         rows = [safe_device(device) for device in snapshots]
         for device in snapshots:
@@ -330,6 +346,9 @@ def devices(
                 if device.id in placements:
                     placement = placements[device.id]
                     row["synced_room"] = {"room_id": placement["room_id"], "building_id": placement["building_id"]}
+
+                if member:
+                    row["functions"] = member_cloud_functions(row["category"], row["functions"])
                 functions, ranges = row["functions"], safe_status_ranges(device)
                 for spec in functions + ranges:
                     if (device.id, spec["code"]) in labels:
@@ -418,9 +437,12 @@ def cloud_device_status(
     refresh: bool = False,
     provider: Provider = "sharing",
     watch: bool = False,
+    account: Account | None = Depends(authenticate),
 ):
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
+        if account and account.role == "member":
+            require_cloud_device(bridge.device(device_id))
         device = bridge.device_status(device_id, refresh)
         audit_cloud(request, bridge, provider, device)
         if watch and provider == "sharing" and not refresh:
@@ -433,6 +455,7 @@ def cloud_device_status(
 @router.get("/devices/{device_id}/functions")
 def cloud_device_functions(
     device_id: Identifier, request: Request, response: Response, provider: Provider = "sharing",
+    account: Account | None = Depends(authenticate),
     session: Session = Depends(get_session),
 ):
     bridge = cloud_bridge(request, provider)
@@ -440,6 +463,9 @@ def cloud_device_functions(
         device = bridge.writable_device(device_id)
         labels = channel_labels(session, bridge, provider, device_id)
         functions = safe_device(device)["functions"]
+        if account and account.role == "member":
+            require_cloud_device(device)
+            functions = member_cloud_functions(getattr(device, "category", None), functions)
         ranges = safe_status_ranges(device)
         for spec in functions + ranges:
             if spec["code"] in labels:
@@ -484,11 +510,14 @@ def save_channel_labels(
 
 @router.post("/devices/{device_id}/commands")
 def cloud_commands(
-    device_id: Identifier, body: CloudCommands, request: Request, provider: Provider = "sharing"
+    device_id: Identifier, body: CloudCommands, request: Request, provider: Provider = "sharing",
+    account: Account | None = Depends(authenticate),
 ):
     bridge = cloud_bridge(request, provider)
     with bridge.lock:
         device = bridge.writable_device(device_id)
+        if account and account.role == "member":
+            require_cloud_commands(device, body.commands)
         return execute_cloud_commands(request, bridge, provider, device, body.commands)
 
 

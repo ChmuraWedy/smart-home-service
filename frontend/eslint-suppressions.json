@@ -7,22 +7,19 @@
       "count": 5
     },
     "arrow-parens": {
-      "count": 11
+      "count": 4
     },
     "brace-style": {
-      "count": 2
+      "count": 1
     },
     "consistent-return": {
       "count": 3
-    },
-    "import/order": {
-      "count": 1
     },
     "import/prefer-default-export": {
       "count": 1
     },
     "indent": {
-      "count": 27
+      "count": 26
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 1
@@ -30,38 +27,26 @@
     "jsx-a11y/no-static-element-interactions": {
       "count": 1
     },
-    "no-confusing-arrow": {
-      "count": 3
-    },
     "no-nested-ternary": {
       "count": 1
     },
     "no-restricted-syntax": {
       "count": 4
     },
-    "no-use-before-define": {
-      "count": 2
-    },
     "no-void": {
       "count": 7
     },
     "object-curly-newline": {
-      "count": 15
+      "count": 5
     },
     "object-property-newline": {
       "count": 2
-    },
-    "one-var": {
-      "count": 1
-    },
-    "one-var-declaration-per-line": {
-      "count": 1
     },
     "prefer-template": {
       "count": 7
     },
     "quotes": {
-      "count": 11
+      "count": 10
     },
     "react/button-has-type": {
       "count": 7
@@ -76,7 +61,7 @@
       "count": 5
     },
     "react/jsx-indent": {
-      "count": 8
+      "count": 4
     },
     "react/jsx-max-props-per-line": {
       "count": 5
@@ -773,10 +758,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 7
+      "count": 6
     },
     "@stylistic/max-len": {
-      "count": 13
+      "count": 12
     },
     "arrow-parens": {
       "count": 34
