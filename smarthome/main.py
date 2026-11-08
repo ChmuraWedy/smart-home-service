@@ -656,6 +656,10 @@ def create_app(settings: Settings | None = None, controller=None):
         from .developer_cloud import DeveloperBridge
 
         app.state.developer_cloud = DeveloperBridge(settings)
+        from .camera_playback import PlaybackStore, install_access_log_filter
+
+        app.state.camera_playback = PlaybackStore()
+        install_access_log_filter()
         from .poller import DisplayPoller
 
         app.state.poller = DisplayPoller(app)
@@ -687,8 +691,9 @@ def create_app(settings: Settings | None = None, controller=None):
         app.add_middleware(
             CORSMiddleware,
             allow_origins=list(settings.cors_origins),
-            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-            allow_headers=["X-API-Key", "Content-Type"],
+            allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
+            allow_headers=["X-API-Key", "Content-Type", "Range"],
+            expose_headers=["Accept-Ranges", "Content-Range"],
             allow_credentials=False,
         )
     app.state.controller = controller or TuyaController(settings)
@@ -715,6 +720,9 @@ def create_app(settings: Settings | None = None, controller=None):
     from .camera_api import router as camera_router
 
     app.include_router(camera_router)
+    from .camera_playback import router as playback_router
+
+    app.include_router(playback_router)
     from .commissioning import router as commissioning_router
 
     app.include_router(commissioning_router)

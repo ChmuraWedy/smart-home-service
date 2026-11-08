@@ -142,9 +142,11 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     try {
       const result = await api.cameraStream(deviceId, provider, controller.signal);
       if (controller.signal.aborted) return;
-      const url = new URL(result.url);
-      if (result.device_id !== deviceId || result.type !== 'hls' || url.protocol !== 'https:' || url.username || url.password) throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM));
-      setSource(result.url);
+      const relayPath = /^\/api\/v1\/camera\/play\/[A-Za-z0-9_-]{43}\/index\.m3u8$/;
+      if (result.device_id !== deviceId || result.type !== 'hls' || !relayPath.test(result.url)) {
+        throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM));
+      }
+      setSource(new URL(result.url, api.baseUrl).href);
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (failure instanceof ApiError && failure.status === 401) onAuthError();

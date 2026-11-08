@@ -14,7 +14,7 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y nginx-light curl gettext-base \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=frontend-build /build/frontend/dist/ /app/web/
-COPY deploy/nginx.conf /app/deploy/nginx.conf
+COPY deploy/nginx*.conf /app/deploy/
 ENV SMART_HOME_BACKEND_HOST=backend
 USER www-data
 EXPOSE 8080
