@@ -556,7 +556,7 @@
       "count": 2
     },
     "no-nested-ternary": {
-      "count": 4
+      "count": 3
     },
     "no-restricted-globals": {
       "count": 1
@@ -586,7 +586,7 @@
       "count": 1
     },
     "prefer-template": {
-      "count": 5
+      "count": 4
     },
     "quotes": {
       "count": 1

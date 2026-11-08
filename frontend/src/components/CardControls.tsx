@@ -30,6 +30,7 @@ import QuickLightSettings from './QuickLightSettings';
 import LightPresetMenu from './LightPresetMenu';
 import lightControls from '../light-controls';
 import { useLightPresets } from '../use-light-presets';
+import { isWhiteUnit, readSimpleScene } from '../light-scenes';
 
 const CARD_CACHE_INTERVAL = 4000;
 
@@ -201,7 +202,7 @@ function StandardCardControls({
   useEffect(() => { onPower?.(reportedPower); }, [onPower, reportedPower]);
   const mode = currentReading(modeSpec)?.value;
   const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
-  const hasSummary = Boolean(brightness || temperature || colorMode);
+  const hasSummary = Boolean(brightness || temperature || colorMode || (mode === 'scene' && scene));
   const onLightFeatures = sheet?.onLightFeatures;
   const hasPresetMenu = hasSummary || Boolean(scene);
   useEffect(() => { onLightFeatures?.(hasQuickSettings, hasPresetMenu); }, [hasQuickSettings, hasPresetMenu, onLightFeatures]);
@@ -211,7 +212,13 @@ function StandardCardControls({
     typeof v === 'number' && v >= 0 && v <= 1000 ? { h, s, v } : undefined;
   const brightnessReading = whiteMode ? currentReading(brightness) : undefined;
   const temperatureReading = whiteMode ? currentReading(temperature) : undefined;
-  const brightnessText = hsv ? hsv.v / 10 + ' %' : brightness && brightnessReading ? displayReading(brightness, brightnessReading) : undefined;
+  const sceneUnit = mode === 'scene' && scene ? readSimpleScene(currentReading(scene)?.value, scene)?.scene_units[0] : undefined;
+  let brightnessText: string | undefined;
+  if (hsv) brightnessText = `${hsv.v / 10} %`;
+  else if (sceneUnit?.unit_change_mode === 'static') {
+    const level = isWhiteUnit(sceneUnit) ? sceneUnit.bright : sceneUnit.v;
+    brightnessText = `${level / 10} %`;
+  } else if (brightness && brightnessReading) brightnessText = displayReading(brightness, brightnessReading);
   const colorText = hsv && hsvToHex(hsv).toUpperCase();
   const summary = hasSummary ? (power: boolean | null) => (
     <span className="dashboard-light-readings">

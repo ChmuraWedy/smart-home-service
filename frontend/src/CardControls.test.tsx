@@ -217,6 +217,7 @@ describe('main controls on device cards', () => {
     document.body.append(slot);
     const props = { open: true, close: vi.fn(), trigger: { current: null }, presetSlot: slot };
     const view = mount(configured, 'sharing', props);
+    await waitFor(() => expect(view.container.querySelector('.dashboard-light-value-text')).toHaveTextContent('77.5 %'));
     const sheet = within(await screen.findByRole('dialog', { name: 'Лампа' }));
     const user = userEvent.setup();
     const add = sheet.getByRole('button', { name: 'Добавить сцену' });
