@@ -5,6 +5,7 @@ import type { CloudDevice, JsonValue, Provider } from '../api';
 import { labelFor } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceDraft, Inventory, ObservationAction, ObservationReading, ObservationSession, Placement, LocalDevice } from '../home-api';
+import useRoomName from '../room-names';
 
 const actions: Record<ObservationAction, { label: string; prompt: string }> = localizeMessages({
   observe: { label: MSG.OBSERVATION, prompt: MSG.READ_THE_INITIAL_STATE_THEN_SELECT_THE_ACTION },
@@ -26,6 +27,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
   existing?: LocalDevice;
   onClose: () => void; onAuthError: () => void;
 }) {
+  const roomLabel = useRoomName();
   const [step, setStep] = useState<'configure' | 'observe'>('configure');
   const [name, setName] = useState(existing?.name || device?.name || ''), [id, setId] = useState(existing?.device_id || device?.id || '');
   const fixedGateway = gatewayOnly || device?.category === 'wg2';
@@ -160,7 +162,7 @@ export function DeviceSurvey({ api, inventory, device, provider, placement, clou
       <label>{t(MSG.ROOM)}
         <select value={room} onChange={event => setRoom(event.target.value)}>
           <option value="">{t(MSG.NOT_SELECTED_FEMININE)}</option>
-          {rooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {rooms.map(item => <option key={item.id} value={item.id}>{roomLabel(item)}</option>)}
         </select>
       </label>
     </div>

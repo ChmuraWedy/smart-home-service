@@ -9,6 +9,7 @@ import { dashboardBrowserId } from '../dashboard-layout';
 import type { RoomNavigationLayout } from '../dashboard-layout';
 import type { HomeApi, Room } from '../home-api';
 import { MSG, t } from '../i18n';
+import useRoomName from '../room-names';
 import { Icon } from './ui/icon';
 import RoomNavigationEditor, { orderRooms } from './RoomNavigationEditor';
 import type { RoomManagement } from './RoomNavigationEditor';
@@ -27,7 +28,7 @@ const roomIcons = [
   [/\bbalcony\b/i, 'room-balcony'],
 ] as const;
 
-function useVisibleRooms(rooms: Room[], allRooms: string, noRoom: string, moreRooms: string) {
+function useVisibleRooms(labels: string) {
   const bar = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(Infinity);
@@ -68,7 +69,7 @@ function useVisibleRooms(rooms: Room[], allRooms: string, noRoom: string, moreRo
     observer.observe(container);
     observer.observe(measure);
     return () => observer.disconnect();
-  }, [rooms, allRooms, noRoom, moreRooms]);
+  }, [labels]);
 
   return { bar, ruler, visibleCount };
 }
@@ -99,10 +100,10 @@ function RoomButton({
   );
 }
 
-function roomChoice(room: Room): RoomChoice {
+function roomChoice(room: Room, label: string): RoomChoice {
   return {
     id: String(room.id),
-    label: room.name,
+    label,
     icon: roomIcons.find(([pattern]) => pattern.test(room.name))?.[1] ?? 'room',
   };
 }
@@ -121,6 +122,7 @@ export default function RoomNavigation({
   const [editingApi, setEditingApi] = useState<HomeApi>();
   const [attempt, setAttempt] = useState(0);
   const [read, setRead] = useState<LayoutRead>();
+  const roomLabel = useRoomName();
   const editing = editingApi === api && allRooms !== undefined;
   const currentRead = read?.api === api ? read : undefined;
   const layout = currentRead?.layout ?? EMPTY_LAYOUT;
@@ -152,12 +154,12 @@ export default function RoomNavigation({
   const all: RoomChoice = { id: '', label: t(MSG.ALL_ROOMS), icon: 'room-all' };
   const none: RoomChoice = { id: 'none', label: t(MSG.NO_ROOM), icon: 'room-none' };
   const moreLabel = t(MSG.MORE_ROOMS);
-  const options = [all, ...visibleRooms.map(roomChoice), none];
-  const { bar, ruler, visibleCount } = useVisibleRooms(visibleRooms, all.label, none.label, moreLabel);
+  const options = [all, ...visibleRooms.map((item) => roomChoice(item, roomLabel(item))), none];
+  const { bar, ruler, visibleCount } = useVisibleRooms(JSON.stringify([...options.map(({ label }) => label), moreLabel]));
   const quick = options.slice(0, visibleCount);
   const overflow = quick.length < options.length;
   const selectedRoom = allRooms?.find(({ id }) => String(id) === selected);
-  const current = selectedRoom ? roomChoice(selectedRoom) : options.find((option) => option.id === selected);
+  const current = selectedRoom ? roomChoice(selectedRoom, roomLabel(selectedRoom)) : options.find((option) => option.id === selected);
   const currentName = current?.label ?? t(MSG.ROOMS);
   const moreActive = options.some((choice) => choice.id === selected) && !quick.some((choice) => choice.id === selected);
   const editLabel = t(readFailed ? MSG.RETRY_DASHBOARD_LAYOUT : MSG.EDIT_ROOMS);

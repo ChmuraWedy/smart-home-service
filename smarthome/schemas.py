@@ -23,6 +23,18 @@ Version = Literal["3.1", "3.2", "3.3", "3.4", "3.5"]
 PositiveID = Annotated[int, Field(gt=0)]
 
 
+def clean_display_text(value):
+    if isinstance(value, str):
+        value = unicodedata.normalize("NFC", value).strip()
+        if any(unicodedata.category(char) in {"Cc", "Cf"} for char in value):
+            raise ValueError("Display translations cannot contain control characters")
+    return value
+
+
+Locale = Literal["en", "ru", "pl", "be"]
+DisplayText = Annotated[str, BeforeValidator(clean_display_text), Field(min_length=1, max_length=120)]
+
+
 def normalize_alias(value):
     return unicodedata.normalize("NFC", value).strip().casefold() if isinstance(value, str) else value
 
@@ -217,13 +229,15 @@ class RoomCreate(AliasedSchema):
     building_id: PositiveID
     name: Name
     description: str | None = Field(default=None, max_length=4000)
+    name_translations: dict[Locale, DisplayText] = Field(default_factory=dict)
 
 
 class RoomPatch(AliasedPatch):
-    non_nullable = {"building_id", "name", "aliases"}
+    non_nullable = {"building_id", "name", "aliases", "name_translations"}
     building_id: PositiveID | None = None
     name: Name | None = None
     description: str | None = Field(default=None, max_length=4000)
+    name_translations: dict[Locale, DisplayText | None] | None = None
 
 
 class RoomRead(RoomCreate):

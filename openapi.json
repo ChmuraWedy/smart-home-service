@@ -8464,6 +8464,23 @@
               }
             ],
             "title": "Description"
+          },
+          "name_translations": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Name Translations"
           }
         },
         "additionalProperties": false,
@@ -8530,6 +8547,37 @@
               }
             ],
             "title": "Description"
+          },
+          "name_translations": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 120,
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "enum": [
+                    "en",
+                    "ru",
+                    "pl",
+                    "be"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Translations"
           }
         },
         "additionalProperties": false,
@@ -8569,6 +8617,23 @@
               }
             ],
             "title": "Description"
+          },
+          "name_translations": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Name Translations"
           },
           "id": {
             "type": "integer",
@@ -8617,6 +8682,23 @@
               }
             ],
             "title": "Description"
+          },
+          "name_translations": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Name Translations"
           },
           "id": {
             "type": "integer",

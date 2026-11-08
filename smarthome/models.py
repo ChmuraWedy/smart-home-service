@@ -164,6 +164,7 @@ class Room(AliasOwner, Base):
         ForeignKey("buildings.id", ondelete="RESTRICT"), index=True
     )
     name: Mapped[str] = mapped_column(String(120))
+    name_translations: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, server_default="{}")
     description: Mapped[str | None] = mapped_column(Text)
     alias_entries: Mapped[list["RoomAlias"]] = relationship(
         cascade="all, delete-orphan",

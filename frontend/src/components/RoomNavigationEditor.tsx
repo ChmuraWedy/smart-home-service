@@ -6,10 +6,13 @@ import {
 } from 'react';
 import { ensureDashboardBrowserId } from '../dashboard-layout';
 import type { RoomNavigationEntry, RoomNavigationLayout } from '../dashboard-layout';
-import type { Building, HomeApi, Room } from '../home-api';
+import type {
+  Building, HomeApi, Room, RoomNameChanges,
+} from '../home-api';
 import { MSG, t } from '../i18n';
+import useRoomName from '../room-names';
 import { Icon } from './ui/icon';
-import { NameForm, removeRoomOrExplain, useRoomAction } from './RoomEditor';
+import { RoomNameDialog, removeRoomOrExplain, useRoomAction } from './RoomEditor';
 
 export type RoomManagement = {
   buildings: Building[];
@@ -52,14 +55,16 @@ export default function RoomNavigationEditor({
   } = useRoomAction(management?.onAuthError);
   const request = useRef<AbortController | null>(null);
   const actionPanel = useRef<HTMLDivElement>(null);
+  const roomLabel = useRoomName();
   const ordered = orderRooms(rooms, draft);
+  const renamedRoom = action?.kind === 'rename' ? rooms.find(({ id }) => id === action.roomId) : undefined;
   const hidden = new Set(draft.filter((entry) => entry.hidden).map(({ id }) => id));
   const syncing = management?.sync;
   const locked = busy || saving || Boolean(syncing?.busy);
 
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
-    if (!action) return;
+    if (action?.kind !== 'delete') return;
     actionPanel.current?.scrollIntoView?.({ block: 'nearest' });
     actionPanel.current?.querySelector<HTMLElement>('input, button')?.focus({ preventScroll: true });
   }, [action]);
@@ -83,21 +88,21 @@ export default function RoomNavigationEditor({
     setAction(next);
   }
 
-  const create = useCallback(async (name: string, buildingId: number) => {
+  const create = useCallback(async (name: string, buildingId: number, changes?: RoomNameChanges) => {
     if (!management) return;
     await run(async () => {
-      management.onSaved(await api.createRoom(name, buildingId));
+      management.onSaved(await api.createRoom(name, buildingId, changes));
       setAction(undefined);
     });
   }, [api, management, run]);
 
-  const rename = useCallback(async (name: string) => {
-    if (!management || action?.kind !== 'rename') return;
+  const rename = useCallback(async (name: string, _buildingId: number, changes?: RoomNameChanges) => {
+    if (!management || !renamedRoom) return;
     await run(async () => {
-      management.onSaved(await api.renameRoom(action.roomId, name));
+      management.onSaved(await api.renameRoom(renamedRoom.id, name === renamedRoom.name ? undefined : name, changes));
       setAction(undefined);
     });
-  }, [action, api, management, run]);
+  }, [api, management, renamedRoom, run]);
 
   async function remove(id: number) {
     if (!management) return;
@@ -109,9 +114,10 @@ export default function RoomNavigationEditor({
     });
   }
 
-  function cancelAction() {
-    edit();
-  }
+  const cancelAction = useCallback(() => {
+    setError('');
+    setAction(undefined);
+  }, [setError]);
 
   const close = useCallback(() => {
     if (!request.current && !busy) onClose();
@@ -149,104 +155,82 @@ export default function RoomNavigationEditor({
         <p className="help room-navigation-editor-help">{t(MSG.ROOM_NAVIGATION_LAYOUT_HELP)}</p>
         <div className="room-picker-list room-navigation-editor-body">
           <ol className="room-navigation-editor-list">
-            {ordered.map(({ id, name }, index) => (
-              <li className="room-navigation-editor-row" key={id} data-room-hidden={hidden.has(id) || undefined} data-manage={Boolean(management) || undefined}>
-                <span>{name}</span>
-                {management && (
-                  <button
-                    type="button"
-                    className="secondary room-navigation-rename"
-                    aria-label={t(MSG.ROOM_RENAME_NAMED, [name])}
-                    title={t(MSG.ROOM_RENAME_NAMED, [name])}
-                    disabled={locked}
-                    onClick={() => edit({ kind: 'rename', roomId: id })}
-                  >
-                    <Icon name="edit" />
-                  </button>
-                )}
-                <div className="room-navigation-order">
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={t(MSG.COMBINED_MOVE_MEMBER_UP, [name])}
-                    disabled={locked || index === 0}
-                    onClick={() => move(index, -1)}
-                  >
-                    <Icon name="chevron-down" className="tw:rotate-180" />
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={t(MSG.COMBINED_MOVE_MEMBER_DOWN, [name])}
-                    disabled={locked || index === ordered.length - 1}
-                    onClick={() => move(index, 1)}
-                  >
-                    <Icon name="chevron-down" />
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={t(MSG.ROOM_NAVIGATION_VISIBILITY, [name])}
-                    aria-pressed={!hidden.has(id)}
-                    disabled={locked}
-                    onClick={() => toggleVisibility(id)}
-                  >
-                    <Icon name={hidden.has(id) ? 'eye-off' : 'eye'} />
-                  </button>
-                </div>
-                {management && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={t(MSG.ROOM_DELETE_NAMED, [name])}
-                    title={t(MSG.ROOM_DELETE_NAMED, [name])}
-                    disabled={locked}
-                    onClick={() => edit({ kind: 'delete', roomId: id })}
-                  >
-                    <Icon name="delete" />
-                  </button>
-                )}
-                {action?.kind === 'rename' && action.roomId === id && (
-                  <div className="room-navigation-room-action" ref={actionPanel}>
-                    <NameForm
-                      title={t(MSG.ROOM_RENAME)}
-                      initial={name}
-                      submitLabel={t(MSG.ROOM_RENAME)}
-                      busy={locked}
-                      onSave={rename}
-                    />
-                    <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>
-                      {t(MSG.CANCEL)}
+            {ordered.map((room, index) => {
+              const { id } = room;
+              const name = roomLabel(room);
+              return (
+                <li className="room-navigation-editor-row" key={id} data-room-hidden={hidden.has(id) || undefined} data-manage={Boolean(management) || undefined}>
+                  <span>{name}</span>
+                  {management && (
+                    <button
+                      type="button"
+                      className="secondary room-navigation-rename"
+                      aria-label={t(MSG.ROOM_RENAME_NAMED, [name])}
+                      title={t(MSG.ROOM_RENAME_NAMED, [name])}
+                      disabled={locked}
+                      onClick={() => edit({ kind: 'rename', roomId: id })}
+                    >
+                      <Icon name="edit" />
+                    </button>
+                  )}
+                  <div className="room-navigation-order">
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label={t(MSG.COMBINED_MOVE_MEMBER_UP, [name])}
+                      disabled={locked || index === 0}
+                      onClick={() => move(index, -1)}
+                    >
+                      <Icon name="chevron-down" className="tw:rotate-180" />
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label={t(MSG.COMBINED_MOVE_MEMBER_DOWN, [name])}
+                      disabled={locked || index === ordered.length - 1}
+                      onClick={() => move(index, 1)}
+                    >
+                      <Icon name="chevron-down" />
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label={t(MSG.ROOM_NAVIGATION_VISIBILITY, [name])}
+                      aria-pressed={!hidden.has(id)}
+                      disabled={locked}
+                      onClick={() => toggleVisibility(id)}
+                    >
+                      <Icon name={hidden.has(id) ? 'eye-off' : 'eye'} />
                     </button>
                   </div>
-                )}
-                {action?.kind === 'delete' && action.roomId === id && (
-                  <div className="room-navigation-room-action" role="group" aria-label={t(MSG.ROOM_DELETE_NAMED, [name])} ref={actionPanel}>
-                    <p>{t(MSG.ROOM_DELETE_CONFIRM, [name])}</p>
-                    <p className="help">{t(MSG.ROOM_DELETE_SYNC_HINT)}</p>
-                    <div className="room-navigation-editor-actions">
-                      <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>{t(MSG.CANCEL)}</button>
-                      <button type="button" disabled={locked} onClick={() => remove(id)}>{t(MSG.ROOM_DELETE)}</button>
+                  {management && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label={t(MSG.ROOM_DELETE_NAMED, [name])}
+                      title={t(MSG.ROOM_DELETE_NAMED, [name])}
+                      disabled={locked}
+                      onClick={() => edit({ kind: 'delete', roomId: id })}
+                    >
+                      <Icon name="delete" />
+                    </button>
+                  )}
+                  {action?.kind === 'delete' && action.roomId === id && (
+                    <div className="room-navigation-room-action" role="group" aria-label={t(MSG.ROOM_DELETE_NAMED, [name])} ref={actionPanel}>
+                      <p>{t(MSG.ROOM_DELETE_CONFIRM, [name])}</p>
+                      <p className="help">{t(MSG.ROOM_DELETE_SYNC_HINT)}</p>
+                      <div className="room-navigation-editor-actions">
+                        <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>{t(MSG.CANCEL)}</button>
+                        <button type="button" disabled={locked} onClick={() => remove(id)}>{t(MSG.ROOM_DELETE)}</button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </li>
-            ))}
+                  )}
+                </li>
+              );
+            })}
           </ol>
-          {management && action?.kind === 'create' && (
-            <div className="room-navigation-room-action" ref={actionPanel}>
-              <NameForm
-                title={t(MSG.ROOM_CREATE)}
-                submitLabel={t(MSG.ROOM_CREATE)}
-                buildings={management.buildings}
-                busy={locked}
-                onSave={create}
-              />
-              <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>{t(MSG.CANCEL)}</button>
-            </div>
-          )}
         </div>
-        {error && <p className="field-error" role="alert">{error}</p>}
+        {action?.kind === 'delete' && error && <p className="field-error" role="alert">{error}</p>}
         {failed && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
         {syncing?.error && <p className="field-error" role="alert">{syncing.error}</p>}
         {syncing?.busy && <p className="help" role="status">{t(MSG.SYNCHRONIZATION_RUNS_IN_THE_BACKGROUND)}</p>}
@@ -286,6 +270,16 @@ export default function RoomNavigationEditor({
             {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
           </button>
         </footer>
+        {management && (action?.kind === 'create' || renamedRoom) && (
+          <RoomNameDialog
+            room={renamedRoom}
+            buildings={renamedRoom ? undefined : management.buildings}
+            busy={locked}
+            error={error}
+            onSave={renamedRoom ? rename : create}
+            onClose={cancelAction}
+          />
+        )}
       </DialogPanel>
     </Dialog>
   );

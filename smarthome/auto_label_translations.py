@@ -9,8 +9,9 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from .device_translations import LOCAL_SCOPE, DisplayText, Locale, save_values
+from .device_translations import LOCAL_SCOPE, save_values
 from .models import CloudDeviceAlias, Device, DeviceTranslation
+from .schemas import DisplayText, Locale
 from .search import fold_name
 
 logger = logging.getLogger(__name__)

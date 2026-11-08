@@ -2,7 +2,8 @@ import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
-import type { DeviceTranslations } from './device-translations';
+import type { DeviceTranslations, TranslatedText } from './device-translations';
+import type { Locale } from './i18n';
 import type { DashboardLayout, RoomNavigationLayout } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
@@ -23,7 +24,8 @@ export type LocalDevice = {
   translations?: DeviceTranslations;
 };
 export type Building = { id: number; name: string; aliases: string[] };
-export type Room = { id: number; building_id: number; name: string; aliases: string[] };
+export type Room = { id: number; building_id: number; name: string; aliases: string[]; 'name_translations'?: TranslatedText };
+export type RoomNameChanges = Partial<Record<Locale, string | null>>;
 export type RoomAppearance = { 'card_opacity': number; 'background_version': string | null };
 export type Group = { id: number; name: string; room_id: number; device_ids: number[] };
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
@@ -162,12 +164,13 @@ export class HomeApi extends CloudApi {
     return this.request<Building>('/buildings', 'POST', { name });
   }
 
-  createRoom(name: string, buildingId: number) {
-    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId });
+  createRoom(name: string, buildingId: number, translations?: RoomNameChanges) {
+    const names = translations && Object.fromEntries(Object.entries(translations).filter(([, value]) => value !== null));
+    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId, name_translations: names });
   }
 
-  renameRoom(roomId: number, name: string) {
-    return this.request<Room>(`/rooms/${roomId}`, 'PATCH', { name });
+  renameRoom(roomId: number, name?: string, translations?: RoomNameChanges) {
+    return this.request<Room>(`/rooms/${roomId}`, 'PATCH', { name, name_translations: translations });
   }
 
   deleteRoom(roomId: number) {

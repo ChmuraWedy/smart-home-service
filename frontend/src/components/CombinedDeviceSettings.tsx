@@ -18,6 +18,7 @@ import type { ResolvedMember } from './CombinedDeviceCard';
 import CombinedDeviceOrder from './CombinedDeviceOrder';
 import CombinedDeviceWiring from './CombinedDeviceWiring';
 import { Switch } from './ui/switch';
+import useRoomName from '../room-names';
 
 const creationSteps = [
   ['devices', MSG.COMBINED_SELECT_DEVICES],
@@ -105,6 +106,7 @@ export function CombinedDeviceList({
   onCreate: () => void;
   onEdit: (id: number) => void;
 }) {
+  const roomLabel = useRoomName();
   return (
     <>
       <div className="card-heading">
@@ -121,7 +123,7 @@ export function CombinedDeviceList({
               <div>
                 <h2>{item.name}</h2>
                 <p className="help">
-                  {rooms.find(({ id }) => id === item.room_id)?.name ?? t(MSG.NO_ROOM)}
+                  {roomLabel(rooms.find(({ id }) => id === item.room_id)) || t(MSG.NO_ROOM)}
                   {' · '}
                   {t(MSG.COMBINED_MEMBER_COUNT, [item.members.length])}
                 </p>
@@ -156,6 +158,7 @@ export function CombinedDeviceSettings({
   onAuthError: () => void;
 }) {
   const formId = useId();
+  const roomLabel = useRoomName();
   const displayName = useDeviceDisplayName();
   const [nameDraft, setName] = useState(existing?.name);
   const [showAllPower, setShowAllPower] = useState(existing?.show_all_power ?? true);
@@ -305,7 +308,7 @@ export function CombinedDeviceSettings({
                 {t(MSG.COMBINED_ROOM_FILTER)}
                 <select id={`${formId}-room-filter`} value={roomFilter} disabled={busy} onChange={(event) => setRoomFilter(event.target.value)}>
                   <option value="all">{t(MSG.ALL_ROOMS)}</option>
-                  {rooms.map(({ id, name: label }) => <option key={id} value={id}>{label}</option>)}
+                  {rooms.map((item) => <option key={item.id} value={item.id}>{roomLabel(item)}</option>)}
                   <option value="none">{t(MSG.NO_ROOM)}</option>
                 </select>
               </label>
@@ -368,7 +371,7 @@ export function CombinedDeviceSettings({
                 disabled={busy}
               >
                 <option value="">{t(MSG.COMBINED_SELECT_ROOM)}</option>
-                {rooms.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+                {rooms.map((item) => <option value={item.id} key={item.id}>{roomLabel(item)}</option>)}
               </select>
             </label>
             <CombinedDeviceWiring

@@ -5,6 +5,7 @@ import { ApiError } from '../api';
 import type { CloudDevice, LanDevice, NetworkInterface, NetworkScan, Provider } from '../api';
 import type { ConnectionFinding, HomeApi, Inventory, LocalDevice } from '../home-api';
 import { deviceHref } from '../device-links';
+import useRoomName from '../room-names';
 
 type Stage = 'start' | 'search' | 'choose' | 'verify' | 'confirm' | 'save' | 'done';
 type Candidate = { device: CloudDevice; observed: LanDevice[]; configured: boolean };
@@ -36,6 +37,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
   api: HomeApi; ready: boolean; sharingReady: boolean; developerReady: boolean;
   onAuthError: () => void; onConnections: () => void; onLock: (locked: boolean) => void;
 }) {
+  const roomLabel = useRoomName();
   const [provider, setProvider] = useState<Provider>(sharingReady ? 'sharing' : 'developer');
   const [devices, setDevices] = useState<CloudDevice[]>([]), [interfaces, setInterfaces] = useState<NetworkInterface[]>([]);
   const [inventory, setInventory] = useState<Inventory | null>(null);
@@ -349,7 +351,7 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
               </div>
                   <div>
                 <dt>{t(MSG.ROOM)}</dt>
-                <dd>{inventory?.rooms.find(room => room.id === row.finding!.device.room_id)?.name || t(MSG.NOT_ASSIGNED_FEMININE)}</dd>
+                <dd>{roomLabel(inventory?.rooms.find(room => room.id === row.finding!.device.room_id)) || t(MSG.NOT_ASSIGNED_FEMININE)}</dd>
               </div>
                   <div>
                 <dt>{t(MSG.KEY)}</dt>

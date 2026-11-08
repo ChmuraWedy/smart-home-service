@@ -1,9 +1,10 @@
 import {
-  fireEvent, render, screen, waitFor, within,
+  act, fireEvent, render, screen, waitFor, within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { STORAGE_KEY } from './connection';
+import { setDeviceTextMode } from './device-translations';
 import type { Building, LocalDevice, Room, RoomAppearance } from './home-api';
 import { setLocale } from './i18n';
 import { prepareRoomBackground } from './room-appearance';
@@ -95,9 +96,11 @@ it('creates a first building and room, renames it, and preserves it after a bloc
   const buildingForm = within(await screen.findByRole('form', { name: 'Create building' }));
   await user.type(buildingForm.getByLabelText('Name'), 'Home');
   await user.click(buildingForm.getByRole('button', { name: 'Create building' }));
+  await user.click(await screen.findByRole('button', { name: 'Create room' }));
   const roomForm = within(await screen.findByRole('form', { name: 'Create room' }));
   await user.type(roomForm.getByLabelText('Name'), 'Workshop');
   await user.click(roomForm.getByRole('button', { name: 'Create room' }));
+  await user.click(await screen.findByRole('button', { name: 'Rename room' }));
   const rename = within(await screen.findByRole('form', { name: 'Rename room' }));
   await user.clear(rename.getByLabelText('Name'));
   await user.type(rename.getByLabelText('Name'), 'Studio');
@@ -112,7 +115,7 @@ it('creates a first building and room, renames it, and preserves it after a bloc
   expect(screen.getByRole('option', { name: 'Studio' })).toBeInTheDocument();
   enableDelete();
   await user.click(screen.getByRole('button', { name: 'Delete room' }));
-  expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Create room' })).toBeInTheDocument();
 });
 
 it('creates, renames, and confirms deletion from the room picker and keeps No room available', async () => {
@@ -128,14 +131,20 @@ it('creates, renames, and confirms deletion from the room picker and keeps No ro
   const editor = within(dialog);
   expect(editor.queryByRole('button', { name: 'Delete No room' })).not.toBeInTheDocument();
   await user.click(editor.getByRole('button', { name: 'New room' }));
-  const create = within(editor.getByRole('form', { name: 'Create room' }));
+  const create = within(await screen.findByRole('dialog', { name: 'Create room' }));
+  const translations = create.getByText('Room name translations (optional)').closest('details');
+  expect(translations).not.toHaveAttribute('open');
+  await user.click(create.getByText('Room name translations (optional)'));
+  fireEvent.change(create.getByLabelText('English'), { target: { value: 'Craft room' } });
   fireEvent.change(create.getByLabelText('Name'), { target: { value: 'Workshop' } });
   await user.click(create.getByRole('button', { name: 'Create room' }));
   await user.click(await editor.findByRole('button', { name: 'Rename Workshop' }));
-  const rename = within(editor.getByRole('form', { name: 'Rename room' }));
-  fireEvent.change(rename.getByLabelText('Name'), { target: { value: 'Studio' } });
+  const rename = within(await screen.findByRole('dialog', { name: 'Rename room' }));
+  await user.click(rename.getByText('Room name translations (optional)'));
+  expect(rename.getByLabelText('English')).toHaveValue('Craft room');
+  fireEvent.change(rename.getByLabelText('English'), { target: { value: 'Art studio' } });
   await user.click(rename.getByRole('button', { name: 'Rename room' }));
-  expect(await editor.findByRole('button', { name: 'Delete Studio' })).toBeEnabled();
+  expect(await editor.findByRole('button', { name: 'Delete Workshop' })).toBeEnabled();
 
   await user.click(editor.getByRole('button', { name: 'Delete Bedroom' }));
   const confirm = within(editor.getByRole('group', { name: 'Delete Bedroom' }));
@@ -146,13 +155,20 @@ it('creates, renames, and confirms deletion from the room picker and keeps No ro
   await waitFor(() => expect(window.location.pathname).toBe('/'));
   await user.click(editor.getByRole('button', { name: 'Cancel' }));
   const updated = within(await screen.findByRole('dialog', { name: 'Rooms' }));
-  expect(updated.getByRole('button', { name: 'Studio' })).toBeInTheDocument();
+  expect(updated.getByRole('button', { name: 'Workshop' })).toBeInTheDocument();
   expect(updated.queryByRole('button', { name: 'Bedroom' })).not.toBeInTheDocument();
   expect(updated.getByRole('button', { name: 'No room' })).toBeInTheDocument();
+  try {
+    act(() => setDeviceTextMode('localized', false));
+    expect(updated.getByRole('button', { name: 'Art studio' })).toBeInTheDocument();
+    expect(updated.getByRole('button', { name: 'Kitchen' })).toBeInTheDocument();
+  } finally {
+    act(() => setDeviceTextMode('original', false));
+  }
   expect(changes).toEqual(['POST /rooms', 'PATCH /rooms/3', 'DELETE /rooms/2']);
 });
 
-it('edits the name and appearance inline without clearing a grid draft', async () => {
+it('edits the name and appearance without clearing a grid draft', async () => {
   const device: LocalDevice = {
     id: 1, device_id: 'kitchen-lamp', name: 'Kitchen lamp', aliases: [], building_id: 1, room_id: 1,
     transport: 'wifi', parent_id: null, cid: null, enabled: false, capabilities: {},
@@ -171,6 +187,7 @@ it('edits the name and appearance inline without clearing a grid draft', async (
   await user.click(screen.getByRole('button', { name: 'Move here (Row 3, column 1)' }));
 
   await user.click(screen.getByText('Room appearance and name editor'));
+  await user.click(screen.getByRole('button', { name: 'Rename room' }));
   const name = within(screen.getByRole('form', { name: 'Rename room' }));
   await user.clear(name.getByLabelText('Name'));
   await user.type(name.getByLabelText('Name'), 'New kitchen');
@@ -209,7 +226,8 @@ it('opens room management from All rooms even before a room exists', async () =>
   expect(window.location.pathname).toBe('/layout/edit');
   await user.click(screen.getByRole('button', { name: 'Manage rooms' }));
   expect(window.location.pathname + window.location.search).toBe('/settings/rooms');
-  expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
+  await user.click(await screen.findByRole('button', { name: 'Create room' }));
+  expect(await screen.findByRole('dialog', { name: 'Create room' })).toBeInTheDocument();
 });
 
 it('restores the room layout editor from a direct URL and returns to that room after saving', async () => {

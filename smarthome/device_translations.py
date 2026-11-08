@@ -1,32 +1,19 @@
 """Explicit display translations for the current device name and custom aliases."""
 
-import unicodedata
-from typing import Annotated, Literal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BeforeValidator, Field
+from pydantic import Field
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .models import Device, DeviceTranslation
-from .schemas import EntityRef, Identifier, Schema
+from .schemas import DisplayText, EntityRef, Identifier, Locale, Schema
 
 LOCAL_SCOPE = "local"
 router = APIRouter(prefix="/api/v1", tags=["Devices"], dependencies=[Depends(authenticate)])
-
-
-def clean_display_text(value):
-    if isinstance(value, str):
-        value = unicodedata.normalize("NFC", value).strip()
-        if any(unicodedata.category(char) in {"Cc", "Cf"} for char in value):
-            raise ValueError("Display translations cannot contain control characters")
-    return value
-
-
-Locale = Literal["en", "ru", "pl", "be"]
-DisplayText = Annotated[str, BeforeValidator(clean_display_text), Field(min_length=1, max_length=120)]
 
 
 class TranslationEdit(Schema):

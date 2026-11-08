@@ -1,10 +1,11 @@
+import json
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -72,8 +73,8 @@ from .tuya import TuyaController
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
 
 
-def update_fields(item, body, session):
-    values = body.model_dump(mode="json", exclude_unset=True)
+def update_fields(item, body, session, *, exclude=None):
+    values = body.model_dump(mode="json", exclude_unset=True, exclude=exclude)
     aliases = values.pop("aliases", None)
     for name, value in values.items():
         setattr(item, name, value)
@@ -197,7 +198,9 @@ def edit_room(item_id: EntityRef, body: RoomPatch, session: Session = Depends(ge
         get_or_404(session, Building, body.building_id)
         if body.building_id != item.building_id:
             assert_empty(session, Device, Device.room_id == item.id)
-    update_fields(item, body, session)
+    update_fields(item, body, session, exclude={"name_translations"})
+    if body.name_translations:
+        item.name_translations = func.json_patch(Room.name_translations, json.dumps(body.name_translations))
     commit(session)
     return item
 

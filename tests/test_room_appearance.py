@@ -23,6 +23,30 @@ def create_room(client, name, building_id):
     return "/api/v1/rooms/" + str(response.json()["id"])
 
 
+def test_room_name_translations_are_optional_and_persist_per_language(tmp_path):
+    settings = Settings(database_path=str(tmp_path / "rooms.db"), display_poll_interval=0)
+    with TestClient(create_app(settings)) as client:
+        building_id = client.post("/api/v1/buildings", json={"name": "Home"}).json()["id"]
+        body = {"building_id": building_id, "name": "Study"}
+        response = client.post("/api/v1/rooms", json={
+            **body, "name_translations": {"pl": " Gabinet ", "be": "Кабінет", "ru": "Кабинет"},
+        })
+        assert response.status_code == 201, response.text
+        path = f"/api/v1/rooms/{response.json()['id']}"
+        assert response.json()["name_translations"] == {"pl": "Gabinet", "be": "Кабінет", "ru": "Кабинет"}
+        response = client.patch(path, json={"name_translations": {"pl": "Pracownia", "ru": None}})
+        assert response.status_code == 200, response.text
+        assert response.json()["name"] == "Study"
+        assert response.json()["name_translations"] == {"pl": "Pracownia", "be": "Кабінет"}
+        assert client.patch(path, json={"name_translations": {"fr": "Bureau"}}).status_code == 422
+        assert client.patch(path, json={"name_translations": {"en": " "}}).status_code == 422
+        assert client.patch(path, json={"name_translations": None}).status_code == 422
+        assert client.patch(path, json={"name": "Office"}).status_code == 200
+
+    with TestClient(create_app(settings)) as client:
+        assert client.get(path).json()["name_translations"] == {"pl": "Pracownia", "be": "Кабінет"}
+
+
 def test_room_appearance_survives_restart_and_stays_isolated(tmp_path):
     settings = Settings(database_path=str(tmp_path / "rooms.db"), display_poll_interval=0)
     with TestClient(create_app(settings)) as client:

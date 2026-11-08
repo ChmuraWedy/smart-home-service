@@ -20,6 +20,7 @@ import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePr
 import { useTopology } from '../use-topology';
 import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
+import useRoomName from '../room-names';
 import { RoomLayoutSettings } from './RoomEditor';
 import DeviceRoomEditor from './DeviceRoomEditor';
 import CameraRoomCard, { cameraRoomCardId } from './CameraRoomCard';
@@ -229,6 +230,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const room = dashboardRoom(location.pathname, query);
   const editingLayout = isDashboardLayoutPath(location.pathname);
   const activeRoom = inventory?.rooms.find(({ id }) => String(id) === room);
+  const roomLabel = useRoomName();
   const [appearanceRevision, setAppearanceRevision] = useState(0);
   const roomAppearance = useRoomAppearance(api, activeRoom?.id, appearanceRevision)?.value;
   const refreshRoomAppearance = useCallback(() => setAppearanceRevision((value) => value + 1), []);
@@ -310,7 +312,10 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     return override ? { ...override, device_id: device.id, building_id: override.building_id ?? synced?.building_id ?? null } : synced;
   }, [placements]);
   const deviceRoom = useCallback((device: UnifiedDevice) => placementOf(device)?.room_id ?? null, [placementOf]);
-  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === placementOf(device)?.room_id)?.name || t(MSG.NO_ROOM); }
+  function roomName(device: UnifiedDevice) {
+    const locationRoom = inventory?.rooms.find((item) => item.id === placementOf(device)?.room_id);
+    return locationRoom ? roomLabel(locationRoom) : t(MSG.NO_ROOM);
+  }
   const [busy, setBusy] = useState(false);
   const combinationRevision = useRef(0);
   const [survey, setSurvey] = useState<{ api: HomeApi; mask: string; key: string; value: Extract<Selection, { kind: 'survey' }> } | null>(null);
@@ -635,7 +640,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (entry.kind === 'combined') {
       const item = entry.combined;
       const href = `/combined-devices/${item.id}`;
-      const name = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id)?.name ?? t(MSG.NO_ROOM);
+      const locationRoom = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id);
+      const name = locationRoom ? roomLabel(locationRoom) : t(MSG.NO_ROOM);
       const quickOpen = combinedQuickOpen && item === combined;
       return (
         <CombinedDeviceCard
@@ -886,7 +892,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
               <select value={room} onChange={event => selectRoom(event.target.value)}>
                 <option value="">{t(MSG.ALL_ROOMS)}</option>
                 <option value="none">{t(MSG.NO_ROOM)}</option>
-                {filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                {filteredRooms.map(item => <option key={item.id} value={item.id}>{roomLabel(item)}</option>)}
               </select>
             </label>
             <label id="dashboard-search" className="dashboard-search-field">
