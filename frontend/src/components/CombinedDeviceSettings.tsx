@@ -210,6 +210,8 @@ export function CombinedDeviceSettings({
                 const choice = selected.get(id);
                 const routes = device ? deviceRoutes(device) : [];
                 const label = displayName(device, id);
+                const canChangeRoute = existing && choice && routes.length > 0
+                  && (routes.length > 1 || !routes.includes(choice.route));
                 return (
                   <div className="combined-member-option" key={id}>
                     <label htmlFor={`${formId}-member-${id}`}>
@@ -222,7 +224,7 @@ export function CombinedDeviceSettings({
                       />
                       {label}
                     </label>
-                    {choice && routes.length > 0 && (
+                    {canChangeRoute && (
                       <select
                         value={choice.route}
                         aria-label={t(MSG.CONTROL_METHOD) + label}

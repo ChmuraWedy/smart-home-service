@@ -37,7 +37,7 @@ const bulbs: CloudDevice[] = Array.from({ length: 3 }, (_, index) => {
   return { id, name, translations, online, has_local_key: false, controls: { ready: true, definitions, snapshot } };
 });
 
-function backend(initial?: CombinedDevice) {
+function backend(initial?: CombinedDevice, developerConnected = false) {
   let combined = initial;
   const writes: { path: string; method: string; body?: CombinedInput | Record<string, unknown> }[] = [];
   vi.mocked(fetch).mockImplementation(async (input, init) => {
@@ -48,7 +48,7 @@ function backend(initial?: CombinedDevice) {
     if (method !== 'GET') writes.push({ path, method, body });
     if (path === '/cloud/status') return json({
       enabled: true, connected: true, has_saved_user_code: false, saved_user_code_requires_login: false,
-      developer: { configured: false, connected: false },
+      developer: { configured: developerConnected, connected: developerConnected },
     });
     if (path === '/combined-devices') {
       if (method === 'POST') {
@@ -75,7 +75,7 @@ function backend(initial?: CombinedDevice) {
     });
     if (path === '/rooms') return json([room]);
     if (['/devices', '/groups', '/buildings'].includes(path)) return json([]);
-    if (path === '/cloud/devices') return json(bulbs);
+    if (path === '/cloud/devices') return json(url.searchParams.get('provider') === 'developer' ? bulbs.slice(0, 1) : bulbs);
     if (path.startsWith('/activity/')) return json({ events: [], next_before: null });
     if (path.endsWith('/mappings')) return json({ mappings: [] });
     const [, id, action] = /^\/cloud\/devices\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
@@ -110,6 +110,7 @@ describe('combined devices', () => {
     expect(form.queryByRole('combobox', { name: 'Room' })).toBeNull();
     expect(form.getByRole('button', { name: 'Next' })).toBeDisabled();
     for (const bulb of bulbs) await user.click(form.getByRole('checkbox', { name: bulb.name }));
+    expect(form.queryByRole('combobox')).toBeNull();
     await user.click(form.getByRole('button', { name: 'Next' }));
     expect(form.getByText('Name and room')).toHaveAttribute('aria-current', 'step');
     expect(form.getByRole('combobox', { name: 'Room' })).toHaveValue('3');
@@ -199,6 +200,33 @@ describe('combined devices', () => {
     expect(screen.queryByRole('listitem', { name: 'Kitchen Lights' })).toBeNull();
     expect(writes[4]).toMatchObject({ path: '/combined-devices/1', method: 'DELETE' });
   }, 15000);
+
+  it('uses the default control route at creation and offers changes only in edit', async () => {
+    const writes = backend(undefined, true);
+    const user = userEvent.setup();
+    openApp('/combined-devices/new?room=3');
+    const creation = within(await screen.findByRole('form', { name: 'Create combined device' }));
+    await user.click(creation.getByRole('checkbox', { name: bulbs[0].name }));
+    await user.click(creation.getByRole('checkbox', { name: bulbs[1].name }));
+    expect(creation.queryByRole('combobox')).toBeNull();
+    await user.click(creation.getByRole('button', { name: 'Next' }));
+    await user.click(creation.getByRole('button', { name: 'Save' }));
+    const edit = await screen.findByRole('button', { name: 'Edit Devices in Kitchen' });
+    expect(writes[0]).toMatchObject({ body: { members: [
+      { device_id: bulbs[0].id, route: 'sharing' },
+      { device_id: bulbs[1].id, route: 'sharing' },
+    ] } });
+    await user.click(edit);
+    const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
+    expect(editor.queryByRole('combobox', { name: 'Control method: Light Kitchen 2' })).toBeNull();
+    const route = editor.getByRole('combobox', { name: 'Control method: Light Kitchen 1' });
+    await user.selectOptions(route, 'developer');
+    await user.click(editor.getByRole('button', { name: 'Save' }));
+    expect(writes[1]).toMatchObject({ body: { members: [
+      { device_id: bulbs[0].id, route: 'developer' },
+      { device_id: bulbs[1].id, route: 'sharing' },
+    ] } });
+  });
 
   it('opens old dashboard creation links in the dedicated editor and cancels to the list', async () => {
     backend();
