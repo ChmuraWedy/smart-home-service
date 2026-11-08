@@ -1,5 +1,5 @@
 import {
-  useEffect, useId, useLayoutEffect, useRef, useState,
+  useEffect, useLayoutEffect, useRef, useState,
 } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
@@ -53,7 +53,7 @@ function useGridColumns(density: string) {
 }
 
 function LayoutTarget({
-  slot, row, column, cardName, selected, moving, disabled, over, onSelect,
+  slot, row, column, cardName, selected, moving, disabled, over, visibility, onSelect,
 }: {
   slot: number;
   row: number;
@@ -63,6 +63,7 @@ function LayoutTarget({
   moving: boolean;
   disabled: boolean;
   over?: DropTarget['nudge'];
+  visibility?: { shown: boolean; toggle: () => void };
   onSelect: (slot: number) => void;
 }) {
   const cell = t(MSG.LAYOUT_CELL, [row, column]);
@@ -90,22 +91,35 @@ function LayoutTarget({
       >
         <Icon name={cardName ? 'move' : 'add'} />
       </button>
+      {cardName && visibility && (
+        <button
+          type="button"
+          className="secondary dashboard-layout-card-eye"
+          aria-label={t(MSG.DASHBOARD_LAYOUT_CARD_VISIBILITY, [cardName])}
+          aria-pressed={visibility.shown}
+          title={t(MSG.DASHBOARD_LAYOUT_CARD_VISIBILITY, [cardName])}
+          disabled={disabled}
+          onClick={visibility.toggle}
+        >
+          <Icon name={visibility.shown ? 'eye' : 'eye-off'} />
+        </button>
+      )}
     </li>
   );
 }
 
 export default function DashboardGrid<T>({
-  api, density, items, view, editable, renderCard,
+  api, density, items, view, editable, navigation, renderCard,
 }: {
   api: HomeApi;
   density: 'small' | 'large';
   items: GridItem<T>[];
   view?: GridView;
   editable: boolean;
+  navigation?: ReactNode;
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
 }) {
   const { grid, columns } = useGridColumns(density);
-  const visibilityId = useId();
   const [browserId, setBrowserId] = useState(dashboardBrowserId);
   const [saved, setSaved] = useState<SavedLayout>();
   const [readAttempt, setReadAttempt] = useState(0);
@@ -144,9 +158,8 @@ export default function DashboardGrid<T>({
   const visibleItems = draft || showAll ? items : items.filter((item) => !item.hideable || item.forceVisible || !hidden.has(item.id));
   const slots = placeCards(visibleItems.map(({ id }) => id), draft?.slots ?? current?.layout?.slots ?? []);
   const cards = new Map(visibleItems.map((item) => [item.id, item]));
-  const individualDevices = items.filter((item) => item.hideable);
-  const hasHiddenDevices = individualDevices.some(({ id }) => hidden.has(id));
-  const showEditor = Boolean(viewKey && (draft || (editable && items.length)));
+  const hasHiddenDevices = items.some((item) => item.hideable && hidden.has(item.id));
+  const showEditor = Boolean(viewKey && (draft || editable));
 
   const drag = useDashboardDrag(scope, (from, target) => {
     setDraft((value) => value && {
@@ -194,11 +207,12 @@ export default function DashboardGrid<T>({
     const slot = index * activeColumns + column;
     const row = index + 1;
     const item = id ? cards.get(id) : undefined;
+    const isHidden = Boolean(item?.hideable && draft?.hiddenDevices.includes(item.id));
     const style = { gridColumnStart: 1, gridRowStart: row };
     const content = [];
     if (item) {
       content.push(renderCard(item.entry, {
-        style,
+        style: { ...style, opacity: isHidden ? 0.55 : undefined },
         inert: Boolean(draft) || undefined,
         slot: draft ? slot : undefined,
         nudge: dropPreview?.slot === slot ? dropPreview.nudge : undefined,
@@ -216,6 +230,10 @@ export default function DashboardGrid<T>({
           moving={draft.selected !== undefined}
           disabled={saving}
           over={dropPreview?.slot === slot ? dropPreview.nudge : undefined}
+          visibility={item?.hideable ? {
+            shown: !isHidden,
+            toggle: () => setDeviceVisibility(item.id, isHidden),
+          } : undefined}
           onSelect={(target) => selectSlot(target)}
         />,
       );
@@ -264,57 +282,57 @@ export default function DashboardGrid<T>({
   }
 
   let editLabel = t(MSG.EDIT_DASHBOARD_LAYOUT);
-  if (draft) editLabel = t(MSG.CANCEL);
-  else if (current?.error) editLabel = t(MSG.RETRY_DASHBOARD_LAYOUT);
+  let editIcon: 'edit' | 'close' | 'refresh-list' = 'edit';
+  if (draft) {
+    editLabel = t(MSG.CANCEL);
+    editIcon = 'close';
+  } else if (current?.error) {
+    editLabel = t(MSG.RETRY_DASHBOARD_LAYOUT);
+    editIcon = 'refresh-list';
+  }
 
   return (
     <>
-      {showEditor && (
+      {(navigation || showEditor) && (
         <div className="dashboard-layout-toolbar" data-editing={Boolean(draft) || undefined}>
-          <button
-            type="button"
-            className="secondary compact"
-            disabled={saving || Boolean(browserId && !current && !draft)}
-            onClick={toggleEditing}
-          >
-            {!draft && <Icon name="edit" />}
-            {editLabel}
-          </button>
-          {draft && (
-            <button type="button" className="primary compact" disabled={saving} onClick={() => saveLayout()}>
-              {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
-            </button>
-          )}
-          {!draft && hasHiddenDevices && (
-            <button type="button" className="secondary compact" aria-pressed={showAll} onClick={() => setShowAll((value) => !value)}>
-              {t(MSG.DASHBOARD_LAYOUT_SHOW_ALL)}
-            </button>
-          )}
+          <div className="dashboard-layout-heading">
+            {navigation && <div className="dashboard-layout-room">{navigation}</div>}
+            {showEditor && (
+              <div className="dashboard-layout-actions">
+                <button
+                  type="button"
+                  className="secondary dashboard-layout-icon"
+                  aria-label={editLabel}
+                  title={editLabel}
+                  disabled={saving || (!draft && !current?.error && !items.length) || Boolean(browserId && !current && !draft)}
+                  onClick={toggleEditing}
+                >
+                  <Icon name={editIcon} />
+                </button>
+                {draft ? (
+                  <button type="button" className="primary compact" disabled={saving} onClick={() => saveLayout()}>
+                    {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary dashboard-layout-icon"
+                    aria-label={t(MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN)}
+                    aria-pressed={showAll}
+                    title={t(hasHiddenDevices ? MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN : MSG.DASHBOARD_LAYOUT_NONE_HIDDEN)}
+                    disabled={!hasHiddenDevices}
+                    onClick={() => setShowAll((value) => !value)}
+                  >
+                    <Icon name={showAll ? 'eye' : 'eye-off'} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           {draft && <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>}
           {saveError && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
         </div>
-      )}
-      {draft && individualDevices.length > 0 && (
-        <details className="dashboard-layout-visibility">
-          <summary>{t(MSG.DASHBOARD_LAYOUT_DEVICE_VISIBILITY)}</summary>
-          <ul>
-            {individualDevices.map(({ id, cardName }) => (
-              <li key={id}>
-                <label htmlFor={`${visibilityId}-${id}`}>
-                  <input
-                    id={`${visibilityId}-${id}`}
-                    type="checkbox"
-                    checked={!draft.hiddenDevices.includes(id)}
-                    disabled={saving}
-                    onChange={(event) => setDeviceVisibility(id, event.target.checked)}
-                  />
-                  {cardName}
-                </label>
-              </li>
-            ))}
-          </ul>
-        </details>
       )}
       <div
         className="dashboard-device-grid"

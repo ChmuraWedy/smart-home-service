@@ -22,7 +22,9 @@ function edgeScrollDelta(y: number) {
 }
 
 function dropTarget(grid: HTMLDivElement, x: number, y: number): DropTarget | undefined {
-  const target = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-layout-target]');
+  const hit = document.elementFromPoint(x, y);
+  const target = hit?.closest<HTMLElement>('[data-layout-target]')
+    ?? hit?.closest('.dashboard-layout-target')?.querySelector<HTMLElement>('[data-layout-target]');
   if (!target || !grid.contains(target)) return undefined;
   const { top, height } = target.getBoundingClientRect();
   return { slot: Number(target.dataset.layoutTarget), nudge: y < top + height / 2 ? 'down' : 'up' };

@@ -389,12 +389,20 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     const displayed = combinedInRoom.filter((item) => item.name.normalize('NFC').toLocaleLowerCase().includes(needle)
       || item.aliases?.some((alias) => alias.toLocaleLowerCase().includes(needle))
       || resolvedMembers.get(item.id)?.some(({ device }) => device && matchesDevice(device, needle)));
-    const combinedMembers = new Set(displayed
-      .filter((item) => !item.show_member_cards)
-      .flatMap((item) => (resolvedMembers.get(item.id) ?? []).map(({ device }) => device?.id)));
-    const filtered = devices.filter((device) => !combinedMembers.has(device.id)
-      && (!building || String(placementOf(device)?.building_id) === building)
-      && inRoom(placementOf(device)?.room_id ?? null) && matchesDevice(device, needle));
+    const shownMembers = new Set<string>();
+    const hiddenMembers = new Set<string>();
+    for (const item of displayed) {
+      const members = item.show_member_cards ? shownMembers : hiddenMembers;
+      for (const { device } of resolvedMembers.get(item.id) ?? []) {
+        if (device) members.add(device.id);
+      }
+    }
+    const filtered = devices.filter((device) => {
+      const placement = placementOf(device);
+      const inView = shownMembers.has(device.id) || (!hiddenMembers.has(device.id)
+        && (!building || String(placement?.building_id) === building) && inRoom(placement?.room_id ?? null));
+      return inView && matchesDevice(device, needle);
+    });
     const groups = inventory?.groups.filter((item) => inRoom(item.room_id)
       && (!building || String(roomBuilding(item.room_id)) === building) && item.name.toLocaleLowerCase().includes(needle)) ?? [];
     return [
@@ -713,7 +721,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         <>
           {linkError && <p className="field-error" role="alert">{linkError}</p>}
           {!busy && current && combinedId && !combined && <p className="field-error" role="alert">{t(MSG.COMBINATION_UNAVAILABLE)}</p>}
-          <RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />
           <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
           {sharingReady && (
           <TopologySummary
@@ -757,6 +764,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             items={gridItems}
             view={canUseLayout ? { building, room, page: page + 1 } : undefined}
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
+            navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />
           {entries.length > PAGE_SIZE && (

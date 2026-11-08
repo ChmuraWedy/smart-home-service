@@ -838,16 +838,16 @@ input[type=hidden] {
 .dashboard-layout-gap { @apply tw:min-h-16; }
 .dashboard-layout-toolbar { @apply tw:my-2 tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
 .dashboard-layout-toolbar[data-editing] { @apply tw:sticky tw:top-0 tw:z-20 tw:bg-(--page-bg) tw:py-2; }
-.dashboard-layout-toolbar button { @apply tw:inline-flex tw:min-h-11 tw:items-center tw:gap-1.5; }
-.dashboard-layout-toolbar .help, .dashboard-layout-toolbar .field-error { @apply tw:m-0 tw:basis-full; }
-.dashboard-layout-visibility { @apply tw:mb-3 tw:rounded-md tw:border tw:border-(--border) tw:px-3; }
-.dashboard-layout-visibility summary { @apply tw:cursor-pointer tw:py-2 tw:text-sm tw:font-semibold; }
-.dashboard-layout-visibility ul {
-  @apply tw:m-0 tw:grid tw:max-h-48 tw:list-none tw:gap-x-4 tw:overflow-y-auto tw:px-0 tw:pb-2;
-  grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));
+.dashboard-layout-heading { @apply tw:flex tw:w-full tw:min-w-0 tw:items-center tw:gap-2; }
+.dashboard-layout-room { @apply tw:min-w-0; }
+.dashboard-layout-actions { @apply tw:flex tw:shrink-0 tw:items-center tw:gap-1; }
+.dashboard-layout-actions > button { @apply tw:min-h-11; }
+.dashboard-layout-actions .dashboard-layout-icon {
+  @apply tw:grid tw:size-11 tw:place-items-center tw:border-transparent tw:bg-transparent tw:p-0;
 }
-.dashboard-layout-visibility label { @apply tw:m-0 tw:flex tw:min-h-8 tw:items-center tw:gap-2 tw:wrap-anywhere; }
-.dashboard-layout-visibility input { @apply tw:m-0 tw:size-4 tw:min-h-0 tw:shrink-0 tw:p-0 tw:accent-(--accent); }
+.dashboard-layout-icon[aria-pressed="true"] { @apply tw:bg-(--success-bg) tw:text-(--accent); }
+.dashboard-layout-icon .ui-icon { @apply tw:size-5; }
+.dashboard-layout-toolbar .help, .dashboard-layout-toolbar .field-error { @apply tw:m-0 tw:basis-full; }
 .dashboard-layout-target { @apply tw:relative tw:z-10; }
 .dashboard-layout-target-button {
   @apply tw:flex tw:min-h-16 tw:w-full tw:items-center tw:justify-center tw:rounded-xl tw:border tw:border-dashed tw:border-(--border-strong) tw:bg-transparent tw:p-0 tw:text-(--text);
@@ -858,6 +858,14 @@ input[type=hidden] {
 .dashboard-layout-target-button[data-occupied] {
   @apply tw:absolute tw:inset-0 tw:min-h-0 tw:cursor-grab tw:items-start tw:justify-end tw:border-transparent tw:p-1 tw:select-none;
 }
+.dashboard-layout-card-eye {
+  @apply tw:absolute tw:top-0 tw:end-8 tw:z-1 tw:grid tw:size-11 tw:items-start tw:justify-items-center tw:border-0 tw:bg-transparent tw:p-0 tw:pt-1;
+}
+.dashboard-layout-card-eye .ui-icon {
+  @apply tw:pointer-events-none tw:box-content tw:size-5 tw:rounded-md tw:bg-(--surface) tw:p-1;
+}
+.dashboard-layout-card-eye:hover:enabled .ui-icon,
+.dashboard-layout-card-eye[aria-pressed="false"] .ui-icon { @apply tw:bg-(--surface-raised); }
 .dashboard-layout-target-button[data-occupied]:hover:enabled {
   @apply tw:bg-transparent;
 }
@@ -1388,8 +1396,9 @@ button.header-icon:hover:enabled { background:var(--hover); }
 @media (max-width:760px), (pointer:coarse) {
   .dashboard-view:has(.room-navigation-bar) { @apply tw:pb-0; }
   .room-navigation-bar, .room-navigation-heading { @apply tw:hidden; }
+  .dashboard-layout-room { @apply tw:flex-1; }
   .room-navigation-trigger {
-    @apply tw:my-2 tw:grid tw:min-h-14 tw:w-full tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:items-center tw:gap-3 tw:px-3 tw:text-start tw:text-lg tw:wrap-anywhere;
+    @apply tw:grid tw:min-h-14 tw:w-full tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:items-center tw:gap-3 tw:px-3 tw:text-start tw:text-lg tw:wrap-anywhere;
   }
   .room-navigation-trigger .ui-icon { @apply tw:size-6; }
   .room-picker-panel {

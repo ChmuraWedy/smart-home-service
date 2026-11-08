@@ -10,6 +10,7 @@ import { App } from './test/App';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 const room = { id: 3, name: 'Kitchen', building_id: 2, aliases: [] };
+const otherRoom = { ...room, id: 4, name: 'Living Room' };
 const bulbs: CloudDevice[] = Array.from({ length: 3 }, (_, index) => {
   const id = `bulb-${index + 1}`;
   const definitions: CloudFunctions = {
@@ -47,7 +48,13 @@ const relayDefinitions: CloudFunctions = {
   ],
 };
 
-function backend(initial?: CombinedDevice, developerConnected = false, allMembersReachable = false, includeRelay = false) {
+function backend(
+  initial?: CombinedDevice,
+  developerConnected = false,
+  allMembersReachable = false,
+  includeRelay = false,
+  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[] },
+) {
   let combined = initial;
   const refreshedPower = new Map<string, boolean>();
   const refreshedMembers: string[] = [];
@@ -67,7 +74,7 @@ function backend(initial?: CombinedDevice, developerConnected = false, allMember
         combined = { id: 1, ...body, members: body.members.map((entry: object) => ({ ...entry, accessible: true })) };
         return json(combined, 201);
       }
-      return json(combined ? [combined] : []);
+      return json([...(combined ? [combined] : []), ...(options?.otherCombinations ?? [])]);
     }
     if (path === '/combined-devices/1' && method === 'PUT') {
       combined = { ...combined, id: 1, ...body, members: body.members.map((entry: object) => ({ ...entry, accessible: true })) };
@@ -93,10 +100,12 @@ function backend(initial?: CombinedDevice, developerConnected = false, allMember
     }
     if (path === '/cloud/topology') return json({
       synced_at: null, warnings: 0,
-      placements: bulbs.map((bulb) => ({ device_id: bulb.id, building_id: room.building_id, room_id: room.id })),
+      placements: bulbs.map((bulb) => ({
+        device_id: bulb.id, building_id: room.building_id, room_id: options?.memberRooms?.[bulb.id] ?? room.id,
+      })),
       job: { status: 'idle', processed: 0, total: 0, message: null },
     });
-    if (path === '/rooms') return json([room]);
+    if (path === '/rooms') return json([room, otherRoom]);
     if (['/devices', '/groups', '/buildings'].includes(path)) return json([]);
     if (path === '/cloud/devices') {
       if (url.searchParams.get('provider') === 'developer') return json(bulbs.slice(0, 1));
@@ -505,18 +514,24 @@ describe('combined devices', () => {
     expect(screen.queryByRole('listitem', { name: bulbs[2].name })).toBeNull();
   });
 
-  it('can show original cards next to a combination and hide them again from the edit preview', async () => {
+  it('shows original cards from other rooms, including a member of another combination', async () => {
+    const members = bulbs.slice(0, 2).map(({ id }) => ({ device_id: id, route: 'sharing' as const, accessible: true }));
     const { writes } = backend({
       id: 1,
       name: 'Kitchen lights',
       room_id: room.id,
       show_member_cards: true,
-      members: bulbs.slice(0, 2).map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+      members,
+    }, false, false, false, {
+      memberRooms: { [bulbs[0].id]: otherRoom.id },
+      otherCombinations: [{ id: 2, name: 'Other lights', room_id: room.id, members }],
     });
     const user = userEvent.setup();
     const app = openApp('/rooms/3');
     await screen.findByRole('listitem', { name: 'Kitchen lights' });
-    expect(screen.getByRole('listitem', { name: bulbs[0].name })).toBeInTheDocument();
+    const lamp = within(await screen.findByRole('listitem', { name: bulbs[0].name }));
+    expect(lamp.getByText(otherRoom.name)).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: bulbs[1].name })).toBeInTheDocument();
     app.unmount();
 
     openApp('/combined-devices/1/edit/preview');

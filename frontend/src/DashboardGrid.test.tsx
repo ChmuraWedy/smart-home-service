@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardGrid from './components/DashboardGrid';
 import { ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards } from './dashboard-layout';
@@ -20,6 +20,7 @@ function mount(room = '3') {
       items={items}
       view={{ ...view, room }}
       editable
+      navigation={<p>Study Room</p>}
       renderCard={({ id, title }, { style, inert, slot, nudge }) => (
         <li key={id} data-testid={id} data-layout-slot={slot} data-layout-nudge={nudge} style={style} inert={inert}>{title}</li>
       )}
@@ -96,41 +97,45 @@ describe('dashboard layout', () => {
     cardAt('device-a', 1, 1);
   });
 
-  it('hides individual cards persistently and reveals them temporarily with Show all', async () => {
+  it('hides individual cards with their eye button and reveals them temporarily from the room header', async () => {
     let stored: DashboardLayout = { slots: [] };
     vi.mocked(fetch).mockImplementation(async (_input, init) => {
       if (init?.method === 'PUT') stored = JSON.parse(String(init.body));
       return Response.json(stored);
     });
     const first = mount();
+    const header = within(screen.getByText('Study Room').closest('.dashboard-layout-heading') as HTMLElement);
+    expect(header.getByRole('button', { name: 'Edit layout' })).toBeEnabled();
+    expect(header.getByRole('button', { name: 'Show hidden devices' })).toBeDisabled();
     click('Edit layout');
-    fireEvent.click(screen.getByText('Visible individual devices'));
-    expect(screen.getByRole('checkbox', { name: 'Card 1' })).toBeChecked();
-    expect(screen.queryByRole('checkbox', { name: 'Card 2' })).toBeNull();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Card 1' }));
+    const cardTools = within(screen.getByRole('button', { name: 'Move Card 1 (Row 1, column 1)' }).closest('li') as HTMLElement);
+    const eye = cardTools.getByRole('button', { name: 'Show Card 1 on the dashboard' });
+    expect(eye).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: 'Show Card 2 on the dashboard' })).toBeNull();
+    fireEvent.click(eye);
+    expect(eye).toHaveAttribute('aria-pressed', 'false');
     click('Save');
-    expect(await screen.findByRole('button', { name: 'Show all' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await screen.findByRole('button', { name: 'Show hidden devices' })).toHaveAttribute('aria-pressed', 'false');
     expect(stored.hidden_devices).toEqual(['device-a']);
     expect(screen.queryByTestId('device-a')).toBeNull();
     expect(screen.getByTestId('group-1')).toBeInTheDocument();
 
-    click('Show all');
+    click('Show hidden devices');
     cardAt('device-a', 1, 1);
-    expect(screen.getByRole('button', { name: 'Show all' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Show hidden devices' })).toHaveAttribute('aria-pressed', 'true');
 
     first.unmount();
     mount();
-    await screen.findByRole('button', { name: 'Show all' });
+    await screen.findByRole('button', { name: 'Show hidden devices' });
     expect(screen.queryByTestId('device-a')).toBeNull();
     click('Edit layout');
-    fireEvent.click(screen.getByText('Visible individual devices'));
-    const checkbox = screen.getByRole('checkbox', { name: 'Card 1' });
-    expect(checkbox).not.toBeChecked();
-    fireEvent.click(checkbox);
+    const savedEye = screen.getByRole('button', { name: 'Show Card 1 on the dashboard' });
+    expect(savedEye).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(savedEye);
     click('Save');
     await waitFor(() => expect(stored.hidden_devices).toEqual([]));
     expect(screen.getByTestId('device-a')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show hidden devices' })).toBeDisabled();
   });
 
   it('keeps a previously saved card beyond the editor slots accessible', async () => {
