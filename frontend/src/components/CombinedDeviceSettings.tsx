@@ -101,7 +101,7 @@ export function CombinedDeviceList({
 }
 
 export function CombinedDeviceSettings({
-  api, existing, devices, rooms, initialRoom, deviceRoom, now, cardSize, onClose, onSaved, onAuthError,
+  api, existing, devices, rooms, initialRoom, deviceRoom, now, cardSize, previewing, onPreview, onPreviewBack, onClose, onSaved, onAuthError,
 }: {
   api: HomeApi;
   existing?: CombinedDevice;
@@ -111,6 +111,9 @@ export function CombinedDeviceSettings({
   deviceRoom: (device: UnifiedDevice) => number | null;
   now: number;
   cardSize: 'small' | 'large';
+  previewing: boolean;
+  onPreview: () => void;
+  onPreviewBack: () => void;
   onClose: () => void;
   onSaved: (saved?: CombinedDevice) => void;
   onAuthError: () => void;
@@ -118,9 +121,12 @@ export function CombinedDeviceSettings({
   const formId = useId();
   const displayName = useDeviceDisplayName();
   const [nameDraft, setName] = useState(existing?.name);
-  const [step, setStep] = useState<(typeof creationSteps)[number][0]>(existing ? 'details' : 'devices');
+  const [draftStep, setDraftStep] = useState<'devices' | 'details'>(existing ? 'details' : 'devices');
+  const step = previewing ? 'preview' : draftStep;
   const activeStep = useRef<HTMLLIElement>(null);
   useEffect(() => { activeStep.current?.focus(); }, [step]);
+  const missingDraft = previewing && draftStep === 'devices';
+  useEffect(() => { if (missingDraft) onPreviewBack(); }, [missingDraft, onPreviewBack]);
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
   const [members, setMembers] = useState<CombinedMemberInput[]>(() => existing?.members.map(({ device_id: id, route, power_source: source }) => ({
     device_id: id, route, ...(source ? { power_source: source } : {}),
@@ -145,7 +151,6 @@ export function CombinedDeviceSettings({
   const roomName = rooms.find(({ id }) => id === room)?.name;
   const name = nameDraft ?? (roomName ? t(MSG.COMBINED_SUGGESTED_NAME, [roomName]).slice(0, 120) : '');
   const pickingDevices = step === 'devices';
-  const previewing = step === 'preview';
   const steps = existing ? editingSteps : creationSteps;
   const submitLabel = existing ? MSG.COMBINED_CARD_PREVIEW : MSG.NEXT;
   const canSubmit = !busy && members.length >= 2 && (pickingDevices || Boolean(roomName && name.trim()));
@@ -173,7 +178,8 @@ export function CombinedDeviceSettings({
     setError('');
     if (!previewing) {
       setConfirmDelete(false);
-      setStep(pickingDevices ? 'details' : 'preview');
+      if (pickingDevices) setDraftStep('details');
+      else onPreview();
       return;
     }
     setBusy(true);
@@ -214,6 +220,8 @@ export function CombinedDeviceSettings({
   const selectSource = useCallback((id: string, source: CombinedPowerSource | null) => {
     setMembers((rows) => rows.map((member) => (member.device_id === id ? { ...member, power_source: source } : member)));
   }, []);
+
+  if (missingDraft) return null;
 
   return (
     <>
@@ -317,7 +325,7 @@ export function CombinedDeviceSettings({
           )}
           <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t(MSG.CANCEL)}</button>
           {(previewing || (!existing && !pickingDevices)) && (
-            <button type="button" className="secondary" disabled={busy} onClick={() => setStep(previewing ? 'details' : 'devices')}>
+            <button type="button" className="secondary" disabled={busy} onClick={previewing ? onPreviewBack : () => setDraftStep('devices')}>
               {t(MSG.BACK)}
             </button>
           )}

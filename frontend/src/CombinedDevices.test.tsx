@@ -144,6 +144,7 @@ describe('combined devices', () => {
     await user.selectOptions(await source(1), `${relay.name} · Channel 2`);
     await user.selectOptions(await source(2), `${relay.name} · Channel 2`);
     await user.click(form.getByRole('button', { name: 'Next' }));
+    expect(window.location.pathname + window.location.search).toBe('/combined-devices/new/preview?room=3');
     expect(form.getByText('Card preview', { selector: 'li' })).toHaveAttribute('aria-current', 'step');
     const preview = within(form.getByRole('group', { name: 'Card preview' }));
     const draftCard = within(preview.getByRole('listitem', { name: 'Devices in Kitchen' }));
@@ -159,6 +160,7 @@ describe('combined devices', () => {
     expect(writes).toHaveLength(0);
 
     await user.click(form.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/combined-devices/new'));
     const restored = await form.findByRole('combobox', { name: `Power source for ${bulbs[0].name}` });
     expect(restored).toHaveDisplayValue(`${relay.name} · Channel 1`);
     await user.click(form.getByRole('button', { name: 'Next' }));
@@ -357,14 +359,16 @@ describe('combined devices', () => {
     await user.clear(editor.getByRole('textbox', { name: 'Name' }));
     await user.type(editor.getByRole('textbox', { name: 'Name' }), 'Evening lights');
     await user.click(editor.getByRole('button', { name: 'Card preview' }));
+    expect(window.location.pathname).toBe('/combined-devices/1/edit/preview');
     expect(editor.getByText('Card preview', { selector: 'li' })).toHaveAttribute('aria-current', 'step');
     const preview = within(editor.getByRole('group', { name: 'Card preview' }));
     const draft = within(preview.getByRole('listitem', { name: 'Evening lights' }));
     expect(draft.getByRole('region', { name: bulbs[2].name })).toBeInTheDocument();
     expect(draft.getByRole('button', { name: 'Power for all devices' })).toBeDisabled();
     expect(writes).toHaveLength(0);
-    await user.click(editor.getByRole('button', { name: 'Back' }));
-    expect(editor.getByRole('textbox', { name: 'Name' })).toHaveValue('Evening lights');
+    act(() => window.history.back());
+    expect(await editor.findByRole('textbox', { name: 'Name' })).toHaveValue('Evening lights');
+    expect(window.location.pathname).toBe('/combined-devices/1/edit');
     expect(editor.getByRole('checkbox', { name: bulbs[2].name })).toBeChecked();
     await user.click(editor.getByRole('button', { name: 'Card preview' }));
     await user.click(editor.getByRole('button', { name: 'Save' }));
@@ -373,6 +377,28 @@ describe('combined devices', () => {
       { device_id: bulbs[1].id, route: 'sharing' },
       { device_id: bulbs[2].id, route: 'sharing' },
     ] } });
+  });
+
+  it('opens a direct edit preview with saved data and can return to its editor', async () => {
+    backend({
+      id: 1, name: 'Kitchen lights', room_id: room.id,
+      members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    });
+    const user = userEvent.setup();
+    openApp('/combined-devices/1/edit/preview?room=3');
+    const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
+    expect(editor.getByRole('listitem', { name: 'Kitchen lights' })).toBeInTheDocument();
+    await user.click(editor.getByRole('button', { name: 'Back' }));
+    expect(await editor.findByRole('textbox', { name: 'Name' })).toHaveValue('Kitchen lights');
+    expect(window.location.pathname + window.location.search).toBe('/combined-devices/1/edit?room=3');
+  });
+
+  it('returns a direct creation preview without a draft to device selection', async () => {
+    backend();
+    openApp('/combined-devices/new/preview?room=3');
+    const editor = within(await screen.findByRole('form', { name: 'Create combined device' }));
+    expect(editor.getByRole('checkbox', { name: bulbs[0].name })).not.toBeChecked();
+    expect(window.location.pathname + window.location.search).toBe('/combined-devices/new?room=3');
   });
 
   it('opens old dashboard creation links in the dedicated editor and cancels to the list', async () => {

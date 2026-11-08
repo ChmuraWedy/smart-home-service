@@ -1,6 +1,8 @@
 import { MSG, t, translateText } from "../i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { matchPath, useLocation, useNavigate } from 'react-router';
+import {
+  generatePath, matchPath, useLocation, useNavigate,
+} from 'react-router';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { localSpec } from '../controls';
@@ -29,7 +31,8 @@ import type { GridCardPlacement } from './DashboardGrid';
 import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
 import {
-  appPaths, combinationEditPattern, combinationNewPath, combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery,
+  appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath,
+  combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery,
 } from '../navigation';
 import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
@@ -225,12 +228,16 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const groupId = matchPath(groupPattern, location.pathname)?.params.groupId;
   const combinedQuick = matchPath(combinationQuickPattern, location.pathname);
   const combinedQuickOpen = Boolean(combinedQuick);
-  const combinedEdit = matchPath(combinationEditPattern, location.pathname);
+  const combinedEditPreview = matchPath(combinationEditPreviewPattern, location.pathname);
+  const combinedEdit = combinedEditPreview ?? matchPath(combinationEditPattern, location.pathname);
   const combinedDetails = matchPath(combinationPattern, location.pathname);
-  const combinedNew = Boolean(matchPath(combinationNewPath, location.pathname));
+  const combinedNewPreview = Boolean(matchPath(combinationNewPreviewPath, location.pathname));
+  const combinedNew = combinedNewPreview || Boolean(matchPath(combinationNewPath, location.pathname));
+  const combinedPreview = combinedNewPreview || Boolean(combinedEditPreview);
   const combinationList = Boolean(matchPath(appPaths['combined-devices'], location.pathname));
   const managingCombinations = combinationList || combinedNew || Boolean(combinedEdit);
   const combinedId = combinedNew ? undefined : (combinedQuick ?? combinedEdit ?? combinedDetails)?.params.combinedId;
+  const editorPath = combinedNew ? combinationNewPath : combinedId && generatePath(combinationEditPattern, { combinedId });
   const [revision, setRevision] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
   useEffect(() => { if (dashboardPanel === 'search') searchInput.current?.focus(); }, [dashboardPanel]);
@@ -442,9 +449,17 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (href !== location.pathname + location.search) void navigate(href, { state: { dashboardOverlay: true } });
   }, [location.pathname, location.search, navigate]);
   const createCombination = useCallback(() => openOverlay(combinationNewPath), [openOverlay]);
-  const editCombination = useCallback((id: number) => openOverlay(`/combined-devices/${id}/edit`), [openOverlay]);
+  const editCombination = useCallback((id: number) => openOverlay(generatePath(combinationEditPattern, { combinedId: String(id) })), [openOverlay]);
+  const showCombinationPreview = useCallback(() => {
+    if (!editorPath) return;
+    navigate(`${editorPath}/preview${location.search}`, { state: { ...location.state, fromCombinationEditor: true } });
+  }, [editorPath, location.search, location.state, navigate]);
+  const returnToCombinationEditor = useCallback(() => {
+    if (location.state?.fromCombinationEditor) navigate(-1);
+    else if (editorPath) navigate(editorPath + location.search, { replace: true });
+  }, [editorPath, location.search, location.state, navigate]);
   const closeManagement = useCallback(() => {
-    if (location.state?.dashboardOverlay) navigate(-1);
+    if (location.state?.dashboardOverlay) navigate(location.state.fromCombinationEditor ? -2 : -1);
     else navigate(appPaths['combined-devices'], { replace: true });
   }, [location.state, navigate]);
   function choose(value: Selection) {
@@ -599,6 +614,9 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           deviceRoom={deviceRoom}
           now={now}
           cardSize={cardSize}
+          previewing={combinedPreview}
+          onPreview={showCombinationPreview}
+          onPreviewBack={returnToCombinationEditor}
           onClose={closeManagement}
           onSaved={saveCombination}
           onAuthError={onAuthError}

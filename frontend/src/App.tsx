@@ -18,7 +18,7 @@ import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 import { Icon, IconGlyph } from './components/ui/icon';
 import {
-  appPaths, combinationEditPattern, combinationNewPath, combinationPattern, combinationQuickPattern,
+  appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath, combinationPattern, combinationQuickPattern,
   dashboardHref, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomPattern,
 } from './navigation';
 import type { DashboardPanel } from './navigation';
@@ -65,9 +65,11 @@ export function createAppRouter() {
     screenRoute(groupPattern, 'control'),
     screenRoute(appPaths['combined-devices'], 'combined-devices'),
     screenRoute(combinationNewPath, 'combined-devices'),
+    screenRoute(combinationNewPreviewPath, 'combined-devices'),
     screenRoute(combinationPattern, 'control'),
     screenRoute(combinationQuickPattern, 'control'),
     screenRoute(combinationEditPattern, 'combined-devices'),
+    screenRoute(combinationEditPreviewPattern, 'combined-devices'),
     screenRoute(dashboardToolsPath, 'control'),
     screenRoute(appPaths.settings, 'settings'),
     ...(!demo ? [
