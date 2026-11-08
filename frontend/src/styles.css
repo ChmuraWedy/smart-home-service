@@ -1775,8 +1775,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   @apply tw:flex-1 tw:self-center tw:truncate tw:px-1.5 tw:text-xs tw:font-semibold tw:text-(--text-strong);
 }
 .combined-member-inline-state { @apply tw:max-w-1/2 tw:self-center tw:truncate tw:pe-1.5; }
-.combined-member-inline .dashboard-light-readings { @apply tw:flex-none; }
-.combined-member-inline .dashboard-light-reading { @apply tw:px-1.5; }
+.combined-member-inline .dashboard-light-readings { @apply tw:auto-cols-max tw:flex-none; }
+.combined-member-inline .dashboard-light-reading { @apply tw:px-0.75; }
 .combined-member-inline .dashboard-light-copy { @apply tw:flex-nowrap tw:gap-x-0.5 tw:whitespace-nowrap; }
 .combined-member-inline .dashboard-light-label { @apply tw:sr-only; }
 .combined-member-inline .dashboard-light-icon { @apply tw:block; }
@@ -1784,6 +1784,11 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-inline .dashboard-light-value { @apply tw:text-xs; }
 .combined-member-inline .dashboard-light-swatch { @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong); }
 .combined-member-inline .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
+.dashboard-view {
+  @variant narrow-dashboard-controls {
+    .combined-member .capability-row:has(.combined-member-inline) { --dashboard-power-size:44px; }
+  }
+}
 .combined-power-footer { @apply tw:border-t tw:border-(--border) tw:p-2; }
 .combined-power-footer .dashboard-power-button {
   @apply tw:flex tw:min-h-11 tw:w-full tw:items-center tw:justify-center tw:gap-2 tw:rounded-md tw:border-0 tw:bg-(--surface-raised) tw:px-2 tw:text-(--text);
