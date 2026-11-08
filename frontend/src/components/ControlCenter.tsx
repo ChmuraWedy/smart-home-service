@@ -7,8 +7,10 @@ import { localSpec } from '../controls';
 import { deviceAliases, deviceRoutes, deviceTextVariants, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
-import type { Group, GroupState, Inventory, LocalDevice } from '../home-api';
+import type { CombinedDevice, Group, GroupState, Inventory, LocalDevice } from '../home-api';
 import { CloudControl } from './CloudControl';
+import CombinedDeviceCard from './CombinedDeviceCard';
+import { CombinedDeviceDetails, CombinedDeviceSettings } from './CombinedDeviceSettings';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
@@ -26,7 +28,9 @@ import DashboardGrid from './DashboardGrid';
 import type { GridCardPlacement } from './DashboardGrid';
 import type { MouseEvent } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
-import { dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery } from '../navigation';
+import {
+  combinationEditPattern, combinationNewPath, combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery,
+} from '../navigation';
 import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
 import { readLocalDevice } from '../local-device-cache';
@@ -36,10 +40,11 @@ import { useLocalDeviceState } from '../use-local-device-state';
 import { useDeviceText } from '../device-translations';
 import type { DeviceTranslations } from '../device-translations';
 
-type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
-type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice };
-type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
+type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
+type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice } | { kind: 'combined'; combined: CombinedDevice };
+type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; combinations?: CombinedDevice[]; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
 const PAGE_SIZE = 24;
+const NO_COMBINATIONS: CombinedDevice[] = [];
 const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
 
 function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
@@ -77,6 +82,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
     setLightFeatures({ route, hasQuickSettings, hasPresets });
   }, [route]);
   const showSheet = () => { if (!paused && !quickBusy && hasSheet && !quickOpen) onQuickOpen(route); };
+  const openDetails = () => { if (!paused && !quickBusy) onOpen(route); };
   const local = device.local;
   const initialBattery = cloud?.battery || (local && state ? batteryFromSpecs(Object.entries(local.capabilities).map(([key,cap]) => localSpec(key,cap)),Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined);
   const battery = live ? live.battery : initialBattery;
@@ -94,23 +100,23 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
       className="device-card dashboard-device"
       data-card-layout={cardLayout}
       data-unavailable={!online || undefined}
-      data-quick-sheet={hasSheet || undefined}
+      data-header-details
       data-layout-slot={placement.slot}
       data-layout-nudge={placement.nudge}
       aria-label={name}
-      onClick={hasSheet ? (event) => openCard(event, showSheet) : undefined}
+      onClick={(event) => {
+        if (event.target instanceof Element) openCard(event, event.target.closest('.dashboard-card-header') ? openDetails : showSheet);
+      }}
       style={placement.style}
       inert={placement.inert}
     >
       <DashboardCardHeader
         icon={<DeviceIcon category={cloud?.category} codes={codes} />} aliases={aliases}
-        title={hasSheet ? (
-          <button type="button" className="device-card-sheet-trigger" ref={sheetTrigger}
-            title={name}
-            aria-haspopup="dialog" aria-expanded={quickOpen} aria-disabled={paused || quickBusy || undefined} onClick={showSheet}
-          >{name}
+        title={(
+          <button type="button" className="device-card-details-trigger" disabled={paused || quickBusy} title={name} onClick={openDetails}>
+            {name}
           </button>
-) : name}
+        )}
         metadata={(
           <>
             <p className="device-location">{room}</p>
@@ -122,7 +128,22 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
 )}
         actions={(
           <>
-            <CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy} onClick={() => onOpen(route)} />
+            {hasSheet && (
+              <button
+                type="button"
+                className="secondary tile-icon-action"
+                ref={sheetTrigger}
+                title={t(MSG.QUICK_DEVICE_CONTROLS)}
+                aria-label={t(MSG.QUICK_DEVICE_CONTROLS)}
+                aria-haspopup="dialog"
+                aria-expanded={quickOpen}
+                disabled={paused || quickBusy}
+                onClick={showSheet}
+              >
+                <Icon name="sliders" />
+              </button>
+            )}
+            <CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy || paused} onClick={openDetails} />
             {!local && (
             <button
               className="secondary tile-icon-action device-setup-action"
@@ -175,6 +196,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const current = ready && record?.api === api && record.mask === mask ? record : null;
   const inventory = current?.inventory;
   const cloud = current?.cloud || NO_CLOUD;
+  const combinations = current?.combinations ?? NO_COMBINATIONS;
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
@@ -185,6 +207,12 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const deviceLink = readDeviceLink(location.pathname + location.search);
   const quick = Boolean(matchPath(quickPattern, location.pathname));
   const groupId = matchPath(groupPattern, location.pathname)?.params.groupId;
+  const combinedQuick = matchPath(combinationQuickPattern, location.pathname);
+  const combinedQuickOpen = Boolean(combinedQuick);
+  const combinedEdit = matchPath(combinationEditPattern, location.pathname);
+  const combinedDetails = matchPath(combinationPattern, location.pathname);
+  const combinedNew = location.pathname === combinationNewPath;
+  const combinedId = combinedNew ? undefined : (combinedQuick ?? combinedEdit ?? combinedDetails)?.params.combinedId;
   const [revision, setRevision] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
   useEffect(() => { if (dashboardPanel === 'search') searchInput.current?.focus(); }, [dashboardPanel]);
@@ -253,7 +281,16 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         if (failure instanceof ApiError && failure.status === 401) onAuthError();
       }
     };
-    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal))];
+    const readCombinations = async () => {
+      try {
+        const result = await api.combinations(controller.signal);
+        if (controller.signal.aborted || !Array.isArray(result)) return;
+        setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, combinations: result } : previous);
+      } catch (failure) {
+        if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
+      }
+    };
+    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal)), readCombinations()];
     if (sharingReady) requests.push(handle('Smart Life', () => api.devices('sharing', controller.signal), 'sharing'));
     if (developerReady) requests.push(handle('Tuya Developer', () => api.devices('developer', controller.signal), 'developer'));
     void Promise.all(requests).finally(() => { if (!controller.signal.aborted) setBusy(false); });
@@ -278,6 +315,16 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     }
     return mergeDevices(localDevices, cloudDevices);
   }, [api, inventory, cloud, identity]);
+  const resolvedMembers = useMemo(() => {
+    const byId = new Map(devices.map((device) => [device.id, device]));
+    return new Map(combinations.map((combined) => [combined.id, combined.members.map((member) => {
+      const device = byId.get(member.device_id);
+      return { member, device: member.accessible && device && deviceRoutes(device).includes(member.route) ? device : undefined };
+    })]));
+  }, [combinations, devices]);
+  const combined = combinations.find((item) => String(item.id) === combinedId);
+  const combinedParent = combinations.find((item) => String(item.id) === query.get('combined')
+    && resolvedMembers.get(item.id)?.some(({ member, device }) => device?.id === deviceLink?.id && member.route === deviceLink?.route));
   const linked = deviceLink ? devices.find(device => device.id === deviceLink.id) : undefined;
   const linkedRoute = linked ? deviceLink?.route || deviceRoutes(linked)[0] : undefined;
   const validRoute = linked && linkedRoute && deviceRoutes(linked).includes(linkedRoute) ? linkedRoute : undefined;
@@ -285,15 +332,18 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const group = inventory?.groups.find(item => String(item.id) === groupId);
   const parent = inventory?.groups.find(item => String(item.id) === query.get('group') && linked?.local && item.device_ids.includes(linked.local.id));
   const activeSurvey = ready && survey?.api === api && survey.mask === mask && survey.key === location.key ? survey.value : null;
-  const selected: Selection | null = activeSurvey ?? (!quick && linked && validRoute ? { kind: 'device', device: linked, route: validRoute, parent }
+  const selected: Selection | null = activeSurvey ?? (!quick && linked && validRoute ? { kind: 'device', device: linked, route: validRoute, parent, combinedParent }
     : group ? { kind: 'group', group } : null);
   const detailDevice = selected?.kind === 'device' ? selected.device : undefined;
+  let detailCloseLabel: string | undefined;
+  if (selected?.kind === 'device' && selected.combinedParent) detailCloseLabel = t(MSG.BACK_TO_COMBINATION);
+  else if (selected?.kind === 'device' && selected.parent) detailCloseLabel = t(MSG.BACK_TO_GROUP);
   const detailProvider = selected?.kind === 'device' && selected.route !== 'local' ? selected.route : undefined;
   const detailCloud = detailProvider && detailDevice?.cloud[detailProvider];
   const knownGatewayId = detailCloud?.gateway_id || detailDevice?.cloud.developer?.gateway_id;
   const detailGateway = inventory?.devices.find((device) => device.id === detailDevice?.local?.parent_id)
     ?? inventory?.devices.find((device) => device.device_id === knownGatewayId);
-  const detailsOpen = selected !== null;
+  const detailsOpen = selected !== null || Boolean(combined || (combinedNew && current?.combinations));
   useEffect(() => {
     if (!detailsOpen) return;
     dispatch(setDetailsOpen(true));
@@ -306,45 +356,66 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const entries = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
-    const filtered = devices.filter(device => (!building || String(placementOf(device)?.building_id) === building) && inRoom(placementOf(device)?.room_id ?? null) && matchesDevice(device, needle));
-    const groups = inventory?.groups.filter(group => inRoom(group.room_id) && (!building || String(inventory.rooms.find(item => item.id === group.room_id)?.building_id) === building) && group.name.toLocaleLowerCase().includes(needle)) || [];
-    return [...groups.map(group => ({ kind: 'group' as const, group })), ...filtered.map(device => ({ kind: 'device' as const, device }))];
-  }, [devices, inventory, building, room, search, placements]);
-  const linkedIndex = entries.findIndex(entry => entry.kind === 'device' ? entry.device === linked : entry.group === group);
+    const roomBuilding = (id: number | null) => inventory?.rooms.find((item) => item.id === id)?.building_id;
+    const combinedInRoom = combinations.filter((item) => inRoom(item.room_id) && (!building || String(roomBuilding(item.room_id)) === building));
+    const displayed = combinedInRoom.filter((item) => item.name.toLocaleLowerCase().includes(needle)
+      || resolvedMembers.get(item.id)?.some(({ device }) => device && matchesDevice(device, needle)));
+    const combinedMembers = new Set(displayed.flatMap((item) => (resolvedMembers.get(item.id) ?? []).map(({ device }) => device?.id)));
+    const filtered = devices.filter((device) => !combinedMembers.has(device.id)
+      && (!building || String(placementOf(device)?.building_id) === building)
+      && inRoom(placementOf(device)?.room_id ?? null) && matchesDevice(device, needle));
+    const groups = inventory?.groups.filter((item) => inRoom(item.room_id)
+      && (!building || String(roomBuilding(item.room_id)) === building) && item.name.toLocaleLowerCase().includes(needle)) ?? [];
+    return [
+      ...groups.map((item) => ({ kind: 'group' as const, group: item })),
+      ...displayed.map((item) => ({ kind: 'combined' as const, combined: item })),
+      ...filtered.map((device) => ({ kind: 'device' as const, device })),
+    ];
+  }, [devices, inventory, building, room, search, placements, combinations, resolvedMembers]);
+  const linkedIndex = entries.findIndex((entry) => {
+    if (entry.kind === 'device') return entry.device === linked;
+    if (entry.kind === 'combined') return entry.combined === (combined ?? combinedParent);
+    return entry.group === group;
+  });
   const page = linkedIndex >= 0 ? Math.floor(linkedIndex / PAGE_SIZE)
     : Number.isSafeInteger(requestedPage) ? Math.min(Math.max(requestedPage - 1, 0), Math.max(0, Math.ceil(entries.length / PAGE_SIZE) - 1)) : 0;
   const visible = useMemo(() => {
     const pageEntries = entries.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
     // A copied quick link can outlive the device's room assignment or alias.
-    return quick && linked && validRoute && linkedIndex < 0 ? [{ kind: 'device' as const, device: linked }, ...pageEntries] : pageEntries;
-  }, [entries, page, quick, linked, validRoute, linkedIndex]);
+    if (linkedIndex < 0 && combinedQuickOpen && combined) return [{ kind: 'combined' as const, combined }, ...pageEntries];
+    if (quick && linked && validRoute && !pageEntries.some((entry) => entry.kind === 'device' && entry.device === linked)) {
+      return [{ kind: 'device' as const, device: linked }, ...pageEntries];
+    }
+    return pageEntries;
+  }, [entries, page, quick, linked, validRoute, linkedIndex, combined, combinedQuickOpen]);
   useEffect(() => {
     const controller = new AbortController();
     setGroupStates({});
     // Initial list reads use SQLite only. Visible card controls separately
     // renew background watches; list loading never requests per-device cloud details.
-    for (const entry of visible) {
-      const local = entry.kind === 'device' ? entry.device.local : undefined;
-      if (entry.kind === 'device' && !local) continue;
-      const request = entry.kind === 'group' ? api.groupState(entry.group.id, controller.signal)
-        : dispatch(readLocalDevice(api, local!.id, false, controller.signal));
+    visible.forEach((entry) => {
+      let request;
+      if (entry.kind === 'group') request = api.groupState(entry.group.id, controller.signal);
+      else if (entry.kind === 'device' && entry.device.local) request = dispatch(readLocalDevice(api, entry.device.local.id, false, controller.signal));
+      if (!request) return;
       void request.then(value => {
         if (controller.signal.aborted) return;
         if ('group_id' in value) setGroupStates(current => ({ ...current, [value.group_id]: value }));
       }).catch(failure => { if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError(); });
-    }
+    });
     return () => controller.abort();
   }, [api, dispatch, visible]);
   function setPage(value: number) {
     if (value > 0) query.set('page', String(value + 1)); else query.delete('page');
     void navigate(dashboardHref(room, query, dashboardPanel));
   }
-  function overlayHref(path: string, route?: DeviceRoute, group?: Group) {
+  function overlayHref(path: string, route?: DeviceRoute, group?: Group, combination?: CombinedDevice) {
     const params = new URLSearchParams(query);
     if (room) params.set('room', room);
     if (dashboardPanel) params.set('panel', dashboardPanel);
     if (route) params.set('route', route); else params.delete('route');
     if (group) params.set('group', String(group.id)); else params.delete('group');
+    if (combination) params.set('combined', String(combination.id)); else params.delete('combined');
     return withQuery(path, params);
   }
   function openOverlay(href: string) {
@@ -353,12 +424,13 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   function choose(value: Selection) {
     if (value.kind === 'survey') { setSurvey({ api, mask, key: location.key, value }); return; }
     setSurvey(null);
-    if (value.kind === 'device') openOverlay(overlayHref(devicePath(value.device.id), value.route, value.parent));
+    if (value.kind === 'device') openOverlay(overlayHref(devicePath(value.device.id), value.route, value.parent, value.combinedParent));
     else openOverlay(overlayHref('/groups/' + value.group.id));
   }
   function closeOverlay() {
     if (location.state?.dashboardOverlay) { void navigate(-1); return; }
     if (parent) { void navigate(overlayHref('/groups/' + parent.id), { replace: true }); return; }
+    if (combinedParent) { navigate(overlayHref(`/combined-devices/${combinedParent.id}`), { replace: true }); return; }
     if (page > 0) query.set('page', String(page + 1));
     void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
   }
@@ -371,7 +443,42 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
     choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
   }
+  function saveCombination(saved?: CombinedDevice) {
+    setRecord((previous) => {
+      if (!previous || previous.api !== api || previous.mask !== mask) return previous;
+      const list = previous.combinations ?? [];
+      if (!saved) return { ...previous, combinations: list.filter((item) => item.id !== combined?.id) };
+      const found = list.some((item) => item.id === saved.id);
+      return { ...previous, combinations: found ? list.map((item) => (item.id === saved.id ? saved : item)) : [...list, saved] };
+    });
+    if (!saved) navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
+    else closeOverlay();
+  }
   function renderCard(entry: DashboardEntry, placement: GridCardPlacement) {
+    if (entry.kind === 'combined') {
+      const item = entry.combined;
+      const href = `/combined-devices/${item.id}`;
+      const name = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id)?.name ?? t(MSG.NO_ROOM);
+      const quickOpen = combinedQuickOpen && item === combined;
+      return (
+        <CombinedDeviceCard
+          key={`combined-${item.id}`}
+          api={api}
+          combined={item}
+          members={resolvedMembers.get(item.id) ?? []}
+          room={name}
+          now={now}
+          placement={placement}
+          paused={Boolean((detailsOpen && !quickOpen) || placement.inert)}
+          quickOpen={quickOpen}
+          onQuickOpen={() => openOverlay(overlayHref(`${href}/quick`))}
+          onQuickClose={() => closeOverlay()}
+          onDetails={() => openOverlay(overlayHref(href))}
+          onAuthError={onAuthError}
+        />
+      );
+    }
+
     if (entry.kind === 'group') {
       const { group: cardGroup } = entry;
       const state = groupStates[cardGroup.id];
@@ -413,7 +520,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         device={device}
         room={roomName(device)}
         now={now}
-        paused={Boolean(selected || placement.inert)}
+        paused={Boolean((detailsOpen && !combinedQuickOpen) || placement.inert)}
         quickRoute={quick && device === linked ? validRoute : undefined}
         onAuthError={onAuthError}
         onOpen={(route) => choose({ ...entry, route })}
@@ -425,9 +532,10 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     );
   }
 
-  const canUseLayout = !search.trim() && !(quick && linkedIndex < 0);
+  const canUseLayout = !search.trim() && !(quick && linkedIndex < 0) && !(combinedQuickOpen && linkedIndex < 0);
   const gridItems = visible.map((entry) => {
     if (entry.kind === 'group') return { id: `group-${entry.group.id}`, cardName: entry.group.name, entry };
+    if (entry.kind === 'combined') return { id: `combined-${entry.combined.id}`, cardName: entry.combined.name, entry };
     return { id: `device-${entry.device.id}`, cardName: entry.device.name, entry };
   });
 
@@ -479,6 +587,17 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             <Icon name="add" className="dashboard-action-icon" />
             <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
           </button>
+          {current?.combinations && (
+            <button
+              type="button"
+              className="secondary compact"
+              disabled={busy || devices.length < 2}
+              onClick={() => openOverlay(overlayHref(combinationNewPath))}
+            >
+              <Icon name="add" className="dashboard-action-icon" />
+              <span>{t(MSG.COMBINE_DEVICES)}</span>
+            </button>
+          )}
           <button className="secondary compact" disabled={!ready || busy} aria-label={t(MSG.REFRESH_LIST)} title={t(MSG.REFRESH_LIST)} onClick={() => setRevision(value => value + 1)}>
             <Icon name="refresh-list" className="dashboard-action-icon" />
             <span>{t(MSG.REFRESH_LIST)}</span>
@@ -488,6 +607,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       {!ready ? <p className="saved-summary">{t(MSG.SAVE_SERVICE_ACCESS_IN_CONNECTION_SETTINGS_FIRST)}</p> : (
         <>
           {linkError && <p className="field-error" role="alert">{linkError}</p>}
+          {!busy && current && combinedId && !combined && <p className="field-error" role="alert">{t(MSG.COMBINATION_UNAVAILABLE)}</p>}
           <RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />
           <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
           {sharingReady && (
@@ -531,7 +651,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             density={cardSize}
             items={gridItems}
             view={canUseLayout ? { building, room, page: page + 1 } : undefined}
-            editable={Boolean(current && !busy && !selected && !quick)}
+            editable={Boolean(current && !busy && !detailsOpen && !quick)}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />
           {entries.length > PAGE_SIZE && (
@@ -543,6 +663,29 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
 )}
         </>
   )}
+      {combined && combinedDetails && (
+        <CombinedDeviceDetails
+          combined={combined}
+          members={resolvedMembers.get(combined.id) ?? []}
+          onChoose={(device, route) => choose({ kind: 'device', device, route, combinedParent: combined })}
+          onEdit={() => openOverlay(overlayHref(`/combined-devices/${combined.id}/edit`))}
+          onClose={() => closeOverlay()}
+        />
+      )}
+      {((combined && combinedEdit) || (combinedNew && current?.combinations)) && (
+        <CombinedDeviceSettings
+          api={api}
+          key={combined?.id ?? 'new'}
+          existing={combined}
+          devices={devices}
+          rooms={inventory?.rooms ?? []}
+          initialRoom={Number(room) || null}
+          deviceRoom={(device) => placementOf(device)?.room_id ?? null}
+          onClose={() => closeOverlay()}
+          onSaved={(saved) => saveCombination(saved)}
+          onAuthError={onAuthError}
+        />
+      )}
       {selected?.kind === 'device' && selected.route === 'local' && detailDevice?.local && (
         <LocalControl
           key={detailDevice.local.id}
@@ -554,7 +697,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           routes={deviceRoutes(detailDevice)}
           onAuthError={onAuthError}
           onSetup={inventory ? () => setupDetailDevice() : undefined}
-          closeLabel={selected.parent ? t(MSG.BACK_TO_GROUP) : undefined}
+          closeLabel={detailCloseLabel}
           onClose={close}
         />
       )}
@@ -564,6 +707,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           api={api}
           room={roomName(detailDevice)}
           displayName={detailDevice.name}
+          closeLabel={detailCloseLabel}
           device={detailCloud}
           localDevice={detailDevice.local}
           gateway={detailGateway}

@@ -109,7 +109,7 @@ describe('device deep navigation', () => {
     backend([lamp], [{ id: 7, building_id: 1, name: 'Рабочая', aliases: [] }]);
     access('/rooms/7');
     const first = render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: lamp.name }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Быстрое управление' }));
     const quickPath = '/devices/physical-0/quick?room=7&route=local';
     expect(currentPath()).toBe(quickPath);
     expect(within(await screen.findByRole('dialog', { name: lamp.name })).getByRole('slider', { name: 'Яркость' })).toBeInTheDocument();

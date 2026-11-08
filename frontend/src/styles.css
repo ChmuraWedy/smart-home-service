@@ -1587,7 +1587,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   .dashboard-view .dashboard-card-header {
     .device-card-identity { @apply tw:contents; }
     .device-card-title h3 { @apply tw:max-w-full; }
-    :is(.device-card-title h3:not(:has(> button)), .device-card-sheet-trigger) { @apply tw:block tw:max-w-full tw:truncate; }
+    :is(.device-card-title h3:not(:has(> button)), .device-card-details-trigger) { @apply tw:block tw:max-w-full tw:truncate; }
     .device-card-context { @apply tw:col-start-2 tw:row-start-2; }
   }
   .dashboard-view[data-card-size="small"] .dashboard-card-header {
@@ -1629,9 +1629,10 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   }
 }
 
-.dashboard-device[id]:not([data-quick-sheet]) { @apply tw:cursor-default; }
-.device-card-sheet-trigger,
-.device-card-sheet-trigger:hover:enabled {
+.dashboard-device[id] { @apply tw:cursor-default; }
+.dashboard-device[data-header-details] .dashboard-card-header { @apply tw:cursor-pointer; }
+.device-card-details-trigger,
+.device-card-details-trigger:hover:enabled {
   @apply tw:cursor-pointer tw:rounded-sm tw:border-0 tw:bg-transparent tw:p-0 tw:text-start tw:text-inherit;
   font:inherit;
   overflow-wrap:anywhere;
@@ -1705,3 +1706,21 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .camera-sheet-live-tag, .camera-sheet-fullscreen { @apply tw:absolute tw:top-2 tw:z-1; }
 .camera-sheet-live-tag { @apply tw:left-2 tw:rounded tw:bg-red-700 tw:px-2 tw:py-1 tw:text-xs tw:font-semibold tw:text-white; }
 .camera-sheet-fullscreen { @apply tw:right-2 tw:grid tw:size-11 tw:place-items-center tw:bg-black/70 tw:p-0 tw:text-2xl tw:text-white; }
+
+
+.combined-device-card .combined-member + .combined-member,
+.dashboard-sheet .combined-member + .combined-member { @apply tw:border-t tw:border-(--border); }
+.combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
+.combined-member-unavailable { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
+.combined-actions, .combined-power, .combined-delete { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
+.combined-actions { @apply tw:border-t tw:border-(--border) tw:p-2; }
+.combined-results { @apply tw:my-1 tw:w-full tw:list-none tw:p-0 tw:text-xs; }
+.combined-device-options { @apply tw:flex tw:list-none tw:flex-col tw:gap-2 tw:p-0; }
+.combined-device-options button { @apply tw:w-full tw:text-start; }
+.combined-device-form { @apply tw:grid tw:gap-3; }
+.combined-members { @apply tw:min-w-0 tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
+.combined-member-option { @apply tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tw:items-center tw:gap-2; }
+.combined-member-option label { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }
+.combined-member-option input[type="checkbox"] { @apply tw:size-4 tw:shrink-0; }
+.combined-member-option select { @apply tw:min-w-0; }
+.combined-delete p { @apply tw:w-full; }

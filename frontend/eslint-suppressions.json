@@ -46,7 +46,7 @@
       "count": 7
     },
     "object-curly-newline": {
-      "count": 17
+      "count": 15
     },
     "object-property-newline": {
       "count": 2
@@ -606,9 +606,6 @@
     "react/button-has-type": {
       "count": 2
     },
-    "react/destructuring-assignment": {
-      "count": 12
-    },
     "react/jsx-first-prop-new-line": {
       "count": 3
     },
@@ -800,13 +797,13 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 8
+      "count": 7
     },
     "@stylistic/max-len": {
-      "count": 16
+      "count": 14
     },
     "arrow-parens": {
-      "count": 40
+      "count": 35
     },
     "arrow-spacing": {
       "count": 2
@@ -824,7 +821,7 @@
       "count": 1
     },
     "indent": {
-      "count": 7
+      "count": 6
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
@@ -832,20 +829,14 @@
     "no-confusing-arrow": {
       "count": 4
     },
-    "no-continue": {
-      "count": 1
-    },
     "no-nested-ternary": {
       "count": 8
     },
     "no-restricted-globals": {
       "count": 2
     },
-    "no-restricted-syntax": {
-      "count": 1
-    },
     "no-shadow": {
-      "count": 5
+      "count": 3
     },
     "no-use-before-define": {
       "count": 1
@@ -877,11 +868,8 @@
     "react/button-has-type": {
       "count": 6
     },
-    "react/jsx-first-prop-new-line": {
-      "count": 1
-    },
     "react/jsx-max-props-per-line": {
-      "count": 3
+      "count": 1
     },
     "react/jsx-no-bind": {
       "count": 4
@@ -976,18 +964,6 @@
     }
   },
   "src/components/DashboardSheet.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 2
-    },
-    "@stylistic/max-len": {
-      "count": 1
-    },
-    "arrow-parens": {
-      "count": 4
-    },
-    "indent": {
-      "count": 3
-    },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
     },
@@ -1000,17 +976,8 @@
     "no-restricted-syntax": {
       "count": 4
     },
-    "object-curly-newline": {
-      "count": 2
-    },
     "react-hooks/exhaustive-deps": {
       "count": 1
-    },
-    "react/jsx-first-prop-new-line": {
-      "count": 2
-    },
-    "react/jsx-max-props-per-line": {
-      "count": 2
     }
   },
   "src/components/DeviceActivity.tsx": {
@@ -2214,7 +2181,7 @@
       "count": 58
     },
     "lines-between-class-members": {
-      "count": 17
+      "count": 16
     },
     "no-await-in-loop": {
       "count": 1
