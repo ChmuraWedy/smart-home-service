@@ -24,8 +24,8 @@ TIMEOUT = 12
 TRANSFER_DEADLINE = 36
 TLS_CONTEXT = ssl.create_default_context()
 PUBLIC_V6 = ip_network("2000::/3")
-# Tuya's documented HTTPS HLS allocator also uses port 554.
-HTTPS_PORTS = {443, 554}
+# Tuya camera streams also use HTTPS on ports 554 and 8080.
+HTTPS_PORTS = {443, 554, 8080}
 REDIRECTS = {301, 302, 303, 307, 308}
 URI_TAGS = {
     "#EXT-X-MEDIA": "playlist",

@@ -11,20 +11,21 @@ PATH = '/api/v1/cloud/devices/gateway/stream/relay'
 URL = 'https://video.example.test/live.m3u8?sign=ephemeral'
 
 
-def camera(client, monkeypatch):
+def camera(client, monkeypatch, url=URL):
     login(client)
     bridge = client.app.state.cloud
     bridge.device('gateway').category = 'sp'
     calls = []
     def allocate(device_id, protocol):
         calls.append((device_id, protocol))
-        return URL
+        return url
     monkeypatch.setattr(bridge.manager, 'get_device_stream_allocate', allocate, raising=False)
     return bridge, calls
 
 
-def test_stream_is_explicit_authenticated_and_not_cached(cloud_client, monkeypatch):
-    bridge, calls = camera(cloud_client, monkeypatch)
+@pytest.mark.parametrize("url", [URL, URL.replace("video.example.test", "video.example.test:8080")])
+def test_stream_is_explicit_authenticated_and_not_cached(cloud_client, monkeypatch, url):
+    bridge, calls = camera(cloud_client, monkeypatch, url)
     cloud_client.get('/api/v1/cloud/devices')
     assert calls == []
     response = cloud_client.post(PATH)
@@ -206,6 +207,7 @@ def test_rejects_client_supplied_upstream_parameters(cloud_client, monkeypatch, 
     "http://provider.example/segment",
     "https://localhost@media.example/segment",
     "https://127.0.0.1/segment",
+    "https://127.0.0.1:8080/segment",
     "https://169.254.169.254/metadata",
     "https://[::1]/metadata",
     "https://[::ffff:127.0.0.1]/metadata",

@@ -53,4 +53,4 @@ The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A 
 
 Two-way talk, browser snapshot/video saving, detection schedules, camera archive playback, cloud subscription pages, additional region formats, and P2P camera-quality control require separate APIs and implementation. Camera SD recording differs from browser recording. The application's device log is not the Smart Life video/event archive.
 
-Historical playback testing confirmed direct Sleep Cam HLS at 640×360. Relay testing uses mock HLS. The relay supports ordinary and low-latency HLS media over public HTTPS on ports 443 and 554. HLS variable substitution, content steering, external interstitial asset lists, and non-HTTPS key delivery are outside this relay's supported formats.
+Historical playback testing confirmed direct Sleep Cam HLS at 640×360. The relay supports ordinary and low-latency HLS media over public HTTPS on ports 443, 554, and 8080. HLS variable substitution, content steering, external interstitial asset lists, and non-HTTPS key delivery are outside this relay's supported formats.
