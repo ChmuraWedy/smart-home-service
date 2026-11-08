@@ -8,6 +8,7 @@ import type { Building, HomeApi, Room } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
 import { dashboardHref } from '../navigation';
 import { BACKGROUND_TYPES, prepareRoomBackground, useRoomAppearance } from '../room-appearance';
+import RoomBackgroundCrop from './RoomBackgroundCrop';
 
 type Catalog = { buildings: Building[]; rooms: Room[] };
 type CatalogRead = { api: HomeApi; data?: Catalog; error?: string };
@@ -73,6 +74,7 @@ function RoomAppearanceForm({
   const [revision, setRevision] = useState(0);
   const [opacityDraft, setOpacityDraft] = useState<number>();
   const [file, setFile] = useState<File>();
+  const [cropOpen, setCropOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const opacityId = useId();
   const backgroundId = useId();
@@ -80,22 +82,29 @@ function RoomAppearanceForm({
   const savedOpacity = read?.value?.appearance.card_opacity;
   const opacity = opacityDraft ?? savedOpacity ?? 100;
   const imageUrl = read?.value?.backgroundUrl;
+  const cropSource = file ?? read?.value?.background;
+  const closeCrop = useCallback(() => setCropOpen(false), []);
 
-  function refresh() {
+  const refresh = useCallback(() => {
     setRevision((previous) => previous + 1);
     onSaved?.();
-  }
+  }, [onSaved]);
+
+  const saveBackground = useCallback(async (image: Blob) => {
+    await api.uploadRoomBackground(roomId, image);
+    setFile(undefined);
+    if (fileInput.current) fileInput.current.value = '';
+    refresh();
+  }, [api, refresh, roomId]);
 
   async function upload() {
-    if (!file) return;
-    await run(async () => {
-      const image = await prepareRoomBackground(file);
-      await api.uploadRoomBackground(roomId, image);
-      setFile(undefined);
-      if (fileInput.current) fileInput.current.value = '';
-      refresh();
-    });
+    if (file) await run(async () => saveBackground(await prepareRoomBackground(file)));
   }
+
+  const saveCrop = useCallback(async (image: Blob) => {
+    setCropOpen(false);
+    await run(() => saveBackground(image));
+  }, [run, saveBackground]);
 
   async function remove() {
     await run(async () => {
@@ -131,6 +140,9 @@ function RoomAppearanceForm({
           <p className="help">{t(MSG.ROOM_BACKGROUND_HINT)}</p>
           <div className="room-editor-actions">
             <button type="button" disabled={busy || !file} onClick={upload}>{t(MSG.ROOM_BACKGROUND_UPLOAD)}</button>
+            <button type="button" className="secondary" disabled={busy || !cropSource} onClick={() => setCropOpen(true)}>
+              {t(MSG.ROOM_CROP_IMAGE)}
+            </button>
             {imageUrl && (
               <button type="button" className="secondary" disabled={busy} onClick={remove}>{t(MSG.ROOM_BACKGROUND_REMOVE)}</button>
             )}
@@ -153,6 +165,9 @@ function RoomAppearanceForm({
           <p className="help">{t(MSG.ROOM_OPACITY_HINT)}</p>
           <button type="button" disabled={busy || opacity === savedOpacity} onClick={saveOpacity}>{t(MSG.SAVE)}</button>
         </>
+      )}
+      {cropOpen && cropSource && (
+        <RoomBackgroundCrop source={cropSource} onSave={saveCrop} onClose={closeCrop} />
       )}
     </section>
   );

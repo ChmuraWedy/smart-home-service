@@ -53,7 +53,7 @@ function backend(
   developerConnected = false,
   allMembersReachable = false,
   includeRelay = false,
-  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[] },
+  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[]; singleRelay?: boolean },
 ) {
   let combined = initial;
   const refreshedPower = new Map<string, boolean>();
@@ -115,7 +115,11 @@ function backend(
     if (path.endsWith('/mappings')) return json({ mappings: [] });
     const [, id, action] = /^\/cloud\/devices\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
     const bulb = bulbs.find((item) => item.id === id);
-    if (action === 'functions') return json(id === relay.id ? relayDefinitions : bulb?.controls?.definitions);
+    if (action === 'functions') {
+      if (id !== relay.id) return json(bulb?.controls?.definitions);
+      const functions = options?.singleRelay ? relayDefinitions.functions.filter(({ code }) => code !== 'switch_2') : relayDefinitions.functions;
+      return json({ ...relayDefinitions, functions });
+    }
     if (action === 'status') {
       if (id === relay.id) return json({ device_id: id, online: true, source: 'cloud', status: { switch_1: true, switch_2: true } });
       const snapshot = bulb?.controls?.snapshot;
@@ -139,6 +143,24 @@ function openApp(path: string) {
 }
 
 describe('combined devices', () => {
+  it('uses the same channel power glyph for a wired relay with a single output', async () => {
+    backend({
+      id: 1,
+      name: 'Wired lamp',
+      room_id: room.id,
+      members: [
+        { device_id: relay.id, route: 'sharing', accessible: true },
+        { device_id: bulbs[0].id, route: 'sharing', accessible: true, power_source: { device_id: relay.id, channel: 'switch_1' } },
+      ],
+    }, false, false, true, { singleRelay: true });
+    openApp('/');
+    const card = within(await screen.findByRole('listitem', { name: 'Wired lamp' }));
+    const channel = await card.findByRole('switch', { name: 'Channel 1' });
+    expect(channel.querySelector('.parameter-icon')).toBeInTheDocument();
+    expect(channel.querySelector('.device-type-icon')).not.toBeInTheDocument();
+    expect(card.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
+  });
+
   it('groups wired devices by relay channel and saves their reordered layout', async () => {
     const { writes } = backend(undefined, false, false, true);
     const user = userEvent.setup();

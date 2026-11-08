@@ -455,7 +455,7 @@ function AppContent() {
         </div>
       </main>
       <footer>
-        <span>Smart Home · Tuya</span>
+        <span>ChmuraRezechy(c) 2026</span>
       </footer>
     </div>
   );

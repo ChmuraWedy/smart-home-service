@@ -204,3 +204,44 @@ it('shrinks a large photo before sending it through the existing upload limit', 
     encode.mockRestore();
   }
 });
+
+it('previews a crop and saves its selected framing as the room background', async () => {
+  const { uploads } = fixture([building], [kitchen]);
+  const bitmap = { width: 1200, height: 800, close: vi.fn() };
+  const decode = vi.fn(async () => bitmap);
+  vi.stubGlobal('createImageBitmap', decode);
+  const drawImage = vi.fn();
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
+  const cropped = new Blob(['jpeg'], { type: 'image/jpeg' });
+  const encode = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => callback(cropped));
+  try {
+    const user = userEvent.setup();
+    openApp('/rooms/1/layout/edit');
+    await user.click(await screen.findByText('Room appearance and name editor'));
+    const appearance = within(screen.getByRole('region', { name: 'Room appearance' }));
+    await user.upload(await appearance.findByLabelText('Background image'), new File(['image'], 'photo.png', { type: 'image/png' }));
+    await user.click(appearance.getByRole('button', { name: 'Crop image' }));
+    const dialog = within(await screen.findByRole('dialog', { name: /Crop image/ }));
+    await user.selectOptions(await dialog.findByLabelText('Crop shape'), 'square');
+    fireEvent.change(dialog.getByRole('slider', { name: 'Zoom' }), { target: { value: '200' } });
+    fireEvent.change(dialog.getByRole('slider', { name: 'Horizontal position' }), { target: { value: '100' } });
+    expect(drawImage).toHaveBeenLastCalledWith(bitmap, 800, 200, 400, 400, 0, 0, 400, 400);
+    expect(uploads).toHaveLength(0);
+
+    await user.click(dialog.getByRole('button', { name: 'Save' }));
+    expect(await appearance.findByRole('img', { name: 'Current room background' })).toBeInTheDocument();
+    expect(uploads[0]?.body).toBe(cropped);
+    expect(drawImage).toHaveBeenLastCalledWith(bitmap, 800, 200, 400, 400, 0, 0, 400, 400);
+    expect(bitmap.close).toHaveBeenCalledOnce();
+
+    await user.click(appearance.getByRole('button', { name: 'Crop image' }));
+    const savedCrop = within(await screen.findByRole('dialog', { name: /Crop image/ }));
+    await savedCrop.findByLabelText('Crop shape');
+    expect(decode).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'image/jpeg' }));
+    await user.click(savedCrop.getByRole('button', { name: 'Cancel' }));
+    expect(uploads).toHaveLength(1);
+  } finally {
+    context.mockRestore();
+    encode.mockRestore();
+  }
+});

@@ -6,32 +6,67 @@ export const BACKGROUND_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_UPLOAD_BYTES = 1024 * 1024;
 const MAX_PHOTO_BYTES = 20 * MAX_UPLOAD_BYTES;
 
-export async function prepareRoomBackground(file: File): Promise<Blob> {
-  if (!BACKGROUND_TYPES.includes(file.type)) throw new Error(t(MSG.ROOM_BACKGROUND_FORMAT_ERROR));
-  if (file.size > MAX_PHOTO_BYTES) throw new Error(t(MSG.ROOM_BACKGROUND_SIZE_ERROR));
-  if (file.size <= MAX_UPLOAD_BYTES) return file;
+export type RoomBackgroundCrop = {
+  ratio?: number;
+  zoom: number;
+  x: number;
+  y: number;
+};
 
-  let bitmap: ImageBitmap | undefined;
+function validateRoomBackground(source: Blob) {
+  if (!BACKGROUND_TYPES.includes(source.type)) throw new Error(t(MSG.ROOM_BACKGROUND_FORMAT_ERROR));
+  if (source.size > MAX_PHOTO_BYTES) throw new Error(t(MSG.ROOM_BACKGROUND_SIZE_ERROR));
+}
+
+export async function decodeRoomBackground(source: Blob) {
+  validateRoomBackground(source);
   try {
-    bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1440 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error();
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const image = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/jpeg', 0.75); });
-    if (image && image.size <= MAX_UPLOAD_BYTES) return image;
+    return await createImageBitmap(source);
   } catch {
     throw new Error(t(MSG.ROOM_BACKGROUND_FORMAT_ERROR));
-  } finally {
-    bitmap?.close();
   }
+}
+
+export function drawRoomBackground(bitmap: ImageBitmap, canvas: HTMLCanvasElement, maximum: number, crop?: RoomBackgroundCrop) {
+  const ratio = crop?.ratio ?? bitmap.width / bitmap.height;
+  const width = Math.min(bitmap.width, bitmap.height * ratio) / (crop?.zoom ?? 1);
+  const height = width / ratio;
+  const scale = Math.min(1, maximum / Math.max(width, height));
+  canvas.setAttribute('width', String(Math.max(1, Math.round(width * scale))));
+  canvas.setAttribute('height', String(Math.max(1, Math.round(height * scale))));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error(t(MSG.ROOM_BACKGROUND_FORMAT_ERROR));
+  if (crop) {
+    const x = (bitmap.width - width) * crop.x;
+    const y = (bitmap.height - height) * crop.y;
+    context.drawImage(bitmap, x, y, width, height, 0, 0, canvas.width, canvas.height);
+  } else {
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  }
+}
+
+export async function encodeRoomBackground(bitmap: ImageBitmap, crop?: RoomBackgroundCrop): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  drawRoomBackground(bitmap, canvas, 1440, crop);
+  const image = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/jpeg', 0.75); });
+  if (image && image.size <= MAX_UPLOAD_BYTES) return image;
   throw new Error(t(MSG.ROOM_BACKGROUND_SIZE_ERROR));
 }
 
-type RoomAppearanceResult = { appearance: RoomAppearance; backgroundUrl?: string };
+export async function prepareRoomBackground(file: File): Promise<Blob> {
+  if (file.size <= MAX_UPLOAD_BYTES) {
+    validateRoomBackground(file);
+    return file;
+  }
+  const bitmap = await decodeRoomBackground(file);
+  try {
+    return await encodeRoomBackground(bitmap);
+  } finally {
+    bitmap.close();
+  }
+}
+
+type RoomAppearanceResult = { appearance: RoomAppearance; backgroundUrl?: string; background?: Blob };
 type RoomAppearanceRead = { api: HomeApi; roomId: number; value?: RoomAppearanceResult; error?: unknown };
 
 export function useRoomAppearance(api: HomeApi, roomId: number | undefined, revision = 0) {
@@ -44,11 +79,10 @@ export function useRoomAppearance(api: HomeApi, roomId: number | undefined, revi
     async function load(id: number) {
       try {
         const appearance = await api.roomAppearance(id, signal);
-        if (appearance.background_version) {
-          const image = await api.roomBackground(id, signal);
-          if (!signal.aborted) backgroundUrl = URL.createObjectURL(image);
-        }
-        if (!signal.aborted) setRead({ api, roomId: id, value: { appearance, backgroundUrl } });
+        const background = appearance.background_version ? await api.roomBackground(id, signal) : undefined;
+        if (signal.aborted) return;
+        if (background) backgroundUrl = URL.createObjectURL(background);
+        setRead({ api, roomId: id, value: { appearance, backgroundUrl, background } });
       } catch (error) {
         if (!signal.aborted) setRead({ api, roomId: id, error });
       }

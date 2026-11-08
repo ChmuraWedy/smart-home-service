@@ -236,7 +236,7 @@ function StandardCardControls({
       immediatePower
       dashboardSwitch
       powerSide={channelChildren?.has(spec.key) ? 'start' : powerSide}
-      powerIcon={powerLayout === 'single'
+      powerIcon={powerLayout === 'single' && !channelChildren?.has(spec.key)
         ? <DeviceIcon category={category} codes={specs.map((item) => item.key)} />
         : <ParameterIcon code={spec.key} />}
       powerSummary={showSummary && renderSummary ? (power) => renderSummary(online ? power : null) : undefined}
