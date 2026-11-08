@@ -1,10 +1,16 @@
 import type { JsonValue } from './api';
 import type { ControlSpec, HSV } from './controls';
 import { limitsOf } from './controls';
+import { MSG } from './i18n';
 import { validateObject } from './lighting';
 
 export const sceneEffects = ['static', 'jump', 'gradient'] as const;
 export type SceneEffect = typeof sceneEffects[number];
+export const sceneEffectLabels = {
+  static: MSG.SCENE_STATIC,
+  jump: MSG.SCENE_FLASH,
+  gradient: MSG.SCENE_BREATHE,
+};
 export type SceneUnit = HSV & {
   bright: number;
   temperature: number;

@@ -14,6 +14,8 @@ import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWi
 import { hasLightEffectWizard, LightEffectWizard } from './LightEffectWizard';
 import { ParameterIcon } from './DevicePresentation';
 import { PowerButton } from './PowerButton';
+import ControlRow from './ControlRow';
+import type { PowerSide } from './ControlRow';
 import type { PowerButtonVariant } from './PowerButton';
 import { Icon, IconGlyph } from './ui/icon';
 
@@ -230,8 +232,8 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   );
 }
 
-export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerSummary, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
-  pendingScope: string; spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerSummary?:(power:boolean|null)=>ReactNode; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerSide, powerSummary, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
+  pendingScope: string; spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerSide?:PowerSide; powerSummary?:(power:boolean|null)=>ReactNode; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
@@ -352,34 +354,95 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
       </label>
     );
   }
-  return (
-    <section className={'capability capability-' + spec.kind + (spec.kind === 'color' ? ' color-control' : '')} aria-label={spec.label}>
-      <div className="capability-row">
-        <div className="capability-heading">
-          <div className="capability-label">
-            <div className="capability-label-line">
-              <h3 className={powerSummary ? "sr-only" : undefined}>
-                {!spec.writable && <ParameterIcon code={spec.key} />}
-                {spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}
-              </h3>{headingActions}
-            </div>
-            {aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}
-          </div>
+  const heading = (
+    <div className="capability-heading">
+      <div className="capability-label">
+        <div className="capability-label-line">
+          <h3 className={powerSummary ? 'sr-only' : undefined}>
+            {!spec.writable && <ParameterIcon code={spec.key} />}
+            {spec.writable && spec.kind === 'boolean' && (stage || immediatePower) && !powerIcon ? <label htmlFor={powerId}>{spec.label}</label> : spec.label}
+          </h3>{headingActions}
         </div>
-        {powerIcon && (
-        <span className={'dashboard-power-state' + (powerSummary ? ' dashboard-power-state-summary' : '')}>
-          {powerSummary ? powerSummary(powerKnown ? selectedPower : null) : powerKnown ? t(selectedPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
-          {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
-          <span role="status" className="dashboard-power-pending" title={awaiting ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
-            {awaiting && (
-            <>
-              <span className="spinner" aria-hidden="true" />
-              <span className="sr-only">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>
-            </>
-)}
-          </span>
-        </span>
-)}
+        {aliasEditor && <div className="capability-alias-editor">{aliasEditor}</div>}
+      </div>
+    </div>
+  );
+  const state = powerIcon && (
+    <span className={`dashboard-power-state${powerSummary ? ' dashboard-power-state-summary' : ''}`}>
+      {powerSummary ? powerSummary(powerKnown ? selectedPower : null) : powerKnown ? t(selectedPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
+      {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+      <span role="status" className="dashboard-power-pending" title={awaiting ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
+        {awaiting && (
+          <>
+            <span className="spinner" aria-hidden="true" />
+            <span className="sr-only">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>
+          </>
+        )}
+      </span>
+    </span>
+  );
+  const power = spec.writable && spec.kind === 'boolean' && (
+    <div className="power-actions">
+      {stage || immediatePower ? (
+        <>
+          <PowerButton
+            id={powerId}
+            label={spec.label}
+            checked={selectedPower}
+            disabled={disabled}
+            variant={powerVariant}
+            icon={powerIcon}
+            known={Boolean(reading?.known || awaiting)}
+            buttonText={buttonText}
+            onChange={changePower}
+          />
+          {!powerIcon && !dirty && !awaiting && !reading?.known && <span className="power-selection">{t(MSG.NO_DATA)}</span>}
+          {!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+          {(dirty || awaiting) && (
+            <span className="help">
+              {dirty ? t(MSG.MODIFIED) : t(MSG.WAITING_FOR_A_READING)}
+              {spec.readable && (
+                <>
+                  {` ${t(MSG.CURRENT_READING_LABEL)} `}
+                  <span>{displayReading(spec, reading)}</span>
+                </>
+              )}
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          {spec.readable && <span className={`power-reading${!fresh ? ' unknown' : ''}`}>{displayReading(spec, reading)}</span>}
+          <button disabled={disabled} aria-pressed={selectedPower} onClick={() => (stage ? change('true') : void send(true))}>{t(MSG.TURN_ON)}</button>
+          <button
+            className="secondary"
+            disabled={disabled}
+            aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)}
+            onClick={() => (stage ? change('false') : void send(false))}
+          >
+            {t(MSG.TURN_OFF)}
+          </button>
+        </>
+      )}
+    </div>
+  );
+  const metadata = (
+    <div className="reading-meta">
+      {spec.readable && !reading?.known && <span>{t(MSG.NO_READING)}</span>}
+      {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{` ${t(MSG.S_AGO)}`}</span>}
+      {!spec.writable ? <span className="read-only">{t(MSG.READ_ONLY)}</span> : !spec.readable
+      && <span className="read-only">{t(MSG.COMMAND)}</span>}
+    </div>
+  );
+  return (
+    <section className={`capability capability-${spec.kind}${spec.kind === 'color' ? ' color-control' : ''}`} aria-label={spec.label}>
+      <ControlRow
+        heading={heading}
+        state={state}
+        power={power}
+        powerSide={powerSide}
+        metadata={metadata}
+      >
         {spec.kind === 'color' && (
         <div className="color-tools">
           {spec.kind === 'color' && spec.writable && <input aria-label={t(MSG.COLOR_PICKER)} title={t(MSG.COLOR_PICKER)} className="color-picker" type="color" value={hsvToHex(color)} disabled={disabled} onChange={event => changeColor(hexToHsv(event.target.value))} />}
@@ -396,115 +459,74 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
           {reading?.known && isStale(reading, now, local) && <span className="stale-tag">{t(MSG.STALE)}</span>}
         </p>
 )}
-        {spec.writable && (spec.kind === 'boolean' ? (
-          <div className="power-actions">
-            {stage || immediatePower ? (
-              <>
-                <PowerButton
-                  id={powerId}
-                  label={spec.label}
-                  checked={selectedPower}
-                  disabled={disabled}
-                  variant={powerVariant}
-                  icon={powerIcon}
-                  known={Boolean(reading?.known || awaiting)}
-                  buttonText={buttonText}
-                  onChange={changePower}
-                />
-                {!powerIcon && !dirty && !awaiting && !reading?.known && <span className="power-selection">{t(MSG.NO_DATA)}</span>}
-                {!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
-                {(dirty || awaiting) && (
-                <span className="help">{dirty ? t(MSG.MODIFIED) : t(MSG.WAITING_FOR_A_READING)}
-                  {spec.readable && (
-                <>{" " + t(MSG.CURRENT_READING_LABEL) + " "}
-                  <span>{displayReading(spec,reading)}</span>
-                </>
-)}
-                </span>
-)}
-              </>
-) : (
-  <>
-    {spec.readable && <span className={'power-reading' + (!fresh ? ' unknown' : '')}>{displayReading(spec, reading)}</span>}
-    <button disabled={disabled} aria-pressed={selectedPower} onClick={() => stage ? change('true') : void send(true)}>{t(MSG.TURN_ON)}</button>
-    <button className="secondary" disabled={disabled} aria-pressed={stage && (dirty || awaiting) ? !selectedPower : Boolean(fresh && reading?.value === false)} onClick={() => stage ? change('false') : void send(false)}>{t(MSG.TURN_OFF)}</button>
-  </>
-    )}
+        {spec.writable && spec.kind !== 'boolean' && (
+        <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!stage && !disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
+          {valueEditor?.(draft,change)}
+          {spec.kind === 'number' && (
+          <div className="range-input-row">
+            <label className="range-value">
+              <span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span>
+              <input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder={t(MSG.VALUE)} />
+              {spec.unit && <span>{spec.unit}</span>}
+            </label>
+            {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + t(MSG.SLIDER)} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
           </div>
-) : (
-  <form className="capability-form" onSubmit={event => { event.preventDefault(); if (!stage && !disabled && dirty && !(spec.kind === 'raw' && error)) void send(); }}>
-    {valueEditor?.(draft,change)}
-    {spec.kind === 'number' && (
-    <div className="range-input-row">
-      <label className="range-value">
-        <span className="sr-only">{spec.label}{spec.unit ? ' (' + spec.unit + ')' : ''}</span>
-        <input aria-label={spec.label + (spec.unit ? ' (' + spec.unit + ')' : '')} type="number" value={draft} style={{ width: Math.max(2, Math.min(14, draft.length + 1)) + 'ch' }} min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} disabled={disabled} onChange={event => change(event.target.value)} placeholder={t(MSG.VALUE)} />
-        {spec.unit && <span>{spec.unit}</span>}
-      </label>
-      {spec.minimum !== undefined && spec.maximum !== undefined && <input aria-label={spec.label + t(MSG.SLIDER)} type="range" min={spec.minimum} max={spec.maximum} step={spec.step || 'any'} value={draft || spec.minimum} disabled={disabled} onChange={event => change(event.target.value)} />}
-    </div>
-)}
-    {spec.kind === 'enum' && (
-    <label className="enum-value">
-      <span className="sr-only">{spec.label}</span>
-      <select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}>
-        <option value="">{t(MSG.SELECT_A_VALUE)}</option>
-        {spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}
-      </select>
-    </label>
-)}
-    {spec.kind === 'color' && (
-    <div className="color-editor">
-      {preciseColor && (
-      <div className="color-sliders">
-        {(['h', 's', 'v'] as const).map(axis => (
-          <label key={axis}>{axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)}
-            <input aria-label={axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} />
-          </label>
-))}
-      </div>
-)}
-    </div>
-)}
-    {spec.kind === 'text' && !effectWizard && !valueEditor && (
-    <label>{spec.label}
-      <input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} />
-    </label>
-)}
-    {spec.kind === 'json' && !effectWizard && !valueEditor && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : (
-      <label>{spec.label} — JSON
-        <textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} />
-      </label>
-      ))}
-    {effectWizard ? (
-      <div className="schedule-launch">
-        <button type="button" className="secondary compact" disabled={disabled} onClick={() => setEffectOpen(true)}>{t(MSG.CONFIGURE)}</button>
-      </div>
-) : hasScheduleWizard(spec) ? (
-  <div className="schedule-launch">
-    <span className="help">{scheduleSummary(spec.key,draft)}</span>
-    <button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>{t(MSG.CONFIGURE)}</button>
-  </div>
-      ) : spec.kind === 'raw' && (
-        <>
-          {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
-          <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
-          <label>{t(MSG.MANUFACTURER_DATA_BASE64)}
-            <textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} />
-          </label>
-          <p className="help">{t(MSG.DECODED_SIZE_UP_TO) + " "}{spec.maximumBytes}{" " + t(MSG.BYTES_APPLY_AUTOMATICALLY_SUFFIX)}</p>
-        </>
       )}
-    {!stage && <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">{t(MSG.APPLY)}</button>}
-  </form>
-    ))}
-        <div className="reading-meta">
-          {spec.readable && !reading?.known && <span>{t(MSG.NO_READING)}</span>}
-          {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{" " + t(MSG.S_AGO)}</span>}
-          {!spec.writable ? <span className="read-only">{t(MSG.READ_ONLY)}</span> : !spec.readable &&
-          <span className="read-only">{t(MSG.COMMAND)}</span>}
+          {spec.kind === 'enum' && (
+          <label className="enum-value">
+            <span className="sr-only">{spec.label}</span>
+            <select aria-label={spec.label} value={draft} disabled={disabled} onChange={event => change(event.target.value)}>
+              <option value="">{t(MSG.SELECT_A_VALUE)}</option>
+              {spec.choices?.map((value, index) => <option key={index} value={index}>{optionLabel(value, spec.key)}</option>)}
+            </select>
+          </label>
+      )}
+          {spec.kind === 'color' && (
+          <div className="color-editor">
+            {preciseColor && (
+            <div className="color-sliders">
+              {(['h', 's', 'v'] as const).map(axis => (
+                <label key={axis}>{axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)}
+                  <input aria-label={axis === 'h' ? t(MSG.HUE) : axis === 's' ? t(MSG.SATURATION) : t(MSG.COLOR_BRIGHTNESS)} type="range" min={0} max={axis === 'h' ? 360 : 1000} step={1} value={color[axis]} disabled={disabled} onChange={event => changeColor({ ...color, [axis]: Number(event.target.value) })} />
+                </label>
+      ))}
+            </div>
+      )}
+          </div>
+      )}
+          {spec.kind === 'text' && !effectWizard && !valueEditor && (
+          <label>{spec.label}
+            <input value={draft} disabled={disabled} maxLength={4096} onChange={event => change(event.target.value)} />
+          </label>
+      )}
+          {spec.kind === 'json' && !effectWizard && !valueEditor && (spec.schema ? <JsonFields schema={spec.schema} value={draft ? JSON.parse(draft) : defaultObject(spec.schema)} prefix={spec.key + '.'} disabled={disabled} onChange={v => change(JSON.stringify(v))} /> : (
+            <label>{spec.label} — JSON
+              <textarea value={draft} disabled={disabled} maxLength={16384} rows={4} onChange={event => change(event.target.value)} />
+            </label>
+            ))}
+          {effectWizard ? (
+            <div className="schedule-launch">
+              <button type="button" className="secondary compact" disabled={disabled} onClick={() => setEffectOpen(true)}>{t(MSG.CONFIGURE)}</button>
+            </div>
+      ) : hasScheduleWizard(spec) ? (
+        <div className="schedule-launch">
+          <span className="help">{scheduleSummary(spec.key,draft)}</span>
+          <button type="button" className="secondary compact" disabled={disabled} onClick={() => setScheduleOpen(true)}>{t(MSG.CONFIGURE)}</button>
         </div>
-      </div>
+            ) : spec.kind === 'raw' && (
+              <>
+                {spec.key === 'power_memory' && <PowerMemoryFields value={draft} disabled={disabled} onChange={change} />}
+                <RawScheduleFields code={spec.key} value={draft} disabled={disabled} onChange={change} onInvalid={setError} />
+                <label>{t(MSG.MANUFACTURER_DATA_BASE64)}
+                  <textarea value={draft} disabled={disabled} maxLength={22000} rows={2} onChange={event => change(event.target.value)} />
+                </label>
+                <p className="help">{t(MSG.DECODED_SIZE_UP_TO) + " "}{spec.maximumBytes}{" " + t(MSG.BYTES_APPLY_AUTOMATICALLY_SUFFIX)}</p>
+              </>
+            )}
+          {!stage && <button className="compact apply-control" disabled={disabled || !dirty || (spec.kind === 'raw' && Boolean(error)) || ((spec.kind === 'number' || spec.kind === 'enum') && !draft)} type="submit">{t(MSG.APPLY)}</button>}
+        </form>
+        )}
+      </ControlRow>
       {booleanActions?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value === 'boolean' ? reading.value : null,
       () => changePower(!selectedPower))}
       {awaiting && !powerIcon && <p className="help pending-reading">{t(MSG.WAITING_FOR_A_NEW_READING)}</p>}

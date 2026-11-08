@@ -1,6 +1,6 @@
 import { MSG, localizeMessages, t } from "./i18n";
 import type { CloudDevice, Provider } from './api';
-import { translationFor } from './device-translations';
+import { translationFor, useDeviceText } from './device-translations';
 import type { TranslationKind } from './device-translations';
 import type { LocalDevice } from './home-api';
 
@@ -40,6 +40,13 @@ export function deviceTextVariants(device: UnifiedDevice, kind: TranslationKind,
     ...translationFor(device.cloud.sharing?.translations, kind, original),
     ...translationFor(device.local?.translations, kind, original),
   };
+}
+
+export function useDeviceDisplayName() {
+  const localize = useDeviceText();
+  return (device: UnifiedDevice | undefined, fallback: string) => (
+    device ? localize(device.name, deviceTextVariants(device, 'name', device.name)) : fallback
+  );
 }
 
 export function matchesDevice(device: UnifiedDevice, search: string): boolean {

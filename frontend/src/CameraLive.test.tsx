@@ -202,7 +202,7 @@ describe('camera live viewing',()=>{
     mountTiles(); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
     expect(hls.attach).not.toHaveBeenCalled();
-    const liveView=within(card).getByRole('button',{name:'Sleep Cam'});
+    const liveView=within(card).getByRole('button',{name:'Быстрое управление'});
     await user.click(liveView);
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
@@ -211,7 +211,7 @@ describe('camera live viewing',()=>{
     await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
     expect(hls.destroy).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
-    const restoredTrigger=within(card).getByRole('button',{name:'Sleep Cam'});
+    const restoredTrigger=within(card).getByRole('button',{name:'Быстрое управление'});
     expect(restoredTrigger).toHaveAttribute('aria-expanded','false');
     expect(restoredTrigger).toHaveFocus();
   });

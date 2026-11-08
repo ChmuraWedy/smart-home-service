@@ -3,6 +3,7 @@ import { deviceHref, readDeviceLink } from './device-links';
 
 export const appPaths = {
   control: '/',
+  'combined-devices': '/combined-devices',
   settings: '/settings',
   connections: '/settings/connections',
   network: '/network',
@@ -11,6 +12,12 @@ export const appPaths = {
 
 export const dashboardToolsPath = '/settings/dashboard';
 export const roomPattern = '/rooms/:roomId';
+export const combinationNewPath = `${appPaths['combined-devices']}/new`;
+export const combinationNewPreviewPath = `${combinationNewPath}/preview`;
+export const combinationPattern = `${appPaths['combined-devices']}/:combinedId`;
+export const combinationQuickPattern = `${combinationPattern}/quick`;
+export const combinationEditPattern = `${combinationPattern}/edit`;
+export const combinationEditPreviewPattern = `${combinationEditPattern}/preview`;
 export const groupPattern = '/groups/:groupId';
 export const devicePattern = '/devices/:deviceId';
 export const quickPattern = devicePattern + '/quick';
@@ -30,6 +37,7 @@ export function dashboardHref(room: string, query: URLSearchParams, panel: Dashb
   const params = new URLSearchParams(query);
   params.delete('route');
   params.delete('group');
+  params.delete('combined');
   params.delete('room');
   params.delete('panel');
   if (panel === 'search') params.set('panel', 'search');

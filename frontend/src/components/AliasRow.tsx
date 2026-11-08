@@ -1,6 +1,10 @@
 import { MSG, t, translateText } from "../i18n";
 import { useRef, useState } from 'react';
 import { Icon, IconGlyph } from './ui/icon';
+export function validDeviceAlias(value: string) {
+  return /^[\p{L}][\p{L}\p{M}\p{N} ._-]*$/u.test(value);
+}
+
 export function AliasRow({ aliases, disabled, onSave, maxAliases = 32, maxLength = 64, validate, label, displayAlias }: {
   aliases: string[]; disabled: boolean; onSave: (values: string[]) => Promise<void>;
   maxAliases?: number; maxLength?: number; validate?: (value: string) => boolean; label?: string; displayAlias?: (alias: string) => string;

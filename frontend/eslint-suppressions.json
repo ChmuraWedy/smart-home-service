@@ -4,7 +4,7 @@
       "count": 9
     },
     "@stylistic/max-len": {
-      "count": 6
+      "count": 5
     },
     "arrow-parens": {
       "count": 11
@@ -46,7 +46,7 @@
       "count": 7
     },
     "object-curly-newline": {
-      "count": 17
+      "count": 15
     },
     "object-property-newline": {
       "count": 2
@@ -67,7 +67,7 @@
       "count": 1
     },
     "react/button-has-type": {
-      "count": 8
+      "count": 7
     },
     "react/jsx-closing-bracket-location": {
       "count": 1
@@ -234,9 +234,6 @@
     "import/order": {
       "count": 1
     },
-    "import/prefer-default-export": {
-      "count": 1
-    },
     "indent": {
       "count": 9
     },
@@ -338,7 +335,7 @@
   },
   "src/components/CameraCardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 8
+      "count": 7
     },
     "arrow-parens": {
       "count": 8
@@ -362,9 +359,6 @@
       "count": 1
     },
     "prefer-template": {
-      "count": 1
-    },
-    "react/button-has-type": {
       "count": 1
     },
     "react/jsx-first-prop-new-line": {
@@ -529,22 +523,19 @@
   },
   "src/components/CardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 5
-    },
-    "@stylistic/max-len": {
-      "count": 2
+      "count": 1
     },
     "arrow-parens": {
-      "count": 10
+      "count": 5
     },
     "brace-style": {
       "count": 2
     },
     "comma-spacing": {
-      "count": 35
+      "count": 34
     },
     "consistent-return": {
-      "count": 2
+      "count": 1
     },
     "function-paren-newline": {
       "count": 3
@@ -556,7 +547,7 @@
       "count": 1
     },
     "indent": {
-      "count": 9
+      "count": 2
     },
     "key-spacing": {
       "count": 9
@@ -565,7 +556,7 @@
       "count": 2
     },
     "no-nested-ternary": {
-      "count": 4
+      "count": 1
     },
     "no-restricted-globals": {
       "count": 1
@@ -577,7 +568,7 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 12
+      "count": 8
     },
     "object-curly-spacing": {
       "count": 10
@@ -586,16 +577,16 @@
       "count": 10
     },
     "one-var": {
-      "count": 3
-    },
-    "one-var-declaration-per-line": {
-      "count": 3
-    },
-    "operator-linebreak": {
       "count": 2
     },
+    "one-var-declaration-per-line": {
+      "count": 2
+    },
+    "operator-linebreak": {
+      "count": 1
+    },
     "prefer-template": {
-      "count": 5
+      "count": 2
     },
     "quotes": {
       "count": 1
@@ -603,17 +594,11 @@
     "react-hooks/exhaustive-deps": {
       "count": 1
     },
-    "react/button-has-type": {
-      "count": 2
-    },
-    "react/destructuring-assignment": {
-      "count": 12
-    },
     "react/jsx-first-prop-new-line": {
-      "count": 3
+      "count": 1
     },
     "react/jsx-max-props-per-line": {
-      "count": 4
+      "count": 1
     },
     "react/jsx-props-no-spreading": {
       "count": 5
@@ -800,13 +785,13 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 8
+      "count": 7
     },
     "@stylistic/max-len": {
-      "count": 16
+      "count": 13
     },
     "arrow-parens": {
-      "count": 40
+      "count": 35
     },
     "arrow-spacing": {
       "count": 2
@@ -824,7 +809,7 @@
       "count": 1
     },
     "indent": {
-      "count": 7
+      "count": 6
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
@@ -832,20 +817,14 @@
     "no-confusing-arrow": {
       "count": 4
     },
-    "no-continue": {
-      "count": 1
-    },
     "no-nested-ternary": {
-      "count": 8
+      "count": 6
     },
     "no-restricted-globals": {
       "count": 2
     },
-    "no-restricted-syntax": {
-      "count": 1
-    },
     "no-shadow": {
-      "count": 5
+      "count": 3
     },
     "no-use-before-define": {
       "count": 1
@@ -877,11 +856,8 @@
     "react/button-has-type": {
       "count": 6
     },
-    "react/jsx-first-prop-new-line": {
-      "count": 1
-    },
     "react/jsx-max-props-per-line": {
-      "count": 3
+      "count": 1
     },
     "react/jsx-no-bind": {
       "count": 4
@@ -976,18 +952,6 @@
     }
   },
   "src/components/DashboardSheet.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 2
-    },
-    "@stylistic/max-len": {
-      "count": 1
-    },
-    "arrow-parens": {
-      "count": 4
-    },
-    "indent": {
-      "count": 3
-    },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
     },
@@ -1000,17 +964,8 @@
     "no-restricted-syntax": {
       "count": 4
     },
-    "object-curly-newline": {
-      "count": 2
-    },
     "react-hooks/exhaustive-deps": {
       "count": 1
-    },
-    "react/jsx-first-prop-new-line": {
-      "count": 2
-    },
-    "react/jsx-max-props-per-line": {
-      "count": 2
     }
   },
   "src/components/DeviceActivity.tsx": {
@@ -1129,7 +1084,7 @@
       "count": 13
     },
     "@stylistic/max-len": {
-      "count": 17
+      "count": 16
     },
     "arrow-parens": {
       "count": 24
@@ -1138,7 +1093,7 @@
       "count": 8
     },
     "comma-spacing": {
-      "count": 17
+      "count": 16
     },
     "consistent-return": {
       "count": 2
@@ -1150,7 +1105,7 @@
       "count": 1
     },
     "indent": {
-      "count": 27
+      "count": 19
     },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
@@ -1165,7 +1120,7 @@
       "count": 5
     },
     "no-confusing-arrow": {
-      "count": 4
+      "count": 2
     },
     "no-nested-ternary": {
       "count": 11
@@ -1201,13 +1156,13 @@
       "count": 11
     },
     "operator-linebreak": {
-      "count": 3
+      "count": 2
     },
     "prefer-template": {
-      "count": 16
+      "count": 11
     },
     "quotes": {
-      "count": 10
+      "count": 6
     },
     "react-hooks/exhaustive-deps": {
       "count": 1
@@ -1216,9 +1171,6 @@
       "count": 3
     },
     "react/jsx-first-prop-new-line": {
-      "count": 1
-    },
-    "react/jsx-indent": {
       "count": 1
     },
     "react/jsx-max-props-per-line": {
@@ -2214,7 +2166,7 @@
       "count": 58
     },
     "lines-between-class-members": {
-      "count": 17
+      "count": 16
     },
     "no-await-in-loop": {
       "count": 1
