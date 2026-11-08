@@ -320,18 +320,36 @@ describe('main controls on device cards', () => {
     expect(power).toBeChecked();
   });
 
+  it.each([false, true])('shows the reported power when brightness and temperature are command-only (on: %s)', async (power) => {
+    const functions = [
+      ...definitions.functions,
+      { code: 'temp_value_v2', type: 'Integer', values: { min: 0, max: 1000, scale: 0, step: 1 } },
+    ];
+    const powerOnly = { ...snapshot, status: { switch_led: power } };
+    const view = mount({ ...lamp, controls: { ready: true, definitions: { ...definitions, functions }, snapshot: powerOnly } });
+    const toggle = await screen.findByRole('switch', { name: 'Питание' });
+    expect(toggle).toHaveAttribute('aria-checked', String(power));
+    const readings = view.container.querySelector<HTMLElement>('.dashboard-light-readings');
+    expect(readings).toHaveTextContent(power ? 'Включено' : 'Выключено');
+    expect(readings).not.toHaveTextContent('Цветовая температура');
+    if (power) expect(readings).toHaveTextContent(/Яркость.*Нет данных/);
+    else expect(readings).not.toHaveTextContent('Яркость');
+  });
+
   it('hides cached bulb values while offline and restores them after a fresh online report', async () => {
     const online = { ...snapshot, status: { ...snapshot.status, switch_led: true, bright_value_v2: 640 } };
     vi.mocked(fetch).mockResolvedValueOnce(json(online));
     const { container } = mount({ ...lamp, online: false, controls: { ready: true, definitions, snapshot: { ...online, online: false } } });
     const power = await screen.findByRole('switch', { name: 'Питание' });
     expect(power).toBeDisabled();
+    expect(power).not.toBeChecked();
     expect(screen.getByText('Нет данных')).toBeInTheDocument();
     expect(screen.queryByText('64 %')).toBeNull();
     expect(container.querySelector('.dashboard-light-tint')).toBeNull();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Обновить параметры' }));
     expect(await screen.findByText('64 %')).toBeVisible();
     expect(power).toBeEnabled();
+    expect(power).toBeChecked();
   });
 
   it('sends once while awaiting an acknowledgement and clears waiting after a matching report', async () => {

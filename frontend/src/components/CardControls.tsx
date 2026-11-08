@@ -181,6 +181,14 @@ function StandardCardControls({
 
   function renderLightReadings(power: boolean | null) {
     if (power && sceneUnit) return <LightSceneReadings unit={sceneUnit} />;
+    if (power !== null && !brightnessText && !temperatureReading && !colorText) {
+      return (
+        <>
+          <LightCardReading code="power" label={t(MSG.POWER)} value={t(power ? MSG.ON : MSG.OFF)} />
+          {power && <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} />}
+        </>
+      );
+    }
     const brightnessValue = power === false ? t(MSG.OFF) : brightnessText || undefined;
     return (
       <>
@@ -222,7 +230,7 @@ function StandardCardControls({
       headingActions={headingActions}
       key={spec.key}
       spec={spec}
-      reading={reading(spec)}
+      reading={online || !summary ? reading(spec) : undefined}
       now={now}
       local={local}
       immediatePower
