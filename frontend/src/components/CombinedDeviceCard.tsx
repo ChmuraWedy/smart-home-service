@@ -1,6 +1,7 @@
 import {
-  useCallback, useId, useRef, useState,
+  Fragment, useCallback, useId, useRef, useState,
 } from 'react';
+import type { ReactNode } from 'react';
 import type {
   CombinedDevice, CombinedMemberInput, CombinedPowerOutcome, HomeApi,
 } from '../home-api';
@@ -8,6 +9,7 @@ import { useDeviceDisplayName } from '../devices';
 import type { UnifiedDevice } from '../devices';
 import { ApiError } from '../api';
 import { labelFor } from '../controls';
+import combinedLayout from '../combined-layout';
 import { cloudDeviceKey, readCloudDevice } from '../cloud-device-cache';
 import { readLocalDevice } from '../local-device-cache';
 import { MSG, t } from '../i18n';
@@ -50,7 +52,7 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
@@ -60,6 +62,7 @@ function MemberControls({
   quick?: boolean;
   commandKey: string;
   sourceLabel?: string;
+  channelChildren?: ReadonlyMap<string, ReactNode>;
   onPower: (deviceId: string, power: MemberPower) => void;
   onAuthError: () => void;
 }) {
@@ -88,8 +91,14 @@ function MemberControls({
           onPower={quick ? undefined : recordPower}
           onBusy={recordBusy}
           onAuthError={onAuthError}
+          channelChildren={channelChildren}
         />
-      ) : <p className="combined-member-unavailable">{t(MSG.UNAVAILABLE)}</p>}
+      ) : (
+        <>
+          <p className="combined-member-unavailable">{t(MSG.UNAVAILABLE)}</p>
+          {channelChildren && Array.from(channelChildren, ([code, content]) => <Fragment key={code}>{content}</Fragment>)}
+        </>
+      )}
     </section>
   );
 }
@@ -139,6 +148,7 @@ export default function CombinedDeviceCard({
   const allKnownOn = knownPowers.length > 0 && knownPowers.every((value) => value === 'on');
   const controlsPaused = paused || preview;
   const canSend = !busy && !controlsPaused && members.some(({ device }) => device);
+  const layout = combinedLayout(members);
 
   const setPower = useCallback(async (value: boolean) => {
     if (savedId === undefined || !canSend || sending.current) return;
@@ -171,11 +181,16 @@ export default function CombinedDeviceCard({
     }
   }, [api, canSend, dispatch, id, members, onAuthError, savedId]);
 
-  function renderMember(entry: ResolvedMember, quick = false) {
+  function renderMember(entry: ResolvedMember, quick = false): ReactNode {
     const { member } = entry;
     const source = member.power_source;
-    const relay = source && members.find((row) => row.member.device_id === source.device_id);
+    const relay = source && layout.byId.get(source.device_id);
     const sourceLabel = source && t(MSG.COMBINED_SUPPLIED_BY, [displayName(relay?.device, source.device_id), labelFor(source.channel)]);
+    const channels = quick ? undefined : layout.channels.get(member.device_id);
+    const channelChildren = channels && new Map(Array.from(channels, ([code, entries]) => [
+      code,
+      <div className="combined-relay-devices">{entries.map((child) => renderMember(child))}</div>,
+    ]));
     return (
       <MemberControls
         key={`${member.device_id}:${member.route}`}
@@ -187,6 +202,7 @@ export default function CombinedDeviceCard({
         quick={quick}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
+        channelChildren={channelChildren}
         onPower={onPower}
         onAuthError={onAuthError}
       />
@@ -228,16 +244,6 @@ export default function CombinedDeviceCard({
         )}
         actions={(
           <>
-            <PowerButton
-              id={powerId}
-              label={t(MSG.COMBINED_POWER)}
-              checked={allKnownOn}
-              disabled={!canSend}
-              variant="button"
-              icon={<ParameterIcon code="switch" />}
-              known
-              onChange={setPower}
-            />
             <button
               className="secondary tile-icon-action"
               type="button"
@@ -256,8 +262,25 @@ export default function CombinedDeviceCard({
         )}
       />
       <DashboardCardFooter>
-        {members.map((entry) => renderMember(entry))}
+        {layout.roots.map((entry) => renderMember(entry))}
         {(sendError || Object.keys(failures).length > 0) && <div className="combined-actions">{feedback}</div>}
+        <div className="combined-power-footer">
+          <PowerButton
+            id={powerId}
+            label={t(MSG.COMBINED_POWER)}
+            checked={allKnownOn}
+            disabled={!canSend}
+            variant="button"
+            icon={(
+              <>
+                <ParameterIcon code="switch" />
+                <span>{t(MSG.COMBINED_POWER)}</span>
+              </>
+            )}
+            known
+            onChange={setPower}
+          />
+        </div>
       </DashboardCardFooter>
       {quickOpen && (
         <DashboardSheet title={combined.name} onClose={onQuickClose} returnFocus={trigger} busy={busy}>

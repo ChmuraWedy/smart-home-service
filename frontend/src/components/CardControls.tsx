@@ -1,5 +1,7 @@
 import { MSG, t } from "../i18n";
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Fragment, useCallback, useEffect, useMemo, useRef, useState,
+} from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CloudDevice, JsonValue, Provider } from '../api';
@@ -87,7 +89,14 @@ export type MemberPower = 'on' | 'off' | 'mixed' | 'unknown';
 type EmbeddedControls = {
   embeddedQuick?: boolean;
   onPower?: (power: MemberPower) => void;
+  channelChildren?: ReadonlyMap<string, ReactNode>;
 };
+
+function unplacedChannelChildren(children?: ReadonlyMap<string, ReactNode>, channels: ControlSpec[] = []) {
+  return children && Array.from(children, ([code, content]) => (
+    channels.some(({ key }) => key === code) ? null : <Fragment key={code}>{content}</Fragment>
+  ));
+}
 
 type CardProps = EmbeddedControls & {
   api: HomeApi;
@@ -109,7 +118,7 @@ export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
   const {
-    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused,
+    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren,
   } = props;
   const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
@@ -126,7 +135,7 @@ export function CardControls(props: CardProps) {
     return () => observer.disconnect();
   }, [paused]);
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
-  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick || loadWhenPaused;
+  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick || loadWhenPaused || Boolean(channelChildren?.size);
   const pollingVisible = visible && !paused;
   let controls: ReactNode;
   if (!active) {
@@ -161,7 +170,7 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
 
 function StandardCardControls({
   api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy,
-  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower,
+  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren,
 }: EmbeddedControls & {
   api: HomeApi; tuyaApi?: HomeApi; name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[];
   reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean;
@@ -216,7 +225,8 @@ function StandardCardControls({
   ) : undefined;
   const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
   const disabled = paused || busy || !readOK || sending || (!!summary && !online);
-  if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return null;
+  const unplaced = unplacedChannelChildren(channelChildren, powers);
+  if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return unplaced ?? null;
   const field = (spec:ControlSpec, headingActions?:ReactNode, showSummary = true) => (
     <CapabilityField pendingScope={pendingScope} headingActions={headingActions} key={spec.key} spec={spec} reading={reading(spec)} now={now} local={local} immediatePower dashboardSwitch
       powerIcon={powerLayout === 'single' ? <DeviceIcon category={category} codes={specs.map(item => item.key)} /> :
@@ -279,7 +289,12 @@ function StandardCardControls({
         sheet.presetSlot,
       )}
       <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
-        {powers.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+        {powers.map((spec) => (channelChildren?.size ? (
+          <div className="combined-relay-channel" data-relay-channel={spec.key} key={spec.key}>
+            <ChannelControl spec={spec} renderField={field} />
+            {channelChildren.get(spec.key)}
+          </div>
+        ) : <ChannelControl key={spec.key} spec={spec} renderField={field} />))}
         {!powerLayout && sensorValues}
         <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>
           <IconGlyph name="refresh" />
@@ -292,12 +307,13 @@ function StandardCardControls({
         </DashboardSheet>
       )}
       {((busy && (!powerLayout || !sending)) || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
+      {unplaced}
     </>
   );
 }
 
 function CloudCardControls({
-  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
+  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower, channelChildren,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
@@ -348,9 +364,12 @@ function CloudCardControls({
     refresh:session.refresh, notice:session.notice, ...commands};
   return isCamera(cloud.category)
     ? (
-      <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
-        online={snapshot?.online ?? cloud.online}
-      />
+      <>
+        <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
+          online={snapshot?.online ?? cloud.online}
+        />
+        {unplacedChannelChildren(channelChildren)}
+      </>
 )
     : (
       <StandardCardControls
@@ -364,12 +383,13 @@ function CloudCardControls({
         category={cloud.category}
         embeddedQuick={embeddedQuick}
         onPower={onPower}
+        channelChildren={channelChildren}
       />
     );
 }
 
 function LocalCardControls({
-  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower,
+  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren,
 }: CardProps & { visible: boolean }) {
   const item = device.local!;
   const dispatch = useAppDispatch();
@@ -407,6 +427,7 @@ function LocalCardControls({
       notice={session.notice}
       embeddedQuick={embeddedQuick}
       onPower={onPower}
+      channelChildren={channelChildren}
       {...commands}
     />
   );

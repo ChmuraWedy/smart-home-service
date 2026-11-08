@@ -14,6 +14,7 @@ import { MSG, t, translateText } from '../i18n';
 import { ControlDialog } from './DeviceControls';
 import CombinedDeviceCard from './CombinedDeviceCard';
 import type { ResolvedMember } from './CombinedDeviceCard';
+import CombinedDeviceOrder from './CombinedDeviceOrder';
 import CombinedDeviceWiring from './CombinedDeviceWiring';
 
 const creationSteps = [
@@ -221,7 +222,19 @@ export function CombinedDeviceSettings({
     setMembers((rows) => rows.map((member) => (member.device_id === id ? { ...member, power_source: source } : member)));
   }, []);
 
+  const moveMember = useCallback((id: string, neighbor: string) => {
+    setMembers((rows) => {
+      const from = rows.findIndex((member) => member.device_id === id);
+      const to = rows.findIndex((member) => member.device_id === neighbor);
+      if (from < 0 || to < 0) return rows;
+      const next = [...rows];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  }, []);
+
   if (missingDraft) return null;
+  const previewMembers = previewing ? members.map(previewMember) : [];
 
   return (
     <>
@@ -303,20 +316,23 @@ export function CombinedDeviceSettings({
           </>
         )}
         {previewing && (
-          <fieldset className="combined-preview dashboard-view" data-card-size={cardSize} disabled>
-            <legend className="sr-only">{t(MSG.COMBINED_CARD_PREVIEW)}</legend>
-            <p className="help">{t(MSG.COMBINED_CARD_PREVIEW_HELP)}</p>
-            <ul className="dashboard-device-column">
-              <CombinedDeviceCard
-                api={api}
-                combined={{ name: name.trim() }}
-                members={members.map(previewMember)}
-                room={roomName ?? t(MSG.NO_ROOM)}
-                now={now}
-                onAuthError={onAuthError}
-              />
-            </ul>
-          </fieldset>
+          <div className="combined-preview-layout">
+            <CombinedDeviceOrder members={previewMembers} disabled={busy} onMove={moveMember} />
+            <fieldset className="combined-preview dashboard-view" data-card-size={cardSize} disabled>
+              <legend className="sr-only">{t(MSG.COMBINED_CARD_PREVIEW)}</legend>
+              <p className="help">{t(MSG.COMBINED_CARD_PREVIEW_HELP)}</p>
+              <ul className="dashboard-device-column">
+                <CombinedDeviceCard
+                  api={api}
+                  combined={{ name: name.trim() }}
+                  members={previewMembers}
+                  room={roomName ?? t(MSG.NO_ROOM)}
+                  now={now}
+                  onAuthError={onAuthError}
+                />
+              </ul>
+            </fieldset>
+          </div>
         )}
         {error && <p className="field-error" role="alert">{translateText(error)}</p>}
         <div className="survey-footer">

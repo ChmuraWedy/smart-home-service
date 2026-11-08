@@ -125,7 +125,7 @@ function openApp(path: string) {
 }
 
 describe('combined devices', () => {
-  it('records two physical relay channels in the creation wizard and shows the saved wiring on the card', async () => {
+  it('groups wired devices by relay channel and saves their reordered layout', async () => {
     const { writes } = backend(undefined, false, false, true);
     const user = userEvent.setup();
     openApp('/combined-devices/new?room=3');
@@ -151,8 +151,20 @@ describe('combined devices', () => {
     expect(draftCard.getByText('Kitchen')).toBeInTheDocument();
     expect(draftCard.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
     expect(draftCard.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
+    const channel = async (name: string) => (await draftCard.findByRole('switch', { name })).closest<HTMLElement>('[data-relay-channel]')!;
+    const firstChannel = within(await channel('Channel 1'));
+    const secondChannel = await channel('Channel 2');
+    const orderedNames = (element: HTMLElement) => [...element.querySelectorAll('.combined-member-name')].map((heading) => heading.textContent);
+    expect(firstChannel.getByRole('region', { name: bulbs[0].name })).toBeInTheDocument();
+    expect(firstChannel.queryByRole('region', { name: bulbs[1].name })).toBeNull();
+    expect(orderedNames(secondChannel)).toEqual([bulbs[1].name, bulbs[2].name]);
+    const order = within(form.getByRole('group', { name: 'Device order' }));
+    expect(order.getByRole('button', { name: `Move ${bulbs[0].name} up` })).toBeDisabled();
+    await user.click(order.getByRole('button', { name: `Move ${bulbs[2].name} up` }));
+    expect(orderedNames(secondChannel)).toEqual([bulbs[2].name, bulbs[1].name]);
     const power = draftCard.getByRole('button', { name: 'Power for all devices' });
     expect(power).toBeDisabled();
+    expect(power.closest('footer')?.lastElementChild).toContainElement(power);
     expect(draftCard.getByRole('button', { name: 'Quick controls' })).toBeDisabled();
     const lamp = within(draftCard.getByRole('region', { name: bulbs[0].name }));
     expect(await lamp.findByRole('switch')).toBeDisabled();
@@ -171,8 +183,8 @@ describe('combined devices', () => {
       path: '/combined-devices', method: 'POST', body: {
         members: [
           { device_id: relay.id, route: 'sharing' },
-          ...bulbs.map((bulb, index) => ({
-            device_id: bulb.id, route: 'sharing', power_source: { device_id: relay.id, channel: index === 0 ? 'switch_1' : 'switch_2' },
+          ...[bulbs[0], bulbs[2], bulbs[1]].map((bulb) => ({
+            device_id: bulb.id, route: 'sharing', power_source: { device_id: relay.id, channel: bulb === bulbs[0] ? 'switch_1' : 'switch_2' },
           })),
         ],
       },
@@ -182,6 +194,13 @@ describe('combined devices', () => {
     const card = within(await screen.findByRole('listitem', { name: 'Devices in Kitchen' }));
     expect(card.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
     expect(card.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
+    const liveChannel = await card.findByRole('switch', { name: 'Channel 2' });
+    await waitFor(() => expect(liveChannel).toBeEnabled());
+    await user.click(liveChannel);
+    expect(writes[1]).toMatchObject({
+      path: `/cloud/devices/${relay.id}/commands`,
+      body: { commands: [{ code: 'switch_2', value: false }] },
+    });
   });
 
   it('saves three cloud bulbs, keeps quick settings independent, routes details, and edits and dissolves the combination', async () => {
@@ -256,7 +275,7 @@ describe('combined devices', () => {
     await user.click(close);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const power = within(card).getByRole('button', { name: 'Power for all devices' });
-    expect(card.querySelector('header')).toContainElement(power);
+    expect(card.querySelector('footer')?.lastElementChild).toContainElement(power);
     await user.click(power);
     await waitFor(() => expect(writes[2]).toMatchObject({ path: '/combined-devices/1/power/on', method: 'POST' }));
     expect(await within(card).findByText(/Light Kitchen 3 · Unavailable/)).toBeInTheDocument();
@@ -364,6 +383,9 @@ describe('combined devices', () => {
     const preview = within(editor.getByRole('group', { name: 'Card preview' }));
     const draft = within(preview.getByRole('listitem', { name: 'Evening lights' }));
     expect(draft.getByRole('region', { name: bulbs[2].name })).toBeInTheDocument();
+    await user.click(editor.getByRole('button', { name: `Move ${bulbs[2].name} up` }));
+    const memberNames = draft.getAllByRole('region').map((region) => region.getAttribute('aria-label'));
+    expect(memberNames.filter((name) => bulbs.some((bulb) => bulb.name === name))).toEqual([bulbs[0].name, bulbs[2].name, bulbs[1].name]);
     expect(draft.getByRole('button', { name: 'Power for all devices' })).toBeDisabled();
     expect(writes).toHaveLength(0);
     act(() => window.history.back());
@@ -374,8 +396,8 @@ describe('combined devices', () => {
     await user.click(editor.getByRole('button', { name: 'Save' }));
     expect(writes[0]).toMatchObject({ path: '/combined-devices/1', method: 'PUT', body: { name: 'Evening lights', members: [
       { device_id: bulbs[0].id, route: 'developer' },
-      { device_id: bulbs[1].id, route: 'sharing' },
       { device_id: bulbs[2].id, route: 'sharing' },
+      { device_id: bulbs[1].id, route: 'sharing' },
     ] } });
   });
 
