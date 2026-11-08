@@ -344,12 +344,7 @@ export default function DashboardGrid<T>({
               </div>
             )}
           </div>
-          {draft && (
-            <>
-              {roomAction}
-              <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>
-            </>
-          )}
+          {draft && <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>}
           {saveError && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
           {editing && current?.error && (
@@ -359,6 +354,7 @@ export default function DashboardGrid<T>({
           )}
         </div>
       )}
+      {draft && roomAction}
       <div
         className="dashboard-device-grid"
         ref={grid}

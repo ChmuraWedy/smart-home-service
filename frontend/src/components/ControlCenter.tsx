@@ -9,7 +9,7 @@ import { localSpec } from '../controls';
 import { deviceAliases, deviceRoutes, deviceTextVariants, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
-import type { CombinedDevice, Group, GroupState, Inventory, LocalDevice } from '../home-api';
+import type { CombinedDevice, Group, GroupState, Inventory, LocalDevice, Room } from '../home-api';
 import { CloudControl } from './CloudControl';
 import CombinedDeviceCard from './CombinedDeviceCard';
 import { CombinedDeviceDetails, CombinedDeviceList, CombinedDeviceSettings } from './CombinedDeviceSettings';
@@ -20,6 +20,7 @@ import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePr
 import { useTopology } from '../use-topology';
 import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
+import { RoomLayoutSettings } from './RoomEditor';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
@@ -223,9 +224,17 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const building = query.get('building') ?? '';
   const room = dashboardRoom(location.pathname, query);
   const editingLayout = isDashboardLayoutPath(location.pathname);
-  const activeRoomId = inventory?.rooms.find(({ id }) => String(id) === room)?.id;
-  const canOpenRoomEditor = import.meta.env.MODE !== 'demo' && Boolean(inventory && (activeRoomId !== undefined || room === ''));
-  const roomAppearance = useRoomAppearance(api, activeRoomId)?.value;
+  const activeRoom = inventory?.rooms.find(({ id }) => String(id) === room);
+  const [appearanceRevision, setAppearanceRevision] = useState(0);
+  const roomAppearance = useRoomAppearance(api, activeRoom?.id, appearanceRevision)?.value;
+  const refreshRoomAppearance = useCallback(() => setAppearanceRevision((value) => value + 1), []);
+  const updateRoomName = useCallback((updated: Room) => {
+    setRecord((value) => {
+      if (value?.api !== api || value.mask !== mask || !value.inventory) return value;
+      const rooms = value.inventory.rooms.map((item) => (item.id === updated.id ? updated : item));
+      return { ...value, inventory: { ...value.inventory, rooms } };
+    });
+  }, [api, mask]);
   const search = editingLayout ? '' : query.get('q') ?? '';
   const requestedPage = Number(query.get('page') ?? 1);
   const deviceLink = readDeviceLink(location.pathname + location.search);
@@ -267,9 +276,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   }, [dashboardPanel, fromDashboardLayout, location.search, navigate, room]);
 
   function openRoomEditor() {
-    const params = new URLSearchParams();
-    if (activeRoomId) params.set('room', String(activeRoomId));
-    navigate(withQuery(appPaths.rooms, params));
+    navigate(appPaths.rooms);
   }
   function setSearch(value: string) {
     if (value) query.set('q', value); else query.delete('q');
@@ -719,6 +726,28 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       />
     );
   }
+  let roomAction: ReactNode;
+  if (import.meta.env.MODE !== 'demo') {
+    if (activeRoom) {
+      roomAction = (
+        <RoomLayoutSettings
+          key={activeRoom.id}
+          api={api}
+          room={activeRoom}
+          onAuthError={onAuthError}
+          onRenamed={updateRoomName}
+          onAppearanceSaved={refreshRoomAppearance}
+        />
+      );
+    } else if (inventory && room === '') {
+      roomAction = (
+        <button type="button" className="secondary compact" onClick={openRoomEditor}>
+          {t(MSG.ROOM_EDITOR_TITLE)}
+        </button>
+      );
+    }
+  }
+
   return (
     <section
       className="card control-center"
@@ -798,11 +827,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             editing={editingLayout}
             onEditingChange={setEditingLayout}
             navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
-            roomAction={canOpenRoomEditor ? (
-              <button type="button" className="secondary compact" onClick={openRoomEditor}>
-                {t(MSG.ROOM_APPEARANCE_AND_NAME_EDITOR)}
-              </button>
-            ) : undefined}
+            roomAction={roomAction}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />
           {entries.length > PAGE_SIZE && (

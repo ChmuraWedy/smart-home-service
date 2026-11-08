@@ -68,8 +68,8 @@ function NameForm({
 }
 
 function RoomAppearanceForm({
-  api, roomId, busy, run,
-}: { api: HomeApi; roomId: number; busy: boolean; run: RunAction }) {
+  api, roomId, busy, run, onSaved,
+}: { api: HomeApi; roomId: number; busy: boolean; run: RunAction; onSaved?: () => void }) {
   const [revision, setRevision] = useState(0);
   const [opacityDraft, setOpacityDraft] = useState<number>();
   const [file, setFile] = useState<File>();
@@ -83,6 +83,7 @@ function RoomAppearanceForm({
 
   function refresh() {
     setRevision((previous) => previous + 1);
+    onSaved?.();
   }
 
   async function upload() {
@@ -157,17 +158,106 @@ function RoomAppearanceForm({
   );
 }
 
+function useRoomAction(onAuthError: () => void) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const run: RunAction = useCallback(async (work) => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await work();
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 401) onAuthError();
+      else setError(failureMessage(failure));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, onAuthError]);
+
+  return {
+    busy, error, run, setError,
+  };
+}
+
+function RoomNameAndAppearance({
+  api, room, busy, run, onRenamed, onAppearanceSaved,
+}: {
+  api: HomeApi;
+  room: Room;
+  busy: boolean;
+  run: RunAction;
+  onRenamed: (room: Room) => void;
+  onAppearanceSaved?: () => void;
+}) {
+  const rename = useCallback(async (name: string) => {
+    await run(async () => {
+      const renamed = await api.renameRoom(room.id, name);
+      onRenamed(renamed);
+    });
+  }, [api, onRenamed, room.id, run]);
+
+  return (
+    <>
+      <NameForm
+        title={t(MSG.ROOM_RENAME)}
+        initial={room.name}
+        submitLabel={t(MSG.ROOM_RENAME)}
+        busy={busy}
+        onSave={rename}
+      />
+      <RoomAppearanceForm
+        api={api}
+        roomId={room.id}
+        busy={busy}
+        run={run}
+        onSaved={onAppearanceSaved}
+      />
+    </>
+  );
+}
+
+export function RoomLayoutSettings({
+  api, room, onAuthError, onRenamed, onAppearanceSaved,
+}: {
+  api: HomeApi;
+  room: Room;
+  onAuthError: () => void;
+  onRenamed: (room: Room) => void;
+  onAppearanceSaved: () => void;
+}) {
+  const { busy, error, run } = useRoomAction(onAuthError);
+
+  return (
+    <details className="room-layout-settings">
+      <summary>{t(MSG.ROOM_APPEARANCE_AND_NAME_EDITOR)}</summary>
+      <div className="room-layout-settings-content" aria-busy={busy}>
+        <RoomNameAndAppearance
+          api={api}
+          room={room}
+          busy={busy}
+          run={run}
+          onRenamed={onRenamed}
+          onAppearanceSaved={onAppearanceSaved}
+        />
+        {error && <p className="field-error" role="alert">{error}</p>}
+      </div>
+    </details>
+  );
+}
+
 export default function RoomEditor({
   api, ready, onAuthError,
 }: { api: HomeApi; ready: boolean; onAuthError: () => void }) {
   const [query] = useSearchParams();
   const [selectedId, setSelectedId] = useState(() => Number(query.get('room')) || undefined);
   const [catalog, setCatalog] = useState<CatalogRead>();
-  const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const {
+    busy, error, run, setError,
+  } = useRoomAction(onAuthError);
   const roomId = useId();
   const read = catalog?.api === api ? catalog : undefined;
   const data = read?.data;
@@ -185,20 +275,6 @@ export default function RoomEditor({
     });
     return () => controller.abort();
   }, [api, attempt, onAuthError, ready]);
-
-  const run: RunAction = useCallback(async (work) => {
-    if (busy) return;
-    setBusy(true);
-    setError('');
-    try {
-      await work();
-    } catch (failure) {
-      if (failure instanceof ApiError && failure.status === 401) onAuthError();
-      else setError(failureMessage(failure));
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, onAuthError]);
 
   const createBuilding = useCallback(async (name: string) => {
     if (!data) return;
@@ -218,13 +294,13 @@ export default function RoomEditor({
     });
   }, [api, data, run]);
 
-  const renameRoom = useCallback(async (name: string) => {
-    if (!data || !selected) return;
-    await run(async () => {
-      const room = await api.renameRoom(selected.id, name);
-      setCatalog({ api, data: { ...data, rooms: data.rooms.map((item) => (item.id === room.id ? room : item)) } });
+  const updateRoom = useCallback((room: Room) => {
+    setCatalog((value) => {
+      if (value?.api !== api || !value.data) return value;
+      const rooms = value.data.rooms.map((item) => (item.id === room.id ? room : item));
+      return { ...value, data: { ...value.data, rooms } };
     });
-  }, [api, data, run, selected]);
+  }, [api]);
 
   async function removeRoom() {
     if (!data || !selected) return;
@@ -309,20 +385,13 @@ export default function RoomEditor({
             />
           ) : (
             <>
-              <NameForm
-                key={`name-${selected.id}`}
-                title={t(MSG.ROOM_RENAME)}
-                initial={selected.name}
-                submitLabel={t(MSG.ROOM_RENAME)}
-                busy={busy}
-                onSave={renameRoom}
-              />
-              <RoomAppearanceForm
-                key={`appearance-${selected.id}`}
+              <RoomNameAndAppearance
+                key={selected.id}
                 api={api}
-                roomId={selected.id}
+                room={selected}
                 busy={busy}
                 run={run}
+                onRenamed={updateRoom}
               />
               <Link to={dashboardHref(String(selected.id), new URLSearchParams(), null)}>{t(MSG.ROOM_VIEW_DASHBOARD)}</Link>
               {confirmDelete ? (

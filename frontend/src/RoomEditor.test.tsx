@@ -4,7 +4,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { STORAGE_KEY } from './connection';
-import type { Building, Room, RoomAppearance } from './home-api';
+import type { Building, LocalDevice, Room, RoomAppearance } from './home-api';
 import { setLocale } from './i18n';
 import { prepareRoomBackground } from './room-appearance';
 import { App } from './test/App';
@@ -13,7 +13,7 @@ const building = { id: 1, name: 'Home', aliases: [] };
 const kitchen = { id: 1, building_id: 1, name: 'Kitchen', aliases: [] };
 const bedroom = { id: 2, building_id: 1, name: 'Bedroom', aliases: [] };
 
-function fixture(initialBuildings: Building[], initialRooms: Room[]) {
+function fixture(initialBuildings: Building[], initialRooms: Room[], devices: LocalDevice[] = []) {
   let buildings = initialBuildings;
   let rooms = initialRooms;
   let allowDelete = false;
@@ -44,7 +44,8 @@ function fixture(initialBuildings: Building[], initialRooms: Room[]) {
       }
       return json(rooms);
     }
-    if (path === '/devices' || path === '/groups' || path === '/combined-devices') return json([]);
+    if (path === '/devices') return json(devices);
+    if (path === '/groups' || path === '/combined-devices') return json([]);
     if (path.startsWith('/dashboard-layouts/')) return json({ slots: [] });
     const match = /^\/rooms\/(\d+)(?:\/(appearance|background))?$/.exec(path);
     if (!match) return json({ detail: 'Not found' }, 404);
@@ -113,37 +114,48 @@ it('creates a first building and room, renames it, and preserves it after a bloc
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
 });
 
-it('opens the selected room from the grid editor and saves its background and opacity', async () => {
-  const { uploads, changes } = fixture([building], [kitchen, bedroom]);
+it('edits the name and appearance inline without clearing a grid draft', async () => {
+  const device: LocalDevice = {
+    id: 1, device_id: 'kitchen-lamp', name: 'Kitchen lamp', aliases: [], building_id: 1, room_id: 1,
+    transport: 'wifi', parent_id: null, cid: null, enabled: false, capabilities: {},
+  };
+  const { uploads, changes } = fixture([building], [kitchen, bedroom], [device]);
   const user = userEvent.setup();
   const app = openApp('/rooms/1');
   const editLayout = await screen.findByRole('button', { name: 'Edit layout' });
   const heading = editLayout.closest('.dashboard-layout-heading') as HTMLElement;
   expect(within(heading).getByText('Kitchen', { selector: '.room-navigation-heading' })).toBeInTheDocument();
   expect(editLayout.querySelector('[data-icon="edit"]')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Room appearance and name editor' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Room appearance and name editor')).not.toBeInTheDocument();
   await user.click(editLayout);
   expect(window.location.pathname).toBe('/rooms/1/layout/edit');
-  expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Room appearance and name editor' }));
-  expect(window.location.pathname).toBe('/settings/rooms');
-  expect(await screen.findByRole('combobox', { name: 'Room' })).toHaveValue('1');
+  fireEvent.click(screen.getByRole('button', { name: 'Move Kitchen lamp (Row 1, column 1)' }));
+  await user.click(screen.getByRole('button', { name: 'Move here (Row 3, column 1)' }));
 
+  await user.click(screen.getByText('Room appearance and name editor'));
+  const name = within(screen.getByRole('form', { name: 'Rename room' }));
+  await user.clear(name.getByLabelText('Name'));
+  await user.type(name.getByLabelText('Name'), 'New kitchen');
+  await user.click(name.getByRole('button', { name: 'Rename room' }));
+  expect(await within(heading).findByText('New kitchen', { selector: '.room-navigation-heading' })).toBeInTheDocument();
+
+  const appearance = within(screen.getByRole('region', { name: 'Room appearance' }));
   const file = new File(['image'], 'kitchen.png', { type: 'image/png' });
-  await user.upload(await screen.findByLabelText('Background image'), file);
-  await user.click(screen.getByRole('button', { name: 'Upload background' }));
-  expect(await screen.findByRole('img', { name: 'Current room background' })).toBeInTheDocument();
+  await user.upload(await appearance.findByLabelText('Background image'), file);
+  await user.click(appearance.getByRole('button', { name: 'Upload background' }));
+  expect(await appearance.findByRole('img', { name: 'Current room background' })).toBeInTheDocument();
   expect(uploads[0]?.body).toBe(file);
   expect(uploads[0]?.headers).toMatchObject({ 'X-API-Key': 'fixture', 'Content-Type': 'image/png' });
 
-  fireEvent.change(screen.getByRole('slider', { name: /Card background opacity/ }), { target: { value: '75' } });
-  await user.click(screen.getByRole('button', { name: 'Save' }));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled());
+  fireEvent.change(appearance.getByRole('slider', { name: /Card background opacity/ }), { target: { value: '75' } });
+  await user.click(appearance.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(appearance.getByRole('button', { name: 'Save' })).toBeDisabled());
   expect(changes).toContain('PATCH /rooms/1/appearance');
-
-  await user.click(screen.getByRole('link', { name: 'View room dashboard' }));
   await waitFor(() => expect(document.querySelector('.control-center')).toHaveAttribute('data-room-background', 'true'));
   expect(document.querySelector('.control-center')).toHaveStyle('--room-card-opacity: 75%');
+  expect(screen.getByRole('button', { name: 'Move Kitchen lamp (Row 3, column 1)' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/rooms/1/layout/edit');
+
   app.unmount();
   expect(URL.revokeObjectURL).toHaveBeenCalled();
   openApp('/rooms/2');
@@ -157,7 +169,7 @@ it('opens room management from All rooms even before a room exists', async () =>
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Edit layout' }));
   expect(window.location.pathname).toBe('/layout/edit');
-  await user.click(screen.getByRole('button', { name: 'Room appearance and name editor' }));
+  await user.click(screen.getByRole('button', { name: 'Manage rooms' }));
   expect(window.location.pathname + window.location.search).toBe('/settings/rooms');
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
 });
@@ -169,10 +181,10 @@ it('restores the room layout editor from a direct URL and returns to that room a
   const heading = await screen.findByText('Bedroom', { selector: '.room-navigation-heading' });
   const toolbar = heading.closest('.dashboard-layout-toolbar');
   expect(toolbar).toHaveAttribute('data-editing', 'true');
-  await user.click(await screen.findByRole('button', { name: 'Save' }));
+  await user.click(await within(toolbar as HTMLElement).findByRole('button', { name: 'Save' }));
   await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/rooms/2?building=1'));
   expect(changes.some((change) => change.startsWith('PUT /dashboard-layouts/'))).toBe(true);
-  expect(screen.queryByRole('button', { name: 'Room appearance and name editor' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Room appearance and name editor')).not.toBeInTheDocument();
 });
 
 it('shrinks a large photo before sending it through the existing upload limit', async () => {
