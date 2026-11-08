@@ -400,6 +400,7 @@ function CloudCardControls({
         <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
           online={snapshot?.online ?? cloud.online}
           paused={paused || supplyPower !== undefined}
+          embeddedQuick={embeddedQuick}
         />
         {unplacedChannelChildren(channelChildren)}
       </>

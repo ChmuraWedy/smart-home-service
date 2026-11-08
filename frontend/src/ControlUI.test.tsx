@@ -5,7 +5,6 @@ import { CloudApi } from './api';
 import { HomeApi } from './home-api';
 import type { Capability, DeviceState, LocalDevice } from './home-api';
 import { CloudControl } from './components/CloudControl';
-import { DeviceMappings } from './components/DeviceMappings';
 import { ControlCenter } from './components/ControlCenter';
 import { renderWithStore } from './test/render-with-store';
 import { LocalControl, GroupControl } from './components/LocalControls';
@@ -406,46 +405,6 @@ describe('cloud device control', () => {
     expect(close).not.toHaveBeenCalled();
     await act(async () => { server.resolve(); });
     expect(screen.getByRole('button', { name: 'Закрыть' })).toBeEnabled();
-  });
-});
-
-describe('manual device maps', () => {
-  it('shows unknown Smart Life bindings, saves explicit device/code/DP references, and makes no control request', async () => {
-    const target={...cloudDevice,id:'target-switch',name:'Выключатель кухни'};
-    const sourceSpec={code:'switch_led',type:'Boolean',values:'{}',dp_id:20,dp_ids:[20]};
-    const targetSpec={code:'switch_2',type:'Boolean',values:'{}',dp_id:2,dp_ids:[2]};
-    const calls:{path:string;method:string;body?:unknown}[]=[];
-    vi.mocked(fetch).mockImplementation(async(input,init) => {
-      const url=new URL(String(input)),method=init?.method || 'GET',body=init?.body?JSON.parse(String(init.body)):undefined;
-      calls.push({path:url.pathname,method,body});
-      expect(url.searchParams.get('provider')).toBe('sharing');
-      if(method==='POST') return json({id:1,source_device_id:url.pathname.split('/')[5],...body,origin:'manual',applied_to_tuya:false},201);
-      if(method==='DELETE') return new Response(null,{status:204});
-      if(url.pathname.endsWith('/functions')) return json({device_id:target.id,functions:[targetSpec]});
-      return json({device_id:cloudDevice.id,provider:'sharing',tuya_bindings_available:false,mappings:[]});
-    });
-    renderWithStore(<DeviceMappings api={new CloudApi(connection)} device={cloudDevice} provider="sharing" definitions={{device_id:cloudDevice.id,functions:[sourceSpec]}} devices={[cloudDevice,target]} disabled={false} onBusy={vi.fn()} onAuthError={vi.fn()} />);
-    expect(fetch).not.toHaveBeenCalled();
-    const user=userEvent.setup(); await user.click(screen.getByText('Ручные сопоставления в нашей базе'));
-    await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
-    await user.selectOptions(screen.getByLabelText('Устройство назначения'),target.id);
-    await screen.findByRole('option',{name:'Канал 2 · switch_2 · DP 2'});
-    expect(screen.getByLabelText('DP источника')).toHaveValue(20);
-    expect(screen.getByLabelText('DP назначения')).toHaveValue(2);
-    await user.selectOptions(screen.getByLabelText('Тип связи'),'multi_control');
-    await user.click(screen.getByRole('button',{name:'Сохранить сопоставление'}));
-    await screen.findByText('Ручное сопоставление · не применено в Tuya');
-    expect(calls.filter(c=>c.method==='POST')).toEqual([{path:'/api/v1/cloud/devices/cloud-lamp/mappings',method:'POST',body:{kind:'multi_control',source_code:'switch_led',source_dp_id:20,target_device_id:'target-switch',target_code:'switch_2',target_dp_id:2}}]);
-    await user.click(screen.getByRole('button',{name:'Удалить сопоставление'}));
-    await screen.findByText('Сохранённых сопоставлений пока нет. Список привязок в Smart Life неизвестен.');
-    expect(calls.some(c=>c.path.includes('/commands'))).toBe(false);
-    await user.selectOptions(screen.getByLabelText('Направление'),'incoming');
-    await screen.findByRole('option',{name:'Канал 2 · switch_2 · DP 2'});
-    expect(screen.getByLabelText('DP источника')).toHaveValue(2);
-    expect(screen.getByLabelText('DP назначения')).toHaveValue(20);
-    await user.click(screen.getByRole('button',{name:'Сохранить сопоставление'}));
-    await screen.findByText('Ручное сопоставление · не применено в Tuya');
-    expect(calls.filter(c=>c.method==='POST')[1]).toEqual({path:'/api/v1/cloud/devices/target-switch/mappings',method:'POST',body:{kind:'multi_control',source_code:'switch_2',source_dp_id:2,target_device_id:'cloud-lamp',target_code:'switch_led',target_dp_id:20}});
   });
 });
 

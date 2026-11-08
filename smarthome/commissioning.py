@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from .api_dependencies import authenticate, get_session
 from .auto_label_translations import translate_local_device
 from .cloud_api import Provider, cloud_bridge, safe_spec
-from .cloud_mappings import scope_for
+from .cloud_scope import scope_for
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
 from .local_lighting import color_capability
 from .models import Device

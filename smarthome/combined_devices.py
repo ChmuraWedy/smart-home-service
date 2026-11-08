@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .cloud_api import CloudCommand, cloud_bridge, execute_cloud_commands
-from .cloud_mappings import scope_for
+from .cloud_scope import scope_for
 from .control import run_command
 from .models import CombinedDevice, Device, Room
 from .schemas import DeviceAliases, Identifier, Name, PositiveID, Schema

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .auto_label_translations import cloud_labels, generate_missing
-from .cloud_mappings import scope_for
+from .cloud_scope import scope_for
 from .device_translations import cloud_translations, promote_alias_translations, prune_translations
 from .models import CloudDeviceAlias, Device
 from .schemas import DeviceAliases, Identifier

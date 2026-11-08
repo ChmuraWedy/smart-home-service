@@ -161,7 +161,7 @@ def save_cloud_translations(
     provider: Literal["sharing", "developer"] = "sharing", session: Session = Depends(get_session),
 ):
     from .cloud_api import cloud_bridge
-    from .cloud_mappings import scope_for
+    from .cloud_scope import scope_for
     from .models import CloudDeviceAlias
     from .service import commit
 

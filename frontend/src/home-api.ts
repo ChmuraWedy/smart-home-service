@@ -166,6 +166,10 @@ export class HomeApi extends CloudApi {
     return this.deleteResource(`/rooms/${roomId}`);
   }
 
+  setLocalDeviceRoom(deviceId: number, roomId: number | null) {
+    return this.request<LocalDevice>(`/devices/${deviceId}`, 'PATCH', { room_id: roomId });
+  }
+
   roomAppearance(roomId: number, signal: AbortSignal) {
     return this.request<RoomAppearance>(`/rooms/${roomId}/appearance`, 'GET', undefined, signal);
   }

@@ -7,7 +7,6 @@ import type { LocalDevice } from '../home-api';
 import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
-import { DeviceMappings } from './DeviceMappings';
 import { ChannelAliases } from './ChannelAliases';
 import DeviceInformation from './DeviceInformation';
 import { useAutomaticControls } from '../control-drafts';
@@ -35,18 +34,18 @@ import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, next
 import { useAppDispatch, useAppSelector } from '../store';
 
 export function CloudControl({
-  api, device, provider, devices, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError,
+  api, device, provider, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError, roomEditor,
 }: {
-  api: CloudApi; device: CloudDevice; provider: Provider; devices?: CloudDevice[]; room?: string; displayName?: string;
+  api: CloudApi; device: CloudDevice; provider: Provider; room?: string; displayName?: string;
   localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; closeLabel?: string; onClose: () => void; onAuthError: () => void;
+  roomEditor?: ReactNode;
 }) {
   const originalName = displayName || device.name || t(MSG.TUYA_DEVICE);
   const localize = useDeviceText();
   const localTransport = localDevice?.transport;
-  const [mappingBusy,setMappingBusy] = useState(false);
   const [aliasBusy, setAliasBusy] = useState(false);
   const [labelBusy, setLabelBusy] = useState(false);
-  const editingBusy = mappingBusy || labelBusy || aliasBusy;
+  const editingBusy = labelBusy || aliasBusy;
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, device.id, provider);
   const dispatch = useAppDispatch();
   const labelKey = cloudMetadataKey(cloudAccountScope(api, provider), device.id);
@@ -131,7 +130,7 @@ export function CloudControl({
       <CapabilityField pendingScope={pendingScope}
         headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec}
         valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false}
-        aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || mappingBusy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)}
+        aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)}
       />
     );
   };
@@ -145,7 +144,7 @@ export function CloudControl({
       closeLabel={closeLabel}
       information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
       statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={name} busy={session.busy || editingBusy} onClose={onClose}
-      titleContent={<DeviceAliases api={api} deviceId={device.id} name={originalName} translations={translations} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || mappingBusy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
+      titleContent={<DeviceAliases api={api} deviceId={device.id} name={originalName} translations={translations} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
       connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
     >
       {camera && (
@@ -153,6 +152,7 @@ export function CloudControl({
         headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined}
       />
 )}
+      {roomEditor}
       <div className="control-toolbar">
         <span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span>
       </div>
@@ -227,7 +227,6 @@ export function CloudControl({
             </li>
 ))}
         </ul>
-        {definitions && <DeviceMappings api={api} device={device} devices={devices} provider={provider} definitions={definitions} disabled={session.busy || labelBusy || aliasBusy} onBusy={setMappingBusy} onAuthError={onAuthError} />}
       </details>
 )}
       <ControlFeedback busy={session.busy} notice={session.notice} />

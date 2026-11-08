@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from smarthome import gateway_setup
-from smarthome.cloud_mappings import scope_for
+from smarthome.cloud_scope import scope_for
 from smarthome.models import CloudDeviceAlias, CloudHome, CloudPlacement, CloudRoom, Device
 from smarthome.network import NetworkMonitor
 from tests.test_capture_tuya import datagram

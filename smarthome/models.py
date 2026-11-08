@@ -81,24 +81,6 @@ class DeviceTranslation(Base):
     values: Mapped[dict[str, str]] = mapped_column(JSON)
 
 
-class CloudDeviceMapping(Base):
-    """User-maintained map; never presented as an applied Tuya association."""
-
-    __tablename__ = "cloud_device_mappings"
-    __table_args__ = (UniqueConstraint(
-        "scope", "kind", "source_device_id", "source_code", "target_device_id", "target_code"
-    ),)
-    id: Mapped[int] = mapped_column(primary_key=True)
-    scope: Mapped[str] = mapped_column(String(64), index=True)
-    kind: Mapped[str] = mapped_column(String(20))
-    source_device_id: Mapped[str] = mapped_column(String(128), index=True)
-    source_code: Mapped[str] = mapped_column(String(128))
-    source_dp_id: Mapped[int | None]
-    target_device_id: Mapped[str] = mapped_column(String(128))
-    target_code: Mapped[str] = mapped_column(String(128))
-    target_dp_id: Mapped[int | None]
-
-
 class AliasOwner:
     @property
     def aliases(self) -> list[str]:
@@ -151,6 +133,13 @@ class CloudTopology(Base):
     scope: Mapped[str] = mapped_column(String(64), primary_key=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     warnings: Mapped[int] = mapped_column(default=0)
+
+
+class CloudRoomOverride(Base):
+    __tablename__ = "cloud_room_overrides"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
 
 
 class Building(AliasOwner, Base):

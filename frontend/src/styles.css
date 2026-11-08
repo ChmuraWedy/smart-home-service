@@ -180,11 +180,7 @@
 .structured-fields .mask-choices { display:flex; flex-wrap:wrap; gap:8px; }
 .mask-choices label { display:flex; flex-direction:row; align-items:center; gap:4px; margin:0; }
 .mask-choices input { width:auto; }
-.device-mappings form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-.device-mappings code, .cloud-properties code { overflow-wrap:anywhere; }
-.mapping-list { padding:0; list-style:none; }
-.mapping-list li { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
-.mapping-list p { margin:5px 0; }
+.cloud-properties code { overflow-wrap:anywhere; }
 .capability { padding:9px 0; border:0; background:transparent; min-width:0; }
 .capability-heading { display:flex; align-items:center; gap:12px; min-width:0; }
 .capability-heading h3 { font-size:13px; overflow-wrap:anywhere; font-weight:550; }
@@ -227,7 +223,7 @@ textarea { width:100%; margin-top:7px; resize:vertical; min-height:90px; backgro
 .group-members h3 { font-size:15px; overflow-wrap:anywhere; }
 .group-members .help { margin:5px 0 0; }
 @media(max-width:860px) { .control-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } .control-filters>label:last-child { grid-column:1/-1; } }
-@media(max-width:520px) { .control-dialog { padding:18px; } .capability-grid,.color-editor,.device-mappings form { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .group-members li { flex-direction:column; align-items:stretch; } }
+@media(max-width:520px) { .control-dialog { padding:18px; } .capability-grid,.color-editor { grid-template-columns:1fr; } .control-header,.control-toolbar { align-items:flex-start; } .group-members li { flex-direction:column; align-items:stretch; } }
 
 * {
   box-sizing:border-box;
@@ -1455,12 +1451,29 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .room-editor-actions select { @apply tw:min-w-0 tw:flex-1; }
 .room-editor-form, .room-appearance-settings { @apply tw:my-4 tw:grid tw:gap-2; }
 .room-editor-form button, .room-appearance-settings button { @apply tw:w-fit; }
+.device-room-form { @apply tw:grid tw:max-w-md tw:gap-2; }
+.device-room-form button { @apply tw:w-fit; }
 .room-appearance-settings { @apply tw:border-y tw:border-(--border) tw:py-4; }
 .room-appearance-settings :is(h2,p) { @apply tw:m-0; }
 .room-crop-controls { @apply tw:grid tw:gap-3; }
+.room-crop-controls > p { @apply tw:m-0; }
+.room-crop-controls > button { @apply tw:w-fit; }
+.room-crop-stage { @apply tw:relative tw:mx-auto tw:w-fit tw:max-w-full tw:touch-none tw:cursor-crosshair tw:overflow-hidden tw:rounded-lg; }
 .room-crop-preview {
-  @apply tw:mx-auto tw:block tw:h-auto tw:w-auto tw:max-w-full tw:rounded-lg tw:bg-(--surface);
+  @apply tw:block tw:h-auto tw:w-auto tw:max-w-full tw:bg-(--surface);
   max-height:min(44dvh,420px);
+}
+.room-crop-stage button.room-crop-selection,
+.room-crop-stage button.room-crop-selection:hover:enabled {
+  @apply tw:absolute tw:cursor-move tw:rounded-none tw:border-2 tw:border-white tw:bg-transparent tw:p-0;
+  box-shadow:0 0 0 1px rgb(0 0 0 / .65),0 0 0 9999px rgb(0 0 0 / .5);
+}
+.room-crop-stage button.room-crop-selection[data-full-image] { @apply tw:cursor-crosshair; }
+.room-crop-stage button.room-crop-selection:focus-visible { outline-offset:-5px; }
+.room-crop-handle {
+  @apply tw:absolute tw:bottom-0 tw:right-0 tw:size-6 tw:cursor-nwse-resize;
+  border-right:4px solid white;
+  border-bottom:4px solid white;
 }
 .room-background-preview { @apply tw:max-h-60 tw:w-full tw:rounded-lg tw:object-cover; }
 .dashboard-device[data-unavailable] :is(.dashboard-card-header, .card-primary-controls, .card-sensor-values) { @apply tw:grayscale; }
@@ -1875,6 +1888,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-device-management .card-heading { @apply tw:flex-wrap; }
 .combined-device-management .group-members h2 { @apply tw:m-0 tw:text-base tw:wrap-anywhere; }
 .combined-device-form { @apply tw:grid tw:gap-3; }
+.combined-member-filters { @apply tw:grid tw:gap-3 tw:sm:grid-cols-2; }
 .combined-creation-steps { @apply tw:m-0 tw:flex tw:flex-wrap tw:gap-x-7 tw:gap-y-1 tw:pl-5 tw:text-sm tw:text-(--muted); }
 .combined-creation-steps [aria-current="step"] { @apply tw:font-semibold tw:text-(--text); }
 .combined-preview-layout { @apply tw:grid tw:items-start tw:gap-3; }

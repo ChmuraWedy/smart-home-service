@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
     Building,
+    CloudPlacement,
     DashboardLayout,
     Device,
     DeviceType,
@@ -331,6 +332,8 @@ def read_device(item_id: EntityRef, session: Session = Depends(get_session)):
 @router.patch("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
 def edit_device(item_id: EntityRef, body: DevicePatch, request: Request, session: Session = Depends(get_session)):
     item = patch_device(session, get_by_ref(session, Device, item_id), body)
+    if "room_id" in body.model_fields_set:
+        session.execute(update(CloudPlacement).where(CloudPlacement.device_id == item.device_id).values(overridden=True))
     commit(session)
     if {"name", "aliases"} & body.model_fields_set:
         translate_local_device(session, request, item)

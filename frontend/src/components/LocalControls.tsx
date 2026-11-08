@@ -1,7 +1,8 @@
+import { useCallback, useState } from 'react';
+import type { ReactNode } from 'react';
 import { MSG, t } from "../i18n";
 import type { CloudDevice } from '../api';
 import type { DeviceRoute } from '../devices';
-import { useCallback, useState } from 'react';
 import { displayReading, isStale, localSpec, validateControlValue } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
@@ -21,10 +22,11 @@ import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 
 export function LocalControl({
-  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup,
+  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup, roomEditor,
 }: {
   api: HomeApi; device: LocalDevice; gateway?: LocalDevice; cloudDevice?: CloudDevice; routes?: DeviceRoute[];
   onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
+  roomEditor?: ReactNode;
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
   const dispatch = useAppDispatch();
@@ -70,6 +72,7 @@ export function LocalControl({
       titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={originalName} translations={translations} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
       connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!state ? t(MSG.CHECKING_CONNECTION) : !state.enabled ? t(MSG.DISABLED_IN_SETTINGS) : state.available ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)} online={state?.enabled && state?.available} />}
     >
+      {roomEditor}
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
       {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
       <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>

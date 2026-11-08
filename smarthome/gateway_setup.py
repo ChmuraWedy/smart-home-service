@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .cloud_api import Provider, cloud_bridge
-from .cloud_mappings import scope_for
+from .cloud_scope import scope_for
 from .device_aliases import aliases_for_devices
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
 from .models import Device

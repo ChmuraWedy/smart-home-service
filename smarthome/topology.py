@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .api_dependencies import get_session
 from .cloud_api import router
-from .cloud_mappings import scope_for
+from .cloud_scope import scope_for
 from .models import (
     Building,
     CloudHome,

@@ -7,10 +7,10 @@ const MAX_UPLOAD_BYTES = 1024 * 1024;
 const MAX_PHOTO_BYTES = 20 * MAX_UPLOAD_BYTES;
 
 export type RoomBackgroundCrop = {
-  ratio?: number;
-  zoom: number;
   x: number;
   y: number;
+  width: number;
+  height: number;
 };
 
 function validateRoomBackground(source: Blob) {
@@ -28,17 +28,16 @@ export async function decodeRoomBackground(source: Blob) {
 }
 
 export function drawRoomBackground(bitmap: ImageBitmap, canvas: HTMLCanvasElement, maximum: number, crop?: RoomBackgroundCrop) {
-  const ratio = crop?.ratio ?? bitmap.width / bitmap.height;
-  const width = Math.min(bitmap.width, bitmap.height * ratio) / (crop?.zoom ?? 1);
-  const height = width / ratio;
+  const width = bitmap.width * (crop?.width ?? 1);
+  const height = bitmap.height * (crop?.height ?? 1);
   const scale = Math.min(1, maximum / Math.max(width, height));
   canvas.setAttribute('width', String(Math.max(1, Math.round(width * scale))));
   canvas.setAttribute('height', String(Math.max(1, Math.round(height * scale))));
   const context = canvas.getContext('2d');
   if (!context) throw new Error(t(MSG.ROOM_BACKGROUND_FORMAT_ERROR));
   if (crop) {
-    const x = (bitmap.width - width) * crop.x;
-    const y = (bitmap.height - height) * crop.y;
+    const x = bitmap.width * crop.x;
+    const y = bitmap.height * crop.y;
     context.drawImage(bitmap, x, y, width, height, 0, 0, canvas.width, canvas.height);
   } else {
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);

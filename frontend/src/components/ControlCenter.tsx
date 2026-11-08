@@ -21,6 +21,7 @@ import { useTopology } from '../use-topology';
 import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
 import { RoomLayoutSettings } from './RoomEditor';
+import DeviceRoomEditor from './DeviceRoomEditor';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
@@ -286,8 +287,13 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
-  function placementOf(device: UnifiedDevice) { return device.local || placements.get(device.id); }
-  const deviceRoom = useCallback((device: UnifiedDevice) => (device.local || placements.get(device.id))?.room_id ?? null, [placements]);
+  const placementOf = useCallback((device: UnifiedDevice) => {
+    if (device.local) return device.local;
+    const synced = placements.get(device.id);
+    const override = device.cloud.sharing?.app_room ?? device.cloud.developer?.app_room;
+    return override ? { ...override, device_id: device.id, building_id: override.building_id ?? synced?.building_id ?? null } : synced;
+  }, [placements]);
+  const deviceRoom = useCallback((device: UnifiedDevice) => placementOf(device)?.room_id ?? null, [placementOf]);
   function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === placementOf(device)?.room_id)?.name || t(MSG.NO_ROOM); }
   const [busy, setBusy] = useState(false);
   const combinationRevision = useRef(0);
@@ -392,6 +398,36 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const selected: Selection | null = activeSurvey ?? (!quick && linked && validRoute ? { kind: 'device', device: linked, route: validRoute, parent, combinedParent }
     : group ? { kind: 'group', group } : null);
   const detailDevice = selected?.kind === 'device' ? selected.device : undefined;
+  const saveDeviceRoom = useCallback(async (roomId: number | null) => {
+    if (!detailDevice) return;
+    const { id, local } = detailDevice;
+    if (local) {
+      const saved = await api.setLocalDeviceRoom(local.id, roomId);
+      setRecord((previous) => {
+        if (previous?.api !== api || previous.mask !== mask || !previous.inventory) return previous;
+        const items = previous.inventory.devices.map((item) => (item.id === local.id ? { ...item, room_id: saved.room_id, building_id: saved.building_id } : item));
+        return { ...previous, inventory: { ...previous.inventory, devices: items } };
+      });
+      return;
+    }
+    const provider = detailDevice.cloud.sharing ? 'sharing' : 'developer';
+    const scope = cloudAccountScope(api, provider);
+    const saved = await api.setCloudDeviceRoom(id, provider, roomId);
+    setRecord((previous) => {
+      if (previous?.api !== api || previous.mask !== mask || cloudAccountScope(api, provider) !== scope) return previous;
+      const items = previous.cloud[provider]?.map((item) => (item.id === id ? { ...item, app_room: saved } : item));
+      return { ...previous, cloud: { ...previous.cloud, [provider]: items } };
+    });
+  }, [api, detailDevice, mask]);
+  const detailRoomEditor = detailDevice && inventory && (
+    <DeviceRoomEditor
+      key={detailDevice.id}
+      rooms={inventory.rooms}
+      roomId={deviceRoom(detailDevice)}
+      onSave={saveDeviceRoom}
+      onAuthError={onAuthError}
+    />
+  );
   let detailCloseLabel: string | undefined;
   if (selected?.kind === 'device' && selected.combinedParent) detailCloseLabel = t(MSG.BACK_TO_COMBINATION);
   else if (selected?.kind === 'device' && selected.parent) detailCloseLabel = t(MSG.BACK_TO_GROUP);
@@ -439,7 +475,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       ...displayed.map((item) => ({ kind: 'combined' as const, combined: item })),
       ...filtered.map((device) => ({ kind: 'device' as const, device })),
     ];
-  }, [devices, inventory, building, room, search, placements, combinations, resolvedMembers]);
+  }, [devices, inventory, building, room, search, placementOf, combinations, resolvedMembers]);
   const linkedIndex = entries.findIndex((entry) => {
     if (entry.kind === 'device') return entry.device === linked;
     if (entry.kind === 'combined') return entry.combined === (combined ?? combinedParent);
@@ -694,6 +730,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
 
   if (activeSurvey && inventory) {
     const { device, existing, provider } = activeSurvey;
+    const surveyedDevice = device && devices.find(({ id }) => id === device.id);
 
     function reopenLocalDevice(local: LocalDevice) {
       const [mergedDevice] = mergeDevices([local], cloud);
@@ -719,7 +756,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         provider={provider}
         cloudDevices={provider ? cloud[provider] : undefined}
         gatewayPlacements={Array.from(placements.values())}
-        placement={device ? placements.get(device.id) : undefined}
+        placement={surveyedDevice ? placementOf(surveyedDevice) : undefined}
         onClose={closeSurvey}
         onSaved={existing ? saveSurvey : undefined}
         onAuthError={onAuthError}
@@ -856,6 +893,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           key={detailDevice.local.id}
           api={api}
           room={roomName(detailDevice)}
+          roomEditor={detailRoomEditor}
           device={detailDevice.local}
           gateway={detailGateway}
           cloudDevice={detailDevice.cloud.sharing ?? detailDevice.cloud.developer}
@@ -871,13 +909,13 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           key={detailProvider + detailDevice.id}
           api={api}
           room={roomName(detailDevice)}
+          roomEditor={detailRoomEditor}
           displayName={detailDevice.name}
           closeLabel={detailCloseLabel}
           device={detailCloud}
           localDevice={detailDevice.local}
           gateway={detailGateway}
           routes={deviceRoutes(detailDevice)}
-          devices={cloud[detailProvider]}
           provider={detailProvider}
           onClose={close}
           onAuthError={onAuthError}
