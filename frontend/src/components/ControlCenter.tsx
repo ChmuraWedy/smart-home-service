@@ -764,7 +764,15 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             items={gridItems}
             view={canUseLayout ? { building, room, page: page + 1 } : undefined}
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
-            navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
+            navigation={(
+              <RoomNavigation
+                api={api}
+                allRooms={inventory?.rooms}
+                rooms={filteredRooms}
+                selected={room}
+                onSelect={selectRoom}
+              />
+            )}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />
           {entries.length > PAGE_SIZE && (

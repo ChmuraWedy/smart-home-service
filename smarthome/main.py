@@ -13,6 +13,8 @@ from .api_dependencies import authenticate, get_session
 from .auto_label_translations import translate_local_device
 from .config import Settings
 from .control import run_command
+from .dashboard_layout_api import remove_room_from_navigation
+from .dashboard_layout_api import router as dashboard_layout_router
 from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
@@ -202,6 +204,7 @@ def edit_room(item_id: EntityRef, body: RoomPatch, session: Session = Depends(ge
 def delete_room(item_id: EntityRef, session: Session = Depends(get_session)):
     item = get_by_ref(session, Room, item_id)
     assert_empty(session, Device, Device.room_id == item.id)
+    remove_room_from_navigation(session, item.id)
     session.delete(item)
     commit(session)
     return Response(status_code=204)
@@ -661,8 +664,6 @@ def create_app(settings: Settings | None = None, controller=None):
     from .display_api import router as display_router
 
     app.include_router(display_router)
-
-    from .dashboard_layout_api import router as dashboard_layout_router
 
     app.include_router(dashboard_layout_router)
     from .light_presets import router as light_presets_router

@@ -50,3 +50,46 @@ def test_hidden_devices_are_optional_for_older_clients_and_cannot_include_groups
         assert client.put(PATH, params=VIEW, json={**legacy, "hidden_devices": hidden_devices}).status_code == 422
     assert client.put(PATH, params=VIEW, json={**legacy, "hidden_devices": []}).json() == legacy
     assert client.get(PATH, params=VIEW).json() == legacy
+
+
+def test_room_navigation_reuses_browser_scope_and_leaves_card_layouts_intact(tmp_path):
+    settings = Settings(
+        database_path=str(tmp_path / "rooms.db"), api_token="token", display_poll_interval=0
+    )
+    path = f"{PATH}/room-navigation"
+    headers = {"X-API-Key": "token"}
+    cards = {"slots": ["device-a"], "hidden_devices": ["device-b"]}
+    with TestClient(create_app(settings)) as client:
+        building = client.post("/api/v1/buildings", headers=headers, json={"name": "Home"}).json()
+        room_ids = [
+            client.post(
+                "/api/v1/rooms", headers=headers, json={"name": name, "building_id": building["id"]}
+            ).json()["id"]
+            for name in ("Hall", "Kitchen")
+        ]
+        layout = {"rooms": [{"id": room_ids[1], "hidden": True}, {"id": room_ids[0], "hidden": False}]}
+        assert client.get(path).status_code == 401
+        assert client.put(path, json=layout).status_code == 401
+        assert client.get(path, headers=headers).json() == {"rooms": []}
+        assert client.put(PATH, params=VIEW, headers=headers, json=cards).json() == cards
+        assert client.put(path, headers=headers, json=layout).json() == layout
+        assert client.get(PATH, params=VIEW, headers=headers).json() == cards
+
+    with TestClient(create_app(settings)) as client:
+        assert client.get(path, headers=headers).json() == layout
+        assert client.get(path.replace(BROWSER, OTHER_BROWSER), headers=headers).json() == {"rooms": []}
+        assert client.delete(f"/api/v1/rooms/{room_ids[1]}", headers=headers).status_code == 204
+        assert client.put(path, headers=headers, json=layout).json() == {"rooms": layout["rooms"][1:]}
+        replacement = client.post(
+            "/api/v1/rooms", headers=headers, json={"name": "Study", "building_id": building["id"]}
+        ).json()
+        assert replacement["id"] == room_ids[1]
+        assert client.get(path, headers=headers).json() == {"rooms": layout["rooms"][1:]}
+
+
+def test_room_navigation_rejects_invalid_ids_and_duplicate_rooms(client):
+    path = f"{PATH}/room-navigation"
+    assert client.get(path.replace(BROWSER, "invalid")).status_code == 422
+    for rooms in ([{"id": 1}, {"id": 1, "hidden": True}], [{"id": 0}], [{"id": True}], [{"id": 1, "hidden": "true"}]):
+        assert client.put(path, json={"rooms": rooms}).status_code == 422
+    assert client.get(path).json() == {"rooms": []}

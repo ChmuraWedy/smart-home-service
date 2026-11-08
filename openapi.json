@@ -6124,6 +6124,110 @@
         }
       }
     },
+    "/api/v1/dashboard-layouts/{browser_id}/room-navigation": {
+      "get": {
+        "tags": [
+          "Dashboard layouts"
+        ],
+        "summary": "Read Room Navigation",
+        "operationId": "read_room_navigation_api_v1_dashboard_layouts__browser_id__room_navigation_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "browser_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Browser Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomNavigationLayout"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Dashboard layouts"
+        ],
+        "summary": "Save Room Navigation",
+        "operationId": "save_room_navigation_api_v1_dashboard_layouts__browser_id__room_navigation_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "browser_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Browser Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomNavigationLayout"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomNavigationLayout"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dashboard-layouts/{browser_id}": {
       "get": {
         "tags": [
@@ -9529,6 +9633,43 @@
         "additionalProperties": false,
         "type": "object",
         "title": "StartExistingObservation"
+      },
+      "RoomNavigationEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Id"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RoomNavigationEntry"
+      },
+      "RoomNavigationLayout": {
+        "properties": {
+          "rooms": {
+            "items": {
+              "$ref": "#/components/schemas/RoomNavigationEntry"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Rooms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rooms"
+        ],
+        "title": "RoomNavigationLayout"
       },
       "LayoutSlots": {
         "properties": {

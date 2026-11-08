@@ -3,7 +3,7 @@ import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { DeviceTranslations } from './device-translations';
-import type { DashboardLayout } from './dashboard-layout';
+import type { DashboardLayout, RoomNavigationLayout } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
 export type Capability = {
@@ -91,6 +91,14 @@ export class HomeApi extends CloudApi {
 
   saveDashboardLayout(browser: string, view: string, layout: DashboardLayout) {
     return this.request<DashboardLayout>(`/dashboard-layouts/${browser}?${view}`, 'PUT', layout);
+  }
+
+  roomNavigationLayout(browser: string, signal: AbortSignal) {
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'GET', undefined, signal);
+  }
+
+  saveRoomNavigationLayout(browser: string, layout: RoomNavigationLayout, signal: AbortSignal) {
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'PUT', layout, signal);
   }
 
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {

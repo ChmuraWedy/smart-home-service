@@ -100,6 +100,8 @@ The batch endpoint validates conflicting values for the same DP before sending. 
 
 `GET` and `PUT /api/v1/dashboard-layouts/{browser_id}` use the usual service authentication. The browser keeps a random 32-character hexadecimal identifier. SQLite stores the layout separately for each identifier and combination of `building`, `room`, `columns`, and `page`.
 
+`GET` and `PUT /api/v1/dashboard-layouts/{browser_id}/room-navigation` use the same browser identifier. The body has a `rooms` array of entries with a numeric `id` and a Boolean `hidden` flag. The array order determines room navigation across dashboard views. New rooms appear after the saved order.
+
 Read or replace the layout as `{"slots":[null,"device-physical-id","group-2"]}`. Slots are ordered row by row, with `null` for empty cells. An unconfigured view returns `{"slots":[]}`.
 
 ## Smart Life topology
