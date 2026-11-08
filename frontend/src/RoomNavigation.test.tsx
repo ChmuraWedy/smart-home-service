@@ -33,9 +33,20 @@ it('saves room order and visibility using the card layout browser ID for both na
   const select = vi.fn();
   const nav = <RoomNavigation api={api} allRooms={rooms} rooms={rooms} selected="1" onSelect={select} />;
   const first = render(nav);
-  const edit = await screen.findByRole('button', { name: 'Edit room navigation' });
+  const openPicker = async () => {
+    await user.click(screen.getByRole('button', { name: 'Change room, current room is Kitchen' }));
+    return screen.findByRole('dialog', { name: 'Rooms' });
+  };
+  const editInPicker = (picker: HTMLElement) => within(picker).getByRole('button', { name: 'Edit room navigation' });
+  expect(screen.queryByRole('button', { name: 'Edit room navigation' })).not.toBeInTheDocument();
+  const firstPicker = await openPicker();
+  const edit = editInPicker(firstPicker);
+  expect(edit.nextElementSibling).toBe(within(firstPicker).getByRole('button', { name: 'Close' }));
+  expect(edit.closest('header')).toBeInTheDocument();
+  await vi.waitFor(() => expect(edit).toBeEnabled());
   await user.click(edit);
   const editor = await screen.findByRole('dialog', { name: 'Edit room navigation' });
+  expect(screen.queryByRole('dialog', { name: 'Rooms' })).not.toBeInTheDocument();
   await user.click(within(editor).getByRole('button', { name: 'Move Hallway up' }));
   await user.click(within(editor).getByRole('button', { name: 'Show Kitchen in room navigation' }));
   await user.click(within(editor).getByRole('button', { name: 'Save' }));
@@ -46,25 +57,24 @@ it('saves room order and visibility using the card layout browser ID for both na
   const desktop = screen.getByRole('navigation', { name: 'Rooms' });
   await within(desktop).findByRole('button', { name: 'Hallway' });
   await vi.waitFor(() => expect(buttonNames(desktop)).toEqual(['All rooms', 'Hallway', 'Study', 'No room']));
-  const changeRoom = screen.getByRole('button', { name: 'Change room, current room is Kitchen' });
-  await user.click(changeRoom);
-  const picker = await screen.findByRole('dialog', { name: 'Rooms' });
+  const picker = await openPicker();
   expect(buttonNames(picker)).toEqual(['All rooms', 'Hallway', 'Study', 'No room']);
   await user.click(within(picker).getByRole('button', { name: 'Study' }));
   expect(select).toHaveBeenCalledWith('2');
 
-  await user.click(screen.getByRole('button', { name: 'Edit room navigation' }));
+  await user.click(editInPicker(await openPicker()));
   const restore = await screen.findByRole('dialog', { name: 'Edit room navigation' });
   const show = within(restore).getByRole('button', { name: 'Show Kitchen in room navigation' });
   expect(show).toHaveAttribute('aria-pressed', 'false');
   await user.click(show);
   await user.click(within(restore).getByRole('button', { name: 'Cancel' }));
-  expect(buttonNames(desktop)).not.toContain('Kitchen');
-  await user.click(screen.getByRole('button', { name: 'Edit room navigation' }));
+  const reopened = await screen.findByRole('dialog', { name: 'Rooms' });
+  expect(buttonNames(reopened)).not.toContain('Kitchen');
+  await user.click(editInPicker(reopened));
   const confirm = await screen.findByRole('dialog', { name: 'Edit room navigation' });
   await user.click(within(confirm).getByRole('button', { name: 'Show Kitchen in room navigation' }));
   await user.click(within(confirm).getByRole('button', { name: 'Save' }));
-  expect(buttonNames(desktop)).toEqual(['All rooms', 'Kitchen', 'Hallway', 'Study', 'No room']);
+  expect(buttonNames(await screen.findByRole('dialog', { name: 'Rooms' }))).toEqual(['All rooms', 'Kitchen', 'Hallway', 'Study', 'No room']);
   expect(new Set(requests)).toEqual(new Set([`/api/v1/dashboard-layouts/${browserId}/room-navigation`]));
 });
 
@@ -78,12 +88,13 @@ it('appends new rooms and retains the draft when saving fails', async () => {
   ));
   const user = userEvent.setup();
   render(<RoomNavigation api={api} allRooms={rooms} rooms={rooms} selected="" onSelect={vi.fn()} />);
-  const edit = screen.getByRole('button', { name: 'Edit room navigation' });
-  await vi.waitFor(() => expect(edit).toBeEnabled());
   const desktop = screen.getByRole('navigation', { name: 'Rooms' });
+  await within(desktop).findByRole('button', { name: 'Study' });
   expect(buttonNames(desktop)).toEqual(['All rooms', 'Study', 'Kitchen', 'Hallway', 'No room']);
 
-  await user.click(edit);
+  await user.click(screen.getByRole('button', { name: 'Change room, current room is All rooms' }));
+  const picker = await screen.findByRole('dialog', { name: 'Rooms' });
+  await user.click(within(picker).getByRole('button', { name: 'Edit room navigation' }));
   const editor = await screen.findByRole('dialog', { name: 'Edit room navigation' });
   const hide = within(editor).getByRole('button', { name: 'Show Study in room navigation' });
   await user.click(hide);

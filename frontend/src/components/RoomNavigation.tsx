@@ -119,6 +119,7 @@ export default function RoomNavigation({
   const [editingApi, setEditingApi] = useState<HomeApi>();
   const [attempt, setAttempt] = useState(0);
   const [read, setRead] = useState<LayoutRead>();
+  const editing = editingApi === api && allRooms !== undefined;
   const currentRead = read?.api === api ? read : undefined;
   const layout = currentRead?.layout ?? EMPTY_LAYOUT;
   const readFailed = Boolean(currentRead && !currentRead.layout);
@@ -199,26 +200,11 @@ export default function RoomNavigation({
           onClick={openPicker}
         >
           <Icon name={current?.icon ?? 'room'} />
-          <span>{currentName}</span>
+          <span className="room-navigation-heading">{currentName}</span>
           <Icon name="chevron-down" />
         </button>
-        <p className="room-navigation-heading">{currentName}</p>
-        {Boolean(allRooms?.length) && (
-          <button
-            type="button"
-            className="secondary dashboard-layout-icon room-navigation-edit"
-            aria-label={editLabel}
-            aria-haspopup={readFailed ? undefined : 'dialog'}
-            title={editLabel}
-            disabled={!currentRead}
-            onClick={openEditor}
-          >
-            <Icon name={readFailed ? 'refresh-list' : 'edit'} />
-          </button>
-        )}
       </div>
-      {readFailed && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
-      {editingApi === api && allRooms && (
+      {editing && (
         <RoomNavigationEditor
           api={api}
           rooms={allRooms}
@@ -253,21 +239,37 @@ export default function RoomNavigation({
           </div>
         </div>
       </nav>
-      <Dialog className="room-picker" open={open} onClose={closePicker}>
+      <Dialog className="room-picker" open={open && !editing} onClose={closePicker}>
         <DialogBackdrop className="room-picker-backdrop" />
         <DialogPanel className="room-picker-panel">
           <header className="room-picker-heading">
             <DialogTitle as="h2">{t(MSG.ROOMS)}</DialogTitle>
-            <button
-              type="button"
-              className="secondary room-picker-close"
-              aria-label={t(MSG.CLOSE)}
-              onClick={closePicker}
-              data-autofocus
-            >
-              <Icon name="close" />
-            </button>
+            <div className="room-picker-actions">
+              {Boolean(allRooms?.length) && (
+                <button
+                  type="button"
+                  className="secondary room-picker-action"
+                  aria-label={editLabel}
+                  aria-haspopup={readFailed ? undefined : 'dialog'}
+                  title={editLabel}
+                  disabled={!currentRead}
+                  onClick={openEditor}
+                >
+                  <Icon name={readFailed ? 'refresh-list' : 'edit'} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="secondary room-picker-action"
+                aria-label={t(MSG.CLOSE)}
+                onClick={closePicker}
+                data-autofocus
+              >
+                <Icon name="close" />
+              </button>
+            </div>
           </header>
+          {readFailed && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
           <ul className="room-picker-list">
             {options.map((choice) => (
               <li key={choice.id}>
