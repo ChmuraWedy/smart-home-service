@@ -146,6 +146,34 @@ describe('dashboard layout', () => {
     expect(screen.getByRole('button', { name: 'Show hidden devices' })).toBeDisabled();
   });
 
+  it('adds a drop target below an occupied last slot in each column and saves the new row', async () => {
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect)
+      .mockReturnValue({ width: 600, height: 64, top: 0, left: 0 } as DOMRect);
+    ensureDashboardBrowserId();
+    const slots: LayoutSlots = Array(20).fill(null);
+    slots[0] = 'device-a';
+    slots[18] = 'group-1';
+    slots[19] = 'device-b';
+    let saved = { slots };
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method === 'PUT') saved = JSON.parse(String(init.body));
+      return Response.json(saved);
+    });
+
+    mount();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
+    click('Edit layout');
+    expect(screen.getByRole('button', { name: 'Move here (Row 11, column 1)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move here (Row 11, column 2)' })).toBeInTheDocument();
+    click('Move Card 1 (Row 1, column 1)');
+    click('Move here (Row 11, column 2)');
+    cardAt('device-a', 11, 2);
+    expect(screen.getByRole('button', { name: 'Move here (Row 12, column 2)' })).toBeInTheDocument();
+    click('Save');
+    await waitFor(() => expect(saved.slots[21]).toBe('device-a'));
+    expect(saved.slots.slice(18, 22)).toEqual(['group-1', 'device-b', null, 'device-a']);
+  });
+
   it('keeps a previously saved card beyond the editor slots accessible', async () => {
     ensureDashboardBrowserId();
     const slots: LayoutSlots = Array(MAX_LAYOUT_SLOTS).fill(null);

@@ -3,7 +3,7 @@ import {
 } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
-  dashboardBrowserId, ensureDashboardBrowserId, moveCard, placeCards, trimSlots,
+  dashboardBrowserId, ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards, trimSlots,
 } from '../dashboard-layout';
 import type { DashboardLayout, LayoutSlots } from '../dashboard-layout';
 import type { HomeApi } from '../home-api';
@@ -218,7 +218,7 @@ export default function DashboardGrid<T>({
     });
   }
 
-  function renderSlot(id: string | null, column: number, index: number) {
+  function renderSlot(id: string | null, column: number, index: number, appendTarget: boolean) {
     const slot = index * activeColumns + column;
     const row = index + 1;
     const item = id ? cards.get(id) : undefined;
@@ -233,7 +233,7 @@ export default function DashboardGrid<T>({
         nudge: dropPreview?.slot === slot ? dropPreview.nudge : undefined,
       }));
     }
-    if (draft && (slot < EDITOR_SLOTS || item)) {
+    if (draft && (slot < EDITOR_SLOTS || item || appendTarget)) {
       content.push(
         <LayoutTarget
           key={`slot-${slot}`}
@@ -259,13 +259,15 @@ export default function DashboardGrid<T>({
   }
 
   function renderColumn(column: number) {
-    const limit = draft ? Math.max(EDITOR_SLOTS, slots.length) : slots.length;
-    const count = Math.max(0, Math.ceil((limit - column) / activeColumns));
-    const columnSlots = Array.from({ length: count }, (_, row) => slots[row * activeColumns + column] ?? null);
-    const visibleSlots = draft ? columnSlots : trimSlots(columnSlots);
+    const columnSlots = trimSlots(slots.filter((_, slot) => slot % activeColumns === column));
+    const appendRow = columnSlots.length;
+    const canAppend = appendRow * activeColumns + column < MAX_LAYOUT_SLOTS;
+    const editorRows = Math.ceil((EDITOR_SLOTS - column) / activeColumns);
+    const rows = draft ? Math.max(editorRows, appendRow + Number(canAppend)) : appendRow;
+    const visibleSlots = Array.from({ length: rows }, (_, row) => columnSlots[row] ?? null);
     return (
       <ul key={column} className="dashboard-device-column" data-dashboard-column={column + 1}>
-        {visibleSlots.flatMap((id, row) => renderSlot(id, column, row))}
+        {visibleSlots.flatMap((id, row) => renderSlot(id, column, row, canAppend && row === appendRow))}
       </ul>
     );
   }
