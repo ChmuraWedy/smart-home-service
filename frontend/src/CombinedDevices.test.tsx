@@ -1,11 +1,17 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
+import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router';
+import type { AppRoomAssignment, CloudDevice, CloudFunctions, CloudSnapshot } from './api';
 import type { CombinedDevice, CombinedInput } from './home-api';
+import { HomeApi } from './home-api';
+import { cloudDeviceKey, readCloudDevice } from './cloud-device-cache';
+import CombinedDeviceCard from './components/CombinedDeviceCard';
 import { STORAGE_KEY } from './connection';
 import { setDeviceTextMode } from './device-translations';
 import { setLocale } from './i18n';
+import { createAppStore } from './store';
 import { App } from './test/App';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
@@ -53,9 +59,11 @@ function backend(
   developerConnected = false,
   allMembersReachable = false,
   includeRelay = false,
-  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[] },
+  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[]; singleRelay?: boolean; extraDevices?: CloudDevice[] },
 ) {
   let combined = initial;
+  const roomOverrides = new Map<string, AppRoomAssignment>();
+  const cloudDevices = [...bulbs, ...(options?.extraDevices ?? [])];
   const refreshedPower = new Map<string, boolean>();
   const refreshedMembers: string[] = [];
   const writes: { path: string; method: string; body?: CombinedInput | Record<string, unknown> }[] = [];
@@ -100,7 +108,7 @@ function backend(
     }
     if (path === '/cloud/topology') return json({
       synced_at: null, warnings: 0,
-      placements: bulbs.map((bulb) => ({
+      placements: cloudDevices.map((bulb) => ({
         device_id: bulb.id, building_id: room.building_id, room_id: options?.memberRooms?.[bulb.id] ?? room.id,
       })),
       job: { status: 'idle', processed: 0, total: 0, message: null },
@@ -109,13 +117,21 @@ function backend(
     if (['/devices', '/groups', '/buildings'].includes(path)) return json([]);
     if (path === '/cloud/devices') {
       if (url.searchParams.get('provider') === 'developer') return json(bulbs.slice(0, 1));
-      return json(includeRelay ? [...bulbs, relay] : bulbs);
+      return json((includeRelay ? [...cloudDevices, relay] : cloudDevices).map((device) => ({ ...device, app_room: roomOverrides.get(device.id) })));
     }
     if (path.startsWith('/activity/')) return json({ events: [], next_before: null });
-    if (path.endsWith('/mappings')) return json({ mappings: [] });
     const [, id, action] = /^\/cloud\/devices\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
-    const bulb = bulbs.find((item) => item.id === id);
-    if (action === 'functions') return json(id === relay.id ? relayDefinitions : bulb?.controls?.definitions);
+    const bulb = cloudDevices.find((item) => item.id === id);
+    if (action === 'room' && method === 'PUT') {
+      const assignment = { room_id: body.room_id, building_id: body.room_id ? room.building_id : null };
+      roomOverrides.set(id, assignment);
+      return json(assignment);
+    }
+    if (action === 'functions') {
+      if (id !== relay.id) return json(bulb?.controls?.definitions);
+      const functions = options?.singleRelay ? relayDefinitions.functions.filter(({ code }) => code !== 'switch_2') : relayDefinitions.functions;
+      return json({ ...relayDefinitions, functions });
+    }
     if (action === 'status') {
       if (id === relay.id) return json({ device_id: id, online: true, source: 'cloud', status: { switch_1: true, switch_2: true } });
       const snapshot = bulb?.controls?.snapshot;
@@ -138,12 +154,204 @@ function openApp(path: string) {
   return render(<App />);
 }
 
+function renderWiredCard(source: CloudDevice, child: CloudDevice, quickOpen = false) {
+  setLocale('en', false);
+  const api = new HomeApi({ baseUrl: 'http://combined.test', token: 'fixture' });
+  const store = createAppStore();
+  const wiring = { device_id: source.id, channel: 'switch_1' };
+  const members = [source, child].map((device) => ({
+    member: { device_id: device.id, route: 'sharing' as const, power_source: device === child ? wiring : undefined },
+    device: { id: device.id, name: device.name, cloud: { sharing: device } },
+  }));
+  render(
+    <Provider store={store}>
+      <MemoryRouter>
+        <CombinedDeviceCard
+          api={api}
+          combined={{ id: 1, name: 'Wired devices', show_all_power: false }}
+          members={members}
+          room={room.name}
+          now={Date.now()}
+          quickOpen={quickOpen}
+          onAuthError={vi.fn()}
+        />
+      </MemoryRouter>
+    </Provider>,
+  );
+  return () => store.dispatch(readCloudDevice(api, cloudDeviceKey(api, source.id, 'sharing'), { refresh: true }));
+}
+
+function relayWithReading(online: boolean, power: boolean): CloudDevice {
+  const statusRange = ['add_ele', 'cur_power', 'cur_voltage', 'cur_current', 'electric_coe', 'fault'].map((code) => ({
+    code, type: 'Integer', values: { min: 0, max: 3000 },
+  }));
+  return {
+    ...relay,
+    online,
+    category: 'cz',
+    controls: {
+      ready: true,
+      definitions: { ...relayDefinitions, status_range: statusRange },
+      snapshot: {
+        device_id: relay.id, source: 'cloud', online,
+        status: { switch_1: power, switch_2: true, ...Object.fromEntries(statusRange.map(({ code }) => [code, 125])) },
+      },
+    },
+  };
+}
+
+function cameraWithPrivacy(privateMode: boolean): CloudDevice {
+  return {
+    id: 'camera', name: 'Sleep camera', category: 'sp', online: true, has_local_key: false,
+    controls: {
+      ready: true,
+      definitions: { device_id: 'camera', functions: [{ code: 'basic_private', type: 'Boolean', values: {} }] },
+      snapshot: { device_id: 'camera', source: 'cloud', online: true, status: { basic_private: privateMode } },
+    },
+  };
+}
+
 describe('combined devices', () => {
+  it('adds a separate browser-saved video card only to the camera room, even for a hidden combination member', async () => {
+    const camera = cameraWithPrivacy(true);
+    const { writes } = backend({
+      id: 1, name: 'Camera and socket', room_id: room.id, show_member_cards: false,
+      members: [relay, camera].map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    }, false, false, true, { extraDevices: [camera] });
+    const user = userEvent.setup();
+    const app = openApp('/devices/camera?room=3&route=sharing');
+    const detail = within(await screen.findByRole('dialog', { name: camera.name }));
+    const setting = detail.getByRole('switch', { name: 'Show room preview' });
+    expect(setting).not.toBeChecked();
+    await user.click(setting);
+    expect(setting).toBeChecked();
+    await user.click(detail.getByRole('button', { name: 'Close' }));
+    const videoTitle = `${camera.name} · Camera video`;
+    const video = within(await screen.findByRole('listitem', { name: videoTitle }));
+    expect(await video.findByRole('region', { name: 'Camera video' })).toBeInTheDocument();
+    expect(video.getByRole('button', { name: 'Watch video' })).toBeDisabled();
+    expect(screen.queryByRole('listitem', { name: camera.name })).toBeNull();
+    expect(writes).toEqual([]);
+
+    app.unmount();
+    openApp('/rooms/3');
+    expect(await screen.findByRole('listitem', { name: videoTitle })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: otherRoom.name }));
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: videoTitle })).toBeNull());
+  });
+
+  it('saves a cloud device room in the app and updates its detail and dashboard placement', async () => {
+    const { writes } = backend();
+    const user = userEvent.setup();
+    openApp('/devices/bulb-1?room=3&route=sharing');
+    const detail = within(await screen.findByRole('dialog', { name: bulbs[0].name }));
+    await user.click(detail.getByText('Edit device room'));
+    const choice = detail.getByRole('combobox', { name: 'Room in this app' });
+    await user.selectOptions(choice, String(otherRoom.id));
+    await user.click(detail.getByRole('button', { name: 'Save room assignment' }));
+    const metadata = within(detail.getByRole('region', { name: 'Device connection' }));
+    expect(await metadata.findByText(otherRoom.name)).toBeInTheDocument();
+    expect(writes).toEqual([{ method: 'PUT', path: '/cloud/devices/bulb-1/room', body: { room_id: otherRoom.id } }]);
+    await user.click(detail.getByRole('button', { name: 'Close' }));
+    await user.click(await screen.findByRole('button', { name: otherRoom.name }));
+    expect(await screen.findByRole('listitem', { name: bulbs[0].name })).toBeInTheDocument();
+  });
+
+  it.each([false, true])('shows the live player in the combined popup and respects camera privacy %s', async (privateMode) => {
+    vi.mocked(fetch).mockResolvedValue(json({ detail: 'Test stream unavailable' }, 503));
+    renderWiredCard(relayWithReading(false, true), cameraWithPrivacy(privateMode), true);
+    const sheet = within(await screen.findByRole('dialog', { name: 'Wired devices' }));
+    const player = within(await sheet.findByRole('region', { name: 'Camera video' }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    if (privateMode) {
+      expect(await player.findByText(/Privacy mode is on/)).toBeInTheDocument();
+      expect(player.getByRole('button', { name: 'Watch video' })).toBeDisabled();
+      expect(fetch).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/cloud/devices/camera/stream?provider=sharing'), expect.objectContaining({ method: 'POST' })));
+      expect(await player.findByRole('button', { name: 'Reconnect' })).toBeEnabled();
+    }
+  });
+
+  it('disables a wired bulb when its channel is off and rereads it when the relay confirms on', async () => {
+    const child = bulbs[0];
+    const childReading = child.controls!.snapshot;
+    let finishRead!: (response: Response) => void;
+    const fresh = new Promise<Response>((resolve) => { finishRead = resolve; });
+    const refreshes: string[] = [];
+    vi.mocked(fetch).mockImplementation(async (input, options) => {
+      const url = new URL(String(input));
+      expect(options?.method).toBe('GET');
+      if (url.pathname.includes('/light-presets/')) return json([]);
+      expect(url.searchParams.get('refresh')).toBe('true');
+      if (url.pathname.endsWith(`/${relay.id}/status`)) return json(relayWithReading(true, true).controls!.snapshot);
+      expect(url.pathname).toMatch(/\/bulb-1\/status$/);
+      refreshes.push(url.pathname);
+      return fresh;
+    });
+    const updateRelay = renderWiredCard(relayWithReading(true, false), child);
+    const bulbRegion = () => screen.getByRole('region', { name: child.name });
+    const power = await waitFor(() => within(bulbRegion()).getByRole('switch', { name: 'Power' }));
+    const bulb = bulbRegion();
+    expect(bulb).toHaveAttribute('data-unavailable');
+    expect(power).toBeDisabled();
+    expect(power).not.toBeChecked();
+    expect(within(bulb).getByText('Off')).toBeInTheDocument();
+    expect(refreshes).toHaveLength(0);
+
+    await act(async () => { await updateRelay(); });
+    await waitFor(() => expect(refreshes).toHaveLength(1));
+    expect(power).toBeDisabled();
+    expect(within(bulb).queryByText('#FF0000')).toBeNull();
+    await act(async () => finishRead(json({
+      ...childReading, status: { ...childReading.status, switch_led: false },
+    })));
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(power).not.toBeChecked();
+    expect(bulb).not.toHaveAttribute('data-unavailable');
+    expect(refreshes).toHaveLength(1);
+  });
+
+  it.each([false, true])('keeps an online camera controllable when its offline socket last reported %s', async (lastPower) => {
+    const camera = cameraWithPrivacy(false);
+    renderWiredCard(relayWithReading(false, lastPower), camera);
+    const source = await screen.findByRole('region', { name: relay.name });
+    const channel = await within(source).findByRole('switch', { name: 'Channel 1' });
+    expect(source).toHaveAttribute('data-unavailable');
+    expect(channel).toHaveAttribute('aria-checked', String(lastPower));
+    expect(channel).toBeDisabled();
+    expect(source.querySelector('.card-sensor-values')).toBeNull();
+    const child = screen.getByRole('region', { name: camera.name });
+    expect(child).not.toHaveAttribute('data-unavailable');
+    expect(screen.getByRole('listitem', { name: 'Wired devices' })).not.toHaveAttribute('data-unavailable');
+    expect(await within(child).findByRole('button', { name: 'Privacy' })).toBeEnabled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('uses the same channel power glyph for a wired relay with a single output', async () => {
+    backend({
+      id: 1,
+      name: 'Wired lamp',
+      room_id: room.id,
+      members: [
+        { device_id: relay.id, route: 'sharing', accessible: true },
+        { device_id: bulbs[0].id, route: 'sharing', accessible: true, power_source: { device_id: relay.id, channel: 'switch_1' } },
+      ],
+    }, false, false, true, { singleRelay: true });
+    openApp('/');
+    const card = within(await screen.findByRole('listitem', { name: 'Wired lamp' }));
+    const channel = await card.findByRole('switch', { name: 'Channel 1' });
+    expect(channel.querySelector('.parameter-icon')).toBeInTheDocument();
+    expect(channel.querySelector('.device-type-icon')).not.toBeInTheDocument();
+    expect(card.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
+  });
+
   it('groups wired devices by relay channel and saves their reordered layout', async () => {
     const { writes } = backend(undefined, false, false, true);
     const user = userEvent.setup();
     openApp('/combined-devices/new?room=3');
     const form = within(await screen.findByRole('form', { name: 'Create combined device' }));
+    await user.selectOptions(form.getByRole('combobox', { name: 'Filter devices by room' }), 'all');
     await user.click(await form.findByRole('checkbox', { name: relay.name }));
     for (const bulb of bulbs) await user.click(form.getByRole('checkbox', { name: bulb.name }));
     expect(form.queryByRole('group', { name: 'Wiring (optional)' })).toBeNull();
@@ -257,7 +465,7 @@ describe('combined devices', () => {
     expect(form.queryByRole('combobox', { name: 'Room' })).toBeNull();
     expect(form.getByRole('button', { name: 'Next' })).toBeDisabled();
     for (const bulb of bulbs) await user.click(form.getByRole('checkbox', { name: bulb.name }));
-    expect(form.queryByRole('combobox')).toBeNull();
+    expect(form.queryByRole('combobox', { name: /Control method/ })).toBeNull();
     await user.click(form.getByRole('button', { name: 'Next' }));
     expect(form.getByText('Name and room')).toHaveAttribute('aria-current', 'step');
     expect(form.getByRole('combobox', { name: 'Room' })).toHaveValue('3');
@@ -384,13 +592,19 @@ describe('combined devices', () => {
   });
 
   it('uses the default control route at creation and never shows a route selector in the combination', async () => {
-    const { writes } = backend(undefined, true);
+    const { writes } = backend(undefined, true, false, false, { memberRooms: { [bulbs[2].id]: otherRoom.id } });
     const user = userEvent.setup();
     openApp('/combined-devices/new?room=3');
     const creation = within(await screen.findByRole('form', { name: 'Create combined device' }));
+    const filter = creation.getByRole('combobox', { name: 'Filter devices by room' });
+    expect(filter).toHaveValue(String(room.id));
+    expect(creation.queryByRole('checkbox', { name: bulbs[2].name })).toBeNull();
     await user.click(creation.getByRole('checkbox', { name: bulbs[0].name }));
     await user.click(creation.getByRole('checkbox', { name: bulbs[1].name }));
-    expect(creation.queryByRole('combobox')).toBeNull();
+    await user.selectOptions(filter, String(otherRoom.id));
+    expect(creation.getByRole('checkbox', { name: bulbs[2].name })).toBeInTheDocument();
+    expect(creation.getByRole('checkbox', { name: bulbs[0].name })).toBeChecked();
+    expect(creation.queryByRole('combobox', { name: /Control method/ })).toBeNull();
     await user.click(creation.getByRole('button', { name: 'Next' }));
     await user.click(creation.getByRole('button', { name: 'Next' }));
     await user.click(creation.getByRole('button', { name: 'Save' }));
@@ -401,6 +615,11 @@ describe('combined devices', () => {
     ] } });
     await user.click(edit);
     const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
+    const editFilter = editor.getByRole('combobox', { name: 'Filter devices by room' });
+    expect(editFilter).toHaveValue(String(room.id));
+    expect(editor.queryByRole('checkbox', { name: bulbs[2].name })).toBeNull();
+    await user.selectOptions(editFilter, 'all');
+    expect(editor.getByRole('checkbox', { name: bulbs[2].name })).toBeInTheDocument();
     expect(editor.queryByRole('combobox', { name: /Control method/ })).toBeNull();
   });
 

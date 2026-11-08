@@ -34,12 +34,16 @@ import { readSimpleScene } from '../light-scenes';
 import { LightCardReading, LightSceneReadings, temperatureTint } from './LightCardReadings';
 
 const CARD_CACHE_INTERVAL = 4000;
+const SOCKET_METER_CODES = /^(?:add_ele|cur_(?:current|power|voltage)|electric(?:ity)?_coe|power_coe|voltage_coe|current|power|voltage|energy|electricity|fault)(?:_[1-9][0-9]*)?$/;
+const ELECTRICAL_UNIT = /^(?:mA|A|mV|V|mW|W|kW|Wh|kWh)$/i;
 
 function powerControl(spec: ControlSpec) {
   return spec.writable && spec.kind === 'boolean' && /^(switch|switch_led|switch_[1-9][0-9]*)$/.test(spec.key);
 }
-function sensorReading(spec: ControlSpec) {
-  return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key) && ['number','boolean','enum','text'].includes(spec.kind);
+function sensorReading(spec: ControlSpec, socket: boolean) {
+  return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key)
+    && (!socket || !(SOCKET_METER_CODES.test(spec.key) || ELECTRICAL_UNIT.test(spec.unit ?? '')))
+    && ['number', 'boolean', 'enum', 'text'].includes(spec.kind);
 }
 
 export type CardStatus = {online:boolean;battery?:BatteryReading};
@@ -57,6 +61,7 @@ type EmbeddedControls = {
   inlineMemberName?: boolean;
   onPower?: (power: MemberPower) => void;
   channelChildren?: ReadonlyMap<string, ReactNode>;
+  supplyPower?: false | null;
 };
 
 function unplacedChannelChildren(children?: ReadonlyMap<string, ReactNode>, channels: ControlSpec[] = []) {
@@ -73,6 +78,7 @@ type CardProps = EmbeddedControls & {
   now: number;
   paused: boolean;
   loadWhenPaused?: boolean;
+  previewOnly?: boolean;
   onAuthError: () => void;
   onBusy: (busy: boolean) => void;
   onStatus?: (status: CardStatus) => void;
@@ -85,7 +91,7 @@ export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
   const {
-    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren,
+    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren, supplyPower, previewOnly,
   } = props;
   const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
@@ -102,8 +108,9 @@ export function CardControls(props: CardProps) {
     return () => observer.disconnect();
   }, [paused]);
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
-  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick || loadWhenPaused || Boolean(channelChildren?.size);
-  const pollingVisible = visible && !paused;
+  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick
+    || loadWhenPaused || Boolean(channelChildren?.size) || supplyPower !== undefined || previewOnly;
+  const pollingVisible = visible && !paused && supplyPower !== false;
   let controls: ReactNode;
   if (!active) {
     controls = <button type="button" className="secondary compact full-width" disabled={paused} onClick={() => setActivated(true)}>{t(MSG.SHOW_STATE)}</button>;
@@ -137,7 +144,7 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
 
 function StandardCardControls({
   api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy,
-  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName,
+  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, supplyPower,
 }: EmbeddedControls & {
   api: HomeApi; tuyaApi?: HomeApi; name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[];
   reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean;
@@ -153,6 +160,7 @@ function StandardCardControls({
   const hasQuickSettings = white.length > 0 || Boolean(color?.writable || scene);
   const currentReading = (spec: ControlSpec | undefined) => {
     const value = spec && reading(spec);
+    if (!online && value?.known) return value;
     return isStale(value, now, local) ? undefined : value;
   };
   const knownPowers = online ? powers.map((spec) => currentReading(spec)) : [];
@@ -162,6 +170,7 @@ function StandardCardControls({
     else if (knownPowers.every((value) => value?.value === false)) reportedPower = 'off';
     else reportedPower = 'mixed';
   }
+  if (supplyPower !== undefined) reportedPower = supplyPower === false ? 'off' : 'unknown';
   useEffect(() => { onPower?.(reportedPower); }, [onPower, reportedPower]);
   const mode = currentReading(modeSpec)?.value;
   const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
@@ -181,6 +190,14 @@ function StandardCardControls({
 
   function renderLightReadings(power: boolean | null) {
     if (power && sceneUnit) return <LightSceneReadings unit={sceneUnit} />;
+    if (power !== null && !brightnessText && !temperatureReading && !colorText) {
+      return (
+        <>
+          <LightCardReading code="power" label={t(MSG.POWER)} value={t(power ? MSG.ON : MSG.OFF)} />
+          {power && <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} />}
+        </>
+      );
+    }
     const brightnessValue = power === false ? t(MSG.OFF) : brightnessText || undefined;
     return (
       <>
@@ -212,35 +229,42 @@ function StandardCardControls({
       </span>
     );
   } : summary;
-  const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
-  const disabled = paused || busy || !readOK || sending || (!!summary && !online);
+  const socket = category === 'cz' || specs.some(({ key }) => /^(?:add_ele|cur_(?:power|current|voltage))$/.test(key));
+  const sensors = specs.filter((spec) => spec !== brightness && spec !== temperature && sensorReading(spec, socket));
+  const disabled = paused || busy || !readOK || sending || !online || supplyPower !== undefined;
   const unplaced = unplacedChannelChildren(channelChildren, powers);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return unplaced ?? null;
-  const field = (spec: ControlSpec, headingActions?: ReactNode, showSummary = true) => (
-    <CapabilityField
-      pendingScope={pendingScope}
-      headingActions={headingActions}
-      key={spec.key}
-      spec={spec}
-      reading={reading(spec)}
-      now={now}
-      local={local}
-      immediatePower
-      dashboardSwitch
-      powerSide={channelChildren?.has(spec.key) ? 'start' : powerSide}
-      powerIcon={powerLayout === 'single'
-        ? <DeviceIcon category={category} codes={specs.map((item) => item.key)} />
-        : <ParameterIcon code={spec.key} />}
-      powerSummary={showSummary && renderSummary ? (power) => renderSummary(online ? power : null) : undefined}
-      disabled={disabled}
-      onSend={(value) => toggle(spec, value)}
-      aliasEditor={spec.aliases?.length ? (
-        <div className="capability-aliases">
-          {spec.aliases.map((alias) => <span className="alias-tag" key={alias}>{alias}</span>)}
-        </div>
-      ) : undefined}
-    />
-  );
+  const field = (spec: ControlSpec, headingActions?: ReactNode, showSummary = true) => {
+    const reported = reading(spec);
+    const lastPower = reported?.known && typeof reported.value === 'boolean' ? reported.value : null;
+    const displayPower = supplyPower === undefined && !online ? lastPower : supplyPower;
+    return (
+      <CapabilityField
+        pendingScope={pendingScope}
+        headingActions={headingActions}
+        key={spec.key}
+        spec={spec}
+        reading={reported}
+        now={now}
+        local={local}
+        immediatePower
+        dashboardSwitch
+        powerSide={channelChildren?.has(spec.key) ? 'start' : powerSide}
+        powerIcon={powerLayout === 'single' && !channelChildren?.has(spec.key)
+          ? <DeviceIcon category={category} codes={specs.map((item) => item.key)} />
+          : <ParameterIcon code={spec.key} />}
+        powerSummary={showSummary ? renderSummary : undefined}
+        displayPower={displayPower}
+        disabled={disabled}
+        onSend={(value) => toggle(spec, value)}
+        aliasEditor={spec.aliases?.length ? (
+          <div className="capability-aliases">
+            {spec.aliases.map((alias) => <span className="alias-tag" key={alias}>{alias}</span>)}
+          </div>
+        ) : undefined}
+      />
+    );
+  };
   const sensorValues = sensors.length > 0 && (
   <div className="card-sensor-values tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-x-3 tw:gap-y-1.5">
     {sensors.map(spec => {
@@ -322,7 +346,8 @@ function StandardCardControls({
 }
 
 function CloudCardControls({
-  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName,
+  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
+  channelChildren, powerSide, inlineMemberName, supplyPower, previewOnly,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
@@ -376,6 +401,9 @@ function CloudCardControls({
       <>
         <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
           online={snapshot?.online ?? cloud.online}
+          paused={paused || supplyPower !== undefined}
+          embeddedQuick={embeddedQuick}
+          previewOnly={previewOnly}
         />
         {unplacedChannelChildren(channelChildren)}
       </>
@@ -395,12 +423,13 @@ function CloudCardControls({
         channelChildren={channelChildren}
         powerSide={powerSide}
         inlineMemberName={inlineMemberName}
+        supplyPower={supplyPower}
       />
     );
 }
 
 function LocalCardControls({
-  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName,
+  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, supplyPower,
 }: CardProps & { visible: boolean }) {
   const item = device.local!;
   const dispatch = useAppDispatch();
@@ -441,6 +470,7 @@ function LocalCardControls({
       channelChildren={channelChildren}
       powerSide={powerSide}
       inlineMemberName={inlineMemberName}
+      supplyPower={supplyPower}
       {...commands}
     />
   );

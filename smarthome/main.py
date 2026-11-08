@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,8 @@ from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
     Building,
+    CloudPlacement,
+    DashboardLayout,
     Device,
     DeviceType,
     Room,
@@ -205,6 +207,8 @@ def delete_room(item_id: EntityRef, session: Session = Depends(get_session)):
     item = get_by_ref(session, Room, item_id)
     assert_empty(session, Device, Device.room_id == item.id)
     remove_room_from_navigation(session, item.id)
+    # The persisted layout view is building/room/columns/page.
+    session.execute(delete(DashboardLayout).where(DashboardLayout.view.like(f"%/{item.id}/%/%")))
     session.delete(item)
     commit(session)
     return Response(status_code=204)
@@ -331,6 +335,8 @@ def read_device(item_id: EntityRef, session: Session = Depends(get_session)):
 @router.patch("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
 def edit_device(item_id: EntityRef, body: DevicePatch, request: Request, session: Session = Depends(get_session)):
     item = patch_device(session, get_by_ref(session, Device, item_id), body)
+    if "room_id" in body.model_fields_set:
+        session.execute(update(CloudPlacement).where(CloudPlacement.device_id == item.device_id).values(overridden=True))
     commit(session)
     if {"name", "aliases"} & body.model_fields_set:
         translate_local_device(session, request, item)
@@ -666,6 +672,10 @@ def create_app(settings: Settings | None = None, controller=None):
     app.include_router(display_router)
 
     app.include_router(dashboard_layout_router)
+
+    from .room_appearance import router as room_appearance_router
+
+    app.include_router(room_appearance_router)
     from .light_presets import router as light_presets_router
 
     app.include_router(light_presets_router)

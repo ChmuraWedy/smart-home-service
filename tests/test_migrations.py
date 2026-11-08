@@ -98,3 +98,23 @@ def test_upgrades_a_version_one_database_without_losing_layouts():
         ).one() == (0, 0, "[]")
         assert connection.exec_driver_sql("SELECT slots, hidden_devices FROM dashboard_layouts").one() == ("[null]", "[]")
     engine.dispose()
+
+
+def test_adds_room_appearance_to_a_version_three_database_without_changing_rooms(tmp_path):
+    engine = db.make_engine(str(tmp_path / "home.db"))
+    db.Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("DROP TABLE room_appearances")
+        connection.exec_driver_sql("INSERT INTO buildings (id, name) VALUES (1, 'Home')")
+        connection.exec_driver_sql("INSERT INTO rooms (id, building_id, name) VALUES (1, 1, 'Study')")
+        connection.exec_driver_sql("PRAGMA user_version = 3")
+
+    db.init_db(engine)
+
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.begin() as connection:
+        assert connection.exec_driver_sql("SELECT name FROM rooms").scalar_one() == "Study"
+        connection.exec_driver_sql("INSERT INTO room_appearances (room_id, card_opacity) VALUES (1, 75)")
+        connection.exec_driver_sql("DELETE FROM rooms WHERE id = 1")
+        assert connection.exec_driver_sql("SELECT room_id FROM room_appearances").fetchall() == []
+    engine.dispose()

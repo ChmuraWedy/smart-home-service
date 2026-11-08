@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -80,24 +81,6 @@ class DeviceTranslation(Base):
     values: Mapped[dict[str, str]] = mapped_column(JSON)
 
 
-class CloudDeviceMapping(Base):
-    """User-maintained map; never presented as an applied Tuya association."""
-
-    __tablename__ = "cloud_device_mappings"
-    __table_args__ = (UniqueConstraint(
-        "scope", "kind", "source_device_id", "source_code", "target_device_id", "target_code"
-    ),)
-    id: Mapped[int] = mapped_column(primary_key=True)
-    scope: Mapped[str] = mapped_column(String(64), index=True)
-    kind: Mapped[str] = mapped_column(String(20))
-    source_device_id: Mapped[str] = mapped_column(String(128), index=True)
-    source_code: Mapped[str] = mapped_column(String(128))
-    source_dp_id: Mapped[int | None]
-    target_device_id: Mapped[str] = mapped_column(String(128))
-    target_code: Mapped[str] = mapped_column(String(128))
-    target_dp_id: Mapped[int | None]
-
-
 class AliasOwner:
     @property
     def aliases(self) -> list[str]:
@@ -152,6 +135,13 @@ class CloudTopology(Base):
     warnings: Mapped[int] = mapped_column(default=0)
 
 
+class CloudRoomOverride(Base):
+    __tablename__ = "cloud_room_overrides"
+    scope: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
+
+
 class Building(AliasOwner, Base):
     __tablename__ = "buildings"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -181,6 +171,14 @@ class Room(AliasOwner, Base):
         lazy="selectin",
         order_by="RoomAlias.alias",
     )
+
+
+class RoomAppearance(Base):
+    __tablename__ = "room_appearances"
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    card_opacity: Mapped[int] = mapped_column(default=100)
+    background_version: Mapped[str | None] = mapped_column(String(64))
+    background: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
 
 
 class DeviceType(Base):

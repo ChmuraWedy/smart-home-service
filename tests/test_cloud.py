@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 from smarthome import auto_label_translations
 from smarthome.cloud import CloudBridge
 from smarthome.config import Settings
+from smarthome.db import init_db, make_engine
 from smarthome.main import create_app
 from smarthome.models import Device
 
@@ -133,6 +135,48 @@ def login(client):
     return id
 
 
+def test_cloud_room_override_is_local_and_account_scoped(cloud_client):
+    login(cloud_client)
+    bridge = cloud_client.app.state.cloud
+    building = cloud_client.post("/api/v1/buildings", json={"name": "Home"}).json()
+    room = cloud_client.post("/api/v1/rooms", json={"name": "Office", "building_id": building["id"]}).json()
+    path = API + "/devices/child/room"
+    assert cloud_client.put(path, json={"room_id": 999}).status_code == 404
+    assert cloud_client.put(API + "/devices/missing/room", json={"room_id": room["id"]}).status_code == 404
+    assignment = {"room_id": room["id"], "building_id": building["id"]}
+    assert cloud_client.put(path, json={"room_id": room["id"]}).json() == assignment
+
+    def list_child():
+        return next(row for row in cloud_client.get(API + "/devices").json() if row["id"] == "child")
+
+    assert list_child()["app_room"] == assignment
+    bridge.auth["token_info"]["uid"] = "another-account"
+    assert "app_room" not in list_child()
+    bridge.auth["token_info"]["uid"] = "user"
+    assert cloud_client.get("/api/v1/devices").json() == []
+    assert cloud_client.delete(f"/api/v1/rooms/{room['id']}").status_code == 204
+    assert list_child()["app_room"] == {"room_id": None, "building_id": None}
+    assert bridge.manager.customer_api.calls == []
+
+
+def test_migration_removes_only_manual_cloud_mapping_storage(tmp_path):
+    database = tmp_path / "legacy.db"
+    engine = make_engine(str(database))
+    init_db(engine)
+    with sqlite3.connect(database) as connection:
+        connection.execute("PRAGMA user_version=4")
+        connection.execute("CREATE TABLE cloud_device_mappings (id INTEGER PRIMARY KEY)")
+        connection.execute("INSERT INTO cloud_device_mappings VALUES (1)")
+        connection.execute("INSERT INTO buildings (id, name) VALUES (1, 'Keep this building')")
+    init_db(engine)
+    with sqlite3.connect(database) as connection:
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "cloud_device_mappings" not in tables
+        assert {"combined_devices", "cloud_room_overrides", "device_observations"} <= tables
+        assert connection.execute("SELECT name FROM buildings").fetchall() == [("Keep this building",)]
+    engine.dispose()
+
+
 def test_channel_names_persist_without_commands_and_are_scoped(cloud_client):
     login(cloud_client)
     bridge = cloud_client.app.state.cloud
@@ -190,55 +234,6 @@ def test_late_token_refresh_cannot_restore_logged_out_session(cloud_client):
     bridge.logout()
     listener.update_token(old_tokens)
     assert bridge.auth is None and not bridge.path.exists()
-
-
-@pytest.mark.parametrize("kind", ["remote", "zigbee_group", "multi_control"])
-def test_device_maps_are_persistent_manual_records_without_cloud_commands(cloud_client, kind):
-    login(cloud_client)
-    bridge = cloud_client.app.state.cloud
-    source = bridge.device("child")
-    source.status_range = {"press": SimpleNamespace(code="press", type="Enum", values='{"range":["single","double"]}')}
-    source.local_strategy = {1: {"status_code": "press"}}
-    target = bridge.device("gateway")
-    target.local_strategy = {20: {"status_code": "switch"}}
-    path = API + "/devices/child/mappings"
-    body = {"kind": kind, "source_code": "press", "target_device_id": "gateway", "target_code": "switch"}
-    response = cloud_client.post(path, json=body)
-    assert response.status_code == 201, response.text
-    entry = response.json()
-    assert entry["source_device_id"] == "child" and entry["source_dp_id"] == 1 and entry["target_dp_id"] == 20
-    assert entry["origin"] == "manual" and entry["applied_to_tuya"] is False
-    assert KEY not in response.text and SECRET not in response.text
-    listing = cloud_client.get(path)
-    assert listing.json()["mappings"] == [entry] and listing.json()["tuya_bindings_available"] is False
-    assert cloud_client.get(API + "/devices/gateway/mappings").json()["mappings"] == [entry]
-    assert cloud_client.post(path, json=body).status_code == 409
-    assert cloud_client.put(path + f'/{entry["id"]}', json={**body, "kind":"multi_control"}).status_code == 200
-    assert cloud_client.delete(path + f'/{entry["id"]}').status_code == 204
-    assert cloud_client.get(path).json()["mappings"] == []
-    assert bridge.manager.customer_api.calls == []
-
-
-def test_maps_reject_unavailable_devices_codes_wrong_dp_and_cross_account_access(cloud_client):
-    login(cloud_client)
-    bridge = cloud_client.app.state.cloud
-    gateway = bridge.device("gateway")
-    gateway.local_strategy = {20: {"status_code":"switch"}}
-    child = bridge.device("child")
-    child.status_range = {"motion": SimpleNamespace(code="motion", type="Boolean", values="{}")}
-    path = API + "/devices/child/mappings"
-    body = {"kind":"remote", "source_code":"motion", "target_device_id":"gateway", "target_code":"switch"}
-    for changes in [{"source_code":"missing"}, {"target_code":"local_key"}, {"target_dp_id":21}, {"source_dp_id":True}]:
-        assert cloud_client.post(path,json={**body,**changes}).status_code == 422
-    assert cloud_client.post(path,json={**body,"target_device_id":"missing"}).status_code == 404
-    entry = cloud_client.post(path,json=body).json()
-    assert entry["source_dp_id"] is None  # Unknown is retained, not guessed from order.
-    bridge.auth["token_info"]["uid"] = "another-account"
-    assert cloud_client.get(path).json()["mappings"] == []
-    assert cloud_client.delete(path + f'/{entry["id"]}').status_code == 404
-    cloud_client.headers.clear()
-    assert cloud_client.get(path).status_code == 401
-    assert bridge.manager.customer_api.calls == []
 
 
 def test_raw_lighting_commands_validate_base64_and_advertised_byte_limit(cloud_client):

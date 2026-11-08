@@ -7,12 +7,14 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import Field, JsonValue, SecretStr, field_validator
 from sqlalchemy import select
+from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .importer import import_tinytuya
-from .models import CloudChannelLabel
+from .models import CloudChannelLabel, CloudRoomOverride, Room
 from .schemas import Identifier, ImportRequest, PositiveID, Schema
+from .service import commit, get_or_404
 
 router = APIRouter(prefix="/api/v1/cloud", tags=["Cloud"], dependencies=[Depends(authenticate)])
 Provider = Literal["sharing", "developer"]
@@ -34,6 +36,10 @@ class DeveloperCredentials(Schema):
         return SecretStr(text)
 
 
+class CloudRoomAssignment(Schema):
+    room_id: PositiveID | None
+
+
 def cloud_bridge(request, provider):
     bridge = request.app.state.developer_cloud if provider == "developer" else request.app.state.cloud
     if provider == "sharing" and hasattr(bridge, "state"):
@@ -45,7 +51,7 @@ def audit_cloud(request, bridge, provider, device, *, commands=None, outcome=Non
     import logging
 
     from .activity import record_command, record_values
-    from .cloud_mappings import scope_for
+    from .cloud_scope import scope_for
     try:
         with Session(request.app.state.engine) as session:
             scope = scope_for(bridge, provider)
@@ -127,7 +133,7 @@ class ChannelLabels(Schema):
 
 
 def channel_labels(session, bridge, provider, device_id):
-    from .cloud_mappings import scope_for
+    from .cloud_scope import scope_for
 
     scope = scope_for(bridge, provider)
     return {
@@ -287,7 +293,7 @@ def devices(
     request: Request, response: Response, refresh: bool = False, provider: Provider = "sharing",
     session: Session = Depends(get_session),
 ):
-    from .cloud_mappings import scope_for
+    from .cloud_scope import scope_for
     from .device_aliases import aliases_for_devices
     from .device_translations import cloud_translations
 
@@ -301,13 +307,24 @@ def devices(
             audit_cloud(request, bridge, provider, device)
         if rows:
             scope = scope_for(bridge, provider)
-            aliases = aliases_for_devices(session, scope, [row["id"] for row in rows])
+            ids = [row["id"] for row in rows]
+            aliases = aliases_for_devices(session, scope, ids)
             cloud_translations(session, scope, rows, aliases)
+            overrides = {
+                device_id: {"room_id": room_id, "building_id": building_id}
+                for device_id, room_id, building_id in session.execute(
+                    select(CloudRoomOverride.device_id, CloudRoomOverride.room_id, Room.building_id)
+                    .outerjoin(Room, Room.id == CloudRoomOverride.room_id)
+                    .where(CloudRoomOverride.scope == scope, CloudRoomOverride.device_id.in_(ids))
+                )
+            }
             labels = {(label.device_id, label.code): label.label for label in session.scalars(
                 select(CloudChannelLabel).where(CloudChannelLabel.scope == scope_for(bridge, provider), CloudChannelLabel.device_id.in_([row["id"] for row in rows]))
             )}
             for row, device in zip(rows, snapshots, strict=True):
                 row["aliases"] = aliases[row["id"]]
+                if device.id in overrides:
+                    row["app_room"] = overrides[device.id]
                 functions, ranges = row["functions"], safe_status_ranges(device)
                 for spec in functions + ranges:
                     if (device.id, spec["code"]) in labels:
@@ -318,6 +335,28 @@ def devices(
                     "snapshot": safe_snapshot(device, provider),
                 }
     return rows
+
+
+@router.put("/devices/{device_id}/room")
+def assign_cloud_device_room(
+    device_id: Identifier, body: CloudRoomAssignment, request: Request,
+    provider: Provider = "sharing", session: Session = Depends(get_session),
+):
+    from .cloud_scope import scope_for
+
+    bridge = cloud_bridge(request, provider)
+    with bridge.lock:
+        scope = scope_for(bridge, provider)
+        bridge.device(device_id)
+        room = get_or_404(session, Room, body.room_id) if body.room_id is not None else None
+        building_id = room.building_id if room else None
+        statement = insert(CloudRoomOverride).values(scope=scope, device_id=device_id, room_id=body.room_id)
+        session.execute(statement.on_conflict_do_update(
+            index_elements=[CloudRoomOverride.scope, CloudRoomOverride.device_id],
+            set_={"room_id": statement.excluded.room_id},
+        ))
+        commit(session)
+    return {"room_id": body.room_id, "building_id": building_id}
 
 
 @router.post("/imports/local-inventory")
@@ -381,6 +420,7 @@ def cloud_device_status(
         audit_cloud(request, bridge, provider, device)
         if watch and provider == "sharing" and not refresh:
             bridge.schedule_inventory_refresh(background_tasks)
+            bridge.schedule_missing_light_refresh(background_tasks, device)
     response.headers["Cache-Control"] = "no-store"
     return safe_snapshot(device, provider)
 
@@ -412,7 +452,7 @@ def save_channel_labels(
     device_id: Identifier, body: ChannelLabels, request: Request, response: Response,
     provider: Provider = "sharing", session: Session = Depends(get_session),
 ):
-    from .cloud_mappings import scope_for
+    from .cloud_scope import scope_for
     from .service import commit
 
     bridge = cloud_bridge(request, provider)

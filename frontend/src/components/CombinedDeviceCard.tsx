@@ -2,16 +2,18 @@ import {
   Fragment, useCallback, useId, useRef, useState,
 } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { shallowEqual } from 'react-redux';
 import type {
-  CombinedDevice, CombinedMemberInput, CombinedPowerOutcome, HomeApi,
+  CombinedDevice, CombinedPowerOutcome, HomeApi,
 } from '../home-api';
 import { useDeviceDisplayName } from '../devices';
-import type { UnifiedDevice } from '../devices';
 import { ApiError } from '../api';
 import { labelFor } from '../controls';
 import combinedLayout from '../combined-layout';
-import { cloudDeviceKey, readCloudDevice } from '../cloud-device-cache';
-import { readLocalDevice } from '../local-device-cache';
+import {
+  memberOnline, refreshCombinedMember, useRestoredWiring, wiredSupply,
+} from '../combined-power';
+import type { ResolvedMember } from '../combined-power';
 import { MSG, t } from '../i18n';
 import {
   selectCommandPending, setCommandPending, useAppDispatch, useAppSelector,
@@ -29,7 +31,7 @@ import { PowerButton } from './PowerButton';
 import { Card } from './ui/card';
 import { Icon } from './ui/icon';
 
-export type ResolvedMember = { member: CombinedMemberInput; device?: UnifiedDevice };
+export type { ResolvedMember } from '../combined-power';
 
 function aggregatePower(powers: MemberPower[]): MemberPower {
   if (powers.includes('unknown')) return 'unknown';
@@ -54,7 +56,7 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth, supplyPower,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
@@ -67,6 +69,7 @@ function MemberControls({
   sourceLabel?: string;
   channelChildren?: ReadonlyMap<string, ReactNode>;
   powerSide?: PowerSide;
+  supplyPower?: false | null;
   onPower: (deviceId: string, power: MemberPower) => void;
   onAuthError: () => void;
 }) {
@@ -74,6 +77,7 @@ function MemberControls({
   const id = member.device_id;
   const displayName = useDeviceDisplayName()(device, id);
   const dispatch = useAppDispatch();
+  const online = useAppSelector((state) => memberOnline(state, api, entry));
   const recordBusy = useCallback((pending: boolean) => {
     dispatch(setCommandPending({ deviceId: commandKey, pending }));
   }, [commandKey, dispatch]);
@@ -82,6 +86,7 @@ function MemberControls({
     <section
       className="combined-member"
       aria-label={displayName}
+      data-unavailable={!device || online === false || supplyPower !== undefined || undefined}
       style={depth ? { '--combined-depth': depth } as CSSProperties : undefined}
     >
       <header className="combined-member-header">
@@ -104,6 +109,7 @@ function MemberControls({
           channelChildren={channelChildren}
           powerSide={powerSide}
           inlineMemberName={Boolean(sourceLabel) && !quick}
+          supplyPower={supplyPower}
         />
       ) : (
         <>
@@ -151,16 +157,31 @@ export default function CombinedDeviceCard({
   const [powers, setPowers] = useState<Record<string, MemberPower>>({});
   const [failures, setFailures] = useState<Partial<Record<string, PowerFailure>>>({});
   const [sendError, setSendError] = useState(false);
+  const layout = combinedLayout(members);
+  const supplies = useAppSelector((state) => wiredSupply(state, api, layout, now), shallowEqual);
+  const waiting = useRestoredWiring(api, members, supplies, paused || preview, onAuthError);
+  const allOffline = useAppSelector((state) => members.length > 0 && members.every((entry) => !entry.device || memberOnline(state, api, entry) === false));
+
+  function suppliedPower(deviceId: string) {
+    if (supplies[deviceId] === false) return false;
+    if (supplies[deviceId] === true && waiting.has(deviceId)) return null;
+    return undefined;
+  }
+
   const onPower = useCallback((deviceId: string, power: MemberPower) => {
     setPowers((values) => (values[deviceId] === power ? values : { ...values, [deviceId]: power }));
   }, []);
-  const memberPowers = members.map(({ member, device }) => (device ? powers[member.device_id] ?? 'unknown' : 'unknown'));
+  const memberPowers = members.map(({ member, device }) => {
+    const supplied = suppliedPower(member.device_id);
+    if (supplied === false) return 'off';
+    if (!device || supplied === null) return 'unknown';
+    return powers[member.device_id] ?? 'unknown';
+  });
   const power = aggregatePower(memberPowers);
   const knownPowers = memberPowers.filter((value) => value !== 'unknown');
   const allKnownOn = knownPowers.length > 0 && knownPowers.every((value) => value === 'on');
   const controlsPaused = paused || preview;
-  const canSend = !busy && !controlsPaused && members.some(({ device }) => device);
-  const layout = combinedLayout(members);
+  const canSend = !busy && !controlsPaused && !allOffline && members.some(({ device }) => device);
 
   const setPower = useCallback(async (value: boolean) => {
     if (savedId === undefined || !canSend || sending.current) return;
@@ -175,13 +196,8 @@ export default function CombinedDeviceCard({
       ))));
       const refreshIds = new Set(results.filter(({ outcome }) => outcome === 'accepted' || outcome === 'unknown').map(({ device_id: memberId }) => memberId));
       // Acknowledgement and cached reports can arrive at different times for each member.
-      const reads = members.filter(({ member, device }) => device && refreshIds.has(member.device_id)).map(({ member, device }) => {
-        if (member.route === 'local') {
-          return device?.local ? dispatch(readLocalDevice(api, device.local.id, true)) : undefined;
-        }
-        const key = cloudDeviceKey(api, member.device_id, member.route);
-        return dispatch(readCloudDevice(api, key, { refresh: true }));
-      });
+      const reads = members.filter(({ member, device }) => device && refreshIds.has(member.device_id))
+        .map((entry) => refreshCombinedMember(dispatch, api, entry));
       const refreshed = await Promise.allSettled(reads);
       if (refreshed.some((result) => result.status === 'rejected' && result.reason instanceof ApiError && result.reason.status === 401)) onAuthError();
     } catch (failure) {
@@ -216,6 +232,7 @@ export default function CombinedDeviceCard({
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
         powerSide={!quick && source ? 'start' : undefined}
+        supplyPower={suppliedPower(member.device_id)}
         channelChildren={channelChildren}
         onPower={onPower}
         onAuthError={onAuthError}
@@ -242,6 +259,7 @@ export default function CombinedDeviceCard({
       id={id}
       className="device-card dashboard-device combined-device-card"
       aria-label={combined.name}
+      data-unavailable={allOffline || undefined}
       data-layout-slot={placement?.slot}
       data-layout-nudge={placement?.nudge}
       style={placement?.style}

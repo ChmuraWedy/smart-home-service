@@ -40,6 +40,42 @@ def status_values(rows):
     return {row["code"]: row["value"] for row in rows}
 
 
+WHITE_LIGHT_READINGS = (
+    ("brightness", "bright_value", "bright_value_v2"),
+    ("color_temperature", "temp_value", "temp_value_v2"),
+)
+COLOR_LIGHT_READINGS = (("color", "colour_data", "colour_data_v2"),)
+SCENE_LIGHT_READINGS = (("scene_data_v2",),)
+
+
+def missing_light_reading(device):
+    advertised = set(getattr(device, "function", {})) | set(getattr(device, "status_range", {}))
+    if not device.online or "switch_led" not in advertised:
+        return False
+
+    status = device.status
+    power = status.get("switch_led")
+    if power is not True:
+        return power is not False
+
+    mode = status.get("work_mode")
+    if mode is None and "work_mode" in advertised:
+        return True
+    if mode in (None, "white"):
+        readings = WHITE_LIGHT_READINGS
+    elif mode in ("colour", "color"):
+        readings = COLOR_LIGHT_READINGS
+    elif mode == "scene":
+        readings = SCENE_LIGHT_READINGS
+    else:
+        return False
+
+    return any(
+        advertised.intersection(codes) and all(status.get(code) is None for code in codes)
+        for codes in readings
+    )
+
+
 class SharingState:
     def __init__(self, bridge, mq_factory=None):
         self.bridge = bridge

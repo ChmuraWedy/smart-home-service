@@ -15,7 +15,7 @@ The installed Sharing `SceneRepository` exposes query/trigger rather than editin
 
 A bulb's `scene_data` or `scene_data_v2` is a device lighting effect, not a home automation such as motion turning on three lamps. Editing the bulb's effect does not modify an existing Smart Life automation.
 
-Likewise, [manual device mappings](device-linkage.md) record intent in our database without applying Smart Life bindings or executing rules. Local [groups](displays.md) can switch several devices, but this is not a server automation engine.
+Local [groups](displays.md) can switch several devices, but this is not a server automation engine.
 
 A rule such as fresh motion → group on → timed off would require a separately implemented rule engine and a reliable event source. Periodic polling can miss short motion events; it must not be presented as complete motion history.
 

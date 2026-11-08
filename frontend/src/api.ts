@@ -18,6 +18,7 @@ export type CloudStatus = {
   developer: DeveloperStatus;
 };
 export type CodeStatus = Pick<CloudStatus, 'connected' | 'has_saved_user_code' | 'saved_user_code_requires_login'>;
+export type AppRoomAssignment = { 'room_id': number | null; 'building_id': number | null };
 export type CloudDevice = {
   id: string;
   name: string;
@@ -30,6 +31,7 @@ export type CloudDevice = {
   has_local_key: boolean;
   node_id?: string | null;
   aliases?: string[];
+  'app_room'?: AppRoomAssignment;
   translations?: DeviceTranslations;
   battery?: { code: string; value: JsonValue; unit?: string | null } | null;
   controls?: { ready: boolean; definitions: CloudFunctions; snapshot: CloudSnapshot };
@@ -43,9 +45,6 @@ export type DeveloperCredentials = {
 export type QRLogin = { session_id: string; qr_url: string; expires_in: number };
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null; dp_id?: number; dp_ids?: number[]; user_label?: string };
-export type MappingInput = { kind: 'remote' | 'zigbee_group' | 'multi_control'; source_code: string; source_dp_id: number | null; target_device_id: string; target_code: string; target_dp_id: number | null };
-export type DeviceMapping = MappingInput & { id: number; source_device_id: string; origin: 'manual'; applied_to_tuya: false };
-export type MappingList = { device_id: string; provider: Provider; tuya_bindings_available: false; mappings: DeviceMapping[] };
 export type CloudFunctions = { device_id: string; functions: CloudFunction[]; status_range?: CloudFunction[] };
 export type CloudSnapshot = {
   device_id: string; online: boolean; source: string;
@@ -115,11 +114,12 @@ export class CloudApi {
     signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(abort, 120_000);
     try {
+      const binary = body instanceof Blob;
       const transport = import.meta.env.MODE === 'demo' ? (await import('./demo/backend')).default : fetch;
       const response = await transport(this.url(path), {
         method,
-        headers: { 'X-API-Key': this.connection.token, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: { 'X-API-Key': this.connection.token, ...(body === undefined ? {} : { 'Content-Type': binary ? body.type : 'application/json' }) },
+        body: binary ? body : JSON.stringify(body),
         credentials: 'omit',
         redirect: 'error',
         cache: 'no-store',
@@ -150,6 +150,11 @@ export class CloudApi {
 
   protected async deleteResource(path: string): Promise<void> {
     await this.response('/api/v1' + path, 'DELETE');
+  }
+
+  protected async readBlob(path: string, signal: AbortSignal): Promise<Blob> {
+    const response = await this.response(`/api/v1${path}`, 'GET', undefined, signal);
+    return response.blob();
   }
 
   private json<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
@@ -185,6 +190,11 @@ export class CloudApi {
   deviceFunctions(id: string, provider: Provider, signal?: AbortSignal) {
     return this.json<CloudFunctions>('/devices/' + encodeURIComponent(id) + '/functions?provider=' + provider, 'GET', undefined, signal);
   }
+
+  setCloudDeviceRoom(id: string, provider: Provider, roomId: number | null) {
+    return this.json<AppRoomAssignment>(`/devices/${encodeURIComponent(id)}/room?provider=${provider}`, 'PUT', { room_id: roomId });
+  }
+
   saveChannelLabels(id: string, provider: Provider, labels: Record<string, string | null>, signal?: AbortSignal) {
     return this.json<{ device_id: string; labels: Record<string, string> }>('/devices/' + encodeURIComponent(id) + '/channel-labels?provider=' + provider, 'PUT', { labels }, signal);
   }
@@ -212,15 +222,6 @@ export class CloudApi {
   }
   sendDeviceCommands(id: string, provider: Provider, commands: { code: string; value: JsonValue }[]) {
     return this.json<CloudCommandResult>('/devices/' + encodeURIComponent(id) + '/commands?provider=' + provider, 'POST', { commands });
-  }
-  deviceMappings(id: string, provider: Provider, signal?: AbortSignal) {
-    return this.json<MappingList>('/devices/' + encodeURIComponent(id) + '/mappings?provider=' + provider, 'GET', undefined, signal);
-  }
-  saveDeviceMapping(id: string, provider: Provider, body: MappingInput, mappingId?: number) {
-    return this.json<DeviceMapping>('/devices/' + encodeURIComponent(id) + '/mappings' + (mappingId ? '/' + mappingId : '') + '?provider=' + provider, mappingId ? 'PUT' : 'POST', body);
-  }
-  async deleteDeviceMapping(id: string, provider: Provider, mappingId: number) {
-    await this.response('/api/v1/cloud/devices/' + encodeURIComponent(id) + '/mappings/' + mappingId + '?provider=' + provider, 'DELETE');
   }
 
   async qrImage(login: QRLogin): Promise<Blob> {

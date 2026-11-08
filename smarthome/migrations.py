@@ -2,6 +2,8 @@ from collections.abc import Callable
 
 from sqlalchemy.engine import Connection
 
+from .models import CloudRoomOverride, RoomAppearance
+
 
 def add_combined_power_visibility(connection: Connection) -> None:
     # Some unversioned databases received this column before migrations were introduced.
@@ -28,9 +30,24 @@ def add_dashboard_hidden_devices(connection: Connection) -> None:
         connection.exec_driver_sql("ALTER TABLE dashboard_layouts ADD COLUMN hidden_devices JSON NOT NULL DEFAULT '[]'")
 
 
+def add_room_appearance(connection: Connection) -> None:
+    RoomAppearance.__table__.create(connection, checkfirst=True)
+
+
+def add_cloud_room_overrides(connection: Connection) -> None:
+    CloudRoomOverride.__table__.create(connection, checkfirst=True)
+
+
+def remove_manual_cloud_mappings(connection: Connection) -> None:
+    connection.exec_driver_sql("DROP TABLE IF EXISTS cloud_device_mappings")
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
     add_combined_card_metadata,
     add_dashboard_hidden_devices,
+    add_room_appearance,
+    add_cloud_room_overrides,
+    remove_manual_cloud_mappings,
 )

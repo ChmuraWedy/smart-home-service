@@ -191,7 +191,7 @@ The guides below are in English. Interface language selection is independent of 
 | Docker, Dell 5070, persistent storage, and deployment | [Deployment guide](deploy/docker.md) |
 | Smart Life login / Tuya Developer login | [QR login](docs/qr-login.md) · [Developer access](docs/developer-login.md) |
 | LAN discovery and packet observation | [Network guide](docs/packet-capture.md) |
-| Lighting, switch channels, aliases, and mappings | [Switch controls](docs/switch-controls.md) · [Aliases](docs/device-aliases.md) · [Lighting and mappings](docs/device-linkage.md) |
+| Lighting, switch channels, and aliases | [Switch controls](docs/switch-controls.md) · [Aliases](docs/device-aliases.md) · [Lighting and device parameters](docs/device-linkage.md) |
 | Camera controls and limitations | [Camera guide](docs/camera-controls.md) |
 | Groups and room displays | [Displays](docs/displays.md) · [CYD firmware](firmware/cyd/README.md) |
 | UI translation | [Localization guide](frontend/src/i18n/README.md) |

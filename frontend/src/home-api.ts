@@ -24,6 +24,7 @@ export type LocalDevice = {
 };
 export type Building = { id: number; name: string; aliases: string[] };
 export type Room = { id: number; building_id: number; name: string; aliases: string[] };
+export type RoomAppearance = { 'card_opacity': number; 'background_version': string | null };
 export type Group = { id: number; name: string; room_id: number; device_ids: number[] };
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
 export type GroupResult = { all_acknowledged: boolean; results: { device_id: number; acknowledged: boolean }[] };
@@ -151,6 +152,52 @@ export class HomeApi extends CloudApi {
     ]);
     return { buildings, rooms, devices, groups };
   }
+
+  async roomCatalog(signal?: AbortSignal) {
+    const [buildings, rooms] = await Promise.all([this.list<Building>('/buildings', signal), this.list<Room>('/rooms', signal)]);
+    return { buildings, rooms };
+  }
+
+  createBuilding(name: string) {
+    return this.request<Building>('/buildings', 'POST', { name });
+  }
+
+  createRoom(name: string, buildingId: number) {
+    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId });
+  }
+
+  renameRoom(roomId: number, name: string) {
+    return this.request<Room>(`/rooms/${roomId}`, 'PATCH', { name });
+  }
+
+  deleteRoom(roomId: number) {
+    return this.deleteResource(`/rooms/${roomId}`);
+  }
+
+  setLocalDeviceRoom(deviceId: number, roomId: number | null) {
+    return this.request<LocalDevice>(`/devices/${deviceId}`, 'PATCH', { room_id: roomId });
+  }
+
+  roomAppearance(roomId: number, signal: AbortSignal) {
+    return this.request<RoomAppearance>(`/rooms/${roomId}/appearance`, 'GET', undefined, signal);
+  }
+
+  setRoomOpacity(roomId: number, opacity: number) {
+    return this.request<RoomAppearance>(`/rooms/${roomId}/appearance`, 'PATCH', { card_opacity: opacity });
+  }
+
+  roomBackground(roomId: number, signal: AbortSignal) {
+    return this.readBlob(`/rooms/${roomId}/background`, signal);
+  }
+
+  uploadRoomBackground(roomId: number, image: Blob) {
+    return this.request<RoomAppearance>(`/rooms/${roomId}/background`, 'PUT', image);
+  }
+
+  removeRoomBackground(roomId: number) {
+    return this.request<RoomAppearance>(`/rooms/${roomId}/background`, 'DELETE');
+  }
+
   device(id: number, signal?: AbortSignal) { return this.request<LocalDevice>(`/devices/${id}`, 'GET', undefined, signal); }
   state(id: number, refresh = false, signal?: AbortSignal, watch = false) {
     return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60${watch ? "&watch=true" : ""}`, 'GET', undefined, signal);
