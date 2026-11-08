@@ -301,7 +301,7 @@ describe('combined devices', () => {
     expect(writes.map(({ path }) => path)).toEqual(['/combined-devices/1/power/on', '/combined-devices/1/power/off']);
   });
 
-  it('uses the default control route at creation and offers changes only in edit', async () => {
+  it('uses the default control route at creation and never shows a route selector in the combination', async () => {
     const { writes } = backend(undefined, true);
     const user = userEvent.setup();
     openApp('/combined-devices/new?room=3');
@@ -318,13 +318,25 @@ describe('combined devices', () => {
     ] } });
     await user.click(edit);
     const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
-    expect(editor.queryByRole('combobox', { name: 'Control method: Light Kitchen 2' })).toBeNull();
-    const route = editor.getByRole('combobox', { name: 'Control method: Light Kitchen 1' });
-    await user.selectOptions(route, 'developer');
+    expect(editor.queryByRole('combobox', { name: /Control method/ })).toBeNull();
+  });
+
+  it('preserves saved member routes when editing and chooses a route for new members', async () => {
+    const { writes } = backend({
+      id: 1, name: 'Kitchen lights', room_id: room.id, members: [
+        { device_id: bulbs[0].id, route: 'developer', accessible: true },
+        { device_id: bulbs[1].id, route: 'sharing', accessible: true },
+      ],
+    }, true);
+    const user = userEvent.setup();
+    openApp('/combined-devices/1/edit');
+    const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
+    await user.click(await editor.findByRole('checkbox', { name: bulbs[2].name }));
     await user.click(editor.getByRole('button', { name: 'Save' }));
-    expect(writes[1]).toMatchObject({ body: { members: [
+    expect(writes[0]).toMatchObject({ path: '/combined-devices/1', method: 'PUT', body: { members: [
       { device_id: bulbs[0].id, route: 'developer' },
       { device_id: bulbs[1].id, route: 'sharing' },
+      { device_id: bulbs[2].id, route: 'sharing' },
     ] } });
   });
 

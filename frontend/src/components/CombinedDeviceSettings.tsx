@@ -4,7 +4,7 @@ import {
 import type { FormEvent } from 'react';
 import { ApiError } from '../api';
 import {
-  deviceRoutes, matchesDevice, routeLabel, useDeviceDisplayName,
+  deviceRoutes, matchesDevice, useDeviceDisplayName,
 } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type {
@@ -186,10 +186,6 @@ export function CombinedDeviceSettings({
     }
   }
 
-  function selectRoute(id: string, route: DeviceRoute) {
-    setMembers((rows) => rows.map((member) => (member.device_id === id ? { ...member, route } : member)));
-  }
-
   const selectSource = useCallback((id: string, source: CombinedPowerSource | null) => {
     setMembers((rows) => rows.map((member) => (member.device_id === id ? { ...member, power_source: source } : member)));
   }, []);
@@ -220,33 +216,19 @@ export function CombinedDeviceSettings({
               {options.map((id) => {
                 const device = byId.get(id);
                 const choice = selected.get(id);
-                const routes = device ? deviceRoutes(device) : [];
+                const route = device ? deviceRoutes(device)[0] : undefined;
                 const label = displayName(device, id);
-                const canChangeRoute = existing && choice && routes.length > 0
-                  && (routes.length > 1 || !routes.includes(choice.route));
                 return (
-                  <div className="combined-member-option" key={id}>
-                    <label htmlFor={`${formId}-member-${id}`}>
-                      <input
-                        id={`${formId}-member-${id}`}
-                        type="checkbox"
-                        checked={Boolean(choice)}
-                        disabled={!choice && (members.length >= 16 || !routes.length)}
-                        onChange={(event) => toggleMember(id, routes[0], event.target.checked)}
-                      />
-                      {label}
-                    </label>
-                    {canChangeRoute && (
-                      <select
-                        value={choice.route}
-                        aria-label={t(MSG.CONTROL_METHOD) + label}
-                        onChange={(event) => selectRoute(id, event.target.value as DeviceRoute)}
-                      >
-                        {!routes.includes(choice.route) && <option value={choice.route}>{routeLabel[choice.route]} · {t(MSG.UNAVAILABLE)}</option>}
-                        {routes.map((route) => <option value={route} key={route}>{routeLabel[route]}</option>)}
-                      </select>
-                    )}
-                  </div>
+                  <label className="combined-member-option" htmlFor={`${formId}-member-${id}`} key={id}>
+                    <input
+                      id={`${formId}-member-${id}`}
+                      type="checkbox"
+                      checked={Boolean(choice)}
+                      disabled={!choice && (members.length >= 16 || !route)}
+                      onChange={(event) => toggleMember(id, route, event.target.checked)}
+                    />
+                    {label}
+                  </label>
                 );
               })}
             </fieldset>

@@ -1735,9 +1735,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-wiring { @apply tw:grid tw:min-w-0 tw:gap-2 tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
 .combined-wiring p { @apply tw:m-0; }
 .combined-wiring select { @apply tw:w-full tw:min-w-0; }
-.combined-member-option { @apply tw:grid tw:grid-cols-1 tw:items-center tw:gap-2; }
-.combined-member-option:has(select) { @apply tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]; }
-.combined-member-option label { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }
+.combined-member-option { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }
 .combined-member-option input[type="checkbox"] { @apply tw:size-4 tw:shrink-0; }
-.combined-member-option select { @apply tw:min-w-0; }
 .combined-delete p { @apply tw:w-full; }
