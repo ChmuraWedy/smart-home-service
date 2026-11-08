@@ -52,6 +52,19 @@ function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
   open();
 }
 
+function cardPresenceMessage({
+  hasCloud, hasLocal, enabled, online,
+}: {
+  hasCloud: boolean;
+  hasLocal: boolean;
+  enabled?: boolean;
+  online?: boolean;
+}) {
+  if (hasCloud) return online ? MSG.ONLINE : MSG.OFFLINE;
+  if (hasLocal && !enabled) return MSG.DISABLED_IN_SETTINGS;
+  return online ? MSG.AVAILABLE_LOCALLY : MSG.STATUS_UNKNOWN;
+}
+
 function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd, placement }: {
   api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
   quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void; placement: GridCardPlacement;
@@ -88,6 +101,9 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const battery = live ? live.battery : initialBattery;
   const enabled = (route === 'local' ? state?.enabled : undefined) ?? local?.enabled;
   const online = route === 'local' ? enabled && state?.available : live?.online ?? cloud?.online;
+  const presenceMessage = cardPresenceMessage({
+    hasCloud: Boolean(cloud), hasLocal: Boolean(local), enabled, online,
+  });
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
@@ -121,7 +137,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           <>
             <p className="device-location">{room}</p>
             <div className="device-card-status tw:flex tw:max-w-full tw:flex-none tw:flex-wrap tw:items-center tw:gap-1.5 tw:text-[11px]">
-              <span className={'presence ' + (online ? 'online' : '')}>{cloud ? (online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : local && !enabled ? t(MSG.DISABLED_IN_SETTINGS) : online ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)}</span>
+              <span className={'presence ' + (online ? 'online' : '')}>{t(presenceMessage)}</span>
               <BatteryBadge reading={battery} />
             </div>
           </>
