@@ -30,7 +30,8 @@ import QuickLightSettings from './QuickLightSettings';
 import LightPresetMenu from './LightPresetMenu';
 import lightControls from '../light-controls';
 import { useLightPresets } from '../use-light-presets';
-import { isWhiteUnit, readSimpleScene } from '../light-scenes';
+import { readSimpleScene } from '../light-scenes';
+import { LightCardReading, LightSceneReadings, temperatureTint } from './LightCardReadings';
 
 const CARD_CACHE_INTERVAL = 4000;
 
@@ -39,44 +40,6 @@ function powerControl(spec: ControlSpec) {
 }
 function sensorReading(spec: ControlSpec) {
   return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key) && ['number','boolean','enum','text'].includes(spec.kind);
-}
-
-function temperatureTint(spec: ControlSpec, value: JsonValue | undefined) {
-  const { minimum, maximum } = spec;
-  if (typeof value !== 'number' || minimum === undefined || maximum === undefined || maximum <= minimum) return;
-  const cool = Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)));
-  const warm = [255, 191, 86], cold = [184, 218, 255];
-  return 'rgb(' + warm.map((channel, index) => Math.round(channel + (cold[index] - channel) * cool)).join(', ') + ')';
-}
-
-function LightCardReading({ code, label, value, tint, off }: { code: 'brightness' | 'color_temperature' | 'color'; label: string; value?: string; tint?: string; off?: boolean }) {
-  return (
-    <span className="dashboard-light-reading" title={value ? label + ' · ' + value : label}>
-      {tint && <span className="dashboard-light-tint" style={{ backgroundColor: tint }} aria-hidden="true" />}
-      <span className="dashboard-light-copy">
-        <span className="dashboard-light-icon">
-          <ParameterIcon code={code} />
-        </span>
-        <span className="dashboard-light-label">{label}</span>
-        <span className="dashboard-light-value">
-          {off ? (
-            <>
-              <span className="dashboard-light-off-label">{value}</span>
-              <span className="dashboard-light-off-mark" aria-hidden="true">—</span>
-            </>
-)
-          : value ? <span className="dashboard-light-value-text">{value}</span>
-            : (
-              <>
-                <span aria-hidden="true">—</span>
-                <span className="sr-only">{t(MSG.NO_DATA)}</span>
-              </>
-)}
-          {code === 'color' && tint && <span className="dashboard-light-swatch" style={{ backgroundColor: tint }} aria-hidden="true" />}
-        </span>
-      </span>
-    </span>
-  );
 }
 
 export type CardStatus = {online:boolean;battery?:BatteryReading};
@@ -213,25 +176,31 @@ function StandardCardControls({
   const brightnessReading = whiteMode ? currentReading(brightness) : undefined;
   const temperatureReading = whiteMode ? currentReading(temperature) : undefined;
   const sceneUnit = mode === 'scene' && scene ? readSimpleScene(currentReading(scene)?.value, scene)?.scene_units[0] : undefined;
-  let brightnessText: string | undefined;
-  if (hsv) brightnessText = `${hsv.v / 10} %`;
-  else if (sceneUnit?.unit_change_mode === 'static') {
-    const level = isWhiteUnit(sceneUnit) ? sceneUnit.bright : sceneUnit.v;
-    brightnessText = `${level / 10} %`;
-  } else if (brightness && brightnessReading) brightnessText = displayReading(brightness, brightnessReading);
+  const brightnessText = hsv ? `${hsv.v / 10} %` : brightness && brightnessReading && displayReading(brightness, brightnessReading);
   const colorText = hsv && hsvToHex(hsv).toUpperCase();
+
+  function renderLightReadings(power: boolean | null) {
+    if (power && sceneUnit) return <LightSceneReadings unit={sceneUnit} />;
+    const brightnessValue = power === false ? t(MSG.OFF) : brightnessText || undefined;
+    return (
+      <>
+        <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === null ? undefined : brightnessValue} />
+        {colorMode
+          ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
+          : whiteMode && temperature && (
+            <LightCardReading
+              code="color_temperature"
+              label={temperature.label}
+              value={power && temperatureReading ? displayReading(temperature, temperatureReading) : undefined}
+              tint={power ? temperatureTint(temperatureReading?.value, temperature.minimum, temperature.maximum) : undefined}
+            />
+          )}
+      </>
+    );
+  }
+
   const summary = hasSummary ? (power: boolean | null) => (
-    <span className="dashboard-light-readings">
-      <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === false ? t(MSG.OFF) : power ? brightnessText : undefined} />
-      {colorMode
-        ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
-        : whiteMode && temperature && (
-        <LightCardReading code="color_temperature" label={temperature.label}
-          value={power && temperatureReading ? displayReading(temperature, temperatureReading) : undefined}
-          tint={power ? temperatureTint(temperature, temperatureReading?.value) : undefined}
-        />
-)}
-    </span>
+    <span className="dashboard-light-readings">{renderLightReadings(power)}</span>
   ) : undefined;
   const inlineName = inlineMemberName && powerLayout === 'single' && !channelChildren?.size;
   const renderSummary = inlineName ? (power: boolean | null) => {

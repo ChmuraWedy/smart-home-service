@@ -22,6 +22,26 @@ const snapshot:CloudSnapshot = {device_id:'lamp',online:true,source:'cloud',stat
 const lamp:CloudDevice = {id:'lamp',name:'Лампа',online:true,has_local_key:false,controls:{ready:true,definitions,snapshot}};
 const json = (value:unknown,status=200) => new Response(JSON.stringify(value),{status});
 
+const axis = (max: number) => ({ min: 0, max, step: 1 });
+const sceneFunctions = [
+  ...definitions.functions,
+  { code: 'work_mode', type: 'Enum', values: { range: ['white', 'colour', 'scene'] } },
+  { code: 'scene_data_v2', type: 'Json', values: {
+    scene_num: { min: 1, max: 8, step: 1 },
+    scene_units: {
+      unit_change_mode: { range: ['static', 'jump', 'gradient'] },
+      unit_switch_duration: axis(100),
+      unit_gradient_duration: axis(100),
+      bright: axis(1000), temperature: axis(1000), h: axis(360), s: axis(1000), v: axis(1000),
+    },
+  } },
+];
+const staticWhiteScene = {
+  scene_num: 8,
+  scene_units: [{ unit_change_mode: 'static', unit_switch_duration: 0, unit_gradient_duration: 0,
+    h: 0, s: 0, v: 0, bright: 775, temperature: 41 }],
+};
+
 function mount(cloud=lamp, route:'sharing'|'developer'='sharing', sheet?:ComponentProps<typeof CardControls>['sheet']) {
   return renderWithStore(<CardControls api={new HomeApi(connection)} device={{id:'lamp',name:'Лампа',cloud:{[route]:cloud}}} route={route} now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} sheet={sheet} />);
 }
@@ -172,28 +192,37 @@ describe('main controls on device cards', () => {
     ]);
   });
 
-  it('saves distinct scenes with the same bulb slot, and applies only the selected scene', async () => {
-    const axis = (max: number) => ({ min: 0, max, step: 1 });
-    const functions = [
-      ...definitions.functions,
-      { code: 'work_mode', type: 'Enum', values: { range: ['white', 'colour', 'scene'] } },
-      { code: 'scene_data_v2', type: 'Json', values: {
-        scene_num: { min: 1, max: 8, step: 1 },
-        scene_units: {
-          unit_change_mode: { range: ['static', 'jump', 'gradient'] },
-          unit_switch_duration: axis(100),
-          unit_gradient_duration: axis(100),
-          bright: axis(1000), temperature: axis(1000), h: axis(360), s: axis(1000), v: axis(1000),
-        },
-      } },
-    ];
-    const staticWhite = {
-      scene_num: 8,
-      scene_units: [{ unit_change_mode: 'static', unit_switch_duration: 0, unit_gradient_duration: 0,
-        h: 0, s: 0, v: 0, bright: 775, temperature: 41 }],
+  it.each([
+    { effect: 'static', white: true, expected: ['77.5 %', '4.1 %'] },
+    { effect: 'static', white: false, expected: ['50 %', '#800000'] },
+    { effect: 'jump', white: false, expected: ['Вспышки'] },
+    { effect: 'gradient', white: false, expected: ['Дыхание'] },
+  ])('shows $effect scene readings on the card (white: $white)', async ({ effect, white, expected }) => {
+    const values = white ? staticWhiteScene.scene_units[0] : { h: 0, s: 1000, v: 500, bright: 0, temperature: 0 };
+    const scene = {
+      ...staticWhiteScene,
+      scene_units: [{
+        ...staticWhiteScene.scene_units[0],
+        ...values,
+        unit_change_mode: effect,
+      }],
     };
     const latest = { ...snapshot, status: {
-      ...snapshot.status, switch_led: true, work_mode: 'scene', scene_data_v2: JSON.stringify(staticWhite),
+      ...snapshot.status, switch_led: true, work_mode: 'scene', scene_data_v2: JSON.stringify(scene),
+    } };
+    vi.mocked(fetch).mockResolvedValue(json(latest));
+    const view = mount({ ...lamp, controls: {
+      ready: true, definitions: { ...definitions, functions: sceneFunctions }, snapshot: latest,
+    } });
+    await waitFor(() => {
+      const valuesOnCard = Array.from(view.container.querySelectorAll('.dashboard-light-value-text'), (node) => node.textContent);
+      expect(valuesOnCard).toEqual(expected);
+    });
+  });
+
+  it('saves distinct scenes with the same bulb slot, and applies only the selected scene', async () => {
+    const latest = { ...snapshot, status: {
+      ...snapshot.status, switch_led: true, work_mode: 'scene', scene_data_v2: JSON.stringify(staticWhiteScene),
     } };
     const writes: unknown[] = [];
     const saved: { id: number; name: string; tuya_scene_id?: string }[] = [];
@@ -212,13 +241,14 @@ describe('main controls on device cards', () => {
       }
       return json(latest);
     });
-    const configured = { ...lamp, controls: { ready: true, definitions: { ...definitions, functions }, snapshot: latest } };
+    const configured = { ...lamp, controls: { ready: true, definitions: { ...definitions, functions: sceneFunctions }, snapshot: latest } };
     const slot = document.createElement('div');
     document.body.append(slot);
     const props = { open: true, close: vi.fn(), trigger: { current: null }, presetSlot: slot };
     const view = mount(configured, 'sharing', props);
     await waitFor(() => expect(view.container.querySelector('.dashboard-light-value-text')).toHaveTextContent('77.5 %'));
     const sheet = within(await screen.findByRole('dialog', { name: 'Лампа' }));
+    expect(sheet.getByText('4.1 %')).toBeInTheDocument();
     const user = userEvent.setup();
     const add = sheet.getByRole('button', { name: 'Добавить сцену' });
     await waitFor(() => expect(add).toBeEnabled());

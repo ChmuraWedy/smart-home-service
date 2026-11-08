@@ -4,19 +4,15 @@ import {
 import { hsvToHex } from '../controls';
 import type { HomeApi } from '../home-api';
 import { MSG, t } from '../i18n';
-import { isWhiteUnit, sceneEffects, sceneTiming } from '../light-scenes';
+import {
+  isWhiteUnit, sceneEffectLabels, sceneEffects, sceneTiming,
+} from '../light-scenes';
 import type {
   LightScene, SavedLightScene, SceneEffect, ScenePresetInput, SceneUnit, TuyaSceneReference,
 } from '../light-scenes';
 import { LightColorWheel, LightRange } from './LightColorWheel';
 import { Icon } from './ui/icon';
 import { WizardDialog } from './WizardDialog';
-
-export const effectLabels = {
-  static: MSG.SCENE_STATIC,
-  jump: MSG.SCENE_FLASH,
-  gradient: MSG.SCENE_BREATHE,
-};
 
 export function SceneSwatch({ unit }: { unit: SceneUnit }) {
   const color = isWhiteUnit(unit)
@@ -142,7 +138,7 @@ export default function BulbSceneEditor({
       <div className="light-segments" role="group" aria-label={t(MSG.SCENE_EFFECT)}>
         {sceneEffects.map((option) => (
           <button key={option} type="button" aria-pressed={effect === option} onClick={() => selectEffect(option)}>
-            {t(effectLabels[option])}
+            {t(sceneEffectLabels[option])}
           </button>
         ))}
       </div>

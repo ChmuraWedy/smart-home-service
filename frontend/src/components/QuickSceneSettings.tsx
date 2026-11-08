@@ -3,11 +3,12 @@ import { sameValue } from '../controls';
 import type { ControlSpec } from '../controls';
 import type { HomeApi, Reading } from '../home-api';
 import { MSG, t } from '../i18n';
-import { readSimpleScene } from '../light-scenes';
+import { readSimpleScene, sceneEffectLabels } from '../light-scenes';
 import type { LightScene, SavedLightScene, ScenePresetInput } from '../light-scenes';
 import type { LightPresetLibrary } from '../use-light-presets';
 import { usePendingDeviceValue } from '../use-pending-device-value';
-import BulbSceneEditor, { effectLabels, SceneSwatch } from './BulbSceneEditor';
+import BulbSceneEditor, { SceneSwatch } from './BulbSceneEditor';
+import { LightSceneReadings } from './LightCardReadings';
 
 export default function QuickSceneSettings({
   library, tuyaApi, scope, spec, reading, disabled, send,
@@ -22,6 +23,7 @@ export default function QuickSceneSettings({
 }) {
   const { target, begin } = usePendingDeviceValue(scope, spec.key, reading);
   const current = readSimpleScene(reading?.known ? reading.value : undefined, spec);
+  const currentUnit = current?.scene_units[0];
   const [edit, setEdit] = useState<SavedLightScene>();
   const [error, setError] = useState(false);
 
@@ -54,11 +56,16 @@ export default function QuickSceneSettings({
           </button>
         )}
       </div>
-      {current && (
+      {currentUnit && (
         <p className="help">
-          {t(MSG.CURRENT)} · {t(effectLabels[current.scene_units[0].unit_change_mode])}
+          {t(MSG.CURRENT)} · {t(sceneEffectLabels[currentUnit.unit_change_mode])}
           {target && <span role="status"> · {t(MSG.WAITING_FOR_A_NEW_READING)}</span>}
         </p>
+      )}
+      {currentUnit?.unit_change_mode === 'static' && (
+        <span className="dashboard-light-readings">
+          <LightSceneReadings unit={currentUnit} />
+        </span>
       )}
       {library.presets.length > 0 && (
         <ul className="bulb-scene-presets">

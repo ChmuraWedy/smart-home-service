@@ -523,7 +523,7 @@
   },
   "src/components/CardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 2
+      "count": 1
     },
     "arrow-parens": {
       "count": 5
@@ -535,7 +535,7 @@
       "count": 34
     },
     "consistent-return": {
-      "count": 2
+      "count": 1
     },
     "function-paren-newline": {
       "count": 3
@@ -547,7 +547,7 @@
       "count": 1
     },
     "indent": {
-      "count": 7
+      "count": 2
     },
     "key-spacing": {
       "count": 9
@@ -556,7 +556,7 @@
       "count": 2
     },
     "no-nested-ternary": {
-      "count": 3
+      "count": 1
     },
     "no-restricted-globals": {
       "count": 1
@@ -568,7 +568,7 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 10
+      "count": 8
     },
     "object-curly-spacing": {
       "count": 10
@@ -577,16 +577,16 @@
       "count": 10
     },
     "one-var": {
-      "count": 3
+      "count": 2
     },
     "one-var-declaration-per-line": {
-      "count": 3
+      "count": 2
     },
     "operator-linebreak": {
       "count": 1
     },
     "prefer-template": {
-      "count": 4
+      "count": 2
     },
     "quotes": {
       "count": 1
@@ -595,10 +595,10 @@
       "count": 1
     },
     "react/jsx-first-prop-new-line": {
-      "count": 2
+      "count": 1
     },
     "react/jsx-max-props-per-line": {
-      "count": 2
+      "count": 1
     },
     "react/jsx-props-no-spreading": {
       "count": 5
