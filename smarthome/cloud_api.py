@@ -381,6 +381,7 @@ def cloud_device_status(
         audit_cloud(request, bridge, provider, device)
         if watch and provider == "sharing" and not refresh:
             bridge.schedule_inventory_refresh(background_tasks)
+            bridge.schedule_missing_light_refresh(background_tasks, device)
     response.headers["Cache-Control"] = "no-store"
     return safe_snapshot(device, provider)
 

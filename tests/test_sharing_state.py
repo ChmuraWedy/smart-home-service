@@ -221,6 +221,46 @@ def test_visible_card_reads_share_one_background_inventory_refresh(lazy_client, 
     assert not any(query.endswith("/devices/detail") for _, query, _ in calls)
 
 
+def test_watched_light_with_missing_readings_retries_once_per_cooldown(lazy_client):
+    path = API + "/devices/switch-0/status"
+    lazy_client.get(API + "/devices/switch-0/functions")
+    bridge = lazy_client.app.state.cloud
+    api = bridge.manager.customer_api
+    device = bridge.manager.device_map["switch-0"]
+    device.function = {
+        code: SimpleNamespace(code=code, type=kind, values="{}")
+        for code, kind in (("switch_led", "Boolean"), ("work_mode", "Enum"), ("bright_value_v2", "Integer"))
+    }
+    api.rows[0]["status"] = [{"code": "switch_led", "value": True}]
+    assert lazy_client.get(path + "?refresh=true").json()["status"] == {"switch_led": True}
+    api.calls.clear()
+
+    def detail_count():
+        return sum(query.endswith("/devices/detail") for _, query, _ in api.calls)
+
+    assert lazy_client.get(path).status_code == 200
+    assert detail_count() == 0
+    for _ in range(3):
+        assert lazy_client.get(path + "?watch=true").json()["status"] == {"switch_led": True}
+    assert detail_count() == 1
+
+    bridge.next_light_refresh["switch-0"] = 0
+    api.rows[0]["status"] += [
+        {"code": "work_mode", "value": "white"}, {"code": "bright_value_v2", "value": 520},
+    ]
+    assert lazy_client.get(path + "?watch=true").status_code == 200
+    assert detail_count() == 2
+    bridge.next_light_refresh["switch-0"] = 0
+    assert lazy_client.get(path + "?watch=true").json()["status"]["bright_value_v2"] == 520
+    assert detail_count() == 2
+
+    api.rows[0]["status"] = [{"code": "switch_led", "value": False}]
+    assert lazy_client.get(path + "?refresh=true").status_code == 200
+    api.calls.clear()
+    assert lazy_client.get(path + "?watch=true").json()["status"] == {"switch_led": False}
+    assert detail_count() == 0
+
+
 def test_unknown_device_and_malformed_detail_never_replace_cached_state(lazy_client):
     path = API + "/devices/switch-0/status"
     lazy_client.get(path)
