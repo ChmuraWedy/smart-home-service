@@ -1721,6 +1721,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-device-management .card-heading { @apply tw:flex-wrap; }
 .combined-device-management .group-members h2 { @apply tw:m-0 tw:text-base tw:wrap-anywhere; }
 .combined-device-form { @apply tw:grid tw:gap-3; }
+.combined-creation-steps { @apply tw:m-0 tw:flex tw:flex-wrap tw:gap-x-7 tw:gap-y-1 tw:pl-5 tw:text-sm tw:text-(--muted); }
+.combined-creation-steps [aria-current="step"] { @apply tw:font-semibold tw:text-(--text); }
 .combined-members { @apply tw:max-h-[min(50dvh,30rem)] tw:min-w-0 tw:overflow-y-auto tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
 .combined-member-option { @apply tw:grid tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] tw:items-center tw:gap-2; }
 .combined-member-option label { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }

@@ -800,7 +800,7 @@
       "count": 7
     },
     "@stylistic/max-len": {
-      "count": 14
+      "count": 13
     },
     "arrow-parens": {
       "count": 35
@@ -830,7 +830,7 @@
       "count": 4
     },
     "no-nested-ternary": {
-      "count": 8
+      "count": 6
     },
     "no-restricted-globals": {
       "count": 2

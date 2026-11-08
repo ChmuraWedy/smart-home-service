@@ -103,7 +103,10 @@ export function CombinedDeviceSettings({
 }) {
   const formId = useId();
   const displayName = useDeviceDisplayName();
-  const [name, setName] = useState(existing?.name ?? '');
+  const [nameDraft, setName] = useState(existing?.name);
+  const [step, setStep] = useState<'devices' | 'details'>('devices');
+  const activeStep = useRef<HTMLLIElement>(null);
+  useEffect(() => { activeStep.current?.focus(); }, [step]);
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
   const [members, setMembers] = useState<CombinedMemberInput[]>(() => existing?.members.map(({ device_id: id, route }) => ({ device_id: id, route })) ?? []);
   const [busy, setBusy] = useState(false);
@@ -123,6 +126,10 @@ export function CombinedDeviceSettings({
   }));
   const suggestedRoom = memberRooms.size === 1 ? [...memberRooms][0] : null;
   const room = chosenRoom === undefined ? suggestedRoom : chosenRoom;
+  const roomName = rooms.find(({ id }) => id === room)?.name;
+  const name = nameDraft ?? (roomName ? t(MSG.COMBINED_SUGGESTED_NAME, [roomName]).slice(0, 120) : '');
+  const pickingDevices = !existing && step === 'devices';
+  const canSubmit = !busy && members.length >= 2 && (pickingDevices || Boolean(roomName && name.trim()));
   const options = [...new Set([...selected.keys(), ...devices.map((device) => device.id)])].filter((id) => {
     const device = byId.get(id);
     return selected.has(id) || (device && matchesDevice(device, search));
@@ -135,7 +142,11 @@ export function CombinedDeviceSettings({
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || members.length < 2 || !name.trim()) return;
+    if (!canSubmit) return;
+    if (pickingDevices) {
+      setStep('details');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -176,68 +187,96 @@ export function CombinedDeviceSettings({
       <h1>{t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)}</h1>
       <p className="help">{t(MSG.COMBINED_DEVICES_HELP)}</p>
       <form className="combined-device-form" aria-label={t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)} aria-busy={busy} onSubmit={(event) => save(event)}>
-        <label className="field" htmlFor={`${formId}-name`}>
-          {t(MSG.NAME)}
-          <input
-            id={`${formId}-name`}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            maxLength={120}
-            required
-            disabled={busy}
-          />
-        </label>
-        <label className="field" htmlFor={`${formId}-room`}>
-          {t(MSG.ROOM)}
-          <select id={`${formId}-room`} value={room ?? ''} onChange={(event) => setRoom(Number(event.target.value) || null)} disabled={busy}>
-            <option value="">{t(MSG.NO_ROOM)}</option>
-            {rooms.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        <label className="field" htmlFor={`${formId}-search`}>
-          {t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}
-          <input id={`${formId}-search`} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-        </label>
-        <fieldset className="combined-members" disabled={busy}>
-          <legend>{t(MSG.CHOOSE_COMBINED_DEVICES)}</legend>
-          {options.map((id) => {
-            const device = byId.get(id);
-            const choice = selected.get(id);
-            const routes = device ? deviceRoutes(device) : [];
-            const label = displayName(device, id);
-            return (
-              <div className="combined-member-option" key={id}>
-                <label htmlFor={`${formId}-member-${id}`}>
-                  <input
-                    id={`${formId}-member-${id}`}
-                    type="checkbox"
-                    checked={Boolean(choice)}
-                    disabled={!choice && (members.length >= 16 || !routes.length)}
-                    onChange={(event) => toggleMember(id, routes[0], event.target.checked)}
-                  />
-                  {label}
-                </label>
-                {choice && routes.length > 0 && (
-                  <select
-                    value={choice.route}
-                    aria-label={t(MSG.CONTROL_METHOD) + label}
-                    onChange={(event) => selectRoute(id, event.target.value as DeviceRoute)}
-                  >
-                    {!routes.includes(choice.route) && <option value={choice.route}>{routeLabel[choice.route]} · {t(MSG.UNAVAILABLE)}</option>}
-                    {routes.map((route) => <option value={route} key={route}>{routeLabel[route]}</option>)}
-                  </select>
-                )}
-              </div>
-            );
-          })}
-        </fieldset>
+        {!existing && (
+          <ol className="combined-creation-steps">
+            <li ref={pickingDevices ? activeStep : undefined} tabIndex={-1} aria-current={pickingDevices ? 'step' : undefined}>
+              {t(MSG.COMBINED_SELECT_DEVICES)}
+            </li>
+            <li ref={pickingDevices ? undefined : activeStep} tabIndex={-1} aria-current={pickingDevices ? undefined : 'step'}>
+              {t(MSG.COMBINED_NAME_AND_ROOM)}
+            </li>
+          </ol>
+        )}
+        {Boolean(existing || pickingDevices) && (
+          <>
+            <label className="field" htmlFor={`${formId}-search`}>
+              {t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}
+              <input id={`${formId}-search`} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+            </label>
+            <fieldset className="combined-members" disabled={busy}>
+              <legend>{t(MSG.CHOOSE_COMBINED_DEVICES)}</legend>
+              {options.map((id) => {
+                const device = byId.get(id);
+                const choice = selected.get(id);
+                const routes = device ? deviceRoutes(device) : [];
+                const label = displayName(device, id);
+                return (
+                  <div className="combined-member-option" key={id}>
+                    <label htmlFor={`${formId}-member-${id}`}>
+                      <input
+                        id={`${formId}-member-${id}`}
+                        type="checkbox"
+                        checked={Boolean(choice)}
+                        disabled={!choice && (members.length >= 16 || !routes.length)}
+                        onChange={(event) => toggleMember(id, routes[0], event.target.checked)}
+                      />
+                      {label}
+                    </label>
+                    {choice && routes.length > 0 && (
+                      <select
+                        value={choice.route}
+                        aria-label={t(MSG.CONTROL_METHOD) + label}
+                        onChange={(event) => selectRoute(id, event.target.value as DeviceRoute)}
+                      >
+                        {!routes.includes(choice.route) && <option value={choice.route}>{routeLabel[choice.route]} · {t(MSG.UNAVAILABLE)}</option>}
+                        {routes.map((route) => <option value={route} key={route}>{routeLabel[route]}</option>)}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
+            </fieldset>
+          </>
+        )}
+        {!existing && !pickingDevices && <p className="help">{t(MSG.COMBINED_MEMBER_COUNT, [members.length])}</p>}
+        {!pickingDevices && (
+          <>
+            <label className="field" htmlFor={`${formId}-name`}>
+              {t(MSG.NAME)}
+              <input
+                id={`${formId}-name`}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={120}
+                required
+                disabled={busy}
+              />
+            </label>
+            <label className="field" htmlFor={`${formId}-room`}>
+              {t(MSG.ROOM)}
+              <select
+                id={`${formId}-room`}
+                value={room ?? ''}
+                onChange={(event) => setRoom(Number(event.target.value) || null)}
+                required
+                disabled={busy}
+              >
+                <option value="">{t(MSG.COMBINED_SELECT_ROOM)}</option>
+                {rooms.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+          </>
+        )}
         {error && <p className="field-error" role="alert">{translateText(error)}</p>}
         <div className="survey-footer">
           {existing && (
             <button type="button" className="secondary" disabled={busy} onClick={() => setConfirmDelete(true)}>{t(MSG.DISSOLVE_COMBINATION)}</button>
           )}
           <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t(MSG.CANCEL)}</button>
-          <button type="submit" disabled={busy || members.length < 2 || !name.trim()}>{t(MSG.SAVE)}</button>
+          {!existing && !pickingDevices && (
+            <button type="button" className="secondary" disabled={busy} onClick={() => setStep('devices')}>{t(MSG.BACK)}</button>
+          )}
+          <button type="submit" disabled={!canSubmit}>{t(pickingDevices ? MSG.NEXT : MSG.SAVE)}</button>
         </div>
         {confirmDelete && (
           <div className="combined-delete">
