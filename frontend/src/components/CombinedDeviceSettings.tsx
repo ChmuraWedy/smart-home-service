@@ -21,6 +21,10 @@ const creationSteps = [
   ['details', MSG.COMBINED_NAME_AND_ROOM],
   ['preview', MSG.COMBINED_CARD_PREVIEW],
 ] as const;
+const editingSteps = [
+  ['details', MSG.EDIT],
+  ['preview', MSG.COMBINED_CARD_PREVIEW],
+] as const;
 
 export function CombinedDeviceDetails({
   combined, members, onChoose, onEdit, onClose,
@@ -114,7 +118,7 @@ export function CombinedDeviceSettings({
   const formId = useId();
   const displayName = useDeviceDisplayName();
   const [nameDraft, setName] = useState(existing?.name);
-  const [step, setStep] = useState<(typeof creationSteps)[number][0]>('devices');
+  const [step, setStep] = useState<(typeof creationSteps)[number][0]>(existing ? 'details' : 'devices');
   const activeStep = useRef<HTMLLIElement>(null);
   useEffect(() => { activeStep.current?.focus(); }, [step]);
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
@@ -140,8 +144,10 @@ export function CombinedDeviceSettings({
   const room = chosenRoom === undefined ? suggestedRoom : chosenRoom;
   const roomName = rooms.find(({ id }) => id === room)?.name;
   const name = nameDraft ?? (roomName ? t(MSG.COMBINED_SUGGESTED_NAME, [roomName]).slice(0, 120) : '');
-  const pickingDevices = !existing && step === 'devices';
-  const previewing = !existing && step === 'preview';
+  const pickingDevices = step === 'devices';
+  const previewing = step === 'preview';
+  const steps = existing ? editingSteps : creationSteps;
+  const submitLabel = existing ? MSG.COMBINED_CARD_PREVIEW : MSG.NEXT;
   const canSubmit = !busy && members.length >= 2 && (pickingDevices || Boolean(roomName && name.trim()));
   const options = [...new Set([...selected.keys(), ...devices.map((device) => device.id)])].filter((id) => {
     const device = byId.get(id);
@@ -153,11 +159,20 @@ export function CombinedDeviceSettings({
     else setError(failure instanceof Error ? failure.message : t(MSG.COMBINED_SAVE_FAILED));
   }
 
+  function previewMember(member: CombinedMemberInput): ResolvedMember {
+    const { device_id: id, route } = member;
+    const device = byId.get(id);
+    const saved = existing?.members.find((row) => row.device_id === id && row.route === route);
+    const accessible = saved?.accessible !== false && device && deviceRoutes(device).includes(route);
+    return { member, device: accessible ? device : undefined };
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) return;
     setError('');
-    if (!existing && !previewing) {
+    if (!previewing) {
+      setConfirmDelete(false);
       setStep(pickingDevices ? 'details' : 'preview');
       return;
     }
@@ -205,16 +220,14 @@ export function CombinedDeviceSettings({
       <h1>{t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)}</h1>
       <p className="help">{t(MSG.COMBINED_DEVICES_HELP)}</p>
       <form className="combined-device-form" aria-label={t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)} aria-busy={busy} onSubmit={(event) => save(event)}>
-        {!existing && (
-          <ol className="combined-creation-steps">
-            {creationSteps.map(([key, label]) => (
-              <li key={key} ref={step === key ? activeStep : undefined} tabIndex={-1} aria-current={step === key ? 'step' : undefined}>
-                {t(label)}
-              </li>
-            ))}
-          </ol>
-        )}
-        {Boolean(existing || pickingDevices) && (
+        <ol className="combined-creation-steps">
+          {steps.map(([key, label]) => (
+            <li key={key} ref={step === key ? activeStep : undefined} tabIndex={-1} aria-current={step === key ? 'step' : undefined}>
+              {t(label)}
+            </li>
+          ))}
+        </ol>
+        {!previewing && Boolean(existing || pickingDevices) && (
           <>
             <label className="field" htmlFor={`${formId}-search`}>
               {t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}
@@ -244,7 +257,7 @@ export function CombinedDeviceSettings({
           </>
         )}
         {!existing && step === 'details' && <p className="help">{t(MSG.COMBINED_MEMBER_COUNT, [members.length])}</p>}
-        {Boolean(existing || step === 'details') && (
+        {step === 'details' && (
           <>
             <label className="field" htmlFor={`${formId}-name`}>
               {t(MSG.NAME)}
@@ -289,7 +302,7 @@ export function CombinedDeviceSettings({
               <CombinedDeviceCard
                 api={api}
                 combined={{ name: name.trim() }}
-                members={members.map((member) => ({ member, device: byId.get(member.device_id) }))}
+                members={members.map(previewMember)}
                 room={roomName ?? t(MSG.NO_ROOM)}
                 now={now}
                 onAuthError={onAuthError}
@@ -299,16 +312,16 @@ export function CombinedDeviceSettings({
         )}
         {error && <p className="field-error" role="alert">{translateText(error)}</p>}
         <div className="survey-footer">
-          {existing && (
+          {existing && !previewing && (
             <button type="button" className="secondary" disabled={busy} onClick={() => setConfirmDelete(true)}>{t(MSG.DISSOLVE_COMBINATION)}</button>
           )}
           <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t(MSG.CANCEL)}</button>
-          {!existing && !pickingDevices && (
+          {(previewing || (!existing && !pickingDevices)) && (
             <button type="button" className="secondary" disabled={busy} onClick={() => setStep(previewing ? 'details' : 'devices')}>
               {t(MSG.BACK)}
             </button>
           )}
-          <button type="submit" disabled={!canSubmit}>{t(existing || previewing ? MSG.SAVE : MSG.NEXT)}</button>
+          <button type="submit" disabled={!canSubmit}>{t(previewing ? MSG.SAVE : submitLabel)}</button>
         </div>
         {confirmDelete && (
           <div className="combined-delete">

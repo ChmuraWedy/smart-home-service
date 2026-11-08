@@ -270,6 +270,7 @@ describe('combined devices', () => {
     await user.click(within(await screen.findByRole('dialog', { name: 'Kitchen Lights' })).getByRole('button', { name: 'Edit combination' }));
     const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
     await user.click(editor.getByRole('checkbox', { name: bulbs[2].name }));
+    await user.click(editor.getByRole('button', { name: 'Card preview' }));
     await user.click(editor.getByRole('button', { name: 'Save' }));
     expect(writes[3]).toMatchObject({ path: '/combined-devices/1', method: 'PUT' });
 
@@ -342,7 +343,7 @@ describe('combined devices', () => {
     expect(editor.queryByRole('combobox', { name: /Control method/ })).toBeNull();
   });
 
-  it('preserves saved member routes when editing and chooses a route for new members', async () => {
+  it('previews unsaved edits, then saves existing member routes and chooses a route for new members', async () => {
     const { writes } = backend({
       id: 1, name: 'Kitchen lights', room_id: room.id, members: [
         { device_id: bulbs[0].id, route: 'developer', accessible: true },
@@ -353,8 +354,21 @@ describe('combined devices', () => {
     openApp('/combined-devices/1/edit');
     const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
     await user.click(await editor.findByRole('checkbox', { name: bulbs[2].name }));
+    await user.clear(editor.getByRole('textbox', { name: 'Name' }));
+    await user.type(editor.getByRole('textbox', { name: 'Name' }), 'Evening lights');
+    await user.click(editor.getByRole('button', { name: 'Card preview' }));
+    expect(editor.getByText('Card preview', { selector: 'li' })).toHaveAttribute('aria-current', 'step');
+    const preview = within(editor.getByRole('group', { name: 'Card preview' }));
+    const draft = within(preview.getByRole('listitem', { name: 'Evening lights' }));
+    expect(draft.getByRole('region', { name: bulbs[2].name })).toBeInTheDocument();
+    expect(draft.getByRole('button', { name: 'Power for all devices' })).toBeDisabled();
+    expect(writes).toHaveLength(0);
+    await user.click(editor.getByRole('button', { name: 'Back' }));
+    expect(editor.getByRole('textbox', { name: 'Name' })).toHaveValue('Evening lights');
+    expect(editor.getByRole('checkbox', { name: bulbs[2].name })).toBeChecked();
+    await user.click(editor.getByRole('button', { name: 'Card preview' }));
     await user.click(editor.getByRole('button', { name: 'Save' }));
-    expect(writes[0]).toMatchObject({ path: '/combined-devices/1', method: 'PUT', body: { members: [
+    expect(writes[0]).toMatchObject({ path: '/combined-devices/1', method: 'PUT', body: { name: 'Evening lights', members: [
       { device_id: bulbs[0].id, route: 'developer' },
       { device_id: bulbs[1].id, route: 'sharing' },
       { device_id: bulbs[2].id, route: 'sharing' },
