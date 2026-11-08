@@ -205,7 +205,7 @@ export default function CombinedDeviceCard({
         quick={quick}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
-        powerSide={!quick && source ? 'end' : undefined}
+        powerSide={!quick && source ? 'start' : undefined}
         channelChildren={channelChildren}
         onPower={onPower}
         onAuthError={onAuthError}
