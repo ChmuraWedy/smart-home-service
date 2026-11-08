@@ -1,5 +1,5 @@
 import {
-  useEffect, useId, useRef, useState,
+  useCallback, useEffect, useId, useRef, useState,
 } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api';
@@ -8,11 +8,12 @@ import {
 } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type {
-  CombinedDevice, CombinedMemberInput, HomeApi, Room,
+  CombinedDevice, CombinedMemberInput, CombinedPowerSource, HomeApi, Room,
 } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
 import { ControlDialog } from './DeviceControls';
 import type { ResolvedMember } from './CombinedDeviceCard';
+import CombinedDeviceWiring from './CombinedDeviceWiring';
 
 export function CombinedDeviceDetails({
   combined, members, onChoose, onEdit, onClose,
@@ -108,7 +109,9 @@ export function CombinedDeviceSettings({
   const activeStep = useRef<HTMLLIElement>(null);
   useEffect(() => { activeStep.current?.focus(); }, [step]);
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
-  const [members, setMembers] = useState<CombinedMemberInput[]>(() => existing?.members.map(({ device_id: id, route }) => ({ device_id: id, route })) ?? []);
+  const [members, setMembers] = useState<CombinedMemberInput[]>(() => existing?.members.map(({ device_id: id, route, power_source: source }) => ({
+    device_id: id, route, ...(source ? { power_source: source } : {}),
+  })) ?? []);
   const [busy, setBusy] = useState(false);
   const active = useRef(false);
   useEffect(() => {
@@ -174,13 +177,22 @@ export function CombinedDeviceSettings({
   }
 
   function toggleMember(id: string, route: DeviceRoute | undefined, checked: boolean) {
-    if (checked && route) setMembers((rows) => [...rows, { device_id: id, route }]);
-    else setMembers((rows) => rows.filter((member) => member.device_id !== id));
+    if (checked && route) {
+      setMembers((rows) => [...rows, { device_id: id, route }]);
+    } else {
+      setMembers((rows) => rows.filter((member) => member.device_id !== id).map((member) => (
+        member.power_source?.device_id === id ? { ...member, power_source: null } : member
+      )));
+    }
   }
 
   function selectRoute(id: string, route: DeviceRoute) {
     setMembers((rows) => rows.map((member) => (member.device_id === id ? { ...member, route } : member)));
   }
+
+  const selectSource = useCallback((id: string, source: CombinedPowerSource | null) => {
+    setMembers((rows) => rows.map((member) => (member.device_id === id ? { ...member, power_source: source } : member)));
+  }, []);
 
   return (
     <>
@@ -267,6 +279,15 @@ export function CombinedDeviceSettings({
                 {rooms.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}
               </select>
             </label>
+            <CombinedDeviceWiring
+              api={api}
+              formId={formId}
+              devices={devices}
+              members={members}
+              disabled={busy}
+              onChange={selectSource}
+              onAuthError={onAuthError}
+            />
           </>
         )}
         {error && <p className="field-error" role="alert">{translateText(error)}</p>}

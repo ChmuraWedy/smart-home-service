@@ -24,9 +24,15 @@ router = APIRouter(
 POWER_CODE = re.compile(r"switch(?:_led|_[1-9][0-9]*)?")
 
 
+class PowerSource(Schema):
+    device_id: Identifier
+    channel: str = Field(pattern=r"^switch(?:_[1-9][0-9]*)?$", max_length=32)
+
+
 class Member(Schema):
     device_id: Identifier
     route: Literal["local", "sharing", "developer"]
+    power_source: PowerSource | None = None
 
 
 class CombinedInput(Schema):
@@ -82,21 +88,63 @@ def read_combination(request, item, scopes):
             except HTTPException:
                 scopes[route] = None
         accessible = route == "local" or scopes[route] == member["scope"]
-        members.append(CombinedMember(device_id=member["device_id"], route=route, accessible=accessible))
+        wiring = {"power_source": member["power_source"]} if "power_source" in member else {}
+        members.append(CombinedMember(device_id=member["device_id"], route=route, accessible=accessible, **wiring))
     return CombinedRead(id=item.id, name=item.name, room_id=item.room_id, members=members)
+
+
+def has_relay_channel(session, request, member, channel):
+    identifier, route = member["device_id"], member["route"]
+    if route == "local":
+        device = local_device(session, identifier)
+        spec = effective_capabilities(session, device).get(channel, {}) if device else {}
+        return spec.get("type") == "boolean" and spec.get("writable", True)
+    bridge = cloud_bridge(request, route)
+    with bridge.lock:
+        if scope_for(bridge, route) != member["scope"]:
+            return False
+        spec = bridge.writable_device(identifier).function.get(channel)
+        return spec is not None and spec.type == "Boolean"
+
+
+def validate_wiring(session, request, members, previous):
+    by_id = {member["device_id"]: member for member in members}
+    for member in members:
+        source = member.get("power_source")
+        if source is None:
+            continue
+        relay = by_id.get(source["device_id"])
+        if relay is None:
+            raise HTTPException(422, "The power source must be part of the combination.")
+        seen = {member["device_id"]}
+        upstream = source
+        while upstream is not None:
+            upstream_id = upstream["device_id"]
+            if upstream_id in seen:
+                raise HTTPException(422, "Wiring cannot form a loop.")
+            seen.add(upstream_id)
+            upstream = by_id.get(upstream_id, {}).get("power_source")
+        before = previous.get(member["device_id"], {})
+        prior_relay = previous.get(source["device_id"], {})
+        if before.get("power_source") == source and all(
+            relay[key] == prior_relay.get(key) for key in ("route", "scope")
+        ):
+            continue
+        if not has_relay_channel(session, request, relay, source["channel"]):
+            raise HTTPException(422, "The selected device does not expose that relay channel.")
 
 
 def configure_combination(session, request, item, body):
     if body.room_id is not None:
         get_or_404(session, Room, body.room_id)
-    existing = {(m["device_id"], m["route"]): m for m in item.members or []}
+    existing = {member["device_id"]: member for member in item.members or []}
+    selected = {member.device_id for member in body.members}
     members = []
     for member in body.members:
-        key = (member.device_id, member.route)
-        if key in existing:
-            members.append(existing[key])
-            continue
-        if member.route == "local":
+        previous = existing.get(member.device_id, {})
+        if previous.get("route") == member.route:
+            scope = previous["scope"]
+        elif member.route == "local":
             if local_device(session, member.device_id) is None:
                 raise HTTPException(404, "Device not found")
             scope = None
@@ -105,18 +153,25 @@ def configure_combination(session, request, item, body):
             with bridge.lock:
                 scope = scope_for(bridge, member.route)
                 bridge.device(member.device_id)
-        members.append({**member.model_dump(), "scope": scope})
+        stored = {"device_id": member.device_id, "route": member.route, "scope": scope}
+        if "power_source" in member.model_fields_set:
+            if member.power_source is not None:
+                stored["power_source"] = member.power_source.model_dump()
+        elif (source := previous.get("power_source")) and source["device_id"] in selected:
+            stored["power_source"] = source
+        members.append(stored)
+    validate_wiring(session, request, members, existing)
     item.name, item.room_id, item.members = body.name.strip(), body.room_id, members
 
 
-@router.get("", response_model=list[CombinedRead])
+@router.get("", response_model=list[CombinedRead], response_model_exclude_unset=True)
 def list_combined(request: Request, session: Session = Depends(get_session)):
     scopes = {}
     items = session.scalars(select(CombinedDevice).order_by(CombinedDevice.id))
     return [read_combination(request, item, scopes) for item in items]
 
 
-@router.post("", status_code=201, response_model=CombinedRead)
+@router.post("", status_code=201, response_model=CombinedRead, response_model_exclude_unset=True)
 def create_combined(body: CombinedInput, request: Request, session: Session = Depends(get_session)):
     item = CombinedDevice()
     configure_combination(session, request, item, body)
@@ -125,7 +180,7 @@ def create_combined(body: CombinedInput, request: Request, session: Session = De
     return read_combination(request, item, {})
 
 
-@router.put("/{item_id}", response_model=CombinedRead)
+@router.put("/{item_id}", response_model=CombinedRead, response_model_exclude_unset=True)
 def update_combined(
     item_id: PositiveID, body: CombinedInput, request: Request, session: Session = Depends(get_session)
 ):

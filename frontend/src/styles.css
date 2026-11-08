@@ -1711,6 +1711,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-device-card .combined-member + .combined-member,
 .dashboard-sheet .combined-member + .combined-member { @apply tw:border-t tw:border-(--border); }
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
+.combined-member-source { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
 .combined-member-unavailable { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
 .combined-actions, .combined-delete { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
 .combined-actions { @apply tw:border-t tw:border-(--border) tw:p-2; }
@@ -1731,6 +1732,9 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-creation-steps { @apply tw:m-0 tw:flex tw:flex-wrap tw:gap-x-7 tw:gap-y-1 tw:pl-5 tw:text-sm tw:text-(--muted); }
 .combined-creation-steps [aria-current="step"] { @apply tw:font-semibold tw:text-(--text); }
 .combined-members { @apply tw:max-h-[min(50dvh,30rem)] tw:min-w-0 tw:overflow-y-auto tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
+.combined-wiring { @apply tw:grid tw:min-w-0 tw:gap-2 tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
+.combined-wiring p { @apply tw:m-0; }
+.combined-wiring select { @apply tw:w-full tw:min-w-0; }
 .combined-member-option { @apply tw:grid tw:grid-cols-1 tw:items-center tw:gap-2; }
 .combined-member-option:has(select) { @apply tw:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]; }
 .combined-member-option label { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }

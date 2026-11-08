@@ -7,6 +7,7 @@ import type {
 import { useDeviceDisplayName } from '../devices';
 import type { UnifiedDevice } from '../devices';
 import { ApiError } from '../api';
+import { labelFor } from '../controls';
 import { cloudDeviceKey, readCloudDevice } from '../cloud-device-cache';
 import { readLocalDevice } from '../local-device-cache';
 import { MSG, t } from '../i18n';
@@ -49,7 +50,7 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, quick, onPower, onAuthError, commandKey,
+  api, entry, now, paused, quick, onPower, onAuthError, commandKey, sourceLabel,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
@@ -57,6 +58,7 @@ function MemberControls({
   paused: boolean;
   quick?: boolean;
   commandKey: string;
+  sourceLabel?: string;
   onPower: (deviceId: string, power: MemberPower) => void;
   onAuthError: () => void;
 }) {
@@ -71,6 +73,7 @@ function MemberControls({
   return (
     <section className="combined-member" aria-label={displayName}>
       <h3 className="combined-member-name">{displayName}</h3>
+      {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
       {device ? (
         <CardControls
           api={api}
@@ -162,6 +165,9 @@ export default function CombinedDeviceCard({
 
   function renderMember(entry: ResolvedMember, quick = false) {
     const { member } = entry;
+    const source = member.power_source;
+    const relay = source && members.find((row) => row.member.device_id === source.device_id);
+    const sourceLabel = source && t(MSG.COMBINED_SUPPLIED_BY, [displayName(relay?.device, source.device_id), labelFor(source.channel)]);
     return (
       <MemberControls
         key={`${member.device_id}:${member.route}`}
@@ -171,6 +177,7 @@ export default function CombinedDeviceCard({
         paused={paused || aggregateBusy || (quickOpen && !quick)}
         quick={quick}
         commandKey={memberKey(member.device_id, quick)}
+        sourceLabel={sourceLabel || undefined}
         onPower={onPower}
         onAuthError={onAuthError}
       />

@@ -37,7 +37,17 @@ const bulbs: CloudDevice[] = Array.from({ length: 3 }, (_, index) => {
   return { id, name, translations, online, has_local_key: false, controls: { ready: true, definitions, snapshot } };
 });
 
-function backend(initial?: CombinedDevice, developerConnected = false, allMembersReachable = false) {
+const relay = { id: 'workroom-relay', name: 'Workroom light switch', online: true, has_local_key: false };
+const relayDefinitions: CloudFunctions = {
+  device_id: relay.id,
+  functions: [
+    { code: 'switch_1', type: 'Boolean', values: {} },
+    { code: 'switch_2', type: 'Boolean', values: {} },
+    { code: 'switch_backlight', type: 'Boolean', values: {} },
+  ],
+};
+
+function backend(initial?: CombinedDevice, developerConnected = false, allMembersReachable = false, includeRelay = false) {
   let combined = initial;
   const refreshedPower = new Map<string, boolean>();
   const refreshedMembers: string[] = [];
@@ -83,13 +93,17 @@ function backend(initial?: CombinedDevice, developerConnected = false, allMember
     });
     if (path === '/rooms') return json([room]);
     if (['/devices', '/groups', '/buildings'].includes(path)) return json([]);
-    if (path === '/cloud/devices') return json(url.searchParams.get('provider') === 'developer' ? bulbs.slice(0, 1) : bulbs);
+    if (path === '/cloud/devices') {
+      if (url.searchParams.get('provider') === 'developer') return json(bulbs.slice(0, 1));
+      return json(includeRelay ? [...bulbs, relay] : bulbs);
+    }
     if (path.startsWith('/activity/')) return json({ events: [], next_before: null });
     if (path.endsWith('/mappings')) return json({ mappings: [] });
     const [, id, action] = /^\/cloud\/devices\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
     const bulb = bulbs.find((item) => item.id === id);
-    if (action === 'functions') return json(bulb?.controls?.definitions);
+    if (action === 'functions') return json(id === relay.id ? relayDefinitions : bulb?.controls?.definitions);
     if (action === 'status') {
+      if (id === relay.id) return json({ device_id: id, online: true, source: 'cloud', status: { switch_1: true, switch_2: true } });
       const snapshot = bulb?.controls?.snapshot;
       if (snapshot && url.searchParams.get('refresh') === 'true' && refreshedPower.has(id)) {
         refreshedMembers.push(id);
@@ -111,6 +125,44 @@ function openApp(path: string) {
 }
 
 describe('combined devices', () => {
+  it('records two physical relay channels in the creation wizard and shows the saved wiring on the card', async () => {
+    const { writes } = backend(undefined, false, false, true);
+    const user = userEvent.setup();
+    openApp('/combined-devices/new?room=3');
+    const form = within(await screen.findByRole('form', { name: 'Create combined device' }));
+    await user.click(await form.findByRole('checkbox', { name: relay.name }));
+    for (const bulb of bulbs) await user.click(form.getByRole('checkbox', { name: bulb.name }));
+    expect(form.queryByRole('group', { name: 'Wiring (optional)' })).toBeNull();
+    await user.click(form.getByRole('button', { name: 'Next' }));
+    const wiring = within(form.getByRole('group', { name: 'Wiring (optional)' }));
+    const source = (index: number) => wiring.findByRole('combobox', { name: `Power source for ${bulbs[index].name}` });
+    const first = await source(0);
+    expect(within(first).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'No power source assigned', `${relay.name} · Channel 1`, `${relay.name} · Channel 2`,
+    ]);
+    await user.selectOptions(first, `${relay.name} · Channel 1`);
+    await user.selectOptions(await source(1), `${relay.name} · Channel 2`);
+    await user.selectOptions(await source(2), `${relay.name} · Channel 2`);
+    await user.click(form.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('heading', { name: 'Devices in Kitchen' });
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({
+      path: '/combined-devices', method: 'POST', body: {
+        members: [
+          { device_id: relay.id, route: 'sharing' },
+          ...bulbs.map((bulb, index) => ({
+            device_id: bulb.id, route: 'sharing', power_source: { device_id: relay.id, channel: index === 0 ? 'switch_1' : 'switch_2' },
+          })),
+        ],
+      },
+    });
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    await user.click(screen.getByRole('button', { name: 'Control' }));
+    const card = within(await screen.findByRole('listitem', { name: 'Devices in Kitchen' }));
+    expect(card.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
+    expect(card.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
+  });
+
   it('saves three cloud bulbs, keeps quick settings independent, routes details, and edits and dissolves the combination', async () => {
     const { writes } = backend();
     const user = userEvent.setup();
