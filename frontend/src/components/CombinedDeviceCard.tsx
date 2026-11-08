@@ -1,7 +1,7 @@
 import {
   Fragment, useCallback, useId, useRef, useState,
 } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type {
   CombinedDevice, CombinedMemberInput, CombinedPowerOutcome, HomeApi,
 } from '../home-api';
@@ -54,13 +54,14 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
   now: number;
   paused: boolean;
   preview: boolean;
+  depth: number;
   quick?: boolean;
   commandKey: string;
   sourceLabel?: string;
@@ -78,7 +79,11 @@ function MemberControls({
   }, [commandKey, dispatch]);
   const recordPower = useCallback((power: MemberPower) => onPower(id, power), [id, onPower]);
   return (
-    <section className="combined-member" aria-label={displayName}>
+    <section
+      className="combined-member"
+      aria-label={displayName}
+      style={depth ? { '--combined-depth': depth } as CSSProperties : undefined}
+    >
       <h3 className="combined-member-name">{displayName}</h3>
       {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
       {device ? (
@@ -186,7 +191,7 @@ export default function CombinedDeviceCard({
     }
   }, [api, canSend, dispatch, id, members, onAuthError, savedId]);
 
-  function renderMember(entry: ResolvedMember, quick = false): ReactNode {
+  function renderMember(entry: ResolvedMember, quick = false, depth = 0): ReactNode {
     const { member } = entry;
     const source = member.power_source;
     const relay = source && layout.byId.get(source.device_id);
@@ -194,7 +199,7 @@ export default function CombinedDeviceCard({
     const channels = quick ? undefined : layout.channels.get(member.device_id);
     const channelChildren = channels && new Map(Array.from(channels, ([code, entries]) => [
       code,
-      entries.map((child) => renderMember(child)),
+      entries.map((child) => renderMember(child, false, depth + 1)),
     ]));
     return (
       <MemberControls
@@ -204,6 +209,7 @@ export default function CombinedDeviceCard({
         now={now}
         paused={controlsPaused || aggregateBusy || (quickOpen && !quick)}
         preview={preview}
+        depth={depth}
         quick={quick}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
