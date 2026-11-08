@@ -1772,17 +1772,18 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .combined-member-inline { @apply tw:flex tw:min-w-0 tw:flex-1 tw:items-stretch; }
 .combined-member-inline-name {
-  @apply tw:flex-1 tw:self-center tw:truncate tw:px-1.5 tw:text-xs tw:font-semibold tw:text-(--text-strong);
+  @apply tw:flex-1 tw:self-center tw:truncate tw:px-1 tw:text-xs tw:font-semibold tw:text-(--text-strong);
 }
 .combined-member-inline-state { @apply tw:max-w-1/2 tw:self-center tw:truncate tw:pe-1.5; }
 .combined-member-inline .dashboard-light-readings { @apply tw:auto-cols-max tw:flex-none; }
-.combined-member-inline .dashboard-light-reading { @apply tw:px-0.75; }
-.combined-member-inline .dashboard-light-copy { @apply tw:flex-nowrap tw:gap-x-0.5 tw:whitespace-nowrap; }
+.combined-member .combined-member-inline .dashboard-light-reading { @apply tw:px-0.5; }
+.combined-member-inline .dashboard-light-copy { @apply tw:flex-nowrap tw:gap-x-px tw:whitespace-nowrap; }
 .combined-member-inline .dashboard-light-label { @apply tw:sr-only; }
 .combined-member-inline .dashboard-light-icon { @apply tw:block; }
-.combined-member-inline .dashboard-light-icon .parameter-icon { @apply tw:size-3.5; }
-.combined-member-inline .dashboard-light-value { @apply tw:text-xs; }
+.combined-member-inline .dashboard-light-icon .parameter-icon { @apply tw:size-[11px]; }
+.combined-member .combined-member-inline .dashboard-light-value { @apply tw:text-[11px]; }
 .combined-member-inline .dashboard-light-swatch { @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong); }
+.combined-member-inline .dashboard-light-reading:has(.dashboard-light-swatch) .dashboard-light-icon { @apply tw:hidden; }
 .combined-member-inline .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
 .dashboard-view {
   @variant narrow-dashboard-controls {
