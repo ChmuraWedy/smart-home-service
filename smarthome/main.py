@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from . import __version__
 from .api_dependencies import authenticate, get_session
-from .auto_label_translations import translate_batches, translate_local_device, translate_room_names
+from .auto_label_translations import (
+    standard_room_names,
+    translate_batches,
+    translate_local_device,
+    translate_room_names,
+)
 from .config import Settings
 from .control import run_command
 from .dashboard_layout_api import remove_room_from_navigation
@@ -172,6 +177,9 @@ def add_room(body: RoomCreate, request: Request, session: Session = Depends(get_
 @router.post("/rooms/translation-preview", tags=["Rooms"])
 def preview_room_name(body: RoomNamePreview, request: Request, response: Response) -> dict[str, str]:
     response.headers["Cache-Control"] = "no-store"
+    standard = standard_room_names(body.name)
+    if standard is not None:
+        return standard
     url = request.app.state.settings.label_translator_url
     if url:
         try:

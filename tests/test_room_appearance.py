@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from smarthome import auto_label_translations
 from smarthome.config import Settings
 from smarthome.main import create_app
-from smarthome.models import RoomAppearance
+from smarthome.models import Room, RoomAppearance
 from smarthome.room_appearance import MAX_IMAGE_BYTES
 
 
@@ -84,6 +84,29 @@ def test_room_names_generate_automatically_and_preserve_corrections(tmp_path, mo
         renamed = client.patch(path, json={"name": "Workshop"})
         assert renamed.status_code == 200
         assert renamed.json()["name_translations"] == {"pl": "Gabinet"}
+
+
+def test_standard_room_terms_preserve_numbers_and_replace_bad_generated_values(client):
+    labels = {"en": "Living room 1", "ru": "Гостиная 1", "pl": "Salon 1", "be": "Гасцёўня 1"}
+    for name in ("Living room1", "LIVING   ROOM 1", "Гостиная1"):
+        preview = client.post("/api/v1/rooms/translation-preview", json={"name": name})
+        assert preview.status_code == 200
+        assert preview.json() == labels
+    building = client.post("/api/v1/buildings", json={"name": "Home"}).json()["id"]
+    response = client.post("/api/v1/rooms", json={
+        "name": "Living room1", "building_id": building, "name_translations": {"pl": "Pokój dzienny 1"},
+    })
+    assert response.status_code == 201
+    assert response.json()["name_translations"] == {**labels, "pl": "Pokój dzienny 1"}
+    room_id = response.json()["id"]
+    with Session(client.app.state.engine) as session:
+        session.get(Room, room_id).generated_name_translations = {
+            "original": "Living room1", "values": {"ru": "Жизненная комната1"},
+        }
+        session.commit()
+    refreshed = client.patch(f"/api/v1/rooms/{room_id}", json={}).json()
+    assert refreshed["name"] == "Living room1"
+    assert refreshed["name_translations"] == {**labels, "pl": "Pokój dzienny 1"}
 
 
 def test_room_appearance_survives_restart_and_stays_isolated(tmp_path):

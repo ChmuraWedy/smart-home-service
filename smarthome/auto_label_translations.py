@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from time import monotonic
 from typing import NamedTuple
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -17,6 +18,34 @@ from .search import fold_name
 
 logger = logging.getLogger(__name__)
 translation_values = TypeAdapter(dict[Locale, DisplayText])
+
+# Common room types have established names in each supported language.
+ROOM_TERMS = (
+    ("Living room", "Гостиная", "Salon", "Гасцёўня"),
+    ("Bedroom", "Спальня", "Sypialnia", "Спальня"),
+    ("Bathroom", "Ванная", "Łazienka", "Ванная"),
+    ("Study room", "Кабинет", "Gabinet", "Кабінет"),
+    ("Kitchen", "Кухня", "Kuchnia", "Кухня"),
+    ("Hallway", "Коридор", "Korytarz", "Калідор"),
+    ("Balcony", "Балкон", "Balkon", "Балкон"),
+)
+ROOM_TERMS_BY_NAME = {
+    fold_name(term): dict(zip(("en", "ru", "pl", "be"), translations, strict=True))
+    for translations in ROOM_TERMS
+    for term in translations
+}
+ROOM_TERMS_BY_NAME["bed room"] = ROOM_TERMS_BY_NAME["bedroom"]
+ROOM_NUMBER = re.compile(r"\s*([0-9]+)$")
+
+
+def standard_room_names(name):
+    label = " ".join(fold_name(name).split())
+    number = ROOM_NUMBER.search(label)
+    terms = ROOM_TERMS_BY_NAME.get(label[:number.start()] if number else label)
+    if terms is None or not number:
+        return terms
+    suffix = f" {number[1]}"
+    return {language: term + suffix for language, term in terms.items() if len(term) + len(suffix) <= 120}
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -119,20 +148,30 @@ def translate_local_device(session, request, device):
 
 
 def translate_room_names(session, url, room_ids, deadline=None):
-    if not url or not room_ids:
+    if not room_ids:
         return
     try:
         rows = session.execute(
             select(Room.id, Room.name, Room.generated_name_translations).where(Room.id.in_(room_ids))
         )
-        candidates = [
-            (id, name) for id, name, generated in rows
-            if 1 <= len(name) <= 120 and generated.get("original") != name
-        ]
+        candidates, standard, custom = [], {}, []
+        for id, name, generated in rows:
+            terms = standard_room_names(name)
+            if terms is not None:
+                if generated.get("original") != name or generated.get("values") != terms:
+                    standard[name] = terms
+                    candidates.append((id, name))
+            elif url and 1 <= len(name) <= 120 and generated.get("original") != name:
+                custom.append(name)
+                candidates.append((id, name))
         session.rollback()
         if not candidates:
             return
-        generated = translate_batches(url, list(dict.fromkeys(name for _, name in candidates)), deadline)
+        generated = standard
+        try:
+            generated.update(translate_batches(url, list(dict.fromkeys(custom)), deadline))
+        except (OSError, ValueError):
+            logger.warning("Automatic room translation was unavailable; the original was saved.")
         for id, name in candidates:
             if name not in generated:
                 continue
