@@ -152,7 +152,20 @@ describe('combined devices', () => {
     expect(draftCard.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
     expect(draftCard.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
     const channel = async (name: string) => (await draftCard.findByRole('switch', { name })).closest<HTMLElement>('[data-relay-channel]')!;
-    const firstChannel = within(await channel('Channel 1'));
+    const firstRelay = await channel('Channel 1');
+    const firstChannel = within(firstRelay);
+    const relayPower = firstChannel.getByRole('switch', { name: 'Channel 1' });
+    expect(relayPower).toBeDisabled();
+    expect(relayPower.closest('.capability-row')).toHaveAttribute('data-power-side', 'start');
+    const disclosure = firstChannel.getByRole('button', { name: 'Devices on Channel 1' });
+    expect(disclosure).toBeEnabled();
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    await user.click(disclosure);
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    expect(firstChannel.queryByRole('region', { name: bulbs[0].name })).toBeNull();
+    expect(draftCard.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
+    await user.click(disclosure);
+    expect(disclosure).toHaveAttribute('aria-expanded', 'true');
     const secondChannel = await channel('Channel 2');
     const orderedNames = (element: HTMLElement) => [...element.querySelectorAll('.combined-member-name')].map((heading) => heading.textContent);
     expect(firstChannel.getByRole('region', { name: bulbs[0].name })).toBeInTheDocument();
@@ -167,7 +180,9 @@ describe('combined devices', () => {
     expect(power.closest('footer')?.lastElementChild).toContainElement(power);
     expect(draftCard.getByRole('button', { name: 'Quick controls' })).toBeDisabled();
     const lamp = within(draftCard.getByRole('region', { name: bulbs[0].name }));
-    expect(await lamp.findByRole('switch')).toBeDisabled();
+    const lampPower = await lamp.findByRole('switch');
+    expect(lampPower).toBeDisabled();
+    expect(lampPower.closest('.capability-row')).toHaveAttribute('data-power-side', 'end');
     await user.click(power);
     expect(writes).toHaveLength(0);
 
@@ -196,6 +211,10 @@ describe('combined devices', () => {
     expect(card.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
     const liveChannel = await card.findByRole('switch', { name: 'Channel 2' });
     await waitFor(() => expect(liveChannel).toBeEnabled());
+    const liveDisclosure = card.getByRole('button', { name: 'Devices on Channel 2' });
+    await user.click(liveDisclosure);
+    expect(card.queryByRole('region', { name: bulbs[1].name })).toBeNull();
+    expect(writes).toHaveLength(1);
     await user.click(liveChannel);
     expect(writes[1]).toMatchObject({
       path: `/cloud/devices/${relay.id}/commands`,

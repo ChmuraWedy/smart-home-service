@@ -333,7 +333,7 @@ export function CombinedDeviceSettings({
               </label>
               <CombinedDeviceOrder members={previewMembers} disabled={busy} onMove={moveMember} />
             </div>
-            <fieldset className="combined-preview dashboard-view" data-card-size={cardSize} disabled>
+            <fieldset className="combined-preview dashboard-view" data-card-size={cardSize}>
               <legend className="sr-only">{t(MSG.COMBINED_CARD_PREVIEW)}</legend>
               <p className="help">{t(MSG.COMBINED_CARD_PREVIEW_HELP)}</p>
               <ul className="dashboard-device-column">

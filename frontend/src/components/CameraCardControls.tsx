@@ -26,7 +26,7 @@ export function CameraCardControls({
       .map(spec => ({ ...spec, label, help: undefined })));
   const privacy = controls.find(spec => spec.key === 'basic_private');
   const switches = controls.filter(spec => spec !== privacy);
-  const disabled = busy || !readOK || sending;
+  const disabled = paused || busy || !readOK || sending;
 
   function renderPreview(privacyState?: boolean | null, changePrivacy?: () => void) {
     if (!sheet?.open || paused) return null;
@@ -75,7 +75,14 @@ export function CameraCardControls({
           {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
         </div>
 )}
-        <button className="secondary card-refresh" aria-label={t(MSG.REFRESH_CONTROLS)} title={t(MSG.REFRESH_CONTROLS)} disabled={busy || sending} onClick={() => void refresh()}>
+        <button
+          type="button"
+          className="secondary card-refresh"
+          aria-label={t(MSG.REFRESH_CONTROLS)}
+          title={t(MSG.REFRESH_CONTROLS)}
+          disabled={paused || busy || sending}
+          onClick={() => void refresh()}
+        >
           <IconGlyph name="refresh" />
         </button>
       </div>

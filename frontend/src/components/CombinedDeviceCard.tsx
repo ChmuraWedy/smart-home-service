@@ -18,6 +18,7 @@ import {
 } from '../store';
 import { CardControls } from './CardControls';
 import type { MemberPower } from './CardControls';
+import type { PowerSide } from './ControlRow';
 import DashboardCardFooter from './DashboardCardFooter';
 import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
 import type { GridCardPlacement } from './DashboardGrid';
@@ -52,7 +53,7 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
@@ -63,6 +64,7 @@ function MemberControls({
   commandKey: string;
   sourceLabel?: string;
   channelChildren?: ReadonlyMap<string, ReactNode>;
+  powerSide?: PowerSide;
   onPower: (deviceId: string, power: MemberPower) => void;
   onAuthError: () => void;
 }) {
@@ -92,6 +94,7 @@ function MemberControls({
           onBusy={recordBusy}
           onAuthError={onAuthError}
           channelChildren={channelChildren}
+          powerSide={powerSide}
         />
       ) : (
         <>
@@ -189,7 +192,7 @@ export default function CombinedDeviceCard({
     const channels = quick ? undefined : layout.channels.get(member.device_id);
     const channelChildren = channels && new Map(Array.from(channels, ([code, entries]) => [
       code,
-      <div className="combined-relay-devices">{entries.map((child) => renderMember(child))}</div>,
+      entries.map((child) => renderMember(child)),
     ]));
     return (
       <MemberControls
@@ -202,6 +205,7 @@ export default function CombinedDeviceCard({
         quick={quick}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
+        powerSide={!quick && source ? 'end' : undefined}
         channelChildren={channelChildren}
         onPower={onPower}
         onAuthError={onAuthError}

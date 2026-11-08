@@ -1509,13 +1509,28 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   @apply tw:items-center tw:justify-normal tw:gap-x-3 tw:gap-y-0;
   grid-template-columns:var(--dashboard-power-size,64px) minmax(0,1fr);
 }
-.dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-heading { @apply tw:col-start-2 tw:row-start-1 tw:block tw:self-end tw:pt-1; }
+.dashboard-device [data-power-layout] .capability-boolean > .capability-row[data-power-side="end"] {
+  --power-column:2;
+  --power-content-column:1;
+  grid-template-columns:minmax(0,1fr) var(--dashboard-power-size,64px);
+}
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-heading {
+  @apply tw:row-start-1 tw:block tw:self-end tw:pt-1;
+  grid-column:var(--power-content-column,2);
+}
+.dashboard-device [data-power-layout] [data-power-side="end"] > .capability-heading { padding-inline-start:12px; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-heading h3 { @apply tw:text-sm tw:whitespace-normal; }
 .dashboard-device [data-power-layout] .capability-aliases { @apply tw:max-w-full; }
 .dashboard-device [data-power-layout] .capability-aliases .alias-tag {
   @apply tw:rounded-none tw:border-0 tw:bg-transparent tw:p-0 tw:text-xs;
 }
-.dashboard-device :is([data-power-layout], .camera-card-privacy) .dashboard-power-state { @apply tw:col-start-2 tw:row-start-2 tw:self-start tw:pb-1; }
+.dashboard-device :is([data-power-layout], .camera-card-privacy) .dashboard-power-state {
+  @apply tw:row-start-2 tw:self-start tw:pb-1;
+  grid-column:var(--power-content-column,2);
+}
+.dashboard-device [data-power-layout] [data-power-side="end"] > .dashboard-power-state:not(.dashboard-power-state-summary) {
+  padding-inline-start:12px;
+}
 .dashboard-device [data-power-layout] .dashboard-power-state-summary {
   @apply tw:relative tw:row-span-2 tw:row-start-1 tw:flex tw:self-stretch tw:pb-0;
 }
@@ -1539,7 +1554,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-light-presets { @apply tw:m-0 tw:min-h-0 tw:w-full tw:cursor-default tw:px-2 tw:py-1 tw:text-xs; }
 .dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
-  @apply tw:col-start-1 tw:row-start-1 tw:row-end-3 tw:self-stretch;
+  @apply tw:row-start-1 tw:row-end-3 tw:self-stretch;
+  grid-column:var(--power-column,1);
 }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .power-actions > .dashboard-power-button {
   @apply tw:self-stretch;
@@ -1712,21 +1728,42 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-sheet .combined-member + .combined-member { @apply tw:border-t tw:border-(--border); }
 .combined-device-card .dashboard-card-footer {
   padding-top:0;
-  margin-inline-start:calc(-1 * var(--dashboard-card-inset));
+  margin-inline:calc(-1 * var(--dashboard-card-inset));
+  border-end-start-radius:inherit;
+  border-end-end-radius:inherit;
+  overflow:clip;
 }
+.dashboard-view:not([data-dashboard-panel="tools"]) .combined-device-card .dashboard-power-state-summary,
+.combined-device-card .camera-card-privacy { margin-inline:0; }
+.combined-device-card :is(.camera-card-switches, .card-sensor-values) { padding-inline:var(--dashboard-card-inset); }
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
 .combined-member-source { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
 .combined-member-unavailable { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
 .combined-actions, .combined-delete { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
 .combined-actions { @apply tw:border-t tw:border-(--border) tw:p-2; }
 .combined-results { @apply tw:my-1 tw:w-full tw:list-none tw:p-0 tw:text-xs; }
-.combined-relay-channel + .combined-relay-channel,
+.dashboard-device [data-power-layout] > :is(.combined-relay-channel, .channel-control) + .combined-relay-channel,
+.dashboard-device [data-power-layout] > .combined-relay-channel + .channel-control,
 .combined-relay-devices { @apply tw:border-t tw:border-(--border); }
-.combined-relay-devices { border-inline-start:3px solid var(--border-strong); }
-.combined-power-footer {
-  @apply tw:border-t tw:border-(--border) tw:p-2;
-  margin-inline-end:calc(-1 * var(--dashboard-card-inset));
+.combined-relay-heading { @apply tw:grid tw:grid-cols-[minmax(0,1fr)_44px] tw:items-center; }
+.combined-relay-heading .combined-relay-toggle {
+  @apply tw:grid tw:size-11 tw:place-items-center tw:border-0 tw:bg-transparent tw:p-0 tw:text-(--muted);
 }
+.combined-relay-toggle .ui-icon { @apply tw:size-[18px]; }
+.combined-relay-toggle[aria-expanded="true"] .ui-icon { transform:rotate(180deg); }
+.combined-relay-devices > .combined-member {
+  position:relative;
+  border-inline-start:2px solid var(--border-strong);
+}
+.combined-relay-devices > .combined-member::before {
+  content:"";
+  position:absolute;
+  inset-inline-start:0;
+  inset-block-start:18px;
+  inline-size:8px;
+  border-block-start:1px solid var(--border-strong);
+}
+.combined-power-footer { @apply tw:border-t tw:border-(--border) tw:p-2; }
 .combined-power-footer .dashboard-power-button {
   @apply tw:flex tw:min-h-11 tw:w-full tw:items-center tw:justify-center tw:gap-2 tw:rounded-md tw:border-0 tw:bg-(--surface-raised) tw:px-2 tw:text-(--text);
 }

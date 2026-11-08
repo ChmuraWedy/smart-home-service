@@ -338,7 +338,7 @@
   },
   "src/components/CameraCardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 8
+      "count": 7
     },
     "arrow-parens": {
       "count": 8
@@ -362,9 +362,6 @@
       "count": 1
     },
     "prefer-template": {
-      "count": 1
-    },
-    "react/button-has-type": {
       "count": 1
     },
     "react/jsx-first-prop-new-line": {
@@ -529,19 +526,16 @@
   },
   "src/components/CardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 5
-    },
-    "@stylistic/max-len": {
       "count": 2
     },
     "arrow-parens": {
-      "count": 9
+      "count": 5
     },
     "brace-style": {
       "count": 2
     },
     "comma-spacing": {
-      "count": 35
+      "count": 34
     },
     "consistent-return": {
       "count": 2
@@ -556,7 +550,7 @@
       "count": 1
     },
     "indent": {
-      "count": 9
+      "count": 7
     },
     "key-spacing": {
       "count": 9
@@ -592,7 +586,7 @@
       "count": 3
     },
     "operator-linebreak": {
-      "count": 2
+      "count": 1
     },
     "prefer-template": {
       "count": 5
@@ -603,14 +597,11 @@
     "react-hooks/exhaustive-deps": {
       "count": 1
     },
-    "react/button-has-type": {
+    "react/jsx-first-prop-new-line": {
       "count": 2
     },
-    "react/jsx-first-prop-new-line": {
-      "count": 3
-    },
     "react/jsx-max-props-per-line": {
-      "count": 4
+      "count": 2
     },
     "react/jsx-props-no-spreading": {
       "count": 5
@@ -1096,7 +1087,7 @@
       "count": 13
     },
     "@stylistic/max-len": {
-      "count": 17
+      "count": 16
     },
     "arrow-parens": {
       "count": 24
@@ -1105,7 +1096,7 @@
       "count": 8
     },
     "comma-spacing": {
-      "count": 17
+      "count": 16
     },
     "consistent-return": {
       "count": 2
@@ -1117,7 +1108,7 @@
       "count": 1
     },
     "indent": {
-      "count": 27
+      "count": 19
     },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
@@ -1132,7 +1123,7 @@
       "count": 5
     },
     "no-confusing-arrow": {
-      "count": 4
+      "count": 2
     },
     "no-nested-ternary": {
       "count": 11
@@ -1168,13 +1159,13 @@
       "count": 11
     },
     "operator-linebreak": {
-      "count": 3
+      "count": 2
     },
     "prefer-template": {
-      "count": 16
+      "count": 11
     },
     "quotes": {
-      "count": 10
+      "count": 6
     },
     "react-hooks/exhaustive-deps": {
       "count": 1
@@ -1183,9 +1174,6 @@
       "count": 3
     },
     "react/jsx-first-prop-new-line": {
-      "count": 1
-    },
-    "react/jsx-indent": {
       "count": 1
     },
     "react/jsx-max-props-per-line": {
