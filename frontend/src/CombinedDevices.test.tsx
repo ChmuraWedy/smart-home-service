@@ -236,8 +236,8 @@ describe('combined devices', () => {
     app.unmount();
     openApp('/rooms/3');
     expect(await screen.findByRole('listitem', { name: videoTitle })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: otherRoom.name }));
-    expect(screen.queryByRole('listitem', { name: videoTitle })).toBeNull();
+    await user.click(await screen.findByRole('button', { name: otherRoom.name }));
+    await waitFor(() => expect(screen.queryByRole('listitem', { name: videoTitle })).toBeNull());
   });
 
   it('saves a cloud device room in the app and updates its detail and dashboard placement', async () => {
