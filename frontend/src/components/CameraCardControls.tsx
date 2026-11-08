@@ -26,7 +26,7 @@ export function CameraCardControls({
       .map(spec => ({ ...spec, label, help: undefined })));
   const privacy = controls.find(spec => spec.key === 'basic_private');
   const switches = controls.filter(spec => spec !== privacy);
-  const disabled = paused || busy || !readOK || sending;
+  const disabled = paused || busy || !readOK || sending || !online;
 
   function renderPreview(privacyState?: boolean | null, changePrivacy?: () => void) {
     if (!sheet?.open || paused) return null;

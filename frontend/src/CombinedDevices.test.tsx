@@ -1,11 +1,17 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
 import type { CombinedDevice, CombinedInput } from './home-api';
+import { HomeApi } from './home-api';
+import { cloudDeviceKey, readCloudDevice } from './cloud-device-cache';
+import CombinedDeviceCard from './components/CombinedDeviceCard';
 import { STORAGE_KEY } from './connection';
 import { setDeviceTextMode } from './device-translations';
 import { setLocale } from './i18n';
+import { createAppStore } from './store';
 import { App } from './test/App';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
@@ -142,7 +148,114 @@ function openApp(path: string) {
   return render(<App />);
 }
 
+function renderWiredCard(source: CloudDevice, child: CloudDevice) {
+  setLocale('en', false);
+  const api = new HomeApi({ baseUrl: 'http://combined.test', token: 'fixture' });
+  const store = createAppStore();
+  const wiring = { device_id: source.id, channel: 'switch_1' };
+  const members = [source, child].map((device) => ({
+    member: { device_id: device.id, route: 'sharing' as const, power_source: device === child ? wiring : undefined },
+    device: { id: device.id, name: device.name, cloud: { sharing: device } },
+  }));
+  render(
+    <Provider store={store}>
+      <MemoryRouter>
+        <CombinedDeviceCard
+          api={api}
+          combined={{ id: 1, name: 'Wired devices', show_all_power: false }}
+          members={members}
+          room={room.name}
+          now={Date.now()}
+          onAuthError={vi.fn()}
+        />
+      </MemoryRouter>
+    </Provider>,
+  );
+  return () => store.dispatch(readCloudDevice(api, cloudDeviceKey(api, source.id, 'sharing'), { refresh: true }));
+}
+
+function relayWithReading(online: boolean, power: boolean): CloudDevice {
+  const statusRange = ['add_ele', 'cur_power', 'cur_voltage', 'cur_current', 'electric_coe', 'fault'].map((code) => ({
+    code, type: 'Integer', values: { min: 0, max: 3000 },
+  }));
+  return {
+    ...relay,
+    online,
+    category: 'cz',
+    controls: {
+      ready: true,
+      definitions: { ...relayDefinitions, status_range: statusRange },
+      snapshot: {
+        device_id: relay.id, source: 'cloud', online,
+        status: { switch_1: power, switch_2: true, ...Object.fromEntries(statusRange.map(({ code }) => [code, 125])) },
+      },
+    },
+  };
+}
+
 describe('combined devices', () => {
+  it('disables a wired bulb when its channel is off and rereads it when the relay confirms on', async () => {
+    const child = bulbs[0];
+    const childReading = child.controls!.snapshot;
+    let finishRead!: (response: Response) => void;
+    const fresh = new Promise<Response>((resolve) => { finishRead = resolve; });
+    const refreshes: string[] = [];
+    vi.mocked(fetch).mockImplementation(async (input, options) => {
+      const url = new URL(String(input));
+      expect(options?.method).toBe('GET');
+      if (url.pathname.includes('/light-presets/')) return json([]);
+      expect(url.searchParams.get('refresh')).toBe('true');
+      if (url.pathname.endsWith(`/${relay.id}/status`)) return json(relayWithReading(true, true).controls!.snapshot);
+      expect(url.pathname).toMatch(/\/bulb-1\/status$/);
+      refreshes.push(url.pathname);
+      return fresh;
+    });
+    const updateRelay = renderWiredCard(relayWithReading(true, false), child);
+    const bulbRegion = () => screen.getByRole('region', { name: child.name });
+    const power = await waitFor(() => within(bulbRegion()).getByRole('switch', { name: 'Power' }));
+    const bulb = bulbRegion();
+    expect(bulb).toHaveAttribute('data-unavailable');
+    expect(power).toBeDisabled();
+    expect(power).not.toBeChecked();
+    expect(within(bulb).getByText('Off')).toBeInTheDocument();
+    expect(refreshes).toHaveLength(0);
+
+    await act(async () => { await updateRelay(); });
+    await waitFor(() => expect(refreshes).toHaveLength(1));
+    expect(power).toBeDisabled();
+    expect(within(bulb).queryByText('#FF0000')).toBeNull();
+    await act(async () => finishRead(json({
+      ...childReading, status: { ...childReading.status, switch_led: false },
+    })));
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(power).not.toBeChecked();
+    expect(bulb).not.toHaveAttribute('data-unavailable');
+    expect(refreshes).toHaveLength(1);
+  });
+
+  it.each([false, true])('keeps an online camera controllable when its offline socket last reported %s', async (lastPower) => {
+    const camera: CloudDevice = {
+      id: 'camera', name: 'Sleep camera', category: 'sp', online: true, has_local_key: false,
+      controls: {
+        ready: true,
+        definitions: { device_id: 'camera', functions: [{ code: 'basic_private', type: 'Boolean', values: {} }] },
+        snapshot: { device_id: 'camera', source: 'cloud', online: true, status: { basic_private: false } },
+      },
+    };
+    renderWiredCard(relayWithReading(false, lastPower), camera);
+    const source = await screen.findByRole('region', { name: relay.name });
+    const channel = await within(source).findByRole('switch', { name: 'Channel 1' });
+    expect(source).toHaveAttribute('data-unavailable');
+    expect(channel).toHaveAttribute('aria-checked', String(lastPower));
+    expect(channel).toBeDisabled();
+    expect(source.querySelector('.card-sensor-values')).toBeNull();
+    const child = screen.getByRole('region', { name: camera.name });
+    expect(child).not.toHaveAttribute('data-unavailable');
+    expect(screen.getByRole('listitem', { name: 'Wired devices' })).not.toHaveAttribute('data-unavailable');
+    expect(await within(child).findByRole('button', { name: 'Privacy' })).toBeEnabled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('uses the same channel power glyph for a wired relay with a single output', async () => {
     backend({
       id: 1,

@@ -47,6 +47,17 @@ function mount(cloud=lamp, route:'sharing'|'developer'='sharing', sheet?:Compone
 }
 
 describe('main controls on device cards', () => {
+  it('hides electrical telemetry on a socket card while keeping unrelated readings', async () => {
+    const statusRange = ['cur_current', 'cur_voltage', 'cur_power', 'add_ele', 'electricity_coe', 'fault', 'temp_current'].map((code) => ({
+      code, type: 'Integer', values: { min: 0, max: 1000 },
+    }));
+    const state = { ...snapshot, status: { switch_1: true, ...Object.fromEntries(statusRange.map(({ code }) => [code, 23])) } };
+    const capabilities = { device_id: 'lamp', functions: [{ code: 'switch_1', type: 'Boolean', values: {} }], status_range: statusRange };
+    const { container } = mount({ ...lamp, category: 'cz', controls: { ready: true, definitions: capabilities, snapshot: state } });
+    expect(await screen.findByRole('switch', { name: 'Канал 1' })).toBeChecked();
+    expect([...container.querySelectorAll('[data-reading]')].map((node) => node.getAttribute('data-reading'))).toEqual(['temp_current']);
+  });
+
   it.each(['sharing','developer'] as const)('sends the four advertised camera toggles immediately through %s without exposing other settings',async route=>{
     const codes=['basic_private','motion_switch','decibel_switch','siren_switch'];
     const cameraDefinitions:CloudFunctions={device_id:'lamp',functions:[...codes.map(code=>({code,type:'Boolean',values:{}})),{code:'sd_format',type:'Boolean',values:{}}],status_range:[{code:'sd_status',type:'Integer',values:{min:1,max:5,scale:0}}]};
@@ -336,16 +347,14 @@ describe('main controls on device cards', () => {
     else expect(readings).not.toHaveTextContent('Яркость');
   });
 
-  it('hides cached bulb values while offline and restores them after a fresh online report', async () => {
+  it('keeps the last reported bulb values visible with disabled controls while offline', async () => {
     const online = { ...snapshot, status: { ...snapshot.status, switch_led: true, bright_value_v2: 640 } };
     vi.mocked(fetch).mockResolvedValueOnce(json(online));
-    const { container } = mount({ ...lamp, online: false, controls: { ready: true, definitions, snapshot: { ...online, online: false } } });
+    mount({ ...lamp, online: false, controls: { ready: true, definitions, snapshot: { ...online, online: false } } });
     const power = await screen.findByRole('switch', { name: 'Питание' });
     expect(power).toBeDisabled();
-    expect(power).not.toBeChecked();
-    expect(screen.getByText('Нет данных')).toBeInTheDocument();
-    expect(screen.queryByText('64 %')).toBeNull();
-    expect(container.querySelector('.dashboard-light-tint')).toBeNull();
+    expect(power).toBeChecked();
+    expect(screen.getByText('64 %')).toBeVisible();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Обновить параметры' }));
     expect(await screen.findByText('64 %')).toBeVisible();
     expect(power).toBeEnabled();

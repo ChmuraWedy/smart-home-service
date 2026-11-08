@@ -1431,6 +1431,12 @@ button.header-icon:hover:enabled { background:var(--hover); }
   @apply tw:pointer-events-none tw:absolute tw:inset-0 tw:-z-10 tw:rounded-xl tw:bg-cover tw:bg-center;
   background-image:linear-gradient(var(--room-background-tint),var(--room-background-tint)),var(--room-background-image);
 }
+.dashboard-view:has(.control-center) > footer { @apply tw:pointer-events-none tw:relative tw:block tw:h-0 tw:p-0; }
+.dashboard-view:has(.control-center) > footer > span {
+  @apply tw:absolute tw:end-3 tw:bottom-2 tw:whitespace-nowrap tw:text-(--text);
+  text-shadow:0 0 4px var(--page-bg),0 0 2px var(--page-bg);
+}
+.dashboard-view:has(.control-center) > main > .notice:not(:empty) { @apply tw:pb-6; }
 .control-center[data-room-background] :is(.room-navigation-heading, .dashboard-intro) {
   @apply tw:w-fit tw:rounded-lg tw:bg-(--surface) tw:px-2 tw:py-1;
 }
@@ -1457,7 +1463,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
   max-height:min(44dvh,420px);
 }
 .room-background-preview { @apply tw:max-h-60 tw:w-full tw:rounded-lg tw:object-cover; }
-.dashboard-device[data-unavailable] .card-primary-controls { @apply tw:grayscale; }
+.dashboard-device[data-unavailable] :is(.dashboard-card-header, .card-primary-controls, .card-sensor-values) { @apply tw:grayscale; }
 .dashboard-card-header {
   @apply tw:grid tw:grid-cols-[28px_minmax(0,1fr)_auto] tw:items-center tw:gap-x-2;
 }
@@ -1799,6 +1805,12 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
 .combined-member-source { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
 .combined-member-unavailable { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
+.combined-member[data-unavailable] > .combined-member-header,
+.combined-member[data-unavailable] > .card-quick-controls > :is(.card-primary-controls, .card-sensor-values):not(:has(.combined-relay-channel)),
+.combined-member[data-unavailable] > .card-quick-controls > .card-primary-controls > .channel-control,
+.combined-member[data-unavailable] > .card-quick-controls > .card-primary-controls > .combined-relay-channel > .combined-relay-heading {
+  @apply tw:bg-(--surface-soft) tw:grayscale;
+}
 .combined-actions, .combined-delete { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
 .combined-actions { @apply tw:border-t tw:border-(--border) tw:p-2; }
 .combined-results { @apply tw:my-1 tw:w-full tw:list-none tw:p-0 tw:text-xs; }

@@ -232,8 +232,9 @@ export function ControlFeedback({ busy, notice }: { busy: boolean; notice: Contr
   );
 }
 
-export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerSide, powerSummary, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
+export function CapabilityField({ pendingScope, spec, reading, now, local, disabled, onSend, aliasEditor, headingActions, stage, immediatePower = false, dashboardSwitch = false, powerIcon, powerSide, powerSummary, displayPower, quickRange, booleanActions, booleanButton = false, buttonText, valueEditor }: {
   pendingScope: string; spec: ControlSpec; reading?: Reading; now: number; local: boolean; disabled: boolean; onSend: (value: JsonValue) => Promise<boolean | void>; aliasEditor?: ReactNode; headingActions?: ReactNode; stage?: DraftStage; immediatePower?: boolean; dashboardSwitch?: boolean; powerIcon?:ReactNode; powerSide?:PowerSide; powerSummary?:(power:boolean|null)=>ReactNode; quickRange?:'brightness'|'temperature'; booleanActions?:(value:boolean|null,toggle:()=>void)=>ReactNode; booleanButton?: boolean; buttonText?:string | ((value:boolean | null)=>string); valueEditor?:(draft:string,change:(value:string)=>void)=>ReactNode;
+  displayPower?: boolean | null;
 }) {
   const powerId = useId();
   const fresh = reading?.known && !isStale(reading, now, local);
@@ -320,7 +321,9 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
     if (immediatePower) void send(checked);
     else change(String(checked));
   }
-  const powerKnown = awaiting || (reading?.known && typeof reading.value === 'boolean');
+  const shownPower = displayPower === undefined ? selectedPower : displayPower === true;
+  const powerKnown = displayPower === undefined ? awaiting || (reading?.known && typeof reading.value === 'boolean') : displayPower !== null;
+  const showPending = displayPower === undefined && awaiting;
   let powerVariant: PowerButtonVariant = dashboardSwitch ? 'dashboard-switch' : 'switch';
   if (booleanButton) powerVariant = 'button';
   if (quickRange) {
@@ -369,10 +372,10 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
   );
   const state = powerIcon && (
     <span className={`dashboard-power-state${powerSummary ? ' dashboard-power-state-summary' : ''}`}>
-      {powerSummary ? powerSummary(powerKnown ? selectedPower : null) : powerKnown ? t(selectedPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
-      {powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
-      <span role="status" className="dashboard-power-pending" title={awaiting ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
-        {awaiting && (
+      {powerSummary ? powerSummary(powerKnown ? shownPower : null) : powerKnown ? t(shownPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
+      {displayPower === undefined && powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+      <span role="status" className="dashboard-power-pending" title={showPending ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
+        {showPending && (
           <>
             <span className="spinner" aria-hidden="true" />
             <span className="sr-only">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>
@@ -388,11 +391,11 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
           <PowerButton
             id={powerId}
             label={spec.label}
-            checked={selectedPower}
+            checked={shownPower}
             disabled={disabled}
             variant={powerVariant}
             icon={powerIcon}
-            known={Boolean(reading?.known || awaiting)}
+            known={Boolean(powerKnown)}
             buttonText={buttonText}
             onChange={changePower}
           />
