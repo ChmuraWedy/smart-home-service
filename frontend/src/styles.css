@@ -1762,11 +1762,18 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .combined-relay-toggle .ui-icon { @apply tw:size-[18px]; }
 .combined-relay-toggle[aria-expanded="true"] .ui-icon { transform:rotate(180deg); }
-.combined-relay-devices > .combined-member {
+.combined-relay-devices {
   --combined-branch-width:5px;
+  --combined-branch-color:var(--border-strong);
+  border-block-start:1px solid var(--border);
+  border-inline-start:var(--combined-branch-width) solid var(--combined-branch-color);
+}
+.combined-relay-channel:nth-child(4n+2) > .combined-relay-devices { --combined-branch-color:var(--accent); }
+.combined-relay-channel:nth-child(4n+3) > .combined-relay-devices { --combined-branch-color:var(--warning-border); }
+.combined-relay-channel:nth-child(4n+4) > .combined-relay-devices { --combined-branch-color:var(--info); }
+.combined-relay-devices > .combined-member {
   --dashboard-power-width:max(32px,calc(var(--dashboard-power-size,64px) - var(--combined-depth,1) * var(--combined-branch-width)));
   position:relative;
-  border-inline-start:var(--combined-branch-width) solid var(--border-strong);
 }
 .combined-relay-devices > .combined-member::before {
   content:"";
@@ -1774,7 +1781,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   inset-inline-start:0;
   inset-block-start:18px;
   inline-size:8px;
-  border-block-start:2px solid var(--border-strong);
+  border-block-start:2px solid var(--combined-branch-color);
 }
 .combined-member:has(> .card-quick-controls > .card-primary-controls > .channel-control .combined-member-inline) {
   > :is(.combined-member-name, .combined-member-source) { @apply tw:sr-only; }
