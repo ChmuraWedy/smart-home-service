@@ -175,9 +175,11 @@ describe('combined devices', () => {
     expect(order.getByRole('button', { name: `Move ${bulbs[0].name} up` })).toBeDisabled();
     await user.click(order.getByRole('button', { name: `Move ${bulbs[2].name} up` }));
     expect(orderedNames(secondChannel)).toEqual([bulbs[2].name, bulbs[1].name]);
-    const power = draftCard.getByRole('button', { name: 'Power for all devices' });
+    const power = draftCard.getByRole('switch', { name: 'Power for all devices' });
     expect(power).toBeDisabled();
-    expect(power.closest('footer')?.lastElementChild).toContainElement(power);
+    const powerFooter = power.closest('footer')?.lastElementChild;
+    expect(powerFooter).toContainElement(power);
+    expect(powerFooter?.querySelector('.dashboard-power-state')).toHaveTextContent('Status unknown');
     expect(draftCard.getByRole('button', { name: 'Quick controls' })).toBeDisabled();
     const lamp = within(draftCard.getByRole('region', { name: bulbs[0].name }));
     const lampPower = await lamp.findByRole('switch');
@@ -293,12 +295,12 @@ describe('combined devices', () => {
     await waitFor(() => expect(writes[1]).toMatchObject({
       path: '/cloud/devices/bulb-2/commands', body: { commands: [{ code: 'bright_value_v2', value: 600 }] },
     }));
-    expect(sheet.queryByRole('button', { name: 'Power for all devices' })).toBeNull();
+    expect(sheet.queryByRole('switch', { name: 'Power for all devices' })).toBeNull();
     const close = sheet.getByRole('button', { name: 'Close' });
     await waitFor(() => expect(close).toBeEnabled());
     await user.click(close);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    const power = within(card).getByRole('button', { name: 'Power for all devices' });
+    const power = within(card).getByRole('switch', { name: 'Power for all devices' });
     expect(card.querySelector('footer')?.lastElementChild).toContainElement(power);
     await user.click(power);
     await waitFor(() => expect(writes[2]).toMatchObject({ path: '/combined-devices/1/power/on', method: 'POST' }));
@@ -336,7 +338,7 @@ describe('combined devices', () => {
     expect(writes[4]).toMatchObject({ path: '/combined-devices/1', method: 'DELETE' });
   }, 15000);
 
-  it('uses one header button and refreshes every member after all-on and all-off', async () => {
+  it('uses one footer switch and refreshes every member after all-on and all-off', async () => {
     const { writes, refreshedMembers } = backend({
       id: 1, name: 'Kitchen Lights', room_id: room.id,
       members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
@@ -344,14 +346,14 @@ describe('combined devices', () => {
     const user = userEvent.setup();
     openApp('/rooms/3');
     const card = within(await screen.findByRole('listitem', { name: 'Kitchen Lights' }));
-    const power = card.getByRole('button', { name: 'Power for all devices' });
+    const power = card.getByRole('switch', { name: 'Power for all devices' });
     const members = bulbs.map(({ name }) => within(card.getByRole('region', { name })));
     await waitFor(() => expect(members[1].getByRole('switch')).toHaveAttribute('aria-checked', 'false'));
 
     await user.click(power);
     await waitFor(() => {
       for (const member of members) expect(member.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
-      expect(power).toHaveAttribute('aria-pressed', 'true');
+      expect(power).toHaveAttribute('aria-checked', 'true');
       expect(power).toBeEnabled();
     });
     expect(refreshedMembers.slice().sort()).toEqual(bulbs.map(({ id }) => id));
@@ -361,7 +363,7 @@ describe('combined devices', () => {
     await user.click(power);
     await waitFor(() => {
       for (const member of members) expect(member.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
-      expect(power).toHaveAttribute('aria-pressed', 'false');
+      expect(power).toHaveAttribute('aria-checked', 'false');
     });
     expect(refreshedMembers.slice(3).sort()).toEqual(bulbs.map(({ id }) => id));
     expect(writes.map(({ path }) => path)).toEqual(['/combined-devices/1/power/on', '/combined-devices/1/power/off']);
@@ -410,7 +412,7 @@ describe('combined devices', () => {
     await user.click(editor.getByRole('button', { name: `Move ${bulbs[2].name} up` }));
     const memberNames = draft.getAllByRole('region').map((region) => region.getAttribute('aria-label'));
     expect(memberNames.filter((name) => bulbs.some((bulb) => bulb.name === name))).toEqual([bulbs[0].name, bulbs[2].name, bulbs[1].name]);
-    expect(draft.getByRole('button', { name: 'Power for all devices' })).toBeDisabled();
+    expect(draft.getByRole('switch', { name: 'Power for all devices' })).toBeDisabled();
     expect(writes).toHaveLength(0);
     act(() => window.history.back());
     expect(await editor.findByRole('textbox', { name: 'Name' })).toHaveValue('Evening lights');
@@ -450,9 +452,9 @@ describe('combined devices', () => {
     const powerName = 'Power for all devices';
     const visibility = await screen.findByRole('switch', { name: visibilityName });
     expect(visibility).toBeChecked();
-    expect(screen.getByRole('button', { name: powerName })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: powerName })).toBeDisabled();
     await user.click(visibility);
-    expect(screen.queryByRole('button', { name: powerName })).toBeNull();
+    expect(screen.queryByRole('switch', { name: powerName })).toBeNull();
     const member = within(screen.getByRole('region', { name: bulbs[0].name }));
     expect(await member.findByRole('switch')).toBeDisabled();
     expect(writes).toHaveLength(0);
@@ -463,7 +465,7 @@ describe('combined devices', () => {
     app.unmount();
     openApp('/rooms/3');
     const card = within(await screen.findByRole('listitem', { name: 'Kitchen lights' }));
-    expect(card.queryByRole('button', { name: powerName })).toBeNull();
+    expect(card.queryByRole('switch', { name: powerName })).toBeNull();
     const savedMember = within(card.getByRole('region', { name: bulbs[0].name }));
     const memberPower = await savedMember.findByRole('switch');
     await waitFor(() => expect(memberPower).toBeEnabled());

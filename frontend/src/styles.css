@@ -1743,7 +1743,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-actions { @apply tw:border-t tw:border-(--border) tw:p-2; }
 .combined-results { @apply tw:my-1 tw:w-full tw:list-none tw:p-0 tw:text-xs; }
 .dashboard-device [data-power-layout] > .combined-relay-channel {
-  border-block-start:2px solid var(--border-strong);
+  border-block-start:2px solid var(--border);
 }
 .dashboard-device [data-power-layout] > .combined-relay-channel + .channel-control,
 .combined-relay-devices { @apply tw:border-t tw:border-(--border); }
@@ -1770,34 +1770,23 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   > :is(.combined-member-name, .combined-member-source) { @apply tw:sr-only; }
   &::before { content:none; }
 }
-.combined-member-inline { @apply tw:flex tw:min-w-0 tw:flex-1 tw:items-stretch; }
-.combined-member-inline-name {
-  @apply tw:flex-1 tw:self-center tw:truncate tw:px-1 tw:text-xs tw:font-semibold tw:text-(--text-strong);
+.combined-member-inline {
+  @apply tw:grid tw:min-w-0 tw:flex-1 tw:grid-rows-[auto_1fr];
 }
-.combined-member-inline-state { @apply tw:max-w-1/2 tw:self-center tw:truncate tw:pe-1.5; }
-.combined-member-inline .dashboard-light-readings { @apply tw:auto-cols-max tw:flex-none; }
-.combined-member .combined-member-inline .dashboard-light-reading { @apply tw:px-0.5; }
-.combined-member-inline .dashboard-light-copy { @apply tw:flex-nowrap tw:gap-x-px tw:whitespace-nowrap; }
-.combined-member-inline .dashboard-light-label { @apply tw:sr-only; }
-.combined-member-inline .dashboard-light-icon { @apply tw:block; }
-.combined-member-inline .dashboard-light-icon .parameter-icon { @apply tw:size-[11px]; }
-.combined-member .combined-member-inline .dashboard-light-value { @apply tw:text-[11px]; }
-.combined-member-inline .dashboard-light-swatch { @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong); }
-.combined-member-inline .dashboard-light-reading:has(.dashboard-light-swatch) .dashboard-light-icon { @apply tw:hidden; }
-.combined-member-inline .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
+.combined-member-inline-name {
+  @apply tw:truncate tw:border-b tw:border-(--border) tw:px-3 tw:py-1 tw:text-xs tw:font-semibold tw:text-(--text-strong);
+}
+.combined-member-inline-state { @apply tw:self-center tw:px-3; }
 .dashboard-view {
   @variant narrow-dashboard-controls {
-    .combined-member .capability-row:has(.combined-member-inline) { --dashboard-power-size:44px; }
+    .combined-member .capability-row:has(.combined-member-inline),
+    .combined-power-footer { --dashboard-power-size:44px; }
+    .combined-member-inline :is(.combined-member-inline-name, .combined-member-inline-state, .dashboard-light-reading) { @apply tw:px-1; }
+    .combined-member-inline .dashboard-light-copy { @apply tw:gap-x-0.5; }
   }
 }
-.combined-power-footer { @apply tw:border-t tw:border-(--border) tw:p-2; }
-.combined-power-footer .dashboard-power-button {
-  @apply tw:flex tw:min-h-11 tw:w-full tw:items-center tw:justify-center tw:gap-2 tw:rounded-md tw:border-0 tw:bg-(--surface-raised) tw:px-2 tw:text-(--text);
-}
-.combined-power-footer .dashboard-power-button[data-checked] {
-  @apply tw:bg-(--toggle-on) tw:text-(--toggle-thumb-on);
-}
-.combined-power-footer .dashboard-power-button .parameter-icon { @apply tw:size-5 tw:shrink-0; }
+.combined-power-footer { @apply tw:border-t tw:border-(--border); }
+.combined-power-footer .capability-heading { @apply tw:m-0 tw:text-sm tw:font-semibold; }
 .combined-device-options { @apply tw:flex tw:list-none tw:flex-col tw:gap-2 tw:p-0; }
 .combined-device-options button { @apply tw:w-full tw:text-start; }
 .combined-device-management { @apply tw:mx-auto tw:w-full tw:max-w-[760px]; }

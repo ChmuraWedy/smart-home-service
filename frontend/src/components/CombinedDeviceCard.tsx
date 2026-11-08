@@ -18,6 +18,7 @@ import {
 } from '../store';
 import { CardControls } from './CardControls';
 import type { MemberPower } from './CardControls';
+import ControlRow from './ControlRow';
 import type { PowerSide } from './ControlRow';
 import DashboardCardFooter from './DashboardCardFooter';
 import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
@@ -270,22 +271,27 @@ export default function CombinedDeviceCard({
         {layout.roots.map((entry) => renderMember(entry))}
         {(sendError || Object.keys(failures).length > 0) && <div className="combined-actions">{feedback}</div>}
         {combined.show_all_power !== false && (
-          <div className="combined-power-footer">
-            <PowerButton
-              id={powerId}
-              label={t(MSG.COMBINED_POWER)}
-              checked={allKnownOn}
-              disabled={!canSend}
-              variant="button"
-              icon={(
-                <>
-                  <ParameterIcon code="switch" />
-                  <span>{t(MSG.COMBINED_POWER)}</span>
-                </>
-              )}
-              known
-              onChange={setPower}
-            />
+          <div className="combined-power-footer" data-power-layout="single">
+            <div className="capability-boolean">
+              <ControlRow
+                heading={<h3 className="capability-heading">{t(MSG.COMBINED_POWER)}</h3>}
+                state={<span className="dashboard-power-state">{t(powerLabels[power])}</span>}
+                power={(
+                  <div className="power-actions">
+                    <PowerButton
+                      id={powerId}
+                      label={t(MSG.COMBINED_POWER)}
+                      checked={allKnownOn}
+                      disabled={!canSend}
+                      variant="dashboard-switch"
+                      icon={<ParameterIcon code="switch" />}
+                      known
+                      onChange={setPower}
+                    />
+                  </div>
+                )}
+              />
+            </div>
           </div>
         )}
       </DashboardCardFooter>
