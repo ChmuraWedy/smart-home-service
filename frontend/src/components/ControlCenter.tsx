@@ -224,7 +224,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const room = dashboardRoom(location.pathname, query);
   const activeRoomId = inventory?.rooms.find(({ id }) => String(id) === room)?.id;
   const canOpenRoomEditor = import.meta.env.MODE !== 'demo' && Boolean(inventory && (activeRoomId !== undefined || room === ''));
-  const roomEditorLabel = t(activeRoomId !== undefined ? MSG.EDIT_ROOM : MSG.ROOM_EDITOR_TITLE);
   const roomAppearance = useRoomAppearance(api, activeRoomId)?.value;
   const search = query.get('q') ?? '';
   const requestedPage = Number(query.get('page') ?? 1);
@@ -785,14 +784,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
             navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
             roomAction={canOpenRoomEditor ? (
-              <button
-                type="button"
-                className="secondary dashboard-layout-icon"
-                aria-label={roomEditorLabel}
-                title={roomEditorLabel}
-                onClick={openRoomEditor}
-              >
-                <Icon name="edit" />
+              <button type="button" className="secondary compact" onClick={openRoomEditor}>
+                {t(MSG.ROOM_APPEARANCE_AND_NAME_EDITOR)}
               </button>
             ) : undefined}
             renderCard={(entry, placement) => renderCard(entry, placement)}

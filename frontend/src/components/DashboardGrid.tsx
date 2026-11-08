@@ -283,7 +283,7 @@ export default function DashboardGrid<T>({
   }
 
   let editLabel = t(MSG.EDIT_DASHBOARD_LAYOUT);
-  let editIcon: 'move' | 'close' | 'refresh-list' = 'move';
+  let editIcon: 'edit' | 'close' | 'refresh-list' = 'edit';
   if (draft) {
     editLabel = t(MSG.CANCEL);
     editIcon = 'close';
@@ -294,11 +294,10 @@ export default function DashboardGrid<T>({
 
   return (
     <>
-      {(navigation || roomAction || showEditor) && (
+      {(navigation || showEditor) && (
         <div className="dashboard-layout-toolbar" data-editing={Boolean(draft) || undefined}>
           <div className="dashboard-layout-heading">
             {navigation && <div className="dashboard-layout-room">{navigation}</div>}
-            {!draft && roomAction && <div className="dashboard-layout-actions">{roomAction}</div>}
             {showEditor && (
               <div className="dashboard-layout-actions">
                 <button
@@ -306,7 +305,7 @@ export default function DashboardGrid<T>({
                   className="secondary dashboard-layout-icon"
                   aria-label={editLabel}
                   title={editLabel}
-                  disabled={saving || (!draft && !current?.error && !items.length) || Boolean(browserId && !current && !draft)}
+                  disabled={saving || (!draft && !current?.error && !items.length && !roomAction) || Boolean(browserId && !current && !draft)}
                   onClick={toggleEditing}
                 >
                   <Icon name={editIcon} />
@@ -331,7 +330,12 @@ export default function DashboardGrid<T>({
               </div>
             )}
           </div>
-          {draft && <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>}
+          {draft && (
+            <>
+              {roomAction}
+              <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>
+            </>
+          )}
           {saveError && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
         </div>

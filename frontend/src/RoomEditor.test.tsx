@@ -112,16 +112,18 @@ it('creates a first building and room, renames it, and preserves it after a bloc
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
 });
 
-it('opens the selected room from its header and saves its background and opacity', async () => {
+it('opens the selected room from the grid editor and saves its background and opacity', async () => {
   const { uploads, changes } = fixture([building], [kitchen, bedroom]);
   const user = userEvent.setup();
   const app = openApp('/rooms/1');
-  const editRoom = await screen.findByRole('button', { name: 'Edit room' });
-  const heading = editRoom.closest('.dashboard-layout-heading') as HTMLElement;
+  const editLayout = await screen.findByRole('button', { name: 'Edit layout' });
+  const heading = editLayout.closest('.dashboard-layout-heading') as HTMLElement;
   expect(within(heading).getByText('Kitchen', { selector: '.room-navigation-heading' })).toBeInTheDocument();
-  expect(within(heading).getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Manage rooms' })).not.toBeInTheDocument();
-  await user.click(editRoom);
+  expect(editLayout.querySelector('[data-icon="edit"]')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Room appearance and name editor' })).not.toBeInTheDocument();
+  await user.click(editLayout);
+  expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Room appearance and name editor' }));
   expect(window.location.pathname).toBe('/settings/rooms');
   expect(await screen.findByRole('combobox', { name: 'Room' })).toHaveValue('1');
 
@@ -150,9 +152,9 @@ it('opens the selected room from its header and saves its background and opacity
 it('opens room management from All rooms even before a room exists', async () => {
   fixture([building], []);
   openApp('/');
-  const editRooms = await screen.findByRole('button', { name: 'Manage rooms' });
-  expect(editRooms).toHaveTextContent(/^$/);
-  await userEvent.setup().click(editRooms);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Edit layout' }));
+  await user.click(screen.getByRole('button', { name: 'Room appearance and name editor' }));
   expect(window.location.pathname + window.location.search).toBe('/settings/rooms');
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
 });
