@@ -116,7 +116,6 @@ const glyphs = {
   play: '▷',
   refresh: '↻',
   resize: '↘',
-  'video-blocked': '▣',
 };
 
 export function IconGlyph({ name, className }: { name: keyof typeof glyphs; className?: string }) {

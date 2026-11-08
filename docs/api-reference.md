@@ -6,7 +6,7 @@ The service uses FastAPI, SQLAlchemy 2, SQLite, TinyTuya, and PyCryptodome. Pyth
 
 ## Authentication and configuration
 
-All `/api/v1/*` requests use `X-API-Key` when `SMART_HOME_API_TOKEN` is configured. `/health`, `/docs`, and `/openapi.json` are public. Standalone Python does not load `.env` automatically; Docker Compose does. An empty API token disables local API authentication; cloud endpoints require a configured service token.
+API requests use `X-API-Key` when `SMART_HOME_API_TOKEN` is configured. Camera media uses short-lived playback tickets issued by the authenticated stream endpoint. `/health`, `/docs`, and `/openapi.json` are public. Standalone Python does not load `.env` automatically; Docker Compose does. An empty API token disables local API authentication; cloud endpoints require a configured service token.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -326,7 +326,8 @@ This index is generated from the application's OpenAPI routes. Consult the live 
 
 | Method | Path | Operation |
 | --- | --- | --- |
-| POST | `/api/v1/cloud/devices/{device_id}/stream` | Camera Stream |
+| POST | `/api/v1/cloud/devices/{device_id}/stream/relay` | Allocate a camera playback ticket |
+| POST | `/api/v1/cloud/devices/{device_id}/stream` | Legacy direct camera stream (deprecated) |
 
 ### Commissioning
 

@@ -111,7 +111,7 @@ describe('cloud readings in the dashboard and details', () => {
     expect(await screen.findByRole('button', { name: 'Приватность' })).toHaveAttribute('aria-pressed', 'false');
     view.rerender(<></>);
     view.rerender(card(camera(true, '2026-11-06T10:00:01Z'), true));
-    await screen.findByText(/Выключите его для просмотра видео/);
+    await screen.findByText(/Режим приватности включён/);
     expect(screen.getByRole('button', { name: 'Смотреть видео' })).toBeDisabled();
     expect(fetch).not.toHaveBeenCalled();
   });

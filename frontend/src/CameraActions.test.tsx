@@ -53,7 +53,7 @@ describe('camera action buttons',()=>{
     await waitFor(()=>expect(privacy).toBeEnabled());
     expect(privacy).toHaveTextContent('Включена');
     expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
-    expect(screen.getByRole('region',{name:'Видео камеры'})).toHaveTextContent('Выключите его для просмотра видео');
+    expect(screen.getByRole('region',{name:'Видео камеры'})).toHaveTextContent('Режим приватности включён');
     await user.click(privacy);
     await waitFor(()=>expect(privacy).toBeEnabled());
     expect(privacy).toHaveTextContent('Выключена');

@@ -1199,17 +1199,16 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
 
 
 .camera-open { grid-column:2; justify-self:end; padding:6px 10px; font-size:12px; }
-.camera-live { margin:8px 0 20px; }
+.camera-live { --camera-frame-max-height:65vh; margin:8px 0 20px; }
 .camera-live-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
 .camera-live-heading h3 { margin:0; font-size:16px; }
-.camera-live video { display:block; width:100%; max-height:65vh; aspect-ratio:16 / 9; background:var(--media-bg); border-radius:10px; object-fit:contain; }
+.camera-live video, .camera-frame-blocked { display:block; width:100%; max-height:var(--camera-frame-max-height); aspect-ratio:16 / 9; background:var(--media-bg); border-radius:10px; object-fit:contain; }
 .camera-live > p { margin:8px 0 0; }
 
-.camera-live-compact { margin:10px 0 0; }
+.camera-live-compact { --camera-frame-max-height:240px; margin:10px 0 0; }
 .camera-live-compact .camera-live-heading { margin-bottom:6px; gap:6px; }
 .camera-live-compact .camera-live-heading h3 { font-size:12px; }
 .camera-live-compact .camera-live-heading button { font-size:11px; padding:5px 8px; }
-.camera-live-compact video { max-height:240px; }
 .camera-live-compact > p { font-size:11px; }
 .camera-preview-placeholder { display:grid; place-items:center; aspect-ratio:16 / 9; max-height:240px; background:var(--media-bg); border-radius:10px; color:var(--media-text); font-size:30px; }
 .camera-setting-group { margin:20px 0; }
@@ -1230,6 +1229,8 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
 .camera-area-footer { flex:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
 .camera-frame { position:relative; }
 .camera-frame-with-overlay { width:100%; background:var(--media-bg); border-radius:10px; overflow:hidden; }
+.camera-frame-blocked { background:#000; }
+.camera-frame-with-overlay.camera-frame-blocked { max-height:none; }
 .camera-frame-with-overlay video { height:100%; max-height:none; aspect-ratio:auto; border-radius:0; }
 .camera-area-placeholder { display:grid; place-items:center; position:absolute; inset:0; color:var(--media-text); padding:24px; text-align:center; }
 .camera-area-surface { position:absolute; inset:0; }
@@ -1834,12 +1835,11 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-sheet-range input[data-temperature]::-moz-range-track {
   height:8px; border-radius:99px; background:linear-gradient(to right,#ffbf56,#fff4d9,#b8daff);
 }
-.camera-live-sheet { @apply tw:flex tw:flex-col tw:gap-2; }
+.camera-live-sheet { --camera-frame-max-height:50dvh; @apply tw:flex tw:flex-col tw:gap-2; }
 .camera-live-sheet .camera-live-heading { @apply tw:order-last tw:mb-0; }
 .camera-live-sheet .camera-live-actions { @apply tw:w-full tw:justify-start; }
 .camera-live-sheet .camera-live-actions > button { @apply tw:min-h-11 tw:px-3 tw:text-sm; }
 .camera-live-sheet :is(.camera-frame, .camera-preview-placeholder) { @apply tw:relative tw:m-0; }
-.camera-live-sheet .camera-frame video { max-height:50dvh; }
 .camera-room-preview-setting { @apply tw:inline-flex tw:items-center tw:gap-2 tw:text-sm tw:font-semibold; }
 .camera-room-card .dashboard-card-footer { @apply tw:pb-2; }
 .camera-sheet-live-tag, .camera-sheet-fullscreen { @apply tw:absolute tw:top-2 tw:z-1; }
