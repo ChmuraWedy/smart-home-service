@@ -134,7 +134,7 @@
   "MEMORY_CARD_IS_BEING_FORMATTED": "Карта памяти форматируется",
   "MEMORY_CARD_NOT_INSERTED": "Карта памяти не установлена",
   "MEMORY_CARD_STATUS_UNKNOWN": "Состояние карты памяти неизвестно",
-  "PRIVACY_MODE_IS_ON": "Режим приватности включён. Выключите его для просмотра видео.",
+  "PRIVACY_MODE_IS_ON": "Режим приватности включён",
   "CHECKING_PRIVACY_MODE": "Проверяем режим приватности. Дождитесь показания камеры.",
   "COULD_NOT_SAVE_THE_ALIAS": "Не удалось сохранить алиас.",
   "EDIT_ALIAS_DIALOG": "Редактирование алиаса",

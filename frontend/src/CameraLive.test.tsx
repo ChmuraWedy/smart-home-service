@@ -115,14 +115,14 @@ describe('camera live viewing',()=>{
     await user.click(screen.getByRole('button',{name:'Картинка в картинке'}));
     expect(present).toHaveBeenCalledWith('picture-in-picture');
     expect(screen.getByRole('button',{name:'Картинка в картинке'})).toHaveAttribute('aria-pressed','true');
-    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact viewingBlocked="Режим приватности включён." />);
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact viewingBlocked="Режим приватности включён" />);
     expect(present).toHaveBeenLastCalledWith('inline');
     expect(hls.destroy).toHaveBeenCalledOnce();
     expect(video).not.toBeInTheDocument();
   });
 
   it('blocks preview allocation during privacy and keeps playback stopped when privacy is turned off',async()=>{
-    const api=new CloudApi(connection),onAuthError=vi.fn(),blocked='Режим приватности включён. Выключите его для просмотра видео.';
+    const api=new CloudApi(connection),onAuthError=vi.fn(),blocked='Режим приватности включён';
     const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart viewingBlocked={blocked} />);
     expect(screen.getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
     expect(fetch).not.toHaveBeenCalled();
@@ -136,6 +136,7 @@ describe('camera live viewing',()=>{
     expect(screen.queryByLabelText('Прямой эфир камеры')).toBeNull();
     view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} compact autoStart />);
     expect(fetch).toHaveBeenCalledOnce();
+    expect(screen.queryByText(blocked)).not.toBeInTheDocument();
   });
   it('discards an in-flight stream if privacy becomes enabled',async()=>{
     let resolve!:(value:Response)=>void;
@@ -143,7 +144,7 @@ describe('camera live viewing',()=>{
     const api=new CloudApi(connection),onAuthError=vi.fn();
     const view=render(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} />);
     await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
-    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} viewingBlocked="Режим приватности включён." />);
+    view.rerender(<CameraLive api={api} deviceId="camera" provider="sharing" onAuthError={onAuthError} viewingBlocked="Режим приватности включён" />);
     await act(async()=>resolve(json({device_id:'camera',type:'hls',url})));
     expect(hls.attach).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Прямой эфир камеры')).toBeNull();
@@ -196,7 +197,9 @@ describe('camera live viewing',()=>{
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     expect(within(sheet).getByRole('button',{name:'Смотреть видео'})).toBeDisabled();
     expect(within(sheet).getByRole('button',{name:'Выключить приватность'})).toBeEnabled();
-    expect(sheet).toHaveTextContent('Выключите его для просмотра видео');
+    const privacyStatus = within(sheet).getByText('Режим приватности включён');
+    expect(privacyStatus).toHaveAttribute('role', 'status');
+    expect(privacyStatus.closest('.camera-frame')).toHaveClass('camera-frame-blocked');
     expect(vi.mocked(fetch).mock.calls.some(([input])=>String(input).includes('/stream'))).toBe(false);
   });
   it('opens live video in a sheet and destroys the player when dismissed',async()=>{

@@ -264,7 +264,8 @@ describe('combined devices', () => {
     const player = within(await sheet.findByRole('region', { name: 'Camera video' }));
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
     if (privateMode) {
-      expect(await player.findByText(/Privacy mode is on/)).toBeInTheDocument();
+      const privacyStatus = await player.findByText('Privacy mode enabled');
+      expect(privacyStatus.closest('.camera-frame')).toHaveClass('camera-frame-blocked');
       expect(player.getByRole('button', { name: 'Watch video' })).toBeDisabled();
       expect(fetch).not.toHaveBeenCalled();
     } else {

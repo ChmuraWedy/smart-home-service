@@ -408,10 +408,10 @@
   },
   "src/components/CameraLive.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 3
+      "count": 2
     },
     "@stylistic/max-len": {
-      "count": 6
+      "count": 5
     },
     "arrow-parens": {
       "count": 5
@@ -440,9 +440,6 @@
     "key-spacing": {
       "count": 9
     },
-    "no-mixed-operators": {
-      "count": 2
-    },
     "no-nested-ternary": {
       "count": 3
     },
@@ -465,13 +462,13 @@
       "count": 7
     },
     "operator-linebreak": {
-      "count": 2
+      "count": 1
     },
     "prefer-template": {
-      "count": 6
+      "count": 5
     },
     "quotes": {
-      "count": 12
+      "count": 9
     },
     "react-hooks/exhaustive-deps": {
       "count": 4
@@ -486,7 +483,7 @@
       "count": 2
     },
     "space-infix-ops": {
-      "count": 9
+      "count": 8
     }
   },
   "src/components/CameraSettings.tsx": {

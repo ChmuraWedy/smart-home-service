@@ -134,7 +134,7 @@
   "MEMORY_CARD_IS_BEING_FORMATTED": "Memory card is being formatted",
   "MEMORY_CARD_NOT_INSERTED": "Memory card not inserted",
   "MEMORY_CARD_STATUS_UNKNOWN": "Memory card status unknown",
-  "PRIVACY_MODE_IS_ON": "Privacy mode is on. Turn it off to watch video.",
+  "PRIVACY_MODE_IS_ON": "Privacy mode enabled",
   "CHECKING_PRIVACY_MODE": "Checking privacy mode. Wait for the camera's reading.",
   "COULD_NOT_SAVE_THE_ALIAS": "Could not save the alias.",
   "EDIT_ALIAS_DIALOG": "Edit alias",

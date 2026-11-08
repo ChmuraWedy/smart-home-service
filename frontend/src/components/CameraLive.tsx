@@ -188,15 +188,33 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
         <p className="help">{!source ? t(MSG.AVAILABLE_HD_SD_VARIANTS_WILL_APPEAR_AFTER_VIDEO) : levels.length < 2 ? t(MSG.HD_SD_SWITCHING_IS_UNAVAILABLE_FOR_THIS_STREAM) : t(MSG.QUALITY_IS_SELECTED_FROM_THE_VIDEO_STREAMS_AVAILABLE)}</p>
       </div>
 )}
-      {compact && !source && !overlay && (
+      {compact && !source && !overlay && !viewingBlocked && (
       <div className="camera-preview-placeholder" aria-hidden="true">
-        <IconGlyph name={sheet && viewingBlocked ? 'video-blocked' : 'play'} />
+        <IconGlyph name="play" />
       </div>
 )}
-      {(!viewingBlocked && source || overlay) && (
-      <div className={"camera-frame"+(overlay ? " camera-frame-with-overlay" : "")} style={overlay ? {aspectRatio:aspect} : undefined}>
-        {source && !viewingBlocked ? <video ref={video} controls={!overlay} disablePictureInPicture={!!overlay} muted autoPlay playsInline preload="none" aria-label={t(MSG.LIVE_CAMERA_VIDEO)} /> :
-        <div className="camera-area-placeholder">{viewingBlocked || t(MSG.PRESS_WATCH_VIDEO_TO_SEE_THE_IMAGE)}</div>}{overlay}
+      {(viewingBlocked || source || overlay) && (
+      <div
+        className={`camera-frame${overlay ? ' camera-frame-with-overlay' : ''}${viewingBlocked ? ' camera-frame-blocked' : ''}`}
+        style={overlay ? {aspectRatio:aspect} : undefined}
+      >
+        {source && !viewingBlocked ? (
+          <video
+            ref={video}
+            controls={!overlay}
+            disablePictureInPicture={!!overlay}
+            muted
+            autoPlay
+            playsInline
+            preload="none"
+            aria-label={t(MSG.LIVE_CAMERA_VIDEO)}
+          />
+        ) : (
+          <div className="camera-area-placeholder" role={viewingBlocked ? 'status' : undefined}>
+            {viewingBlocked || t(MSG.PRESS_WATCH_VIDEO_TO_SEE_THE_IMAGE)}
+          </div>
+        )}
+        {overlay}
         {sheet && source && !viewingBlocked && (
         <>
           {playback === t(MSG.PLAYING) && <span className="camera-sheet-live-tag">{t(MSG.LIVE)}</span>}
@@ -214,7 +232,9 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
 )}
       </div>
 )}
-      <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{viewingBlocked || message}</p>
+      {!viewingBlocked && (
+        <p className={error ? 'error' : 'help'} role={error ? 'alert' : 'status'}>{message}</p>
+      )}
       {source && !viewingBlocked && pipError && <p className="error" role="alert">{t(MSG.COULD_NOT_SWITCH_PICTURE_IN_PICTURE_MODE)}</p>}
     </section>
   );
