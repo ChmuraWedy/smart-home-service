@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import {
   dashboardBrowserId, ensureDashboardBrowserId, moveCard, placeCards, trimSlots,
 } from '../dashboard-layout';
-import type { LayoutSlots } from '../dashboard-layout';
+import type { DashboardLayout, LayoutSlots } from '../dashboard-layout';
 import type { HomeApi } from '../home-api';
 import { MSG, t } from '../i18n';
 import { Icon } from './ui/icon';
@@ -16,9 +16,9 @@ export type GridCardPlacement = {
   style?: CSSProperties; inert?: boolean; slot?: number; nudge?: DropTarget['nudge'];
 };
 type GridView = { building: string; room: string; page: number };
-type GridItem<T> = { id: string; cardName: string; entry: T };
-type SavedLayout = { api: HomeApi; view: string; slots?: LayoutSlots; error?: boolean };
-type LayoutDraft = { columns: number; slots: LayoutSlots; selected?: number };
+type GridItem<T> = { id: string; cardName: string; entry: T; hideable?: boolean; forceVisible?: boolean };
+type SavedLayout = { api: HomeApi; view: string; layout?: DashboardLayout; error?: boolean };
+type LayoutDraft = { columns: number; slots: LayoutSlots; hiddenDevices: string[]; selected?: number };
 const EDITOR_SLOTS = 20;
 
 function useGridColumns(density: string) {
@@ -53,7 +53,7 @@ function useGridColumns(density: string) {
 }
 
 function LayoutTarget({
-  slot, row, column, cardName, selected, moving, disabled, over, onSelect,
+  slot, row, column, cardName, selected, moving, disabled, over, visibility, onSelect,
 }: {
   slot: number;
   row: number;
@@ -63,6 +63,7 @@ function LayoutTarget({
   moving: boolean;
   disabled: boolean;
   over?: DropTarget['nudge'];
+  visibility?: { shown: boolean; toggle: () => void };
   onSelect: (slot: number) => void;
 }) {
   const cell = t(MSG.LAYOUT_CELL, [row, column]);
@@ -90,18 +91,32 @@ function LayoutTarget({
       >
         <Icon name={cardName ? 'move' : 'add'} />
       </button>
+      {cardName && visibility && (
+        <button
+          type="button"
+          className="secondary dashboard-layout-card-eye"
+          aria-label={t(MSG.DASHBOARD_LAYOUT_CARD_VISIBILITY, [cardName])}
+          aria-pressed={visibility.shown}
+          title={t(MSG.DASHBOARD_LAYOUT_CARD_VISIBILITY, [cardName])}
+          disabled={disabled}
+          onClick={visibility.toggle}
+        >
+          <Icon name={visibility.shown ? 'eye' : 'eye-off'} />
+        </button>
+      )}
     </li>
   );
 }
 
 export default function DashboardGrid<T>({
-  api, density, items, view, editable, renderCard,
+  api, density, items, view, editable, navigation, renderCard,
 }: {
   api: HomeApi;
   density: 'small' | 'large';
   items: GridItem<T>[];
   view?: GridView;
   editable: boolean;
+  navigation?: ReactNode;
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
 }) {
   const { grid, columns } = useGridColumns(density);
@@ -110,6 +125,7 @@ export default function DashboardGrid<T>({
   const [readAttempt, setReadAttempt] = useState(0);
   const [draft, setDraft] = useState<LayoutDraft>();
   const [saving, setSaving] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const pendingSave = useRef<symbol | null>(null);
   const scope = view && new URLSearchParams({
@@ -120,6 +136,7 @@ export default function DashboardGrid<T>({
 
   useLayoutEffect(() => {
     setDraft(undefined);
+    setShowAll(false);
     setSaving(false);
     setSaveError(false);
     return () => { pendingSave.current = null; };
@@ -128,8 +145,8 @@ export default function DashboardGrid<T>({
   useEffect(() => {
     if (!browserId || !viewKey) return undefined;
     const request = new AbortController();
-    api.dashboardLayout(browserId, viewKey, request.signal).then(({ slots }) => {
-      if (!request.signal.aborted) setSaved({ api, view: viewKey, slots });
+    api.dashboardLayout(browserId, viewKey, request.signal).then((layout) => {
+      if (!request.signal.aborted) setSaved({ api, view: viewKey, layout });
     }).catch(() => {
       if (!request.signal.aborted) setSaved({ api, view: viewKey, error: true });
     });
@@ -137,12 +154,19 @@ export default function DashboardGrid<T>({
   }, [api, browserId, readAttempt, viewKey]);
 
   const current = saved?.api === api && saved.view === viewKey ? saved : undefined;
-  const slots = placeCards(items.map(({ id }) => id), draft?.slots ?? current?.slots ?? []);
-  const cards = new Map(items.map((item) => [item.id, item]));
-  const showEditor = Boolean(viewKey && (draft || (editable && items.length)));
+  const hidden = new Set(current?.layout?.hidden_devices);
+  const visibleItems = draft || showAll ? items : items.filter((item) => !item.hideable || item.forceVisible || !hidden.has(item.id));
+  const slots = placeCards(visibleItems.map(({ id }) => id), draft?.slots ?? current?.layout?.slots ?? []);
+  const cards = new Map(visibleItems.map((item) => [item.id, item]));
+  const hasHiddenDevices = items.some((item) => item.hideable && hidden.has(item.id));
+  const showEditor = Boolean(viewKey && (draft || editable));
 
   const drag = useDashboardDrag(scope, (from, target) => {
-    setDraft({ columns: activeColumns, slots: moveCard(slots, from, target.slot, activeColumns, target.nudge === 'up') });
+    setDraft((value) => value && {
+      ...value,
+      slots: moveCard(slots, from, target.slot, activeColumns, target.nudge === 'up'),
+      selected: undefined,
+    });
   });
   const dropPreview = drag.over;
 
@@ -153,25 +177,42 @@ export default function DashboardGrid<T>({
     else if (current?.error) {
       setSaved(undefined);
       setReadAttempt((attempt) => attempt + 1);
-    } else setDraft({ columns, slots });
+    } else {
+      setDraft({
+        columns,
+        slots: placeCards(items.map(({ id }) => id), current?.layout?.slots ?? []),
+        hiddenDevices: [...hidden],
+      });
+    }
   }
 
   function selectSlot(slot: number) {
     if (!draft) return;
     const { selected } = draft;
     if (selected === undefined) setDraft({ ...draft, selected: slot });
-    else setDraft({ columns: activeColumns, slots: moveCard(slots, selected, slot, activeColumns) });
+    else setDraft({ ...draft, slots: moveCard(slots, selected, slot, activeColumns), selected: undefined });
+  }
+
+  function setDeviceVisibility(id: string, visible: boolean) {
+    setDraft((value) => {
+      if (!value) return value;
+      const hiddenDevices = new Set(value.hiddenDevices);
+      if (visible) hiddenDevices.delete(id);
+      else hiddenDevices.add(id);
+      return { ...value, hiddenDevices: [...hiddenDevices] };
+    });
   }
 
   function renderSlot(id: string | null, column: number, index: number) {
     const slot = index * activeColumns + column;
     const row = index + 1;
     const item = id ? cards.get(id) : undefined;
+    const isHidden = Boolean(item?.hideable && draft?.hiddenDevices.includes(item.id));
     const style = { gridColumnStart: 1, gridRowStart: row };
     const content = [];
     if (item) {
       content.push(renderCard(item.entry, {
-        style,
+        style: { ...style, opacity: isHidden ? 0.55 : undefined },
         inert: Boolean(draft) || undefined,
         slot: draft ? slot : undefined,
         nudge: dropPreview?.slot === slot ? dropPreview.nudge : undefined,
@@ -189,6 +230,10 @@ export default function DashboardGrid<T>({
           moving={draft.selected !== undefined}
           disabled={saving}
           over={dropPreview?.slot === slot ? dropPreview.nudge : undefined}
+          visibility={item?.hideable ? {
+            shown: !isHidden,
+            toggle: () => setDeviceVisibility(item.id, isHidden),
+          } : undefined}
           onSelect={(target) => selectSlot(target)}
         />,
       );
@@ -211,18 +256,21 @@ export default function DashboardGrid<T>({
   }
 
   async function saveLayout() {
-    if (!viewKey || pendingSave.current) return;
+    if (!viewKey || !draft || pendingSave.current) return;
     const request = Symbol('dashboard-layout-save');
     pendingSave.current = request;
     setSaving(true);
     setSaveError(false);
     try {
       const id = ensureDashboardBrowserId();
-      const result = await api.saveDashboardLayout(id, viewKey, slots);
+      const changes: DashboardLayout = { slots };
+      if (hidden.size || draft.hiddenDevices.length) changes.hidden_devices = draft.hiddenDevices;
+      const result = await api.saveDashboardLayout(id, viewKey, changes);
       setBrowserId(id);
       if (pendingSave.current !== request) return;
-      setSaved({ api, view: viewKey, slots: result.slots });
+      setSaved({ api, view: viewKey, layout: result });
       setDraft(undefined);
+      setShowAll(false);
     } catch {
       if (pendingSave.current === request) setSaveError(true);
     } finally {
@@ -234,27 +282,53 @@ export default function DashboardGrid<T>({
   }
 
   let editLabel = t(MSG.EDIT_DASHBOARD_LAYOUT);
-  if (draft) editLabel = t(MSG.CANCEL);
-  else if (current?.error) editLabel = t(MSG.RETRY_DASHBOARD_LAYOUT);
+  let editIcon: 'edit' | 'close' | 'refresh-list' = 'edit';
+  if (draft) {
+    editLabel = t(MSG.CANCEL);
+    editIcon = 'close';
+  } else if (current?.error) {
+    editLabel = t(MSG.RETRY_DASHBOARD_LAYOUT);
+    editIcon = 'refresh-list';
+  }
 
   return (
     <>
-      {showEditor && (
+      {(navigation || showEditor) && (
         <div className="dashboard-layout-toolbar" data-editing={Boolean(draft) || undefined}>
-          <button
-            type="button"
-            className="secondary compact"
-            disabled={saving || Boolean(browserId && !current && !draft)}
-            onClick={toggleEditing}
-          >
-            {!draft && <Icon name="edit" />}
-            {editLabel}
-          </button>
-          {draft && (
-            <button type="button" className="primary compact" disabled={saving} onClick={() => saveLayout()}>
-              {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
-            </button>
-          )}
+          <div className="dashboard-layout-heading">
+            {navigation && <div className="dashboard-layout-room">{navigation}</div>}
+            {showEditor && (
+              <div className="dashboard-layout-actions">
+                <button
+                  type="button"
+                  className="secondary dashboard-layout-icon"
+                  aria-label={editLabel}
+                  title={editLabel}
+                  disabled={saving || (!draft && !current?.error && !items.length) || Boolean(browserId && !current && !draft)}
+                  onClick={toggleEditing}
+                >
+                  <Icon name={editIcon} />
+                </button>
+                {draft ? (
+                  <button type="button" className="primary compact" disabled={saving} onClick={() => saveLayout()}>
+                    {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary dashboard-layout-icon"
+                    aria-label={t(MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN)}
+                    aria-pressed={showAll}
+                    title={t(hasHiddenDevices ? MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN : MSG.DASHBOARD_LAYOUT_NONE_HIDDEN)}
+                    disabled={!hasHiddenDevices}
+                    onClick={() => setShowAll((value) => !value)}
+                  >
+                    <Icon name={showAll ? 'eye' : 'eye-off'} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           {draft && <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>}
           {saveError && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}

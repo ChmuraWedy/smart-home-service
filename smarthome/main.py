@@ -675,6 +675,10 @@ def create_app(settings: Settings | None = None, controller=None):
     from .light_presets import router as light_presets_router
 
     app.include_router(light_presets_router)
+
+    from .combined_devices import router as combined_router
+
+    app.include_router(combined_router)
     from .topology import router as cloud_router
 
     app.include_router(cloud_router)

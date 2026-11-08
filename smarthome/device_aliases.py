@@ -3,7 +3,6 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -12,15 +11,10 @@ from .auto_label_translations import cloud_labels, generate_missing
 from .cloud_mappings import scope_for
 from .device_translations import cloud_translations, promote_alias_translations, prune_translations
 from .models import CloudDeviceAlias, Device
-from .schemas import Alias, Identifier, Schema, unique_aliases
+from .schemas import DeviceAliases, Identifier
 from .service import commit, replace_aliases
 
 router = APIRouter(prefix="/api/v1/cloud", tags=["Cloud"], dependencies=[Depends(authenticate)])
-
-
-class DeviceAliases(Schema):
-    aliases: list[Alias] = Field(max_length=32)
-    _unique = field_validator("aliases")(unique_aliases)
 
 
 def aliases_for_devices(session, scope, device_ids):

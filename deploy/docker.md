@@ -66,6 +66,8 @@ The `smart-home-service_smart-home-data` volume contains the database, reports, 
 
 Ordinary updates preserve the volume. For a manual import into a new volume, use UID/GID `1000:1000`, directories with mode 0700, and files with mode 0600. Both containers run as unprivileged users. Keep HTTP access within a trusted LAN or use a VPN or HTTPS reverse proxy.
 
+The backend applies pending SQLite migrations at startup. It records the schema version in `PRAGMA user_version` and rolls back the upgrade if a migration fails. Take a database backup before deploying a schema change. Developers append upgrades to `smarthome/migrations.py` in version order.
+
 ## Build on another computer
 
 For an x86-64 Dell target:

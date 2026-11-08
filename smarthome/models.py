@@ -9,6 +9,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
+    true,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -26,6 +28,7 @@ class DashboardLayout(Base):
     browser_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     view: Mapped[str] = mapped_column(String(64), primary_key=True)
     slots: Mapped[list[str | None]] = mapped_column(JSON)
+    hidden_devices: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
 
 
 class LightPreset(Base):
@@ -37,6 +40,21 @@ class LightPreset(Base):
     name: Mapped[str] = mapped_column(String(80))
     scene: Mapped[dict] = mapped_column(JSON)
     tuya_scene_id: Mapped[str | None] = mapped_column(String(128))
+
+
+class CombinedDevice(Base):
+    """Dashboard-only virtual device. Each member pins a physical identity and route."""
+
+    __tablename__ = "combined_devices"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
+    members: Mapped[list[dict[str, str | None]]] = mapped_column(JSON)
+    show_all_power: Mapped[bool] = mapped_column(Boolean, server_default=true())
+    show_member_cards: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    aliases: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
 
 
 class CloudChannelLabel(Base):

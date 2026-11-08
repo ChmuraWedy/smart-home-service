@@ -82,6 +82,11 @@ class Schema(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True, allow_inf_nan=False)
 
 
+class DeviceAliases(Schema):
+    aliases: list[Alias] = Field(max_length=32)
+    _unique = field_validator("aliases")(unique_aliases)
+
+
 class Patch(Schema):
     non_nullable: ClassVar[set[str]] = set()
 

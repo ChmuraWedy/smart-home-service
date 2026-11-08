@@ -38,3 +38,15 @@ def test_layout_rejects_invalid_browser_scope_and_slots(client):
     for slots in [["device-a", None, "device-a"], ["untyped-card"], [None] * 97]:
         assert client.put(PATH, params=VIEW, json={"slots": slots}).status_code == 422
     assert client.get(PATH, params=VIEW).json() == {"slots": []}
+
+
+def test_hidden_devices_are_optional_for_older_clients_and_cannot_include_groups(client):
+    initial = {"slots": ["device-a", "combined-1", "group-1"], "hidden_devices": ["device-a"]}
+    assert client.put(PATH, params=VIEW, json=initial).json() == initial
+    assert client.get(PATH, params=VIEW).json() == initial
+    legacy = {"slots": ["combined-1", "group-1", "device-a"]}
+    assert client.put(PATH, params=VIEW, json=legacy).json() == {**legacy, "hidden_devices": ["device-a"]}
+    for hidden_devices in (["combined-1"], ["group-1"], ["device-a", "device-a"]):
+        assert client.put(PATH, params=VIEW, json={**legacy, "hidden_devices": hidden_devices}).status_code == 422
+    assert client.put(PATH, params=VIEW, json={**legacy, "hidden_devices": []}).json() == legacy
+    assert client.get(PATH, params=VIEW).json() == legacy

@@ -2,9 +2,40 @@
   "name": "Demo Apartment",
   "rooms": [
     {"name":"Living Room","devices":[{"name":"Ceiling light","kind":"light","values":{"switch":true,"brightness":65}},{"name":"Floor lamp","kind":"light","values":{"switch":false,"brightness":40}}],"lightingGroup":"Living room lights"},
-    {"name":"Kitchen","devices":[{"name":"Counter lights","kind":"light","values":{"switch":true,"brightness":80}},{"name":"Coffee station plug","kind":"plug","values":{"switch":false}}]},
+    {
+      "name": "Kitchen",
+      "devices": [
+        {"name": "Counter lights", "kind": "light", "values": {"switch": true, "brightness": 80}, "key": "counter"},
+        {"name": "Coffee station plug", "kind": "plug", "values": {"switch": false}, "key": "coffee"}
+      ],
+      "combination": {
+        "name": "Kitchen controls",
+        "members": [
+          {"device": "counter"},
+          {"device": "coffee"}
+        ]
+      }
+    },
     {"name":"Bedroom","devices":[{"name":"Bedside lamp","kind":"light","values":{"switch":false,"brightness":25}},{"name":"Bedroom climate","kind":"climate","values":{"temperature":21.3,"humidity":46}}]},
     {"name":"Bathroom","devices":[{"name":"Extractor fan","kind":"plug","values":{"switch":false}},{"name":"Bathroom climate","kind":"climate","values":{"temperature":23.1,"humidity":61}}]},
-    {"name":"Hallway","devices":[{"name":"Entry motion sensor","kind":"motion","values":{"motion":false,"battery_level":87}},{"name":"Hall light","kind":"light","values":{"switch":false,"brightness":55}}]}
+    {"name":"Hallway","devices":[{"name":"Entry motion sensor","kind":"motion","values":{"motion":false,"battery_level":87}},{"name":"Hall light","kind":"light","values":{"switch":false,"brightness":55}}]},
+    {
+      "name": "Study Room",
+      "devices": [
+        {"key": "wall", "name": "Study wall switch", "kind": "relay", "values": {"switch_1": true, "switch_2": true}},
+        {"key": "desk", "name": "Desk lamp", "kind": "tunable_light", "values": {"switch": true, "brightness": 65, "color_temperature": 15}},
+        {"key": "shelf", "name": "Shelf lamp", "kind": "tunable_light", "values": {"switch": true, "brightness": 40, "color_temperature": 55}},
+        {"key": "reading", "name": "Reading lamp", "kind": "tunable_light", "values": {"switch": false, "brightness": 30, "color_temperature": 20}}
+      ],
+      "combination": {
+        "name": "Study room lighting",
+        "members": [
+          {"device": "wall"},
+          {"device": "desk", "powerSource": {"device": "wall", "channel": "switch_1"}},
+          {"device": "shelf", "powerSource": {"device": "wall", "channel": "switch_2"}},
+          {"device": "reading", "powerSource": {"device": "wall", "channel": "switch_2"}}
+        ]
+      }
+    }
   ]
 }

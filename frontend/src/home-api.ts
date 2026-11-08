@@ -3,7 +3,8 @@ import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { DeviceTranslations } from './device-translations';
-import type { LayoutSlots } from './dashboard-layout';
+import type { DashboardLayout } from './dashboard-layout';
+import type { DeviceRoute } from './devices';
 
 export type Capability = {
   type: 'boolean' | 'integer' | 'number' | 'string' | 'object';
@@ -28,6 +29,13 @@ export type Group = { id: number; name: string; room_id: number; device_ids: num
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
 export type GroupResult = { all_acknowledged: boolean; results: { device_id: number; acknowledged: boolean }[] };
 export type Inventory = { buildings: Building[]; rooms: Room[]; devices: LocalDevice[]; groups: Group[] };
+export type CombinedPowerSource = { 'device_id': string; channel: string };
+export type CombinedMemberInput = { 'device_id': string; route: DeviceRoute; 'power_source'?: CombinedPowerSource | null };
+export type CombinedInput = { 'name': string; 'room_id': number | null; members: CombinedMemberInput[]; 'show_all_power'?: boolean; 'show_member_cards'?: boolean };
+export type CombinedMember = CombinedMemberInput & { accessible: boolean };
+export type CombinedDevice = Omit<CombinedInput, 'members'> & { id: number; members: CombinedMember[]; aliases?: string[] };
+export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 'unknown';
+export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
 export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
 export type TopologyJob = { status: 'idle' | 'running' | 'done' | 'failed'; processed: number; total: number; message: string | null };
 export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: false; placements: Placement[]; job: TopologyJob };
@@ -79,11 +87,11 @@ export class HomeApi extends CloudApi {
   }
 
   dashboardLayout(browser: string, view: string, signal: AbortSignal) {
-    return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
+    return this.request<DashboardLayout>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
   }
 
-  saveDashboardLayout(browser: string, view: string, slots: LayoutSlots) {
-    return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'PUT', { slots });
+  saveDashboardLayout(browser: string, view: string, layout: DashboardLayout) {
+    return this.request<DashboardLayout>(`/dashboard-layouts/${browser}?${view}`, 'PUT', layout);
   }
 
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {
@@ -108,6 +116,27 @@ export class HomeApi extends CloudApi {
     }
     throw new Error(t(MSG.THE_LIST_IS_TOO_LARGE));
   }
+
+  combinations(signal: AbortSignal) {
+    return this.request<CombinedDevice[]>('/combined-devices', 'GET', undefined, signal);
+  }
+
+  saveCombination(input: CombinedInput, id?: number) {
+    return this.request<CombinedDevice>(id === undefined ? '/combined-devices' : `/combined-devices/${id}`, id === undefined ? 'POST' : 'PUT', input);
+  }
+
+  saveCombinationAliases(id: number, aliases: string[]) {
+    return this.request<{ aliases: string[] }>(`/combined-devices/${id}/aliases`, 'PUT', { aliases });
+  }
+
+  async removeCombination(id: number) {
+    await this.deleteResource(`/combined-devices/${id}`);
+  }
+
+  combinationPower(id: number, value: boolean) {
+    return this.request<CombinedPowerResult>(`/combined-devices/${id}/power/${value ? 'on' : 'off'}`, 'POST');
+  }
+
   async inventory(signal?: AbortSignal): Promise<Inventory> {
     const [buildings, rooms, devices, groups] = await Promise.all([
       this.list<Building>('/buildings', signal), this.list<Room>('/rooms', signal),

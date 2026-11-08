@@ -9,7 +9,15 @@ export type DashboardSheetState = {
   trigger: RefObject<HTMLButtonElement | null>;
 };
 
-export function DashboardSheet({ title, onClose, returnFocus, children }: { title: string; onClose: () => void; returnFocus?: RefObject<HTMLElement | null>; children: ReactNode }) {
+export function DashboardSheet({
+  title, onClose, returnFocus, children, busy,
+}: {
+  title: string;
+  onClose: () => void;
+  returnFocus?: RefObject<HTMLElement | null>;
+  children: ReactNode;
+  busy?: boolean;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const dragStart = useRef<number | null>(null);
   const titleId = useId();
@@ -26,23 +34,35 @@ export function DashboardSheet({ title, onClose, returnFocus, children }: { titl
   }, [returnFocus]);
 
   return (
-    <dialog ref={dialog} className="dashboard-sheet" aria-labelledby={titleId}
-      onCancel={event => { event.preventDefault(); onClose(); }}
-      onClick={event => event.stopPropagation()}
+    <dialog
+      ref={dialog}
+      className="dashboard-sheet"
+      aria-labelledby={titleId}
+      aria-busy={busy}
+      onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+      onClick={(event) => event.stopPropagation()}
     >
-      <div className="dashboard-sheet-handle" aria-hidden="true"
-        onPointerDown={event => { dragStart.current = event.clientY; event.currentTarget.setPointerCapture(event.pointerId); }}
+      <div
+        className="dashboard-sheet-handle"
+        aria-hidden="true"
+        onPointerDown={(event) => { dragStart.current = event.clientY; event.currentTarget.setPointerCapture(event.pointerId); }}
         onPointerCancel={() => { dragStart.current = null; }}
-        onPointerUp={event => {
-        if (dragStart.current !== null && event.clientY - dragStart.current > 48) onClose();
-        dragStart.current = null;
-      }}
+        onPointerUp={(event) => {
+          if (!busy && dragStart.current !== null && event.clientY - dragStart.current > 48) onClose();
+          dragStart.current = null;
+        }}
       >
         <span />
       </div>
       <header className="dashboard-sheet-heading">
         <h2 id={titleId}>{title}</h2>
-        <button type="button" className="secondary" aria-label={t(MSG.CLOSE)} onClick={onClose}>
+        <button
+          type="button"
+          className="secondary"
+          aria-label={t(MSG.CLOSE)}
+          disabled={busy}
+          onClick={onClose}
+        >
           <IconGlyph name="close" />
         </button>
       </header>
