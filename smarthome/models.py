@@ -164,7 +164,10 @@ class Room(AliasOwner, Base):
         ForeignKey("buildings.id", ondelete="RESTRICT"), index=True
     )
     name: Mapped[str] = mapped_column(String(120))
-    name_translations: Mapped[dict[str, str]] = mapped_column(JSON, default=dict, server_default="{}")
+    name_translation_overrides: Mapped[dict[str, str | None]] = mapped_column(
+        "name_translations", JSON, default=dict, server_default="{}"
+    )
+    generated_name_translations: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     description: Mapped[str | None] = mapped_column(Text)
     alias_entries: Mapped[list["RoomAlias"]] = relationship(
         cascade="all, delete-orphan",
@@ -172,6 +175,20 @@ class Room(AliasOwner, Base):
         lazy="selectin",
         order_by="RoomAlias.alias",
     )
+
+    @property
+    def name_translations(self):
+        generated = self.generated_name_translations or {}
+        values = generated.get("values", {}) if generated.get("original") == self.name else {}
+        return {locale: value for locale, value in (values | (self.name_translation_overrides or {})).items() if value is not None}
+
+    @name_translations.setter
+    def name_translations(self, values):
+        self.name_translation_overrides = values
+
+    @property
+    def manual_name_languages(self):
+        return list(self.name_translation_overrides or {})
 
 
 class RoomAppearance(Base):

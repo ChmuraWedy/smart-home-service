@@ -105,6 +105,7 @@ def test_adds_name_translations_to_existing_rooms():
     engine = db.make_engine(":memory:")
     db.Base.metadata.create_all(engine)
     with engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE rooms DROP COLUMN generated_name_translations")
         connection.exec_driver_sql("ALTER TABLE rooms DROP COLUMN name_translations")
         connection.exec_driver_sql("INSERT INTO buildings (id, name) VALUES (1, 'Home')")
         connection.exec_driver_sql("INSERT INTO rooms (id, building_id, name) VALUES (1, 1, 'Study')")
@@ -113,7 +114,9 @@ def test_adds_name_translations_to_existing_rooms():
     db.init_db(engine)
 
     with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT name, name_translations FROM rooms").one() == ("Study", "{}")
+        assert connection.exec_driver_sql(
+            "SELECT name, name_translations, generated_name_translations FROM rooms"
+        ).one() == ("Study", "{}", "{}")
     engine.dispose()
 
 

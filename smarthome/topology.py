@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .api_dependencies import get_session
+from .auto_label_translations import translate_room_names
 from .cloud_api import router
 from .cloud_scope import scope_for
 from .models import (
@@ -198,6 +199,7 @@ def apply_snapshot(session, scope, homes, room_names, devices):
         for r in session.scalars(select(CloudRoom).where(CloudRoom.scope == scope))
     }
     warnings = 0
+    imported_rooms = []
     for mapping in home_maps.values():
         mapping.active = False
     for home_id, name in homes.items():
@@ -243,6 +245,7 @@ def apply_snapshot(session, scope, homes, room_names, devices):
         mapping.local_room_id, mapping.name = local.id, name
         if follow_name:
             mapping.imported_name = local.name
+        imported_rooms.append(local.id)
     old = {
         p.device_id: p
         for p in session.scalars(select(CloudPlacement).where(CloudPlacement.scope == scope))
@@ -292,6 +295,7 @@ def apply_snapshot(session, scope, homes, room_names, devices):
     state.synced_at, state.warnings = utcnow(), warnings
     session.add(state)
     session.commit()
+    return imported_rooms
 
 
 class TopologySync:
@@ -405,7 +409,9 @@ class TopologySync:
             with bridge.lock:
                 guard()
                 with Session(engine) as session:
-                    apply_snapshot(session, scope, homes, room_names, devices)
+                    imported_rooms = apply_snapshot(session, scope, homes, room_names, devices)
+            with Session(engine) as session:
+                translate_room_names(session, bridge.settings.label_translator_url, imported_rooms, deadline)
             self.update(status="done", empty_rooms_available=bool(homes) and len(catalogs) == len(homes))
         except Exception:
             # Cloud exceptions can include credentials and raw responses. Never publish them.

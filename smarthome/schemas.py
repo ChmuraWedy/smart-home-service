@@ -229,7 +229,7 @@ class RoomCreate(AliasedSchema):
     building_id: PositiveID
     name: Name
     description: str | None = Field(default=None, max_length=4000)
-    name_translations: dict[Locale, DisplayText] = Field(default_factory=dict)
+    name_translations: dict[Locale, DisplayText | None] = Field(default_factory=dict)
 
 
 class RoomPatch(AliasedPatch):
@@ -242,8 +242,14 @@ class RoomPatch(AliasedPatch):
 
 class RoomRead(RoomCreate):
     id: int
+    name_translations: dict[Locale, DisplayText] = Field(default_factory=dict)
+    manual_name_languages: list[Locale] = Field(default_factory=list)
     aliases: list[str] = Field(default_factory=list, max_length=33)
     _normalize_aliases = field_validator("aliases")(lambda v: v)
+
+
+class RoomNamePreview(Schema):
+    name: DisplayText
 
 
 class DeviceTypeCreate(Schema):

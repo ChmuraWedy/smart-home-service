@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { STORAGE_KEY } from './connection';
 import { setDeviceTextMode } from './device-translations';
+import type { TranslatedText } from './device-translations';
 import type { Building, LocalDevice, Room, RoomAppearance } from './home-api';
 import { setLocale } from './i18n';
 import { prepareRoomBackground } from './room-appearance';
@@ -14,7 +15,7 @@ const building = { id: 1, name: 'Home', aliases: [] };
 const kitchen = { id: 1, building_id: 1, name: 'Kitchen', aliases: [] };
 const bedroom = { id: 2, building_id: 1, name: 'Bedroom', aliases: [] };
 
-function fixture(initialBuildings: Building[], initialRooms: Room[], devices: LocalDevice[] = []) {
+function fixture(initialBuildings: Building[], initialRooms: Room[], devices: LocalDevice[] = [], suggestions: TranslatedText = {}) {
   let buildings = initialBuildings;
   let rooms = initialRooms;
   let allowDelete = false;
@@ -26,6 +27,7 @@ function fixture(initialBuildings: Building[], initialRooms: Room[], devices: Lo
   vi.mocked(fetch).mockImplementation(async (input, init) => {
     const path = new URL(String(input)).pathname.slice('/api/v1'.length);
     const method = init?.method ?? 'GET';
+    if (path === '/rooms/translation-preview') return json(suggestions);
     if (method !== 'GET') changes.push(`${method} ${path}`);
     if (path === '/cloud/status') return json({ enabled: false, connected: false });
     if (path === '/buildings') {
@@ -119,7 +121,7 @@ it('creates a first building and room, renames it, and preserves it after a bloc
 });
 
 it('creates, renames, and confirms deletion from the room picker and keeps No room available', async () => {
-  const { changes, enableDelete } = fixture([building], [kitchen, bedroom]);
+  const { changes, enableDelete } = fixture([building], [kitchen, bedroom], [], { pl: 'Warsztat' });
   const user = userEvent.setup();
   openApp('/rooms/2');
   await user.click(await screen.findByRole('button', { name: 'Change room, current room is Bedroom' }));
@@ -134,14 +136,17 @@ it('creates, renames, and confirms deletion from the room picker and keeps No ro
   const create = within(await screen.findByRole('dialog', { name: 'Create room' }));
   const translations = create.getByText('Room name translations (optional)').closest('details');
   expect(translations).not.toHaveAttribute('open');
-  await user.click(create.getByText('Room name translations (optional)'));
-  fireEvent.change(create.getByLabelText('English'), { target: { value: 'Craft room' } });
   fireEvent.change(create.getByLabelText('Name'), { target: { value: 'Workshop' } });
+  await user.click(create.getByText('Room name translations (optional)'));
+  await waitFor(() => expect(create.getByLabelText('Polski')).toHaveValue('Warsztat'));
+  fireEvent.change(create.getByLabelText('Polski'), { target: { value: 'Pracownia' } });
+  fireEvent.change(create.getByLabelText('English'), { target: { value: 'Craft room' } });
   await user.click(create.getByRole('button', { name: 'Create room' }));
   await user.click(await editor.findByRole('button', { name: 'Rename Workshop' }));
   const rename = within(await screen.findByRole('dialog', { name: 'Rename room' }));
   await user.click(rename.getByText('Room name translations (optional)'));
   expect(rename.getByLabelText('English')).toHaveValue('Craft room');
+  expect(rename.getByLabelText('Polski')).toHaveValue('Pracownia');
   fireEvent.change(rename.getByLabelText('English'), { target: { value: 'Art studio' } });
   await user.click(rename.getByRole('button', { name: 'Rename room' }));
   expect(await editor.findByRole('button', { name: 'Delete Workshop' })).toBeEnabled();

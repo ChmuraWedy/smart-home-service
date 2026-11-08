@@ -2,15 +2,16 @@
 
 import json
 import logging
+from time import monotonic
 from typing import NamedTuple
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from .device_translations import LOCAL_SCOPE, save_values
-from .models import CloudDeviceAlias, Device, DeviceTranslation
+from .models import CloudDeviceAlias, Device, DeviceTranslation, Room
 from .schemas import DisplayText, Locale
 from .search import fold_name
 
@@ -67,6 +68,15 @@ def translate_labels(url, originals):
     return {original: translation_values.validate_python(value) for original, value in zip(originals, raw, strict=True)}
 
 
+def translate_batches(url, originals, deadline=None):
+    generated = {}
+    for offset in range(0, len(originals), 33):
+        if deadline is not None and monotonic() + 8 > deadline:
+            break
+        generated.update(translate_labels(url, originals[offset:offset + 33]))
+    return generated
+
+
 def generate_missing(session, url, current_labels):
     """Call after saving the originals. Insert only labels that still exist and have no override."""
     if not url:
@@ -80,9 +90,7 @@ def generate_missing(session, url, current_labels):
         if not candidates:
             return
         originals = list(dict.fromkeys(label.original for label in candidates))
-        generated = {}
-        for offset in range(0, len(originals), 33):
-            generated.update(translate_labels(url, originals[offset:offset + 33]))
+        generated = translate_batches(url, originals)
         if not any(generated.values()):
             return
         session.connection().exec_driver_sql("BEGIN IMMEDIATE")
@@ -108,3 +116,32 @@ def translate_local_device(session, request, device):
         return local_labels(item) if item and item.device_id == physical else []
 
     generate_missing(session, url, current)
+
+
+def translate_room_names(session, url, room_ids, deadline=None):
+    if not url or not room_ids:
+        return
+    try:
+        rows = session.execute(
+            select(Room.id, Room.name, Room.generated_name_translations).where(Room.id.in_(room_ids))
+        )
+        candidates = [
+            (id, name) for id, name, generated in rows
+            if 1 <= len(name) <= 120 and generated.get("original") != name
+        ]
+        session.rollback()
+        if not candidates:
+            return
+        generated = translate_batches(url, list(dict.fromkeys(name for _, name in candidates)), deadline)
+        for id, name in candidates:
+            if name not in generated:
+                continue
+            session.execute(
+                update(Room).where(Room.id == id, Room.name == name).values(
+                    generated_name_translations={"original": name, "values": generated[name]}
+                )
+            )
+        session.commit()
+    except (OSError, ValueError, ValidationError, SQLAlchemyError):
+        session.rollback()
+        logger.warning("Automatic room translation was unavailable; the original was saved.")

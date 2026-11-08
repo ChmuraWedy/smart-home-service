@@ -14,6 +14,7 @@ import type {
 import {
   LANGUAGES, MSG, t, translateText,
 } from '../i18n';
+import type { Locale } from '../i18n';
 import { dashboardHref } from '../navigation';
 import { BACKGROUND_TYPES, prepareRoomBackground, useRoomAppearance } from '../room-appearance';
 import useRoomName from '../room-names';
@@ -22,13 +23,15 @@ import RoomBackgroundCrop from './RoomBackgroundCrop';
 type Catalog = { buildings: Building[]; rooms: Room[] };
 type CatalogRead = { api: HomeApi; data?: Catalog; error?: string };
 type RunAction = (work: () => Promise<void>) => Promise<void>;
+type NamePreview = { source: string; values?: TranslatedText };
+type TranslationDraft = Partial<Record<Locale, { text: string; original: string }>>;
 
 function failureMessage(failure: unknown) {
   return failure instanceof Error ? translateText(failure.message) : t(MSG.COULD_NOT_COMPLETE_THE_ACTION);
 }
 
 function NameForm({
-  title, initial = '', submitLabel, buildings, busy, onSave, translations, onCancel,
+  title, initial = '', submitLabel, buildings, busy, onSave, translations, manualLanguages = [], api, onCancel,
 }: {
   title: string;
   initial?: string;
@@ -36,6 +39,8 @@ function NameForm({
   buildings?: Building[];
   busy: boolean;
   translations?: TranslatedText;
+  manualLanguages?: Locale[];
+  api?: HomeApi;
   onCancel?: () => void;
   onSave: (name: string, buildingId: number, changes?: RoomNameChanges) => void;
 }) {
@@ -43,14 +48,43 @@ function NameForm({
   const buildingId = useId();
   const [name, setName] = useState(initial);
   const [building, setBuilding] = useState(buildings?.[0]?.id ?? 0);
-  const [draft, setDraft] = useState<TranslatedText>({});
+  const [draft, setDraft] = useState<TranslationDraft>({});
+  const [expanded, setExpanded] = useState(false);
+  const [preview, setPreview] = useState<NamePreview>();
   const trimmed = name.trim();
-  const changes: RoomNameChanges = Object.fromEntries(LANGUAGES.flatMap(({ value }) => {
-    const text = draft[value]?.normalize('NFC').trim();
-    return text !== undefined && text !== (translations?.[value] ?? '') ? [[value, text || null]] : [];
+  const shownPreview = preview?.source === trimmed ? preview : undefined;
+  const hasGenerated = LANGUAGES.some(({ value }) => translations?.[value] && !manualLanguages.includes(value));
+  const generating = expanded && Boolean(trimmed) && !busy && !shownPreview
+    && manualLanguages.length < LANGUAGES.length && (trimmed !== initial || !hasGenerated);
+  const changes: RoomNameChanges = Object.fromEntries(Object.entries(draft).flatMap(([locale, entry]) => {
+    const text = entry.text.normalize('NFC').trim();
+    return text !== entry.original ? [[locale, text || null]] : [];
   }));
   const translationsChanged = Object.keys(changes).length > 0;
-  const disabled = busy || !trimmed || (trimmed === initial && !translationsChanged) || (Boolean(buildings) && !building);
+  const hasSuggestions = Boolean(shownPreview?.values && Object.keys(shownPreview.values).length);
+  const unchanged = trimmed === initial && !translationsChanged && !hasSuggestions;
+  const disabled = busy || !trimmed || unchanged || (Boolean(buildings) && !building);
+
+  useEffect(() => {
+    if (!api || !generating) return undefined;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      api.previewRoomName(trimmed, controller.signal).then((values) => {
+        if (!controller.signal.aborted) setPreview({ source: trimmed, values });
+      }).catch(() => {
+        if (!controller.signal.aborted) setPreview({ source: trimmed });
+      });
+    }, 600);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [api, generating, trimmed]);
+
+  function translationValue(locale: Locale) {
+    if (manualLanguages.includes(locale)) return translations?.[locale] ?? '';
+    return shownPreview?.values?.[locale] ?? (trimmed === initial ? translations?.[locale] : undefined) ?? '';
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,7 +116,7 @@ function NameForm({
         </>
       )}
       {translations && (
-        <details className="room-name-translations">
+        <details className="room-name-translations" onToggle={(event) => setExpanded(event.currentTarget.open)}>
           <summary>{t(MSG.ROOM_NAME_TRANSLATIONS)}</summary>
           <p className="help">{t(MSG.ROOM_NAME_TRANSLATIONS_HELP)}</p>
           <div className="device-translation-inputs">
@@ -91,14 +125,19 @@ function NameForm({
                 {label}
                 <input
                   id={`${nameId}-${value}`}
-                  value={draft[value] ?? translations[value] ?? ''}
+                  value={draft[value]?.text ?? translationValue(value)}
                   maxLength={120}
                   disabled={busy}
-                  onChange={(event) => setDraft({ ...draft, [value]: event.target.value })}
+                  onChange={(event) => setDraft({
+                    ...draft,
+                    [value]: { text: event.target.value, original: draft[value]?.original ?? translationValue(value) },
+                  })}
                 />
               </label>
             ))}
           </div>
+          {generating && <p className="help" role="status">{t(MSG.ROOM_TRANSLATING_NAMES)}</p>}
+          {shownPreview && !shownPreview.values && <p className="help" role="status">{t(MSG.ROOM_TRANSLATION_UNAVAILABLE)}</p>}
         </details>
       )}
       <div className="room-editor-actions">
@@ -112,12 +151,13 @@ function NameForm({
 }
 
 export function RoomNameDialog({
-  room, buildings, busy, error, onSave, onClose,
+  room, buildings, busy, error, api, onSave, onClose,
 }: {
   room?: Room;
   buildings?: Building[];
   busy: boolean;
   error?: string;
+  api: HomeApi;
   onSave: (name: string, buildingId: number, changes?: RoomNameChanges) => void;
   onClose: () => void;
 }) {
@@ -134,6 +174,8 @@ export function RoomNameDialog({
           title={title}
           initial={room?.name}
           translations={room?.name_translations ?? {}}
+          manualLanguages={room?.manual_name_languages}
+          api={api}
           buildings={buildings}
           submitLabel={title}
           busy={busy}
@@ -311,6 +353,7 @@ function RoomNameAndAppearance({
       {renaming && (
         <RoomNameDialog
           room={room}
+          api={api}
           busy={busy}
           error={error}
           onSave={rename}
@@ -491,6 +534,7 @@ export default function RoomEditor({
           {creating && (
             <RoomNameDialog
               buildings={data.buildings}
+              api={api}
               busy={busy}
               error={error}
               onSave={createRoom}

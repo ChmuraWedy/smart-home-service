@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.orm import Session
 
+from smarthome import auto_label_translations
 from smarthome.config import Settings
 from smarthome.main import create_app
 from smarthome.models import RoomAppearance
@@ -45,6 +46,44 @@ def test_room_name_translations_are_optional_and_persist_per_language(tmp_path):
 
     with TestClient(create_app(settings)) as client:
         assert client.get(path).json()["name_translations"] == {"pl": "Pracownia", "be": "Кабінет"}
+
+
+def test_room_names_generate_automatically_and_preserve_corrections(tmp_path, monkeypatch):
+    calls = []
+
+    def translate(_url, originals):
+        calls.append(originals)
+        return {name: {"en": name, "pl": "Auto PL", "be": f"Auto {name}", "ru": "Auto RU"} for name in originals}
+
+    monkeypatch.setattr(auto_label_translations, "translate_labels", translate)
+    settings = Settings(
+        database_path=str(tmp_path / "rooms.db"), display_poll_interval=0,
+        label_translator_url="http://127.0.0.1:8093",
+    )
+    with TestClient(create_app(settings)) as client:
+        preview = client.post("/api/v1/rooms/translation-preview", json={"name": "Study"})
+        assert preview.status_code == 200 and preview.json()["pl"] == "Auto PL"
+        assert client.get("/api/v1/rooms").json() == []
+        building = client.post("/api/v1/buildings", json={"name": "Home"}).json()["id"]
+        room = client.post("/api/v1/rooms", json={
+            "name": "Study", "building_id": building, "name_translations": {"pl": "Gabinet", "ru": None},
+        }).json()
+        path = f"/api/v1/rooms/{room['id']}"
+        assert room["name_translations"] == {"en": "Study", "pl": "Gabinet", "be": "Auto Study"}
+        assert set(room["manual_name_languages"]) == {"pl", "ru"}
+        corrected = client.patch(path, json={"name_translations": {"be": None}}).json()
+        assert corrected["name_translations"] == {"en": "Study", "pl": "Gabinet"}
+        renamed = client.patch(path, json={"name": "Office"}).json()
+        assert renamed["name_translations"] == {"en": "Office", "pl": "Gabinet"}
+        assert calls == [["Study"], ["Study"], ["Office"]]
+
+        def unavailable(*_args):
+            raise OSError("Translator offline")
+
+        monkeypatch.setattr(auto_label_translations, "translate_labels", unavailable)
+        renamed = client.patch(path, json={"name": "Workshop"})
+        assert renamed.status_code == 200
+        assert renamed.json()["name_translations"] == {"pl": "Gabinet"}
 
 
 def test_room_appearance_survives_restart_and_stays_isolated(tmp_path):

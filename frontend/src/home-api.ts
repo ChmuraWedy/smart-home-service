@@ -24,7 +24,14 @@ export type LocalDevice = {
   translations?: DeviceTranslations;
 };
 export type Building = { id: number; name: string; aliases: string[] };
-export type Room = { id: number; building_id: number; name: string; aliases: string[]; 'name_translations'?: TranslatedText };
+export type Room = {
+  id: number;
+  building_id: number;
+  name: string;
+  aliases: string[];
+  'name_translations'?: TranslatedText;
+  'manual_name_languages'?: Locale[];
+};
 export type RoomNameChanges = Partial<Record<Locale, string | null>>;
 export type RoomAppearance = { 'card_opacity': number; 'background_version': string | null };
 export type Group = { id: number; name: string; room_id: number; device_ids: number[] };
@@ -165,8 +172,11 @@ export class HomeApi extends CloudApi {
   }
 
   createRoom(name: string, buildingId: number, translations?: RoomNameChanges) {
-    const names = translations && Object.fromEntries(Object.entries(translations).filter(([, value]) => value !== null));
-    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId, name_translations: names });
+    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId, name_translations: translations });
+  }
+
+  previewRoomName(name: string, signal: AbortSignal) {
+    return this.request<TranslatedText>('/rooms/translation-preview', 'POST', { name }, signal);
   }
 
   renameRoom(roomId: number, name?: string, translations?: RoomNameChanges) {

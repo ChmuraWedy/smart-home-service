@@ -272,6 +272,7 @@ export default function RoomNavigationEditor({
         </footer>
         {management && (action?.kind === 'create' || renamedRoom) && (
           <RoomNameDialog
+            api={api}
             room={renamedRoom}
             buildings={renamedRoom ? undefined : management.buildings}
             busy={locked}
