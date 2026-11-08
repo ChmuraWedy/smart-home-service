@@ -13,9 +13,10 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
-from .sharing_state import SharingState
+from .sharing_state import SharingState, missing_light_reading
 
 INVENTORY_REFRESH_INTERVAL = 60
+MISSING_LIGHT_REFRESH_INTERVAL = 60
 
 
 class CloudBridge:
@@ -30,6 +31,7 @@ class CloudBridge:
         self.saved_user_code = None
         self.manager = None
         self.next_inventory_refresh = 0.0
+        self.next_light_refresh = {}
         self.state = SharingState(self, mq_factory)
         if settings.cloud_enabled and self.path.exists():
             if self.path.is_symlink():
@@ -267,6 +269,7 @@ class CloudBridge:
                     503, "Cloud authorization could not be saved securely"
                 ) from None
             self.state.stop()
+            self.next_light_refresh.clear()
             self.manager = None
             self.pending.clear()
             return {"connected": True, "tokens_stored_on_server": True}
@@ -329,6 +332,25 @@ class CloudBridge:
                 # The next heartbeat can retry after the cooldown. Keep the cache.
                 pass
 
+    def schedule_missing_light_refresh(self, background_tasks, device):
+        with self.lock:
+            now = time.monotonic()
+            if self.auth is None or now < self.next_light_refresh.get(device.id, 0) or not missing_light_reading(device):
+                return
+            self.next_light_refresh[device.id] = now + MISSING_LIGHT_REFRESH_INTERVAL
+            background_tasks.add_task(self._refresh_visible_light, self.auth, device.id)
+
+    def _refresh_visible_light(self, authorization, device_id):
+        with self.lock:
+            if self.auth is not authorization:
+                return
+            try:
+                if missing_light_reading(self.device_status(device_id)):
+                    self.device_status(device_id, refresh=True)
+            except HTTPException:
+                # Preserve the last report. A later watch can retry after the cooldown.
+                pass
+
     def device(self, id, refresh=False):
         with self.lock:
             self.devices()
@@ -354,6 +376,7 @@ class CloudBridge:
     def close(self):
         with self.lock:
             self.state.stop()
+            self.next_light_refresh.clear()
 
     def send_commands(self, id, commands):
         self.device(id)
@@ -406,6 +429,7 @@ class CloudBridge:
         with self.lock:
             # Local deletion only. SDK unload() can revoke the shared HA terminal remotely.
             self.state.stop()
+            self.next_light_refresh.clear()
             if self.auth is not None:
                 self.state.stored("clear")
             self.auth, self.saved_user_code, self.manager, self.pending = None, None, None, {}

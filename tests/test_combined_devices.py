@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from smarthome.config import Settings
 from smarthome.main import create_app
+from smarthome.migrations import MIGRATIONS
 
 PATH = "/api/v1/combined-devices"
 
@@ -188,7 +189,7 @@ def test_power_button_visibility_upgrades_existing_combinations_and_persists(tmp
         assert client.put(alias_url, json={"aliases": []}).json() == {"aliases": []}
         assert client.get(PATH).json()[0]["aliases"] == []
     with sqlite3.connect(db) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone() == (3,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (len(MIGRATIONS),)
 
 
 def wired(target, source="relay", channel="switch_1", route="sharing"):

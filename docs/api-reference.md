@@ -104,6 +104,8 @@ Read or replace the layout as `{"slots":[null,"device-physical-id","group-2"]}`.
 
 ## Smart Life topology
 
+**Edit device room** saves the dashboard room assignment in this service. Local inventory uses its existing device record. Cloud-only devices use an account-scoped room override that takes precedence over imported placement.
+
 **Sync Smart Life** reads homes and each device's room through Sharing. Homes become buildings; rooms and device placement are matched by Tuya IDs. Cloud cards can use this placement before local registration.
 
 `POST /cloud/topology/sync` starts a background job; `GET /cloud/topology` returns the saved topology and progress. Refreshes preserve manual names, aliases, and placement. Automatically placed devices follow later cloud moves until placement is changed manually. Existing dependency constraints still apply; skipped moves appear as warnings.
@@ -309,10 +311,7 @@ This index is generated from the application's OpenAPI routes. Consult the live 
 | PUT | `/api/v1/cloud/devices/{device_id}/channel-labels` | Save Channel Labels |
 | POST | `/api/v1/cloud/devices/{device_id}/commands` | Cloud Commands |
 | GET | `/api/v1/cloud/scenes` | Cloud Scenes |
-| GET | `/api/v1/cloud/devices/{device_id}/mappings` | List Mappings |
-| POST | `/api/v1/cloud/devices/{device_id}/mappings` | Create Mapping |
-| PUT | `/api/v1/cloud/devices/{device_id}/mappings/{mapping_id}` | Update Mapping |
-| DELETE | `/api/v1/cloud/devices/{device_id}/mappings/{mapping_id}` | Delete Mapping |
+| PUT | `/api/v1/cloud/devices/{device_id}/room` | Assign Device Room in App |
 | GET | `/api/v1/cloud/topology` | Get Topology |
 | POST | `/api/v1/cloud/topology/sync` | Sync Topology |
 | GET | `/api/v1/cloud/devices/{device_id}/aliases` | Read Aliases |

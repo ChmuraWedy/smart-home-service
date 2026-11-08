@@ -84,7 +84,7 @@ def history(device_id: Identifier, request: Request, response: Response,
         scope, identity = "local", item.device_id
     else:
         from .cloud_api import cloud_bridge
-        from .cloud_mappings import scope_for
+        from .cloud_scope import scope_for
         bridge = cloud_bridge(request, provider)
         with bridge.lock:
             bridge.device(device_id)  # Membership check without a status query.

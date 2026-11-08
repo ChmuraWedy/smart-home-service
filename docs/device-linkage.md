@@ -1,4 +1,4 @@
-# Bulb controls and device mappings
+# Bulb controls and device parameters
 
 [Interface guide](../frontend/README.md) · [Switch channels](switch-controls.md)
 
@@ -40,23 +40,5 @@ JSON editors follow device schemas. On the inspected bulb, music/transition satu
 Known Tuya version-0 raw formats have structured editors. Parsing validates length, version, point counts, ranges, and big-endian fields. Unknown versions and structures remain unchanged. Creating a replacement schedule explicitly replaces the entire raw parameter. Raw transport is base64; declared maximum length applies to decoded bytes, with a 16 KiB global cap. Protocol encoding tests do not prove that every firmware executes every extended mode.
 
 Sources: [lighting function definitions](https://developer.tuya.com/en/docs/iot/product-function-definition?id=K9s9rhj576ypf), [standard lighting JSON](https://developer.tuya.com/en/docs/iot/dj?id=K9i5ql3v98hn3), and [raw transport](https://developer.tuya.com/en/docs/iot/basic-features?id=Kaumiwx9b4kkp). Actual device metadata takes precedence.
-
-## Related devices and manual mappings
-
-Mappings record the intended source/target devices and functions in this application's database. Types are `remote`, `zigbee_group`, and `multi_control`. They are not applied Zigbee groups or Smart Life bindings. Saving does not send commands, forward button presses, or create an automation.
-
-Select a kind, direction, other device, and source/target functions. Known DP numbers come from metadata; unknown numbers may remain null or be entered explicitly when valid. Incoming and outgoing mappings appear on both devices and survive restart. An empty list means no local manual records, not proof that Smart Life has no bindings.
-
-Sharing SDK 0.2.15 exposes function/DP mappings but not Smart Life binding CRUD. Separate Tuya mechanisms exist for [mobile multi-control](https://developer.tuya.com/en/docs/app-development/devicemulticontrol?id=Kceuh30jk2dcu), [association control](https://developer.tuya.com/en/docs/app-development/associationControl?id=Ke6l68yd78zed), and [Zigbee remote panels](https://developer.tuya.com/en/miniapp-codelabs/codelabs/panel-zigbee-remote-group-guide/index.html); those APIs are not automatically available through Sharing authorization.
-
-## Mapping API
-
-Routes require `X-API-Key` and the selected `provider=sharing|developer`. Data is isolated by provider/account. Both devices must be in that account's inventory; a source can be read-only, but the destination must be writable. DP/code mismatches return 422 and duplicate records return 409.
-
-```sh
-curl -sS -X POST -H "X-API-Key: $TOKEN" -H 'Content-Type: application/json'   -d '{"kind":"remote","source_code":"switch_1","source_dp_id":1,"target_device_id":"demo-lamp","target_code":"switch_led","target_dp_id":20}'   "$BASE/cloud/devices/demo-switch/mappings?provider=sharing"
-```
-
-`BASE` includes `/api/v1`. GET on the same collection returns incoming/outgoing records, `origin:manual`, `applied_to_tuya:false`, and `tuya_bindings_available:false`. PUT/DELETE address `/cloud/devices/{source_device_id}/mappings/{id}`. Incoming records must still be changed via their source device. DELETE removes only our database record. UI creation/deletion and REST editing do not change actual Tuya bindings.
 
 Local bulb setup recognizes HSV16, JSON HSV v2, and legacy RGB+HSV8 only when an advertised color function, its unambiguous DP, a valid LAN payload, and an observed writable white/color mode agree. The color capability includes the confirmed mode DP, so picking a color also selects color mode. Unknown formats remain read-only; no product category supplies an assumed DP map. Previously saved raw mappings are preserved until explicitly corrected.

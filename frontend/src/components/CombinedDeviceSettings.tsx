@@ -179,6 +179,10 @@ export function CombinedDeviceSettings({
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [search, setSearch] = useState('');
+  const [roomFilter, setRoomFilter] = useState(() => {
+    const context = existing?.room_id ?? initialRoom;
+    return rooms.some(({ id }) => id === context) ? String(context) : 'all';
+  });
   const byId = new Map(devices.map((device) => [device.id, device]));
   const selected = new Map(members.map((member) => [member.device_id, member]));
   const memberRooms = new Set(members.map(({ device_id: id }) => {
@@ -195,7 +199,9 @@ export function CombinedDeviceSettings({
   const canSubmit = !busy && members.length >= 2 && (pickingDevices || Boolean(roomName && name.trim()));
   const options = [...new Set([...selected.keys(), ...devices.map((device) => device.id)])].filter((id) => {
     const device = byId.get(id);
-    return selected.has(id) || (device && matchesDevice(device, search));
+    if (selected.has(id)) return true;
+    if (!device || !matchesDevice(device, search)) return false;
+    return roomFilter === 'all' || roomFilter === String(deviceRoom(device) ?? 'none');
   });
 
   function handleFailure(failure: unknown) {
@@ -294,12 +300,29 @@ export function CombinedDeviceSettings({
         </ol>
         {!previewing && Boolean(existing || pickingDevices) && (
           <>
-            <label className="field" htmlFor={`${formId}-search`}>
-              {t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}
-              <input id={`${formId}-search`} type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
-            </label>
+            <div className="combined-member-filters">
+              <label className="field" htmlFor={`${formId}-room-filter`}>
+                {t(MSG.COMBINED_ROOM_FILTER)}
+                <select id={`${formId}-room-filter`} value={roomFilter} disabled={busy} onChange={(event) => setRoomFilter(event.target.value)}>
+                  <option value="all">{t(MSG.ALL_ROOMS)}</option>
+                  {rooms.map(({ id, name: label }) => <option key={id} value={id}>{label}</option>)}
+                  <option value="none">{t(MSG.NO_ROOM)}</option>
+                </select>
+              </label>
+              <label className="field" htmlFor={`${formId}-search`}>
+                {t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}
+                <input
+                  id={`${formId}-search`}
+                  type="search"
+                  value={search}
+                  disabled={busy}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
+            </div>
             <fieldset className="combined-members" disabled={busy}>
               <legend>{t(MSG.CHOOSE_COMBINED_DEVICES)}</legend>
+              {!options.length && <p className="help">{t(MSG.NO_MATCHES_FOR_THIS_FILTER)}</p>}
               {options.map((id) => {
                 const device = byId.get(id);
                 const choice = selected.get(id);

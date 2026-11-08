@@ -16,7 +16,7 @@ export function temperatureTint(value: JsonValue | undefined, minimum?: number, 
 }
 
 type LightCardReadingProps = {
-  code: 'brightness' | 'color_temperature' | 'color' | 'scene';
+  code: 'power' | 'brightness' | 'color_temperature' | 'color' | 'scene';
   label: string;
   value?: string;
   tint?: string;

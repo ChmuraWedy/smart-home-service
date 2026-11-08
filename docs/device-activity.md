@@ -20,7 +20,7 @@ Sharing records received device reports, including repeated motion with a differ
 
 Saved snapshots are labeled and recorded on first observation or a changed value. They do not overwrite newer real reports. Developer records available snapshots and commands; local transport records normalized reads and commands, including display collector reads. Earlier Smart Life history is not recovered.
 
-Command requests and outcomes are separate events. ACK is acceptance rather than confirmation. Rejection and unknown outcomes remain distinct. Tokens, local keys, private nested fields, and large compound payloads are excluded or summarized. Alias edits and manual device mappings are not part of this command/reading journal.
+Command requests and outcomes are separate events. ACK is acceptance rather than confirmation. Rejection and unknown outcomes remain distinct. Tokens, local keys, private nested fields, and large compound payloads are excluded or summarized. Alias edits are outside the command and reading journal.
 
 ## Cards and navigation
 
