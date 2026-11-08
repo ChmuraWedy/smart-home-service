@@ -22,6 +22,8 @@ import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
 import { RoomLayoutSettings } from './RoomEditor';
 import DeviceRoomEditor from './DeviceRoomEditor';
+import CameraRoomCard, { cameraRoomCardId } from './CameraRoomCard';
+import { cameraRoomPreviewKey, setCameraRoomPreview, useCameraRoomPreviews } from '../camera-room-previews';
 import type { CardStatus } from './CardControls';
 import { CardControls } from './CardControls';
 import { Card } from './ui/card';
@@ -47,7 +49,8 @@ import type { DeviceTranslations } from '../device-translations';
 import { useRoomAppearance } from '../room-appearance';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
-type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice } | { kind: 'combined'; combined: CombinedDevice };
+type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice }
+  | { kind: 'combined'; combined: CombinedDevice } | { kind: 'camera-video'; device: UnifiedDevice; provider: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; combinations?: CombinedDevice[]; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
 const PAGE_SIZE = 24;
 const NO_COMBINATIONS: CombinedDevice[] = [];
@@ -433,6 +436,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   else if (selected?.kind === 'device' && selected.parent) detailCloseLabel = t(MSG.BACK_TO_GROUP);
   const detailProvider = selected?.kind === 'device' && selected.route !== 'local' ? selected.route : undefined;
   const detailCloud = detailProvider && detailDevice?.cloud[detailProvider];
+  const cameraPreviews = useCameraRoomPreviews();
+  const previewKey = detailDevice && cameraRoomPreviewKey(api.baseUrl, detailDevice.id);
+  const toggleRoomPreview = useCallback((enabled: boolean) => {
+    if (previewKey && detailProvider) setCameraRoomPreview(previewKey, enabled ? detailProvider : undefined);
+  }, [detailProvider, previewKey]);
   const knownGatewayId = detailCloud?.gateway_id || detailDevice?.cloud.developer?.gateway_id;
   const detailGateway = inventory?.devices.find((device) => device.id === detailDevice?.local?.parent_id)
     ?? inventory?.devices.find((device) => device.device_id === knownGatewayId);
@@ -470,16 +478,26 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     });
     const groups = inventory?.groups.filter((item) => inRoom(item.room_id)
       && (!building || String(roomBuilding(item.room_id)) === building) && item.name.toLocaleLowerCase().includes(needle)) ?? [];
+    const videos = devices.flatMap((device) => {
+      const provider = cameraPreviews[cameraRoomPreviewKey(api.baseUrl, device.id)];
+      if (provider !== 'sharing' && provider !== 'developer') return [];
+      const camera = device.cloud[provider];
+      const placement = placementOf(device);
+      const inActiveRoom = Boolean(room && room !== 'none' && String(placement?.room_id) === room && (!building || String(placement?.building_id) === building));
+      return camera && isCamera(camera.category) && inActiveRoom && matchesDevice(device, needle)
+        ? [{ kind: 'camera-video' as const, device, provider }] : [];
+    });
     return [
       ...groups.map((item) => ({ kind: 'group' as const, group: item })),
       ...displayed.map((item) => ({ kind: 'combined' as const, combined: item })),
       ...filtered.map((device) => ({ kind: 'device' as const, device })),
+      ...videos,
     ];
-  }, [devices, inventory, building, room, search, placementOf, combinations, resolvedMembers]);
+  }, [api.baseUrl, devices, inventory, building, room, search, placementOf, combinations, resolvedMembers, cameraPreviews]);
   const linkedIndex = entries.findIndex((entry) => {
     if (entry.kind === 'device') return entry.device === linked;
     if (entry.kind === 'combined') return entry.combined === (combined ?? combinedParent);
-    return entry.group === group;
+    return entry.kind === 'group' && entry.group === group;
   });
   const page = linkedIndex >= 0 ? Math.floor(linkedIndex / PAGE_SIZE)
     : Number.isSafeInteger(requestedPage) ? Math.min(Math.max(requestedPage - 1, 0), Math.max(0, Math.ceil(entries.length / PAGE_SIZE) - 1)) : 0;
@@ -585,6 +603,22 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     else closeManagement();
   }, [api, closeManagement, combined?.id, mask, navigate]);
   function renderCard(entry: DashboardEntry, placement: GridCardPlacement) {
+    if (entry.kind === 'camera-video') {
+      const { device, provider } = entry;
+      return (
+        <CameraRoomCard
+          key={cameraRoomCardId(device.id)}
+          api={api}
+          device={device}
+          provider={provider}
+          now={now}
+          placement={placement}
+          paused={Boolean(detailsOpen || quick || combinedQuickOpen || editingLayout || placement.inert)}
+          onOpen={() => choose({ kind: 'device', device, route: provider })}
+          onAuthError={onAuthError}
+        />
+      );
+    }
     if (entry.kind === 'combined') {
       const item = entry.combined;
       const href = `/combined-devices/${item.id}`;
@@ -666,6 +700,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const gridItems = visible.map((entry) => {
     if (entry.kind === 'group') return { id: `group-${entry.group.id}`, cardName: entry.group.name, entry };
     if (entry.kind === 'combined') return { id: `combined-${entry.combined.id}`, cardName: entry.combined.name, entry };
+    if (entry.kind === 'camera-video') return { id: cameraRoomCardId(entry.device.id), cardName: `${entry.device.name} · ${t(MSG.CAMERA_VIDEO)}`, entry };
     return {
       id: `device-${entry.device.id}`,
       cardName: entry.device.name,
@@ -913,6 +948,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           displayName={detailDevice.name}
           closeLabel={detailCloseLabel}
           device={detailCloud}
+          roomPreview={previewKey ? {
+            enabled: Boolean(cameraPreviews[previewKey]),
+            available: deviceRoom(detailDevice) !== null,
+            toggle: toggleRoomPreview,
+          } : undefined}
           localDevice={detailDevice.local}
           gateway={detailGateway}
           routes={deviceRoutes(detailDevice)}

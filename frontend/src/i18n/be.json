@@ -178,6 +178,7 @@
   "THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM": "Сэрвіс вярнуў няправільны відэапаток.",
   "COULD_NOT_CONNECT_TO_THE_CAMERA_VIDEO": "Не ўдалося падключыцца да відэа камеры.",
   "CAMERA_VIDEO": "Відэа камеры",
+  "SHOW_ROOM_PREVIEW": "Паказваць відэа ў пакоі",
   "STOP": "Спыніць",
   "RECONNECT": "Падключыцца зноў",
   "WATCH_VIDEO": "Глядзець відэа",

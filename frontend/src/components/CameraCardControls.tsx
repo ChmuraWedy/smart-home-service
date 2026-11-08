@@ -13,11 +13,12 @@ import type { ControlNotice } from './DeviceControls';
 import { Icon, IconGlyph } from './ui/icon';
 
 export function CameraCardControls({
-  api, deviceId, name, pendingScope, provider, online, onAuthError, paused, sheet, embeddedQuick,
+  api, deviceId, name, pendingScope, provider, online, onAuthError, paused, sheet, embeddedQuick, previewOnly,
   specs, reading, now, busy, readOK, sending, refresh, toggle, notice,
 }: {
   api: HomeApi; deviceId: string; name: string; pendingScope: string; provider: Provider; online: boolean; onAuthError: () => void;
-  paused: boolean; sheet?: DashboardSheetState; embeddedQuick?: boolean; specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
+  paused: boolean; sheet?: DashboardSheetState; embeddedQuick?: boolean; previewOnly?: boolean;
+  specs: ControlSpec[]; reading: (spec: ControlSpec) => Reading | undefined;
   now: number; busy: boolean; readOK: boolean; sending: boolean; refresh: () => Promise<void>;
   toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice;
 }) {
@@ -69,6 +70,14 @@ export function CameraCardControls({
     );
   }
 
+  if (previewOnly) {
+    return (
+      <>
+        {renderPlayer()}
+        {notice.error && <ControlFeedback busy={false} notice={notice} />}
+      </>
+    );
+  }
   if (!busy && readOK && !controls.length && !notice.error && !sheet?.open && !embeddedQuick) return null;
 
   const field = (spec: ControlSpec) => (

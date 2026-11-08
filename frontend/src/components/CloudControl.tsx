@@ -1,5 +1,7 @@
 import { MSG, dateLocale, t } from "../i18n";
-import { useCallback, useMemo, useState } from 'react';
+import {
+  useCallback, useId, useMemo, useState,
+} from 'react';
 import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, JsonValue, Provider } from '../api';
 import type { DeviceRoute } from '../devices';
@@ -32,15 +34,18 @@ import { useCloudDeviceSnapshot } from '../use-cloud-device-snapshot';
 import { cloudAccountScope } from '../cloud-account-scope';
 import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, nextDeviceMetadataRevision } from '../device-metadata';
 import { useAppDispatch, useAppSelector } from '../store';
+import { Switch } from './ui/switch';
 
 export function CloudControl({
-  api, device, provider, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError, roomEditor,
+  api, device, provider, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError, roomEditor, roomPreview,
 }: {
   api: CloudApi; device: CloudDevice; provider: Provider; room?: string; displayName?: string;
   localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; closeLabel?: string; onClose: () => void; onAuthError: () => void;
   roomEditor?: ReactNode;
+  roomPreview?: { enabled: boolean; available: boolean; toggle: (enabled: boolean) => void };
 }) {
   const originalName = displayName || device.name || t(MSG.TUYA_DEVICE);
+  const roomPreviewId = useId();
   const localize = useDeviceText();
   const localTransport = localDevice?.transport;
   const [aliasBusy, setAliasBusy] = useState(false);
@@ -149,7 +154,22 @@ export function CloudControl({
     >
       {camera && (
       <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
-        headingActions={privacy ? <div className="camera-header-privacy">{field(privacy)}</div> : undefined}
+        headingActions={(
+          <>
+            {privacy && <div className="camera-header-privacy">{field(privacy)}</div>}
+            {roomPreview && (
+              <label htmlFor={roomPreviewId} className="camera-room-preview-setting" title={roomPreview.available ? undefined : t(MSG.COMBINED_SELECT_ROOM)}>
+                <Switch
+                  id={roomPreviewId}
+                  checked={roomPreview.enabled}
+                  disabled={!roomPreview.available && !roomPreview.enabled}
+                  onChange={roomPreview.toggle}
+                />
+                <span>{t(MSG.SHOW_ROOM_PREVIEW)}</span>
+              </label>
+            )}
+          </>
+        )}
       />
 )}
       {roomEditor}

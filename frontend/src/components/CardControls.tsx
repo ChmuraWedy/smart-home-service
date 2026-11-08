@@ -78,6 +78,7 @@ type CardProps = EmbeddedControls & {
   now: number;
   paused: boolean;
   loadWhenPaused?: boolean;
+  previewOnly?: boolean;
   onAuthError: () => void;
   onBusy: (busy: boolean) => void;
   onStatus?: (status: CardStatus) => void;
@@ -90,7 +91,7 @@ export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
   const {
-    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren, supplyPower,
+    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren, supplyPower, previewOnly,
   } = props;
   const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
@@ -108,7 +109,7 @@ export function CardControls(props: CardProps) {
   }, [paused]);
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick
-    || loadWhenPaused || Boolean(channelChildren?.size) || supplyPower !== undefined;
+    || loadWhenPaused || Boolean(channelChildren?.size) || supplyPower !== undefined || previewOnly;
   const pollingVisible = visible && !paused && supplyPower !== false;
   let controls: ReactNode;
   if (!active) {
@@ -345,7 +346,8 @@ function StandardCardControls({
 }
 
 function CloudCardControls({
-  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, supplyPower,
+  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
+  channelChildren, powerSide, inlineMemberName, supplyPower, previewOnly,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
@@ -401,6 +403,7 @@ function CloudCardControls({
           online={snapshot?.online ?? cloud.online}
           paused={paused || supplyPower !== undefined}
           embeddedQuick={embeddedQuick}
+          previewOnly={previewOnly}
         />
         {unplacedChannelChildren(channelChildren)}
       </>

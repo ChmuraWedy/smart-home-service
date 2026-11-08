@@ -178,6 +178,7 @@
   "THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM": "The service returned an invalid video stream.",
   "COULD_NOT_CONNECT_TO_THE_CAMERA_VIDEO": "Could not connect to the camera video.",
   "CAMERA_VIDEO": "Camera video",
+  "SHOW_ROOM_PREVIEW": "Show room preview",
   "STOP": "Stop",
   "RECONNECT": "Reconnect",
   "WATCH_VIDEO": "Watch video",

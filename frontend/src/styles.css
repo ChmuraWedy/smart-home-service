@@ -1797,6 +1797,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .camera-live-sheet .camera-live-actions > button { @apply tw:min-h-11 tw:px-3 tw:text-sm; }
 .camera-live-sheet :is(.camera-frame, .camera-preview-placeholder) { @apply tw:relative tw:m-0; }
 .camera-live-sheet .camera-frame video { max-height:50dvh; }
+.camera-room-preview-setting { @apply tw:inline-flex tw:items-center tw:gap-2 tw:text-sm tw:font-semibold; }
+.camera-room-card .dashboard-card-footer { @apply tw:pb-2; }
 .camera-sheet-live-tag, .camera-sheet-fullscreen { @apply tw:absolute tw:top-2 tw:z-1; }
 .camera-sheet-live-tag { @apply tw:left-2 tw:rounded tw:bg-red-700 tw:px-2 tw:py-1 tw:text-xs tw:font-semibold tw:text-white; }
 .camera-sheet-fullscreen { @apply tw:right-2 tw:grid tw:size-11 tw:place-items-center tw:bg-black/70 tw:p-0 tw:text-2xl tw:text-white; }

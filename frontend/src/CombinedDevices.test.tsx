@@ -59,10 +59,11 @@ function backend(
   developerConnected = false,
   allMembersReachable = false,
   includeRelay = false,
-  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[]; singleRelay?: boolean },
+  options?: { memberRooms?: Record<string, number>; otherCombinations?: CombinedDevice[]; singleRelay?: boolean; extraDevices?: CloudDevice[] },
 ) {
   let combined = initial;
   const roomOverrides = new Map<string, AppRoomAssignment>();
+  const cloudDevices = [...bulbs, ...(options?.extraDevices ?? [])];
   const refreshedPower = new Map<string, boolean>();
   const refreshedMembers: string[] = [];
   const writes: { path: string; method: string; body?: CombinedInput | Record<string, unknown> }[] = [];
@@ -107,7 +108,7 @@ function backend(
     }
     if (path === '/cloud/topology') return json({
       synced_at: null, warnings: 0,
-      placements: bulbs.map((bulb) => ({
+      placements: cloudDevices.map((bulb) => ({
         device_id: bulb.id, building_id: room.building_id, room_id: options?.memberRooms?.[bulb.id] ?? room.id,
       })),
       job: { status: 'idle', processed: 0, total: 0, message: null },
@@ -116,11 +117,11 @@ function backend(
     if (['/devices', '/groups', '/buildings'].includes(path)) return json([]);
     if (path === '/cloud/devices') {
       if (url.searchParams.get('provider') === 'developer') return json(bulbs.slice(0, 1));
-      return json((includeRelay ? [...bulbs, relay] : bulbs).map((device) => ({ ...device, app_room: roomOverrides.get(device.id) })));
+      return json((includeRelay ? [...cloudDevices, relay] : cloudDevices).map((device) => ({ ...device, app_room: roomOverrides.get(device.id) })));
     }
     if (path.startsWith('/activity/')) return json({ events: [], next_before: null });
     const [, id, action] = /^\/cloud\/devices\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
-    const bulb = bulbs.find((item) => item.id === id);
+    const bulb = cloudDevices.find((item) => item.id === id);
     if (action === 'room' && method === 'PUT') {
       const assignment = { room_id: body.room_id, building_id: body.room_id ? room.building_id : null };
       roomOverrides.set(id, assignment);
@@ -211,6 +212,34 @@ function cameraWithPrivacy(privateMode: boolean): CloudDevice {
 }
 
 describe('combined devices', () => {
+  it('adds a separate browser-saved video card only to the camera room, even for a hidden combination member', async () => {
+    const camera = cameraWithPrivacy(true);
+    const { writes } = backend({
+      id: 1, name: 'Camera and socket', room_id: room.id, show_member_cards: false,
+      members: [relay, camera].map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    }, false, false, true, { extraDevices: [camera] });
+    const user = userEvent.setup();
+    const app = openApp('/devices/camera?room=3&route=sharing');
+    const detail = within(await screen.findByRole('dialog', { name: camera.name }));
+    const setting = detail.getByRole('switch', { name: 'Show room preview' });
+    expect(setting).not.toBeChecked();
+    await user.click(setting);
+    expect(setting).toBeChecked();
+    await user.click(detail.getByRole('button', { name: 'Close' }));
+    const videoTitle = `${camera.name} · Camera video`;
+    const video = within(await screen.findByRole('listitem', { name: videoTitle }));
+    expect(await video.findByRole('region', { name: 'Camera video' })).toBeInTheDocument();
+    expect(video.getByRole('button', { name: 'Watch video' })).toBeDisabled();
+    expect(screen.queryByRole('listitem', { name: camera.name })).toBeNull();
+    expect(writes).toEqual([]);
+
+    app.unmount();
+    openApp('/rooms/3');
+    expect(await screen.findByRole('listitem', { name: videoTitle })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: otherRoom.name }));
+    expect(screen.queryByRole('listitem', { name: videoTitle })).toBeNull();
+  });
+
   it('saves a cloud device room in the app and updates its detail and dashboard placement', async () => {
     const { writes } = backend();
     const user = userEvent.setup();

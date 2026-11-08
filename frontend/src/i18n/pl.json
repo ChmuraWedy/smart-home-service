@@ -178,6 +178,7 @@
   "THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM": "Usługa zwróciła nieprawidłowy strumień wideo.",
   "COULD_NOT_CONNECT_TO_THE_CAMERA_VIDEO": "Nie udało się połączyć z wideo kamery.",
   "CAMERA_VIDEO": "Wideo z kamery",
+  "SHOW_ROOM_PREVIEW": "Pokaż podgląd w pokoju",
   "STOP": "Zatrzymaj",
   "RECONNECT": "Połącz ponownie",
   "WATCH_VIDEO": "Oglądaj wideo",

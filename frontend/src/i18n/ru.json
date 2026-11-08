@@ -178,6 +178,7 @@
   "THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM": "Сервис вернул недопустимый видеопоток.",
   "COULD_NOT_CONNECT_TO_THE_CAMERA_VIDEO": "Не удалось подключить видео камеры.",
   "CAMERA_VIDEO": "Видео камеры",
+  "SHOW_ROOM_PREVIEW": "Показывать видео в комнате",
   "STOP": "Остановить",
   "RECONNECT": "Подключиться заново",
   "WATCH_VIDEO": "Смотреть видео",
