@@ -1775,7 +1775,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   --combined-branch-width:5px;
   --combined-branch-color:var(--border-strong);
   border-block-start:1px solid var(--border);
-  border-inline-start:var(--combined-branch-width) solid var(--combined-branch-color);
+  border-inline:var(--combined-branch-width) solid var(--combined-branch-color);
 }
 .combined-relay-channel:nth-child(4n+2) > .combined-relay-devices { --combined-branch-color:var(--accent); }
 .combined-relay-channel:nth-child(4n+3) > .combined-relay-devices { --combined-branch-color:var(--warning-border); }
