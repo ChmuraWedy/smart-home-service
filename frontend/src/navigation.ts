@@ -13,6 +13,8 @@ export const appPaths = {
 
 export const dashboardToolsPath = '/settings/dashboard';
 export const roomPattern = '/rooms/:roomId';
+export const dashboardLayoutPath = '/layout/edit';
+export const roomLayoutPattern = roomPattern + dashboardLayoutPath;
 export const combinationNewPath = `${appPaths['combined-devices']}/new`;
 export const combinationNewPreviewPath = `${combinationNewPath}/preview`;
 export const combinationPattern = `${appPaths['combined-devices']}/:combinedId`;
@@ -31,16 +33,27 @@ export function withQuery(pathname: string, query: URLSearchParams) {
 }
 
 export function dashboardRoom(pathname: string, query: URLSearchParams) {
-  return matchPath(roomPattern, pathname)?.params.roomId ?? query.get('room') ?? '';
+  const match = matchPath(roomPattern, pathname) ?? matchPath(roomLayoutPattern, pathname);
+  return match?.params.roomId ?? query.get('room') ?? '';
 }
 
-export function dashboardHref(room: string, query: URLSearchParams, panel: DashboardPanel) {
+export function isDashboardLayoutPath(pathname: string) {
+  return Boolean(matchPath(dashboardLayoutPath, pathname) || matchPath(roomLayoutPattern, pathname));
+}
+
+export function dashboardHref(room: string, query: URLSearchParams, panel: DashboardPanel, editingLayout = false) {
   const params = new URLSearchParams(query);
   params.delete('route');
   params.delete('group');
   params.delete('combined');
   params.delete('room');
   params.delete('panel');
+  if (editingLayout) {
+    params.delete('q');
+    if (panel) params.set('panel', panel);
+    const roomPath = room ? `/rooms/${encodeURIComponent(room)}` : '';
+    return withQuery(roomPath + dashboardLayoutPath, params);
+  }
   if (panel === 'search') params.set('panel', 'search');
   if (panel === 'tools') {
     if (room) params.set('room', room);

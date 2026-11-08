@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardGrid from './components/DashboardGrid';
@@ -12,20 +13,27 @@ const items = ['device-a', 'group-1', 'device-b'].map((id, index) => ({
 const api = new HomeApi({ baseUrl: 'http://dashboard.test', token: 'fixture-key' });
 const view = { building: '', room: '3', page: 1 };
 
-function mount(room = '3') {
-  return render(
+function GridFixture({ room }: { room: string }) {
+  const [editing, setEditing] = useState(false);
+  return (
     <DashboardGrid
       api={api}
       density="large"
       items={items}
       view={{ ...view, room }}
       editable
+      editing={editing}
+      onEditingChange={setEditing}
       navigation={<p>Study Room</p>}
       renderCard={({ id, title }, { style, inert, slot, nudge }) => (
         <li key={id} data-testid={id} data-layout-slot={slot} data-layout-nudge={nudge} style={style} inert={inert}>{title}</li>
       )}
-    />,
+    />
   );
+}
+
+function mount(room = '3') {
+  return render(<GridFixture room={room} />);
 }
 
 function click(name: string) {

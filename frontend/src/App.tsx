@@ -20,7 +20,7 @@ import RoomEditor from './components/RoomEditor';
 import { Icon, IconGlyph } from './components/ui/icon';
 import {
   appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath, combinationPattern, combinationQuickPattern,
-  dashboardHref, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomPattern,
+  dashboardHref, dashboardLayoutPath, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomLayoutPattern, roomPattern,
 } from './navigation';
 import type { DashboardPanel } from './navigation';
 import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
@@ -61,6 +61,8 @@ export function createAppRouter() {
   return createRouter([{ element: <App />, children: [
     screenRoute(appPaths.control, 'control'),
     screenRoute(roomPattern, 'control'),
+    screenRoute(dashboardLayoutPath, 'control'),
+    screenRoute(roomLayoutPattern, 'control'),
     screenRoute(devicePattern, 'control'),
     screenRoute(quickPattern, 'control'),
     screenRoute(groupPattern, 'control'),

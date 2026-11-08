@@ -44,7 +44,8 @@ function fixture(initialBuildings: Building[], initialRooms: Room[]) {
       }
       return json(rooms);
     }
-    if (path === '/devices' || path === '/groups') return json([]);
+    if (path === '/devices' || path === '/groups' || path === '/combined-devices') return json([]);
+    if (path.startsWith('/dashboard-layouts/')) return json({ slots: [] });
     const match = /^\/rooms\/(\d+)(?:\/(appearance|background))?$/.exec(path);
     if (!match) return json({ detail: 'Not found' }, 404);
     const id = Number(match[1]);
@@ -122,6 +123,7 @@ it('opens the selected room from the grid editor and saves its background and op
   expect(editLayout.querySelector('[data-icon="edit"]')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Room appearance and name editor' })).not.toBeInTheDocument();
   await user.click(editLayout);
+  expect(window.location.pathname).toBe('/rooms/1/layout/edit');
   expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Room appearance and name editor' }));
   expect(window.location.pathname).toBe('/settings/rooms');
@@ -154,9 +156,23 @@ it('opens room management from All rooms even before a room exists', async () =>
   openApp('/');
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Edit layout' }));
+  expect(window.location.pathname).toBe('/layout/edit');
   await user.click(screen.getByRole('button', { name: 'Room appearance and name editor' }));
   expect(window.location.pathname + window.location.search).toBe('/settings/rooms');
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
+});
+
+it('restores the room layout editor from a direct URL and returns to that room after saving', async () => {
+  const { changes } = fixture([building], [kitchen, bedroom]);
+  const user = userEvent.setup();
+  openApp('/rooms/2/layout/edit?building=1');
+  const heading = await screen.findByText('Bedroom', { selector: '.room-navigation-heading' });
+  const toolbar = heading.closest('.dashboard-layout-toolbar');
+  expect(toolbar).toHaveAttribute('data-editing', 'true');
+  await user.click(await screen.findByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/rooms/2?building=1'));
+  expect(changes.some((change) => change.startsWith('PUT /dashboard-layouts/'))).toBe(true);
+  expect(screen.queryByRole('button', { name: 'Room appearance and name editor' })).not.toBeInTheDocument();
 });
 
 it('shrinks a large photo before sending it through the existing upload limit', async () => {

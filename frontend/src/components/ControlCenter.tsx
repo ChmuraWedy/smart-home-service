@@ -32,7 +32,7 @@ import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
 import {
   appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath,
-  combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery,
+  combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, isDashboardLayoutPath, quickPattern, withQuery,
 } from '../navigation';
 import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
@@ -222,10 +222,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const query = new URLSearchParams(location.search);
   const building = query.get('building') ?? '';
   const room = dashboardRoom(location.pathname, query);
+  const editingLayout = isDashboardLayoutPath(location.pathname);
   const activeRoomId = inventory?.rooms.find(({ id }) => String(id) === room)?.id;
   const canOpenRoomEditor = import.meta.env.MODE !== 'demo' && Boolean(inventory && (activeRoomId !== undefined || room === ''));
   const roomAppearance = useRoomAppearance(api, activeRoomId)?.value;
-  const search = query.get('q') ?? '';
+  const search = editingLayout ? '' : query.get('q') ?? '';
   const requestedPage = Number(query.get('page') ?? 1);
   const deviceLink = readDeviceLink(location.pathname + location.search);
   const quick = Boolean(matchPath(quickPattern, location.pathname));
@@ -253,6 +254,18 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (value) query.set('building', value); else query.delete('building');
     selectRoom('', query);
   }
+  const fromDashboardLayout = Boolean(location.state?.fromDashboardLayout);
+  const setEditingLayout = useCallback((editing: boolean) => {
+    const params = new URLSearchParams(location.search);
+    if (editing) {
+      navigate(dashboardHref(room, params, dashboardPanel, true), { state: { fromDashboardLayout: true } });
+    } else if (fromDashboardLayout) {
+      navigate(-1);
+    } else {
+      navigate(dashboardHref(room, params, dashboardPanel), { replace: true });
+    }
+  }, [dashboardPanel, fromDashboardLayout, location.search, navigate, room]);
+
   function openRoomEditor() {
     const params = new URLSearchParams();
     if (activeRoomId) params.set('room', String(activeRoomId));
@@ -782,6 +795,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             items={gridItems}
             view={canUseLayout ? { building, room, page: page + 1 } : undefined}
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
+            editing={editingLayout}
+            onEditingChange={setEditingLayout}
             navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
             roomAction={canOpenRoomEditor ? (
               <button type="button" className="secondary compact" onClick={openRoomEditor}>

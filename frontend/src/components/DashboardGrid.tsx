@@ -109,13 +109,15 @@ function LayoutTarget({
 }
 
 export default function DashboardGrid<T>({
-  api, density, items, view, editable, navigation, roomAction, renderCard,
+  api, density, items, view, editable, editing, onEditingChange, navigation, roomAction, renderCard,
 }: {
   api: HomeApi;
   density: 'small' | 'large';
   items: GridItem<T>[];
   view?: GridView;
   editable: boolean;
+  editing: boolean;
+  onEditingChange: (value: boolean) => void;
   navigation?: ReactNode;
   roomAction?: ReactNode;
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
@@ -160,9 +162,26 @@ export default function DashboardGrid<T>({
   const slots = placeCards(visibleItems.map(({ id }) => id), draft?.slots ?? current?.layout?.slots ?? []);
   const cards = new Map(visibleItems.map((item) => [item.id, item]));
   const hasHiddenDevices = items.some((item) => item.hideable && hidden.has(item.id));
-  const showEditor = Boolean(viewKey && (draft || editable));
+  const showEditor = Boolean(editing || (viewKey && editable));
 
-  const drag = useDashboardDrag(scope, (from, target) => {
+  useLayoutEffect(() => {
+    if (editing) return;
+    setDraft(undefined);
+    setSaving(false);
+    setSaveError(false);
+    pendingSave.current = null;
+  }, [editing]);
+
+  useEffect(() => {
+    if (!editing || !editable || !viewKey || draft || (browserId && !current?.layout)) return;
+    setDraft({
+      columns,
+      slots: placeCards(items.map(({ id }) => id), current?.layout?.slots ?? []),
+      hiddenDevices: current?.layout?.hidden_devices ?? [],
+    });
+  }, [editing, editable, viewKey, draft, browserId, current, columns, items]);
+
+  const drag = useDashboardDrag(editing ? scope : undefined, (from, target) => {
     setDraft((value) => value && {
       ...value,
       slots: moveCard(slots, from, target.slot, activeColumns, target.nudge === 'up'),
@@ -171,20 +190,15 @@ export default function DashboardGrid<T>({
   });
   const dropPreview = drag.over;
 
+  function retryLayout() {
+    setSaved(undefined);
+    setReadAttempt((attempt) => attempt + 1);
+  }
+
   function toggleEditing() {
-    setSaveError(false);
     drag.cancel();
-    if (draft) setDraft(undefined);
-    else if (current?.error) {
-      setSaved(undefined);
-      setReadAttempt((attempt) => attempt + 1);
-    } else {
-      setDraft({
-        columns,
-        slots: placeCards(items.map(({ id }) => id), current?.layout?.slots ?? []),
-        hiddenDevices: [...hidden],
-      });
-    }
+    if (current?.error && !editing) retryLayout();
+    else onEditingChange(!editing);
   }
 
   function selectSlot(slot: number) {
@@ -270,8 +284,8 @@ export default function DashboardGrid<T>({
       setBrowserId(id);
       if (pendingSave.current !== request) return;
       setSaved({ api, view: viewKey, layout: result });
-      setDraft(undefined);
       setShowAll(false);
+      onEditingChange(false);
     } catch {
       if (pendingSave.current === request) setSaveError(true);
     } finally {
@@ -284,7 +298,7 @@ export default function DashboardGrid<T>({
 
   let editLabel = t(MSG.EDIT_DASHBOARD_LAYOUT);
   let editIcon: 'edit' | 'close' | 'refresh-list' = 'edit';
-  if (draft) {
+  if (editing) {
     editLabel = t(MSG.CANCEL);
     editIcon = 'close';
   } else if (current?.error) {
@@ -295,7 +309,7 @@ export default function DashboardGrid<T>({
   return (
     <>
       {(navigation || showEditor) && (
-        <div className="dashboard-layout-toolbar" data-editing={Boolean(draft) || undefined}>
+        <div className="dashboard-layout-toolbar" data-editing={editing || undefined}>
           <div className="dashboard-layout-heading">
             {navigation && <div className="dashboard-layout-room">{navigation}</div>}
             {showEditor && (
@@ -305,7 +319,7 @@ export default function DashboardGrid<T>({
                   className="secondary dashboard-layout-icon"
                   aria-label={editLabel}
                   title={editLabel}
-                  disabled={saving || (!draft && !current?.error && !items.length && !roomAction) || Boolean(browserId && !current && !draft)}
+                  disabled={saving || (!editing && ((!current?.error && !items.length && !roomAction) || Boolean(browserId && !current)))}
                   onClick={toggleEditing}
                 >
                   <Icon name={editIcon} />
@@ -314,7 +328,7 @@ export default function DashboardGrid<T>({
                   <button type="button" className="primary compact" disabled={saving} onClick={() => saveLayout()}>
                     {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
                   </button>
-                ) : (
+                ) : !editing && (
                   <button
                     type="button"
                     className="secondary dashboard-layout-icon"
@@ -338,6 +352,11 @@ export default function DashboardGrid<T>({
           )}
           {saveError && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
+          {editing && current?.error && (
+            <button type="button" className="secondary compact" onClick={retryLayout}>
+              {t(MSG.RETRY_DASHBOARD_LAYOUT)}
+            </button>
+          )}
         </div>
       )}
       <div

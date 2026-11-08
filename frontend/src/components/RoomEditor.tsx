@@ -262,7 +262,7 @@ export default function RoomEditor({
     <section className="card room-editor" aria-busy={busy}>
       <div className="card-heading">
         <h1>{t(MSG.ROOM_EDITOR_TITLE)}</h1>
-        <Link to={dashboardHref(selected ? String(selected.id) : '', new URLSearchParams(), 'tools')}>{t(MSG.DASHBOARD_SETTINGS)}</Link>
+        <Link to={dashboardHref(selected ? String(selected.id) : '', new URLSearchParams(), null, true)}>{t(MSG.EDIT_DASHBOARD_LAYOUT)}</Link>
       </div>
       {!read && <p role="status">{t(MSG.LOADING_LIST)}</p>}
       {read?.error && (
