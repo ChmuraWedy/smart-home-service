@@ -8,11 +8,11 @@ The main card offers privacy, motion detection, sound detection, and siren contr
 
 Full details place privacy beside the video action. Privacy blocks video while enabled or pending confirmation, stops active playback, and ignores late stream responses. Turning privacy off does not automatically start video.
 
-The player uses a temporary HTTPS HLS URL obtained through the selected Sharing/Developer connection. Compatible browsers use lazy-loaded hls.js; native HLS is the fallback. Audio starts muted. Stopping or closing the player stops downloads. The application does not use the microphone or record browser video.
+The service opens a temporary HTTPS HLS stream through the selected Tuya connection and relays playlists, video, audio, and encryption keys to the player. Compatible browsers use lazy-loaded hls.js; native HLS is the fallback. Audio starts muted. Stopping or closing the player stops downloads. The application does not use the microphone or record browser video.
 
-The player shows available resolution, playback state, latest-segment download speed, and a known Wi-Fi reading. HD/SD selection uses actual HLS variants; if only one exists it is unavailable. Download speed is not a Wi-Fi quality percentage. Sharing does not expose a separate camera HD/SD command or Wi-Fi query here.
+The player shows available resolution, playback state, latest-segment download speed from the service to the browser, and a known Wi-Fi reading. HD/SD selection uses actual HLS variants; if only one exists it is unavailable. Download speed is not a Wi-Fi quality percentage. Sharing does not expose a separate camera HD/SD command or Wi-Fi query here.
 
-`POST /api/v1/cloud/devices/{device_id}/stream?provider=sharing|developer` validates ownership/category and returns a short-lived no-store URL. It is not persisted in the database. Reconnect explicitly after expiration or playback failure. Developer streaming needs the appropriate project permissions.
+`POST /api/v1/cloud/devices/{device_id}/stream/relay?provider=sharing|developer` validates the device against the selected account and returns a temporary playback path. The path is a bearer credential for that playback session and works with native HLS. The relay keeps tickets and signed Tuya URLs in memory on its single backend worker. Tickets expire after three minutes without a valid request, after two hours of total playback, or when the Tuya connection changes. The relay does not store media or buffer entire segments. Reconnect after expiration or playback failure. Developer streaming needs the appropriate project permissions. The deprecated `/stream` endpoint still returns the direct Tuya address for older frontend builds.
 
 ## Settings and explanations
 
@@ -53,4 +53,4 @@ The supported single-region format is `num:1` with `region0:{x,y,xlen,ylen}`. A 
 
 Two-way talk, browser snapshot/video saving, detection schedules, camera archive playback, cloud subscription pages, additional region formats, and P2P camera-quality control require separate APIs and implementation. Camera SD recording differs from browser recording. The application's device log is not the Smart Life video/event archive.
 
-Historical playback testing confirmed Sleep Cam HLS at 640×360 with browser CORS. This does not establish compatibility with every Tuya camera or every Developer service plan.
+Historical playback testing confirmed direct Sleep Cam HLS at 640×360. Relay testing uses mock HLS. The relay supports ordinary and low-latency HLS media over public HTTPS on ports 443 and 554. HLS variable substitution, content steering, external interstitial asset lists, and non-HTTPS key delivery are outside this relay's supported formats.

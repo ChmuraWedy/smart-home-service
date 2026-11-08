@@ -18,7 +18,8 @@ vi.mock('hls.js', () => ({default:class {
   on(event:string, handler:(...args:any[])=>void) { hls.handlers[event]=handler; }
 }}));
 const connection={baseUrl:'http://api.test',token:'private-test-key'};
-const url='https://video.example.test/live.m3u8?sign=temporary';
+const url='/api/v1/camera/play/' + 'a'.repeat(43) + '/index.m3u8';
+const playbackUrl=connection.baseUrl + url;
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status});
 function mount(provider:'sharing'|'developer'='sharing',onAuthError=vi.fn()) {
   return render(<CameraLive api={new CloudApi(connection)} deviceId="camera" provider={provider} onAuthError={onAuthError} />);
@@ -29,7 +30,7 @@ function mountTiles(privacy?:boolean) {
   const definitions={device_id:'camera',functions};
   vi.mocked(fetch).mockImplementation(async (input) => {
     const path=new URL(String(input)).pathname;
-    if (path.endsWith('/stream')) return json({device_id:'camera',type:'hls',url});
+    if (path.endsWith('/stream/relay')) return json({device_id:'camera',type:'hls',url});
     if (path.endsWith('/cloud/topology')) return json({synced_at:null,warnings:0,placements:[],job:{status:'idle',processed:0,total:0,message:null}});
     if (path.endsWith('/cloud/devices')) return json([{id:'camera',name:'Sleep Cam',category:'sp',online:true,has_local_key:false,...(privacy===undefined ? {} : {controls:{ready:true,definitions,snapshot}})}]);
     if (path.endsWith('/functions')) return json(definitions);
@@ -205,9 +206,9 @@ describe('camera live viewing',()=>{
     const liveView=within(card).getByRole('button',{name:'Быстрое управление'});
     await user.click(liveView);
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
-    await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
+    await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(playbackUrl));
     expect(within(sheet).getByLabelText('Прямой эфир камеры')).toBeInTheDocument();
-    expect(vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream')).map(([input])=>String(input))).toEqual(['http://api.test/api/v1/cloud/devices/camera/stream?provider=sharing']);
+    expect(vi.mocked(fetch).mock.calls.filter(([input])=>String(input).includes('/stream')).map(([input])=>String(input))).toEqual(['http://api.test/api/v1/cloud/devices/camera/stream/relay?provider=sharing']);
     await user.click(within(sheet).getByRole('button',{name:'Закрыть'}));
     expect(hls.destroy).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -236,9 +237,9 @@ describe('camera live viewing',()=>{
     const view=mount('developer'),user=userEvent.setup();
     expect(fetch).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button',{name:'Смотреть видео'}));
-    await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(url));
+    await waitFor(()=>expect(hls.load).toHaveBeenCalledWith(playbackUrl));
     const [path,options]=vi.mocked(fetch).mock.calls[0];
-    expect(String(path)).toContain('/devices/camera/stream?provider=developer');
+    expect(String(path)).toContain('/devices/camera/stream/relay?provider=developer');
     expect(options?.method).toBe('POST');
     expect(hls.attach).toHaveBeenCalledWith(screen.getByLabelText('Прямой эфир камеры'));
     await act(async()=>hls.handlers.manifest());
@@ -283,7 +284,14 @@ describe('camera live viewing',()=>{
     hls.supported=false;
     vi.mocked(HTMLMediaElement.prototype.canPlayType).mockReturnValue('probably');
     mount(); await userEvent.setup().click(screen.getByRole('button',{name:'Смотреть видео'}));
-    await waitFor(()=>expect(screen.getByLabelText('Прямой эфир камеры')).toHaveAttribute('src',url));
+    await waitFor(()=>expect(screen.getByLabelText('Прямой эфир камеры')).toHaveAttribute('src',playbackUrl));
+    expect(hls.attach).not.toHaveBeenCalled();
+  });
+  it.each(['https://video.example.test/live.m3u8?sign=temporary', '//video.example.test/live.m3u8', url + '?key=private-test-key'])('rejects a playback address outside the ticket route', async (invalidUrl) => {
+    vi.mocked(fetch).mockResolvedValue(json({ device_id: 'camera', type: 'hls', url: invalidUrl }));
+    mount();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Смотреть видео' }));
+    expect(await screen.findByRole('alert')).not.toHaveTextContent(invalidUrl);
     expect(hls.attach).not.toHaveBeenCalled();
   });
   it('handles authentication failure without fallback',async()=>{

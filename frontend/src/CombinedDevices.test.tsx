@@ -268,7 +268,7 @@ describe('combined devices', () => {
       expect(player.getByRole('button', { name: 'Watch video' })).toBeDisabled();
       expect(fetch).not.toHaveBeenCalled();
     } else {
-      await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/cloud/devices/camera/stream?provider=sharing'), expect.objectContaining({ method: 'POST' })));
+      await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/cloud/devices/camera/stream/relay?provider=sharing'), expect.objectContaining({ method: 'POST' })));
       expect(await player.findByRole('button', { name: 'Reconnect' })).toBeEnabled();
     }
   });
