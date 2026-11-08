@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, true
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -40,6 +40,7 @@ class CombinedDevice(Base):
     name: Mapped[str] = mapped_column(String(120))
     room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
     members: Mapped[list[dict[str, str | None]]] = mapped_column(JSON)
+    show_all_power: Mapped[bool] = mapped_column(Boolean, server_default=true())
 
 
 class CloudChannelLabel(Base):

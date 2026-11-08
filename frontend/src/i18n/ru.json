@@ -1076,6 +1076,7 @@
   "COMBINED_NO_POWER_CONTROL": "Управление питанием недоступно",
   "COMBINED_OUTCOME_UNKNOWN": "Результат команды неизвестен",
   "COMBINED_POWER": "Питание всех устройств",
+  "COMBINED_SHOW_ALL_POWER": "Показывать кнопку питания всех устройств",
   "COMBINED_MEMBER_COUNT": "Устройств: {0}",
   "CHOOSE_COMBINED_MEMBER": "Выберите устройство, чтобы открыть его настройки.",
   "EDIT_COMBINATION": "Изменить объединение",

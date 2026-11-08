@@ -39,6 +39,7 @@ class CombinedInput(Schema):
     name: Name
     room_id: PositiveID | None = None
     members: list[Member] = Field(min_length=2, max_length=16)
+    show_all_power: bool = True
 
     @field_validator("members")
     @classmethod
@@ -57,6 +58,7 @@ class CombinedRead(Schema):
     name: Name
     room_id: PositiveID | None
     members: list[CombinedMember]
+    show_all_power: bool
 
 
 class PowerResult(Schema):
@@ -90,7 +92,9 @@ def read_combination(request, item, scopes):
         accessible = route == "local" or scopes[route] == member["scope"]
         wiring = {"power_source": member["power_source"]} if "power_source" in member else {}
         members.append(CombinedMember(device_id=member["device_id"], route=route, accessible=accessible, **wiring))
-    return CombinedRead(id=item.id, name=item.name, room_id=item.room_id, members=members)
+    return CombinedRead(
+        id=item.id, name=item.name, room_id=item.room_id, members=members, show_all_power=item.show_all_power
+    )
 
 
 def has_relay_channel(session, request, member, channel):
@@ -162,6 +166,8 @@ def configure_combination(session, request, item, body):
         members.append(stored)
     validate_wiring(session, request, members, existing)
     item.name, item.room_id, item.members = body.name.strip(), body.room_id, members
+    if "show_all_power" in body.model_fields_set:
+        item.show_all_power = body.show_all_power
 
 
 @router.get("", response_model=list[CombinedRead], response_model_exclude_unset=True)

@@ -1076,6 +1076,7 @@
   "COMBINED_NO_POWER_CONTROL": "Sterowanie zasilaniem niedostępne",
   "COMBINED_OUTCOME_UNKNOWN": "Wynik polecenia nieznany",
   "COMBINED_POWER": "Zasilanie wszystkich urządzeń",
+  "COMBINED_SHOW_ALL_POWER": "Pokaż przycisk zasilania wszystkich urządzeń",
   "COMBINED_MEMBER_COUNT": "Urządzenia: {0}",
   "CHOOSE_COMBINED_MEMBER": "Wybierz urządzenie, aby otworzyć jego ustawienia.",
   "EDIT_COMBINATION": "Edytuj połączenie urządzeń",

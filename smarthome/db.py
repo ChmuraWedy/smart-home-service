@@ -38,3 +38,11 @@ def make_engine(path: str):
 
 def init_db(engine):
     Base.metadata.create_all(engine)
+    # create_all leaves existing tables intact. Serialize this upgrade with other writers.
+    with engine.begin() as connection:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        columns = connection.exec_driver_sql("PRAGMA table_info(combined_devices)").fetchall()
+        if not any(column[1] == "show_all_power" for column in columns):
+            connection.exec_driver_sql(
+                "ALTER TABLE combined_devices ADD COLUMN show_all_power BOOLEAN NOT NULL DEFAULT 1"
+            )

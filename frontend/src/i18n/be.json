@@ -1076,6 +1076,7 @@
   "COMBINED_NO_POWER_CONTROL": "Кіраванне сілкаваннем недаступнае",
   "COMBINED_OUTCOME_UNKNOWN": "Вынік каманды невядомы",
   "COMBINED_POWER": "Сілкаванне ўсіх прылад",
+  "COMBINED_SHOW_ALL_POWER": "Паказваць кнопку сілкавання ўсіх прылад",
   "COMBINED_MEMBER_COUNT": "Прылад: {0}",
   "CHOOSE_COMBINED_MEMBER": "Выберыце прыладу, каб адкрыць яе налады.",
   "EDIT_COMBINATION": "Змяніць аб’яднанне",

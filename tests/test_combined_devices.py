@@ -1,3 +1,5 @@
+import json
+import sqlite3
 from threading import RLock
 from types import SimpleNamespace
 
@@ -136,6 +138,38 @@ def test_membership_edit_survives_server_restart_and_delete_restores_inventory(t
         assert client.delete(url).status_code == 204
         assert client.get(PATH).json() == []
     assert bridge.commands == []
+
+
+def test_power_button_visibility_upgrades_existing_combinations_and_persists(tmp_path):
+    db = tmp_path / "combined.sqlite"
+    members = [member("cloud-1"), member("cloud-2")]
+    with sqlite3.connect(db) as connection:
+        connection.execute(
+            "CREATE TABLE combined_devices (id INTEGER PRIMARY KEY, name VARCHAR(120) NOT NULL, "
+            "room_id INTEGER, members JSON NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO combined_devices VALUES (1, 'Existing lights', NULL, ?)",
+            (json.dumps([{**entry, "scope": "saved-account"} for entry in members]),),
+        )
+    settings = Settings(database_path=str(db), display_poll_interval=0)
+    with TestClient(create_app(settings)) as client:
+        assert client.get(PATH).json()[0]["show_all_power"] is True
+        url = f"{PATH}/1"
+        hidden = client.put(url, json={"name": "Existing lights", "members": members, "show_all_power": False})
+        assert hidden.status_code == 200, hidden.text
+        assert hidden.json()["show_all_power"] is False
+        legacy_update = client.put(url, json={"name": "Renamed lights", "members": members})
+        assert legacy_update.status_code == 200, legacy_update.text
+        assert legacy_update.json()["show_all_power"] is False
+
+    with TestClient(create_app(settings)) as client:
+        saved = client.get(PATH).json()[0]
+        assert saved["name"] == "Renamed lights"
+        assert saved["show_all_power"] is False
+        restored = client.put(url, json={"name": saved["name"], "members": members, "show_all_power": True})
+        assert restored.status_code == 200, restored.text
+        assert restored.json()["show_all_power"] is True
 
 
 def wired(target, source="relay", channel="switch_1", route="sharing"):

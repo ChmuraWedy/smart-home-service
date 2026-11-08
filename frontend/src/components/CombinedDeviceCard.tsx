@@ -110,7 +110,7 @@ export default function CombinedDeviceCard({
   onQuickOpen = noAction, onQuickClose = noAction, onDetails = noAction, onAuthError,
 }: {
   api: HomeApi;
-  combined: Pick<CombinedDevice, 'name'> & Partial<Pick<CombinedDevice, 'id'>>;
+  combined: Pick<CombinedDevice, 'name' | 'show_all_power'> & Partial<Pick<CombinedDevice, 'id'>>;
   members: ResolvedMember[];
   room: string;
   now: number;
@@ -264,23 +264,25 @@ export default function CombinedDeviceCard({
       <DashboardCardFooter>
         {layout.roots.map((entry) => renderMember(entry))}
         {(sendError || Object.keys(failures).length > 0) && <div className="combined-actions">{feedback}</div>}
-        <div className="combined-power-footer">
-          <PowerButton
-            id={powerId}
-            label={t(MSG.COMBINED_POWER)}
-            checked={allKnownOn}
-            disabled={!canSend}
-            variant="button"
-            icon={(
-              <>
-                <ParameterIcon code="switch" />
-                <span>{t(MSG.COMBINED_POWER)}</span>
-              </>
-            )}
-            known
-            onChange={setPower}
-          />
-        </div>
+        {combined.show_all_power !== false && (
+          <div className="combined-power-footer">
+            <PowerButton
+              id={powerId}
+              label={t(MSG.COMBINED_POWER)}
+              checked={allKnownOn}
+              disabled={!canSend}
+              variant="button"
+              icon={(
+                <>
+                  <ParameterIcon code="switch" />
+                  <span>{t(MSG.COMBINED_POWER)}</span>
+                </>
+              )}
+              known
+              onChange={setPower}
+            />
+          </div>
+        )}
       </DashboardCardFooter>
       {quickOpen && (
         <DashboardSheet title={combined.name} onClose={onQuickClose} returnFocus={trigger} busy={busy}>

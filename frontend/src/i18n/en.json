@@ -1076,6 +1076,7 @@
   "COMBINED_NO_POWER_CONTROL": "Power control unavailable",
   "COMBINED_OUTCOME_UNKNOWN": "Command outcome unknown",
   "COMBINED_POWER": "Power for all devices",
+  "COMBINED_SHOW_ALL_POWER": "Show power button for all devices",
   "COMBINED_MEMBER_COUNT": "Devices: {0}",
   "CHOOSE_COMBINED_MEMBER": "Choose a device to open its settings.",
   "EDIT_COMBINATION": "Edit combination",

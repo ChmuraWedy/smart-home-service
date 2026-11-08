@@ -16,6 +16,7 @@ import CombinedDeviceCard from './CombinedDeviceCard';
 import type { ResolvedMember } from './CombinedDeviceCard';
 import CombinedDeviceOrder from './CombinedDeviceOrder';
 import CombinedDeviceWiring from './CombinedDeviceWiring';
+import { Switch } from './ui/switch';
 
 const creationSteps = [
   ['devices', MSG.COMBINED_SELECT_DEVICES],
@@ -122,6 +123,7 @@ export function CombinedDeviceSettings({
   const formId = useId();
   const displayName = useDeviceDisplayName();
   const [nameDraft, setName] = useState(existing?.name);
+  const [showAllPower, setShowAllPower] = useState(existing?.show_all_power ?? true);
   const [draftStep, setDraftStep] = useState<'devices' | 'details'>(existing ? 'details' : 'devices');
   const step = previewing ? 'preview' : draftStep;
   const activeStep = useRef<HTMLLIElement>(null);
@@ -185,7 +187,9 @@ export function CombinedDeviceSettings({
     }
     setBusy(true);
     try {
-      const saved = await api.saveCombination({ name: name.trim(), room_id: room, members }, existing?.id);
+      const saved = await api.saveCombination({
+        name: name.trim(), room_id: room, members, show_all_power: showAllPower,
+      }, existing?.id);
       if (active.current) onSaved(saved);
     } catch (failure) {
       if (active.current) handleFailure(failure);
@@ -317,14 +321,25 @@ export function CombinedDeviceSettings({
         )}
         {previewing && (
           <div className="combined-preview-layout">
-            <CombinedDeviceOrder members={previewMembers} disabled={busy} onMove={moveMember} />
+            <div className="combined-preview-options">
+              <label className="combined-power-option" htmlFor={`${formId}-show-all-power`}>
+                {t(MSG.COMBINED_SHOW_ALL_POWER)}
+                <Switch
+                  id={`${formId}-show-all-power`}
+                  checked={showAllPower}
+                  disabled={busy}
+                  onChange={setShowAllPower}
+                />
+              </label>
+              <CombinedDeviceOrder members={previewMembers} disabled={busy} onMove={moveMember} />
+            </div>
             <fieldset className="combined-preview dashboard-view" data-card-size={cardSize} disabled>
               <legend className="sr-only">{t(MSG.COMBINED_CARD_PREVIEW)}</legend>
               <p className="help">{t(MSG.COMBINED_CARD_PREVIEW_HELP)}</p>
               <ul className="dashboard-device-column">
                 <CombinedDeviceCard
                   api={api}
-                  combined={{ name: name.trim() }}
+                  combined={{ name: name.trim(), show_all_power: showAllPower }}
                   members={previewMembers}
                   room={roomName ?? t(MSG.NO_ROOM)}
                   now={now}

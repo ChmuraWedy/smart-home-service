@@ -234,9 +234,9 @@ describe('combined devices', () => {
     await user.selectOptions(roomField, '3');
     await user.click(form.getByRole('button', { name: 'Next' }));
     await user.click(form.getByRole('button', { name: 'Save' }));
-    expect(await screen.findByRole('heading', { name: 'Kitchen Lights' })).toBeInTheDocument();
+    const editKitchen = await screen.findByRole('button', { name: 'Edit Kitchen Lights' });
     expect(window.location.pathname).toBe('/combined-devices');
-    await user.click(screen.getByRole('button', { name: 'Edit Kitchen Lights' }));
+    await user.click(editKitchen);
     const managementEditor = within(await screen.findByRole('form', { name: 'Edit combination' }));
     expect(managementEditor.getByLabelText('Name')).toHaveValue('Kitchen Lights');
     await user.click(managementEditor.getByRole('button', { name: 'Cancel' }));
@@ -246,7 +246,7 @@ describe('combined devices', () => {
     const card = await screen.findByRole('listitem', { name: 'Kitchen Lights' });
     expect(writes).toEqual([{
       path: '/combined-devices', method: 'POST',
-      body: { name: 'Kitchen Lights', room_id: room.id, members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing' })) },
+      body: { name: 'Kitchen Lights', room_id: room.id, show_all_power: true, members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing' })) },
     }]);
     for (const bulb of bulbs) {
       expect(screen.queryByRole('listitem', { name: bulb.name })).toBeNull();
@@ -413,6 +413,36 @@ describe('combined devices', () => {
     await user.click(editor.getByRole('button', { name: 'Back' }));
     expect(await editor.findByRole('textbox', { name: 'Name' })).toHaveValue('Kitchen lights');
     expect(window.location.pathname + window.location.search).toBe('/combined-devices/1/edit?room=3');
+  });
+
+  it('previews and saves hiding the aggregate power button without hiding member controls', async () => {
+    const { writes } = backend({
+      id: 1, name: 'Kitchen lights', room_id: room.id,
+      members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    });
+    const user = userEvent.setup();
+    const app = openApp('/combined-devices/1/edit/preview');
+    const visibilityName = 'Show power button for all devices';
+    const powerName = 'Power for all devices';
+    const visibility = await screen.findByRole('switch', { name: visibilityName });
+    expect(visibility).toBeChecked();
+    expect(screen.getByRole('button', { name: powerName })).toBeDisabled();
+    await user.click(visibility);
+    expect(screen.queryByRole('button', { name: powerName })).toBeNull();
+    const member = within(screen.getByRole('region', { name: bulbs[0].name }));
+    expect(await member.findByRole('switch')).toBeDisabled();
+    expect(writes).toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('heading', { name: 'Combined devices' });
+    expect(writes[0]).toMatchObject({ path: '/combined-devices/1', method: 'PUT', body: { show_all_power: false } });
+
+    app.unmount();
+    openApp('/rooms/3');
+    const card = within(await screen.findByRole('listitem', { name: 'Kitchen lights' }));
+    expect(card.queryByRole('button', { name: powerName })).toBeNull();
+    const savedMember = within(card.getByRole('region', { name: bulbs[0].name }));
+    const memberPower = await savedMember.findByRole('switch');
+    await waitFor(() => expect(memberPower).toBeEnabled());
   });
 
   it('returns a direct creation preview without a draft to device selection', async () => {

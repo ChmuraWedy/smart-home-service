@@ -1743,6 +1743,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-creation-steps { @apply tw:m-0 tw:flex tw:flex-wrap tw:gap-x-7 tw:gap-y-1 tw:pl-5 tw:text-sm tw:text-(--muted); }
 .combined-creation-steps [aria-current="step"] { @apply tw:font-semibold tw:text-(--text); }
 .combined-preview-layout { @apply tw:grid tw:items-start tw:gap-3; }
+.combined-preview-options { @apply tw:grid tw:min-w-0 tw:gap-2; }
+.combined-power-option { @apply tw:flex tw:items-center tw:justify-between tw:gap-2 tw:rounded-lg tw:border tw:border-(--border) tw:px-2; }
 @media (min-width:720px) {
   .combined-preview-layout { grid-template-columns:minmax(0,1fr) minmax(0,1.55fr); }
 }
