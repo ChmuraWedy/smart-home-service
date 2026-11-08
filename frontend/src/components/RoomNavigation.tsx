@@ -2,15 +2,22 @@ import {
   Dialog, DialogBackdrop, DialogPanel, DialogTitle,
 } from '@headlessui/react';
 import {
-  useCallback, useLayoutEffect, useRef, useState,
+  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from 'react';
 import type { ComponentProps } from 'react';
-import type { Room } from '../home-api';
+import { dashboardBrowserId } from '../dashboard-layout';
+import type { RoomNavigationLayout } from '../dashboard-layout';
+import type { HomeApi, Room } from '../home-api';
 import { MSG, t } from '../i18n';
+import useRoomName from '../room-names';
 import { Icon } from './ui/icon';
+import RoomNavigationEditor, { orderRooms } from './RoomNavigationEditor';
+import type { RoomManagement } from './RoomNavigationEditor';
 
 type RoomIcon = ComponentProps<typeof Icon>['name'];
 type RoomChoice = { id: string; label: string; icon: RoomIcon };
+type LayoutRead = { api: HomeApi; layout?: RoomNavigationLayout };
+const EMPTY_LAYOUT: RoomNavigationLayout = { rooms: [] };
 
 const roomIcons = [
   [/\b(?:study|office)\b/i, 'room-study'],
@@ -21,7 +28,7 @@ const roomIcons = [
   [/\bbalcony\b/i, 'room-balcony'],
 ] as const;
 
-function useVisibleRooms(rooms: Room[], allRooms: string, noRoom: string, moreRooms: string) {
+function useVisibleRooms(labels: string) {
   const bar = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(Infinity);
@@ -62,7 +69,7 @@ function useVisibleRooms(rooms: Room[], allRooms: string, noRoom: string, moreRo
     observer.observe(container);
     observer.observe(measure);
     return () => observer.disconnect();
-  }, [rooms, allRooms, noRoom, moreRooms]);
+  }, [labels]);
 
   return { bar, ruler, visibleCount };
 }
@@ -93,27 +100,84 @@ function RoomButton({
   );
 }
 
-export default function RoomNavigation({ rooms, selected, onSelect }: {
+function roomChoice(room: Room, label: string): RoomChoice {
+  return {
+    id: String(room.id),
+    label,
+    icon: roomIcons.find(([pattern]) => pattern.test(room.name))?.[1] ?? 'room',
+  };
+}
+
+export default function RoomNavigation({
+  api, allRooms, rooms, selected, onSelect, management,
+}: {
+  api: HomeApi;
+  allRooms: Room[] | undefined;
   rooms: Room[];
   selected: string;
   onSelect: (id: string) => void;
+  management?: RoomManagement;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingApi, setEditingApi] = useState<HomeApi>();
+  const [attempt, setAttempt] = useState(0);
+  const [read, setRead] = useState<LayoutRead>();
+  const roomLabel = useRoomName();
+  const editing = editingApi === api && allRooms !== undefined;
+  const currentRead = read?.api === api ? read : undefined;
+  const layout = currentRead?.layout ?? EMPTY_LAYOUT;
+  const readFailed = Boolean(currentRead && !currentRead.layout);
+  const layoutLoaded = Boolean(currentRead);
+  const ready = allRooms !== undefined;
+  const visibleRooms = useMemo(() => {
+    if (!layoutLoaded) return [];
+    const hidden = new Set(layout.rooms.filter((entry) => entry.hidden).map(({ id }) => id));
+    return orderRooms(rooms, layout.rooms).filter(({ id }) => !hidden.has(id));
+  }, [layout, layoutLoaded, rooms]);
+
+  useEffect(() => {
+    if (!ready) return undefined;
+    const browser = dashboardBrowserId();
+    if (!browser) {
+      setRead({ api, layout: EMPTY_LAYOUT });
+      return undefined;
+    }
+    const controller = new AbortController();
+    api.roomNavigationLayout(browser, controller.signal).then((saved) => {
+      if (!controller.signal.aborted) setRead({ api, layout: Array.isArray(saved?.rooms) ? saved : undefined });
+    }).catch(() => {
+      if (!controller.signal.aborted) setRead({ api });
+    });
+    return () => controller.abort();
+  }, [api, attempt, ready]);
+
   const all: RoomChoice = { id: '', label: t(MSG.ALL_ROOMS), icon: 'room-all' };
   const none: RoomChoice = { id: 'none', label: t(MSG.NO_ROOM), icon: 'room-none' };
   const moreLabel = t(MSG.MORE_ROOMS);
-  const choices: RoomChoice[] = rooms.map((room) => ({
-    id: String(room.id),
-    label: room.name,
-    icon: roomIcons.find(([pattern]) => pattern.test(room.name))?.[1] ?? 'room',
-  }));
-  const options = [all, ...choices, none];
-  const { bar, ruler, visibleCount } = useVisibleRooms(rooms, all.label, none.label, moreLabel);
+  const options = [all, ...visibleRooms.map((item) => roomChoice(item, roomLabel(item))), none];
+  const { bar, ruler, visibleCount } = useVisibleRooms(JSON.stringify([...options.map(({ label }) => label), moreLabel]));
   const quick = options.slice(0, visibleCount);
   const overflow = quick.length < options.length;
-  const current = options.find((option) => option.id === selected);
+  const selectedRoom = allRooms?.find(({ id }) => String(id) === selected);
+  const current = selectedRoom ? roomChoice(selectedRoom, roomLabel(selectedRoom)) : options.find((option) => option.id === selected);
   const currentName = current?.label ?? t(MSG.ROOMS);
-  const moreActive = current && !quick.includes(current);
+  const moreActive = options.some((choice) => choice.id === selected) && !quick.some((choice) => choice.id === selected);
+  const editLabel = t(readFailed ? MSG.RETRY_DASHBOARD_LAYOUT : MSG.EDIT_ROOMS);
+
+  function openEditor() {
+    if (readFailed) {
+      setRead(undefined);
+      setAttempt((value) => value + 1);
+    } else {
+      setEditingApi(api);
+    }
+  }
+
+  const closeEditor = useCallback(() => setEditingApi(undefined), []);
+  const applyLayout = useCallback((saved: RoomNavigationLayout) => {
+    setRead({ api, layout: saved });
+    setEditingApi(undefined);
+  }, [api]);
 
   function openPicker() {
     setOpen(true);
@@ -128,21 +192,43 @@ export default function RoomNavigation({ rooms, selected, onSelect }: {
     onSelect(id);
   }, [onSelect]);
 
+  function roomDeleted(id: number) {
+    setRead((value) => {
+      if (value?.api !== api || !value.layout) return value;
+      return { api, layout: { rooms: value.layout.rooms.filter((room) => room.id !== id) } };
+    });
+    management?.onDeleted(id);
+    if (selected === String(id)) onSelect('');
+  }
+
+  const editorManagement = management && { ...management, onDeleted: roomDeleted };
+
   return (
     <>
-      <button
-        type="button"
-        className="secondary room-navigation-trigger"
-        aria-label={t(MSG.CHANGE_ROOM, [currentName])}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={openPicker}
-      >
-        <Icon name={current?.icon ?? 'room'} />
-        <span>{currentName}</span>
-        <Icon name="chevron-down" />
-      </button>
-      <p className="room-navigation-heading">{currentName}</p>
+      <div className="room-navigation-selection">
+        <button
+          type="button"
+          className="secondary room-navigation-trigger"
+          aria-label={t(MSG.CHANGE_ROOM, [currentName])}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={openPicker}
+        >
+          <Icon name={current?.icon ?? 'room'} />
+          <span className="room-navigation-heading">{currentName}</span>
+          <Icon name="chevron-down" />
+        </button>
+      </div>
+      {editing && (
+        <RoomNavigationEditor
+          api={api}
+          rooms={allRooms}
+          layout={layout}
+          onClose={closeEditor}
+          onSave={applyLayout}
+          management={editorManagement}
+        />
+      )}
       <nav className="room-navigation-bar" aria-label={t(MSG.ROOMS)}>
         <div className="room-navigation-shortcuts" ref={bar}>
           {quick.map((choice) => <RoomButton key={choice.id} choice={choice} active={choice.id === selected} onSelect={onSelect} />)}
@@ -169,21 +255,37 @@ export default function RoomNavigation({ rooms, selected, onSelect }: {
           </div>
         </div>
       </nav>
-      <Dialog className="room-picker" open={open} onClose={closePicker}>
+      <Dialog className="room-picker" open={open && !editing} onClose={closePicker}>
         <DialogBackdrop className="room-picker-backdrop" />
         <DialogPanel className="room-picker-panel">
           <header className="room-picker-heading">
             <DialogTitle as="h2">{t(MSG.ROOMS)}</DialogTitle>
-            <button
-              type="button"
-              className="secondary room-picker-close"
-              aria-label={t(MSG.CLOSE)}
-              onClick={closePicker}
-              data-autofocus
-            >
-              <Icon name="close" />
-            </button>
+            <div className="room-picker-actions">
+              {(management || Boolean(allRooms?.length)) && (
+                <button
+                  type="button"
+                  className="secondary room-picker-action"
+                  aria-label={editLabel}
+                  aria-haspopup={readFailed ? undefined : 'dialog'}
+                  title={editLabel}
+                  disabled={!currentRead}
+                  onClick={openEditor}
+                >
+                  <Icon name={readFailed ? 'refresh-list' : 'edit'} />
+                </button>
+              )}
+              <button
+                type="button"
+                className="secondary room-picker-action"
+                aria-label={t(MSG.CLOSE)}
+                onClick={closePicker}
+                data-autofocus
+              >
+                <Icon name="close" />
+              </button>
+            </div>
           </header>
+          {readFailed && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
           <ul className="room-picker-list">
             {options.map((choice) => (
               <li key={choice.id}>

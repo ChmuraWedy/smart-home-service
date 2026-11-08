@@ -2,8 +2,9 @@ import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
-import type { DeviceTranslations } from './device-translations';
-import type { DashboardLayout } from './dashboard-layout';
+import type { DeviceTranslations, TranslatedText } from './device-translations';
+import type { Locale } from './i18n';
+import type { DashboardLayout, RoomNavigationLayout } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
 export type Capability = {
@@ -23,7 +24,15 @@ export type LocalDevice = {
   translations?: DeviceTranslations;
 };
 export type Building = { id: number; name: string; aliases: string[] };
-export type Room = { id: number; building_id: number; name: string; aliases: string[] };
+export type Room = {
+  id: number;
+  building_id: number;
+  name: string;
+  aliases: string[];
+  'name_translations'?: TranslatedText;
+  'manual_name_languages'?: Locale[];
+};
+export type RoomNameChanges = Partial<Record<Locale, string | null>>;
 export type RoomAppearance = { 'card_opacity': number; 'background_version': string | null };
 export type Group = { id: number; name: string; room_id: number; device_ids: number[] };
 export type GroupState = { group_id: number; state: 'on' | 'off' | 'mixed' | 'unknown'; members: DeviceState[] };
@@ -38,7 +47,7 @@ export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 
 export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
 export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
 export type TopologyJob = { status: 'idle' | 'running' | 'done' | 'failed'; processed: number; total: number; message: string | null };
-export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: false; placements: Placement[]; job: TopologyJob };
+export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: boolean; placements: Placement[]; job: TopologyJob };
 export type DeviceDraft = {
   name: string; device_id: string; transport: 'wifi' | 'zigbee'; is_gateway: boolean;
   ip: string | null; version: string | null; parent_id: number | null; cid: string | null;
@@ -92,6 +101,14 @@ export class HomeApi extends CloudApi {
 
   saveDashboardLayout(browser: string, view: string, layout: DashboardLayout) {
     return this.request<DashboardLayout>(`/dashboard-layouts/${browser}?${view}`, 'PUT', layout);
+  }
+
+  roomNavigationLayout(browser: string, signal: AbortSignal) {
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'GET', undefined, signal);
+  }
+
+  saveRoomNavigationLayout(browser: string, layout: RoomNavigationLayout, signal: AbortSignal) {
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'PUT', layout, signal);
   }
 
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {
@@ -154,12 +171,16 @@ export class HomeApi extends CloudApi {
     return this.request<Building>('/buildings', 'POST', { name });
   }
 
-  createRoom(name: string, buildingId: number) {
-    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId });
+  createRoom(name: string, buildingId: number, translations?: RoomNameChanges) {
+    return this.request<Room>('/rooms', 'POST', { name, building_id: buildingId, name_translations: translations });
   }
 
-  renameRoom(roomId: number, name: string) {
-    return this.request<Room>(`/rooms/${roomId}`, 'PATCH', { name });
+  previewRoomName(name: string, signal: AbortSignal) {
+    return this.request<TranslatedText>('/rooms/translation-preview', 'POST', { name }, signal);
+  }
+
+  renameRoom(roomId: number, name?: string, translations?: RoomNameChanges) {
+    return this.request<Room>(`/rooms/${roomId}`, 'PATCH', { name, name_translations: translations });
   }
 
   deleteRoom(roomId: number) {

@@ -1,6 +1,9 @@
 export type LayoutSlots = (string | null)[];
 export type DashboardLayout = { slots: LayoutSlots; 'hidden_devices'?: string[] };
 
+export type RoomNavigationEntry = { id: number; hidden: boolean };
+export type RoomNavigationLayout = { rooms: RoomNavigationEntry[] };
+
 export const MAX_LAYOUT_SLOTS = 96;
 const BROWSER_STORAGE_KEY = 'smart-home.ui.dashboard-browser.v1';
 

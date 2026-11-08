@@ -1,6 +1,7 @@
 import copy
 import threading
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -230,6 +231,63 @@ def test_removals_do_not_delete_local_objects_and_rooms_without_devices_remain(t
     result = sync(client)
     assert result["homes"] == [] and result["placements"] == []
     assert len(client.get("/api/v1/buildings").json()) == 2
+
+
+def test_device_discovery_uses_existing_rooms_and_explicit_sync_restores_deleted_rooms(topology_client):
+    client, api = topology_client
+    api.rooms["lamp"] = {"id": 1, "name": "Office"}
+    initial = {row["device_id"]: row for row in sync(client)["placements"]}
+    assert client.delete(f"/api/v1/rooms/{initial['lamp']['room_id']}").status_code == 204
+
+    bridge = client.app.state.cloud
+    with bridge.lock:
+        device = bridge.devices()[0]
+        manager = bridge._manager()
+        manager.device_map = {
+            key: SimpleNamespace(**{**vars(device), "id": key})
+            for key in ("new-known", "new-deleted", "new-unknown")
+        }
+        room_ids = {"new-known": "2", "new-deleted": "1", "new-unknown": "99"}
+        manager.query_room_by_device = lambda device_id: SimpleNamespace(id=room_ids[device_id])
+
+    listed = {row["id"]: row for row in client.get(API + "/devices").json()}
+    assert listed["new-known"]["synced_room"]["room_id"] == initial["sensor"]["room_id"]
+    assert listed["new-deleted"]["synced_room"]["room_id"] is None
+    assert "synced_room" not in listed["new-unknown"]
+    assert all(room["name"] != "Office" for room in client.get("/api/v1/rooms").json())
+    placements = {row["device_id"]: row for row in client.get(API + "/topology").json()["placements"]}
+    assert placements["lamp"]["room_id"] is None
+
+    api.devices["101"].append({"id": "new-deleted"})
+    api.rooms["new-deleted"] = api.rooms["lamp"]
+    placements = {row["device_id"]: row for row in sync(client)["placements"]}
+    assert placements["lamp"]["room_id"] is not None
+    assert placements["new-deleted"]["room_id"] == placements["lamp"]["room_id"]
+    assert any(room["name"] == "Office" for room in client.get("/api/v1/rooms").json())
+
+
+def test_explicit_sync_imports_empty_rooms_from_the_developer_room_catalog(topology_client):
+    client, _api = topology_client
+
+    def list_rooms(method, path):
+        assert method == "GET"
+        if path == "/v1.0/homes/101/rooms":
+            return {"home_id": 101, "rooms": [
+                {"room_id": 1, "name": "Kitchen"},
+                {"room_id": 2, "name": "Hall"},
+                {"room_id": 42, "name": "Empty room"},
+            ]}
+        assert path == "/v1.0/homes/202/rooms"
+        return {"home_id": 202, "rooms": []}
+
+    client.app.state.developer_cloud.client = SimpleNamespace(request=list_rooms)
+    result = sync(client)
+    assert result["empty_rooms_available"] is True
+    room = next(room for room in client.get("/api/v1/rooms").json() if room["name"] == "Empty room")
+    assert all(row["room_id"] != room["id"] for row in result["placements"])
+    assert client.delete(f"/api/v1/rooms/{room['id']}").status_code == 204
+    sync(client)
+    assert any(room["name"] == "Empty room" for room in client.get("/api/v1/rooms").json())
 
 
 def test_cached_topology_survives_worker_restart_but_is_account_scoped(topology_client):

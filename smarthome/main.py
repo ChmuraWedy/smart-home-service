@@ -4,15 +4,22 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from . import __version__
 from .api_dependencies import authenticate, get_session
-from .auto_label_translations import translate_local_device
+from .auto_label_translations import (
+    standard_room_names,
+    translate_batches,
+    translate_local_device,
+    translate_room_names,
+)
 from .config import Settings
 from .control import run_command
+from .dashboard_layout_api import remove_room_from_navigation
+from .dashboard_layout_api import router as dashboard_layout_router
 from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
@@ -46,6 +53,7 @@ from .schemas import (
     NameQuery,
     PositiveID,
     RoomCreate,
+    RoomNamePreview,
     RoomPatch,
     RoomRead,
     RoomTree,
@@ -70,8 +78,8 @@ from .tuya import TuyaController
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
 
 
-def update_fields(item, body, session):
-    values = body.model_dump(mode="json", exclude_unset=True)
+def update_fields(item, body, session, *, exclude=None):
+    values = body.model_dump(mode="json", exclude_unset=True, exclude=exclude)
     aliases = values.pop("aliases", None)
     for name, value in values.items():
         setattr(item, name, value)
@@ -158,11 +166,27 @@ def hierarchy(item_id: EntityRef, session: Session = Depends(get_session)):
 
 
 @router.post("/rooms", response_model=RoomRead, status_code=201, tags=["Rooms"])
-def add_room(body: RoomCreate, session: Session = Depends(get_session)):
+def add_room(body: RoomCreate, request: Request, session: Session = Depends(get_session)):
     get_or_404(session, Building, body.building_id)
     item = create_aliased(session, Room, body)
     commit(session)
+    translate_room_names(session, request.app.state.settings.label_translator_url, [item.id])
     return item
+
+
+@router.post("/rooms/translation-preview", tags=["Rooms"])
+def preview_room_name(body: RoomNamePreview, request: Request, response: Response) -> dict[str, str]:
+    response.headers["Cache-Control"] = "no-store"
+    standard = standard_room_names(body.name)
+    if standard is not None:
+        return standard
+    url = request.app.state.settings.label_translator_url
+    if url:
+        try:
+            return translate_batches(url, [body.name])[body.name]
+        except (OSError, ValueError):
+            pass
+    raise HTTPException(503, "Room name translation is unavailable")
 
 
 @router.get("/rooms", response_model=list[RoomRead], tags=["Rooms"])
@@ -189,14 +213,18 @@ def read_room(item_id: EntityRef, session: Session = Depends(get_session)):
 
 
 @router.patch("/rooms/{item_id}", response_model=RoomRead, tags=["Rooms"])
-def edit_room(item_id: EntityRef, body: RoomPatch, session: Session = Depends(get_session)):
+def edit_room(item_id: EntityRef, body: RoomPatch, request: Request, session: Session = Depends(get_session)):
     item = get_by_ref(session, Room, item_id)
     if body.building_id is not None:
         get_or_404(session, Building, body.building_id)
         if body.building_id != item.building_id:
             assert_empty(session, Device, Device.room_id == item.id)
-    update_fields(item, body, session)
+    update_fields(item, body, session, exclude={"name_translations"})
+    if body.name_translations:
+        edits = [part for locale, value in body.name_translations.items() for part in (f"$.{locale}", value)]
+        item.name_translation_overrides = func.json_set(Room.name_translation_overrides, *edits)
     commit(session)
+    translate_room_names(session, request.app.state.settings.label_translator_url, [item.id])
     return item
 
 
@@ -204,6 +232,7 @@ def edit_room(item_id: EntityRef, body: RoomPatch, session: Session = Depends(ge
 def delete_room(item_id: EntityRef, session: Session = Depends(get_session)):
     item = get_by_ref(session, Room, item_id)
     assert_empty(session, Device, Device.room_id == item.id)
+    remove_room_from_navigation(session, item.id)
     # The persisted layout view is building/room/columns/page.
     session.execute(delete(DashboardLayout).where(DashboardLayout.view.like(f"%/{item.id}/%/%")))
     session.delete(item)
@@ -667,8 +696,6 @@ def create_app(settings: Settings | None = None, controller=None):
     from .display_api import router as display_router
 
     app.include_router(display_router)
-
-    from .dashboard_layout_api import router as dashboard_layout_router
 
     app.include_router(dashboard_layout_router)
 

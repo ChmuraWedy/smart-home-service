@@ -32,7 +32,7 @@ it('uses originals or the current-language variants and searches both on the das
     </>,
   );
   expect(await screen.findByRole('listitem', { name: 'Kitchen Lamp' })).toBeVisible();
-  await user.selectOptions(screen.getByLabelText('Device names and aliases'), 'localized');
+  await user.selectOptions(screen.getByLabelText('Names and aliases'), 'localized');
   expect(localStorage.getItem('smart-home.ui.device-text.v1')).toBe('localized');
   act(() => setLocale('pl', false));
   const card = await screen.findByRole('listitem', { name: 'Lampa kuchenna' });

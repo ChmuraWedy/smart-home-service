@@ -1,43 +1,94 @@
 import {
+  Dialog, DialogBackdrop, DialogPanel, DialogTitle,
+} from '@headlessui/react';
+import {
   useCallback, useEffect, useId, useRef, useState,
 } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ApiError } from '../api';
-import type { Building, HomeApi, Room } from '../home-api';
-import { MSG, t, translateText } from '../i18n';
+import type { TranslatedText } from '../device-translations';
+import type {
+  Building, HomeApi, Room, RoomNameChanges,
+} from '../home-api';
+import {
+  LANGUAGES, MSG, t, translateText,
+} from '../i18n';
+import type { Locale } from '../i18n';
 import { dashboardHref } from '../navigation';
 import { BACKGROUND_TYPES, prepareRoomBackground, useRoomAppearance } from '../room-appearance';
+import useRoomName from '../room-names';
 import RoomBackgroundCrop from './RoomBackgroundCrop';
 
 type Catalog = { buildings: Building[]; rooms: Room[] };
 type CatalogRead = { api: HomeApi; data?: Catalog; error?: string };
 type RunAction = (work: () => Promise<void>) => Promise<void>;
+type NamePreview = { source: string; values?: TranslatedText };
+type TranslationDraft = Partial<Record<Locale, { text: string; original: string }>>;
 
 function failureMessage(failure: unknown) {
   return failure instanceof Error ? translateText(failure.message) : t(MSG.COULD_NOT_COMPLETE_THE_ACTION);
 }
 
 function NameForm({
-  title, initial = '', submitLabel, buildings, busy, onSave,
+  title, initial = '', submitLabel, buildings, busy, onSave, translations, manualLanguages = [], api, onCancel,
 }: {
   title: string;
   initial?: string;
   submitLabel: string;
   buildings?: Building[];
   busy: boolean;
-  onSave: (name: string, buildingId: number) => void;
+  translations?: TranslatedText;
+  manualLanguages?: Locale[];
+  api?: HomeApi;
+  onCancel?: () => void;
+  onSave: (name: string, buildingId: number, changes?: RoomNameChanges) => void;
 }) {
   const nameId = useId();
   const buildingId = useId();
   const [name, setName] = useState(initial);
   const [building, setBuilding] = useState(buildings?.[0]?.id ?? 0);
+  const [draft, setDraft] = useState<TranslationDraft>({});
+  const [expanded, setExpanded] = useState(false);
+  const [preview, setPreview] = useState<NamePreview>();
   const trimmed = name.trim();
-  const disabled = busy || !trimmed || trimmed === initial || (Boolean(buildings) && !building);
+  const shownPreview = preview?.source === trimmed ? preview : undefined;
+  const hasGenerated = LANGUAGES.some(({ value }) => translations?.[value] && !manualLanguages.includes(value));
+  const generating = expanded && Boolean(trimmed) && !busy && !shownPreview
+    && manualLanguages.length < LANGUAGES.length && (trimmed !== initial || !hasGenerated);
+  const changes: RoomNameChanges = Object.fromEntries(Object.entries(draft).flatMap(([locale, entry]) => {
+    const text = entry.text.normalize('NFC').trim();
+    return text !== entry.original ? [[locale, text || null]] : [];
+  }));
+  const translationsChanged = Object.keys(changes).length > 0;
+  const hasSuggestions = Boolean(shownPreview?.values && Object.keys(shownPreview.values).length);
+  const unchanged = trimmed === initial && !translationsChanged && !hasSuggestions;
+  const disabled = busy || !trimmed || unchanged || (Boolean(buildings) && !building);
+
+  useEffect(() => {
+    if (!api || !generating) return undefined;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      api.previewRoomName(trimmed, controller.signal).then((values) => {
+        if (!controller.signal.aborted) setPreview({ source: trimmed, values });
+      }).catch(() => {
+        if (!controller.signal.aborted) setPreview({ source: trimmed });
+      });
+    }, 600);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [api, generating, trimmed]);
+
+  function translationValue(locale: Locale) {
+    if (manualLanguages.includes(locale)) return translations?.[locale] ?? '';
+    return shownPreview?.values?.[locale] ?? (trimmed === initial ? translations?.[locale] : undefined) ?? '';
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!disabled) onSave(trimmed, building);
+    if (!disabled) onSave(trimmed, building, translationsChanged ? changes : undefined);
   }
 
   return (
@@ -54,6 +105,7 @@ function NameForm({
         maxLength={120}
         required
         disabled={busy}
+        data-autofocus={Boolean(onCancel) || undefined}
       />
       {buildings && (
         <>
@@ -63,8 +115,76 @@ function NameForm({
           </select>
         </>
       )}
-      <button type="submit" disabled={disabled}>{submitLabel}</button>
+      {translations && (
+        <details className="room-name-translations" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+          <summary>{t(MSG.ROOM_NAME_TRANSLATIONS)}</summary>
+          <p className="help">{t(MSG.ROOM_NAME_TRANSLATIONS_HELP)}</p>
+          <div className="device-translation-inputs">
+            {LANGUAGES.map(({ value, label }) => (
+              <label key={value} lang={value} htmlFor={`${nameId}-${value}`}>
+                {label}
+                <input
+                  id={`${nameId}-${value}`}
+                  value={draft[value]?.text ?? translationValue(value)}
+                  maxLength={120}
+                  disabled={busy}
+                  onChange={(event) => setDraft({
+                    ...draft,
+                    [value]: { text: event.target.value, original: draft[value]?.original ?? translationValue(value) },
+                  })}
+                />
+              </label>
+            ))}
+          </div>
+          {generating && <p className="help" role="status">{t(MSG.ROOM_TRANSLATING_NAMES)}</p>}
+          {shownPreview && !shownPreview.values && <p className="help" role="status">{t(MSG.ROOM_TRANSLATION_UNAVAILABLE)}</p>}
+        </details>
+      )}
+      <div className="room-editor-actions">
+        {onCancel && (
+          <button type="button" className="secondary" disabled={busy} onClick={onCancel}>{t(MSG.CANCEL)}</button>
+        )}
+        <button type="submit" disabled={disabled}>{submitLabel}</button>
+      </div>
     </form>
+  );
+}
+
+export function RoomNameDialog({
+  room, buildings, busy, error, api, onSave, onClose,
+}: {
+  room?: Room;
+  buildings?: Building[];
+  busy: boolean;
+  error?: string;
+  api: HomeApi;
+  onSave: (name: string, buildingId: number, changes?: RoomNameChanges) => void;
+  onClose: () => void;
+}) {
+  const title = t(room ? MSG.ROOM_RENAME : MSG.ROOM_CREATE);
+  const close = useCallback(() => {
+    if (!busy) onClose();
+  }, [busy, onClose]);
+  return (
+    <Dialog className="room-picker" open onClose={close}>
+      <DialogBackdrop className="room-picker-backdrop" />
+      <DialogPanel className="room-name-panel">
+        <DialogTitle as="h2">{title}</DialogTitle>
+        <NameForm
+          title={title}
+          initial={room?.name}
+          translations={room?.name_translations ?? {}}
+          manualLanguages={room?.manual_name_languages}
+          api={api}
+          buildings={buildings}
+          submitLabel={title}
+          busy={busy}
+          onSave={onSave}
+          onCancel={close}
+        />
+        {error && <p className="field-error" role="alert">{error}</p>}
+      </DialogPanel>
+    </Dialog>
   );
 }
 
@@ -173,7 +293,7 @@ function RoomAppearanceForm({
   );
 }
 
-function useRoomAction(onAuthError: () => void) {
+export function useRoomAction(onAuthError?: () => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const run: RunAction = useCallback(async (work) => {
@@ -183,7 +303,7 @@ function useRoomAction(onAuthError: () => void) {
     try {
       await work();
     } catch (failure) {
-      if (failure instanceof ApiError && failure.status === 401) onAuthError();
+      if (failure instanceof ApiError && failure.status === 401 && onAuthError) onAuthError();
       else setError(failureMessage(failure));
     } finally {
       setBusy(false);
@@ -195,32 +315,51 @@ function useRoomAction(onAuthError: () => void) {
   };
 }
 
+export async function removeRoomOrExplain(api: HomeApi, id: number) {
+  try {
+    await api.deleteRoom(id);
+  } catch (failure) {
+    if (failure instanceof ApiError && failure.status === 409) throw new Error(t(MSG.ROOM_DELETE_BLOCKED));
+    throw failure;
+  }
+}
+
 function RoomNameAndAppearance({
-  api, room, busy, run, onRenamed, onAppearanceSaved,
+  api, room, busy, error, run, onRenamed, onAppearanceSaved,
 }: {
   api: HomeApi;
   room: Room;
   busy: boolean;
+  error?: string;
   run: RunAction;
   onRenamed: (room: Room) => void;
   onAppearanceSaved?: () => void;
 }) {
-  const rename = useCallback(async (name: string) => {
+  const [renaming, setRenaming] = useState(false);
+  const closeRename = useCallback(() => setRenaming(false), []);
+  const rename = useCallback(async (name: string, _buildingId: number, changes?: RoomNameChanges) => {
     await run(async () => {
-      const renamed = await api.renameRoom(room.id, name);
+      const renamed = await api.renameRoom(room.id, name === room.name ? undefined : name, changes);
       onRenamed(renamed);
+      closeRename();
     });
-  }, [api, onRenamed, room.id, run]);
+  }, [api, closeRename, onRenamed, room.id, room.name, run]);
 
   return (
     <>
-      <NameForm
-        title={t(MSG.ROOM_RENAME)}
-        initial={room.name}
-        submitLabel={t(MSG.ROOM_RENAME)}
-        busy={busy}
-        onSave={rename}
-      />
+      <button type="button" className="secondary compact" disabled={busy} onClick={() => setRenaming(true)}>
+        {t(MSG.ROOM_RENAME)}
+      </button>
+      {renaming && (
+        <RoomNameDialog
+          room={room}
+          api={api}
+          busy={busy}
+          error={error}
+          onSave={rename}
+          onClose={closeRename}
+        />
+      )}
       <RoomAppearanceForm
         api={api}
         roomId={room.id}
@@ -251,6 +390,7 @@ export function RoomLayoutSettings({
           api={api}
           room={room}
           busy={busy}
+          error={error}
           run={run}
           onRenamed={onRenamed}
           onAppearanceSaved={onAppearanceSaved}
@@ -274,6 +414,7 @@ export default function RoomEditor({
     busy, error, run, setError,
   } = useRoomAction(onAuthError);
   const roomId = useId();
+  const roomLabel = useRoomName();
   const read = catalog?.api === api ? catalog : undefined;
   const data = read?.data;
   const selected = data?.rooms.find(({ id }) => id === selectedId) ?? data?.rooms[0];
@@ -299,10 +440,10 @@ export default function RoomEditor({
     });
   }, [api, data, run]);
 
-  const createRoom = useCallback(async (name: string, buildingId: number) => {
+  const createRoom = useCallback(async (name: string, buildingId: number, changes?: RoomNameChanges) => {
     if (!data) return;
     await run(async () => {
-      const room = await api.createRoom(name, buildingId);
+      const room = await api.createRoom(name, buildingId, changes);
       setCatalog({ api, data: { ...data, rooms: [...data.rooms, room] } });
       setSelectedId(room.id);
       setCreating(false);
@@ -320,12 +461,7 @@ export default function RoomEditor({
   async function removeRoom() {
     if (!data || !selected) return;
     await run(async () => {
-      try {
-        await api.deleteRoom(selected.id);
-      } catch (failure) {
-        if (failure instanceof ApiError && failure.status === 409) throw new Error(t(MSG.ROOM_DELETE_BLOCKED));
-        throw failure;
-      }
+      await removeRoomOrExplain(api, selected.id);
       setCatalog({ api, data: { ...data, rooms: data.rooms.filter((item) => item.id !== selected.id) } });
       setSelectedId(undefined);
       setConfirmDelete(false);
@@ -339,8 +475,10 @@ export default function RoomEditor({
     setError('');
   }
 
-  function toggleCreate() {
-    setCreating((previous) => !previous);
+  const closeCreate = useCallback(() => setCreating(false), []);
+
+  function openCreate() {
+    setCreating(true);
     setError('');
   }
 
@@ -370,41 +508,47 @@ export default function RoomEditor({
       )}
       {data && data.buildings.length > 0 && (
         <>
-          {data.rooms.length > 0 && (
-            <div className="room-editor-actions">
-              <label htmlFor={roomId}>{t(MSG.ROOM)}</label>
-              <select
-                id={roomId}
-                value={selected?.id}
-                disabled={busy}
-                onChange={selectRoom}
-              >
-                {data.rooms.map((room) => {
-                  const building = data.buildings.find(({ id }) => id === room.building_id);
-                  const label = data.buildings.length > 1 && building ? `${room.name} · ${building.name}` : room.name;
-                  return <option key={room.id} value={room.id}>{label}</option>;
-                })}
-              </select>
-              <button type="button" className="secondary" disabled={busy} onClick={toggleCreate}>
-                {t(creating ? MSG.CANCEL : MSG.ROOM_CREATE)}
-              </button>
-            </div>
-          )}
-          {creating || !selected ? (
-            <NameForm
-              title={t(MSG.ROOM_CREATE)}
-              submitLabel={t(MSG.ROOM_CREATE)}
+          <div className="room-editor-actions">
+            {data.rooms.length > 0 && (
+              <>
+                <label htmlFor={roomId}>{t(MSG.ROOM)}</label>
+                <select
+                  id={roomId}
+                  value={selected?.id}
+                  disabled={busy}
+                  onChange={selectRoom}
+                >
+                  {data.rooms.map((room) => {
+                    const building = data.buildings.find(({ id }) => id === room.building_id);
+                    const name = roomLabel(room);
+                    const label = data.buildings.length > 1 && building ? `${name} · ${building.name}` : name;
+                    return <option key={room.id} value={room.id}>{label}</option>;
+                  })}
+                </select>
+              </>
+            )}
+            <button type="button" className="secondary" disabled={busy} onClick={openCreate}>
+              {t(MSG.ROOM_CREATE)}
+            </button>
+          </div>
+          {creating && (
+            <RoomNameDialog
               buildings={data.buildings}
+              api={api}
               busy={busy}
+              error={error}
               onSave={createRoom}
+              onClose={closeCreate}
             />
-          ) : (
+          )}
+          {selected && (
             <>
               <RoomNameAndAppearance
                 key={selected.id}
                 api={api}
                 room={selected}
                 busy={busy}
+                error={error}
                 run={run}
                 onRenamed={updateRoom}
               />

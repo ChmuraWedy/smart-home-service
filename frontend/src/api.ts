@@ -32,6 +32,7 @@ export type CloudDevice = {
   node_id?: string | null;
   aliases?: string[];
   'app_room'?: AppRoomAssignment;
+  'synced_room'?: AppRoomAssignment;
   translations?: DeviceTranslations;
   battery?: { code: string; value: JsonValue; unit?: string | null } | null;
   controls?: { ready: boolean; definitions: CloudFunctions; snapshot: CloudSnapshot };

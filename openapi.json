@@ -5917,6 +5917,110 @@
         }
       }
     },
+    "/api/v1/dashboard-layouts/{browser_id}/room-navigation": {
+      "get": {
+        "tags": [
+          "Dashboard layouts"
+        ],
+        "summary": "Read Room Navigation",
+        "operationId": "read_room_navigation_api_v1_dashboard_layouts__browser_id__room_navigation_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "browser_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Browser Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomNavigationLayout"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Dashboard layouts"
+        ],
+        "summary": "Save Room Navigation",
+        "operationId": "save_room_navigation_api_v1_dashboard_layouts__browser_id__room_navigation_put",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "browser_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Browser Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomNavigationLayout"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomNavigationLayout"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/dashboard-layouts/{browser_id}": {
       "get": {
         "tags": [
@@ -6241,6 +6345,56 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/rooms/translation-preview": {
+      "post": {
+        "tags": [
+          "Rooms"
+        ],
+        "summary": "Preview Room Name",
+        "operationId": "preview_room_name_api_v1_rooms_translation_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoomNamePreview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Preview Room Name Api V1 Rooms Translation Preview Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
       }
     }
   },
@@ -8360,6 +8514,30 @@
               }
             ],
             "title": "Description"
+          },
+          "name_translations": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 120,
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Name Translations"
           }
         },
         "additionalProperties": false,
@@ -8426,6 +8604,37 @@
               }
             ],
             "title": "Description"
+          },
+          "name_translations": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 120,
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "propertyNames": {
+                  "enum": [
+                    "en",
+                    "ru",
+                    "pl",
+                    "be"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Translations"
           }
         },
         "additionalProperties": false,
@@ -8466,9 +8675,39 @@
             ],
             "title": "Description"
           },
+          "name_translations": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Name Translations"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
+          },
+          "manual_name_languages": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "array",
+            "title": "Manual Name Languages"
           }
         },
         "additionalProperties": false,
@@ -8514,9 +8753,39 @@
             ],
             "title": "Description"
           },
+          "name_translations": {
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 1
+            },
+            "propertyNames": {
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "object",
+            "title": "Name Translations"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
+          },
+          "manual_name_languages": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ru",
+                "pl",
+                "be"
+              ]
+            },
+            "type": "array",
+            "title": "Manual Name Languages"
           },
           "devices": {
             "items": {
@@ -9280,6 +9549,43 @@
         "type": "object",
         "title": "StartExistingObservation"
       },
+      "RoomNavigationEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Id"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RoomNavigationEntry"
+      },
+      "RoomNavigationLayout": {
+        "properties": {
+          "rooms": {
+            "items": {
+              "$ref": "#/components/schemas/RoomNavigationEntry"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Rooms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rooms"
+        ],
+        "title": "RoomNavigationLayout"
+      },
       "LayoutSlots": {
         "properties": {
           "slots": {
@@ -9417,6 +9723,22 @@
           "shared"
         ],
         "title": "TranslationSaved"
+      },
+      "RoomNamePreview": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RoomNamePreview"
       }
     },
     "securitySchemes": {

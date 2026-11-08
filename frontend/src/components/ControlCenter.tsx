@@ -20,6 +20,7 @@ import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePr
 import { useTopology } from '../use-topology';
 import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
+import useRoomName from '../room-names';
 import { RoomLayoutSettings } from './RoomEditor';
 import DeviceRoomEditor from './DeviceRoomEditor';
 import CameraRoomCard, { cameraRoomCardId } from './CameraRoomCard';
@@ -229,13 +230,17 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const room = dashboardRoom(location.pathname, query);
   const editingLayout = isDashboardLayoutPath(location.pathname);
   const activeRoom = inventory?.rooms.find(({ id }) => String(id) === room);
+  const roomLabel = useRoomName();
   const [appearanceRevision, setAppearanceRevision] = useState(0);
   const roomAppearance = useRoomAppearance(api, activeRoom?.id, appearanceRevision)?.value;
   const refreshRoomAppearance = useCallback(() => setAppearanceRevision((value) => value + 1), []);
-  const updateRoomName = useCallback((updated: Room) => {
+  const updateRoom = useCallback((updated: Room) => {
     setRecord((value) => {
       if (value?.api !== api || value.mask !== mask || !value.inventory) return value;
-      const rooms = value.inventory.rooms.map((item) => (item.id === updated.id ? updated : item));
+      const existing = value.inventory.rooms;
+      const rooms = existing.some((item) => item.id === updated.id)
+        ? existing.map((item) => (item.id === updated.id ? updated : item))
+        : [...existing, updated];
       return { ...value, inventory: { ...value.inventory, rooms } };
     });
   }, [api, mask]);
@@ -289,15 +294,28 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   }
 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
+  function roomDeleted(id: number) {
+    setRecord((value) => {
+      if (value?.api !== api || value.mask !== mask || !value.inventory) return value;
+      const rooms = value.inventory.rooms.filter((item) => item.id !== id);
+      return { ...value, inventory: { ...value.inventory, rooms } };
+    });
+    topology.reload();
+    setRevision((value) => value + 1);
+  }
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
   const placementOf = useCallback((device: UnifiedDevice) => {
     if (device.local) return device.local;
-    const synced = placements.get(device.id);
+    const listed = device.cloud.sharing?.synced_room;
+    const synced = placements.get(device.id) ?? (listed && { ...listed, device_id: device.id });
     const override = device.cloud.sharing?.app_room ?? device.cloud.developer?.app_room;
     return override ? { ...override, device_id: device.id, building_id: override.building_id ?? synced?.building_id ?? null } : synced;
   }, [placements]);
   const deviceRoom = useCallback((device: UnifiedDevice) => placementOf(device)?.room_id ?? null, [placementOf]);
-  function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === placementOf(device)?.room_id)?.name || t(MSG.NO_ROOM); }
+  function roomName(device: UnifiedDevice) {
+    const locationRoom = inventory?.rooms.find((item) => item.id === placementOf(device)?.room_id);
+    return locationRoom ? roomLabel(locationRoom) : t(MSG.NO_ROOM);
+  }
   const [busy, setBusy] = useState(false);
   const combinationRevision = useRef(0);
   const [survey, setSurvey] = useState<{ api: HomeApi; mask: string; key: string; value: Extract<Selection, { kind: 'survey' }> } | null>(null);
@@ -622,7 +640,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (entry.kind === 'combined') {
       const item = entry.combined;
       const href = `/combined-devices/${item.id}`;
-      const name = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id)?.name ?? t(MSG.NO_ROOM);
+      const locationRoom = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id);
+      const name = locationRoom ? roomLabel(locationRoom) : t(MSG.NO_ROOM);
       const quickOpen = combinedQuickOpen && item === combined;
       return (
         <CombinedDeviceCard
@@ -807,7 +826,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           api={api}
           room={activeRoom}
           onAuthError={onAuthError}
-          onRenamed={updateRoomName}
+          onRenamed={updateRoom}
           onAppearanceSaved={refreshRoomAppearance}
         />
       );
@@ -873,7 +892,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
               <select value={room} onChange={event => selectRoom(event.target.value)}>
                 <option value="">{t(MSG.ALL_ROOMS)}</option>
                 <option value="none">{t(MSG.NO_ROOM)}</option>
-                {filteredRooms.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                {filteredRooms.map(item => <option key={item.id} value={item.id}>{roomLabel(item)}</option>)}
               </select>
             </label>
             <label id="dashboard-search" className="dashboard-search-field">
@@ -898,7 +917,27 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
             editing={editingLayout}
             onEditingChange={setEditingLayout}
-            navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
+            navigation={(
+              <RoomNavigation
+                api={api}
+                allRooms={inventory?.rooms}
+                rooms={filteredRooms}
+                selected={room}
+                onSelect={selectRoom}
+                management={inventory && import.meta.env.MODE !== 'demo' ? {
+                  buildings: inventory.buildings,
+                  onSaved: updateRoom,
+                  onDeleted: roomDeleted,
+                  onAuthError,
+                  sync: sharingReady ? {
+                    run: topology.sync,
+                    busy: topology.busy,
+                    error: topology.error || topology.data?.job.message,
+                    emptyRoomsAvailable: Boolean(topology.data?.empty_rooms_available),
+                  } : undefined,
+                } : undefined}
+              />
+            )}
             roomAction={roomAction}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />

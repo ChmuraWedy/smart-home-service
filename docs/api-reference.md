@@ -100,6 +100,8 @@ The batch endpoint validates conflicting values for the same DP before sending. 
 
 `GET` and `PUT /api/v1/dashboard-layouts/{browser_id}` use the usual service authentication. The browser keeps a random 32-character hexadecimal identifier. SQLite stores the layout separately for each identifier and combination of `building`, `room`, `columns`, and `page`.
 
+`GET` and `PUT /api/v1/dashboard-layouts/{browser_id}/room-navigation` use the same browser identifier. The body has a `rooms` array of entries with a numeric `id` and a Boolean `hidden` flag. The array order determines room navigation across dashboard views. New rooms appear after the saved order.
+
 Read or replace the layout as `{"slots":[null,"device-physical-id","group-2"]}`. Slots are ordered row by row, with `null` for empty cells. An unconfigured view returns `{"slots":[]}`.
 
 ## Smart Life topology
@@ -110,7 +112,9 @@ Read or replace the layout as `{"slots":[null,"device-physical-id","group-2"]}`.
 
 `POST /cloud/topology/sync` starts a background job; `GET /cloud/topology` returns the saved topology and progress. Refreshes preserve manual names, aliases, and placement. Automatically placed devices follow later cloud moves until placement is changed manually. Existing dependency constraints still apply; skipped moves appear as warnings.
 
-A failed sync or account change does not partially replace the previous snapshot. Cache and jobs are account-scoped. Empty rooms cannot initially be discovered through this SDK; missing cloud entries do not automatically delete known rooms. This process does not change keys, IPs, capabilities, or Smart Life itself. Limits are 2,000 devices, 100 homes, and five minutes per job.
+A failed sync or account change does not partially replace the previous snapshot. Cache and jobs are account-scoped. Sharing discovers rooms through device assignments. A connected Tuya Developer project with access to the same homes can also provide the full room list, including empty rooms. Missing cloud entries do not automatically delete known rooms. This process does not change keys, IPs, capabilities, or Smart Life itself. Limits are 2,000 devices, 100 homes, and five minutes per job.
+
+Device discovery uses existing room mappings and leaves unmatched devices under **No room**. Explicit room sync imports the rooms returned by Tuya, including rooms deleted locally, and refreshes device placement. App room assignments take precedence.
 
 ## Find, verify, and save local connections
 

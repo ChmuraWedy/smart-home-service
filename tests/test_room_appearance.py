@@ -5,9 +5,10 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.orm import Session
 
+from smarthome import auto_label_translations
 from smarthome.config import Settings
 from smarthome.main import create_app
-from smarthome.models import RoomAppearance
+from smarthome.models import Room, RoomAppearance
 from smarthome.room_appearance import MAX_IMAGE_BYTES
 
 
@@ -21,6 +22,91 @@ def create_room(client, name, building_id):
     response = client.post("/api/v1/rooms", json={"building_id": building_id, "name": name})
     assert response.status_code == 201, response.text
     return "/api/v1/rooms/" + str(response.json()["id"])
+
+
+def test_room_name_translations_are_optional_and_persist_per_language(tmp_path):
+    settings = Settings(database_path=str(tmp_path / "rooms.db"), display_poll_interval=0)
+    with TestClient(create_app(settings)) as client:
+        building_id = client.post("/api/v1/buildings", json={"name": "Home"}).json()["id"]
+        body = {"building_id": building_id, "name": "Study"}
+        response = client.post("/api/v1/rooms", json={
+            **body, "name_translations": {"pl": " Gabinet ", "be": "Кабінет", "ru": "Кабинет"},
+        })
+        assert response.status_code == 201, response.text
+        path = f"/api/v1/rooms/{response.json()['id']}"
+        assert response.json()["name_translations"] == {"pl": "Gabinet", "be": "Кабінет", "ru": "Кабинет"}
+        response = client.patch(path, json={"name_translations": {"pl": "Pracownia", "ru": None}})
+        assert response.status_code == 200, response.text
+        assert response.json()["name"] == "Study"
+        assert response.json()["name_translations"] == {"pl": "Pracownia", "be": "Кабінет"}
+        assert client.patch(path, json={"name_translations": {"fr": "Bureau"}}).status_code == 422
+        assert client.patch(path, json={"name_translations": {"en": " "}}).status_code == 422
+        assert client.patch(path, json={"name_translations": None}).status_code == 422
+        assert client.patch(path, json={"name": "Office"}).status_code == 200
+
+    with TestClient(create_app(settings)) as client:
+        assert client.get(path).json()["name_translations"] == {"pl": "Pracownia", "be": "Кабінет"}
+
+
+def test_room_names_generate_automatically_and_preserve_corrections(tmp_path, monkeypatch):
+    calls = []
+
+    def translate(_url, originals):
+        calls.append(originals)
+        return {name: {"en": name, "pl": "Auto PL", "be": f"Auto {name}", "ru": "Auto RU"} for name in originals}
+
+    monkeypatch.setattr(auto_label_translations, "translate_labels", translate)
+    settings = Settings(
+        database_path=str(tmp_path / "rooms.db"), display_poll_interval=0,
+        label_translator_url="http://127.0.0.1:8093",
+    )
+    with TestClient(create_app(settings)) as client:
+        preview = client.post("/api/v1/rooms/translation-preview", json={"name": "Study"})
+        assert preview.status_code == 200 and preview.json()["pl"] == "Auto PL"
+        assert client.get("/api/v1/rooms").json() == []
+        building = client.post("/api/v1/buildings", json={"name": "Home"}).json()["id"]
+        room = client.post("/api/v1/rooms", json={
+            "name": "Study", "building_id": building, "name_translations": {"pl": "Gabinet", "ru": None},
+        }).json()
+        path = f"/api/v1/rooms/{room['id']}"
+        assert room["name_translations"] == {"en": "Study", "pl": "Gabinet", "be": "Auto Study"}
+        assert set(room["manual_name_languages"]) == {"pl", "ru"}
+        corrected = client.patch(path, json={"name_translations": {"be": None}}).json()
+        assert corrected["name_translations"] == {"en": "Study", "pl": "Gabinet"}
+        renamed = client.patch(path, json={"name": "Office"}).json()
+        assert renamed["name_translations"] == {"en": "Office", "pl": "Gabinet"}
+        assert calls == [["Study"], ["Study"], ["Office"]]
+
+        def unavailable(*_args):
+            raise OSError("Translator offline")
+
+        monkeypatch.setattr(auto_label_translations, "translate_labels", unavailable)
+        renamed = client.patch(path, json={"name": "Workshop"})
+        assert renamed.status_code == 200
+        assert renamed.json()["name_translations"] == {"pl": "Gabinet"}
+
+
+def test_standard_room_terms_preserve_numbers_and_replace_bad_generated_values(client):
+    labels = {"en": "Living room 1", "ru": "Гостиная 1", "pl": "Salon 1", "be": "Гасцёўня 1"}
+    for name in ("Living room1", "LIVING   ROOM 1", "Гостиная1"):
+        preview = client.post("/api/v1/rooms/translation-preview", json={"name": name})
+        assert preview.status_code == 200
+        assert preview.json() == labels
+    building = client.post("/api/v1/buildings", json={"name": "Home"}).json()["id"]
+    response = client.post("/api/v1/rooms", json={
+        "name": "Living room1", "building_id": building, "name_translations": {"pl": "Pokój dzienny 1"},
+    })
+    assert response.status_code == 201
+    assert response.json()["name_translations"] == {**labels, "pl": "Pokój dzienny 1"}
+    room_id = response.json()["id"]
+    with Session(client.app.state.engine) as session:
+        session.get(Room, room_id).generated_name_translations = {
+            "original": "Living room1", "values": {"ru": "Жизненная комната1"},
+        }
+        session.commit()
+    refreshed = client.patch(f"/api/v1/rooms/{room_id}", json={}).json()
+    assert refreshed["name"] == "Living room1"
+    assert refreshed["name_translations"] == {**labels, "pl": "Pokój dzienny 1"}
 
 
 def test_room_appearance_survives_restart_and_stays_isolated(tmp_path):

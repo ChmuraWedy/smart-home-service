@@ -156,9 +156,27 @@ function setCombinedPower(combination: CombinedDevice, enabled: boolean): Combin
   };
 }
 
+function demoLayout(url: URL, init: RequestInit): Response | undefined {
+  const match = /^\/api\/v1\/dashboard-layouts\/[a-f0-9]{32}(\/room-navigation)?$/.exec(url.pathname);
+  if (!match || (init.method !== 'GET' && init.method !== 'PUT')) return undefined;
+  url.searchParams.sort();
+  const key = `smart-home.demo.layout:${url.pathname}${url.search}`;
+  if (init.method === 'PUT') {
+    const body = String(init.body);
+    localStorage.setItem(key, body);
+    return Response.json(JSON.parse(body));
+  }
+  const saved = localStorage.getItem(key);
+  if (saved) return Response.json(JSON.parse(saved));
+  return Response.json(match[1] ? { rooms: [] } : { slots: [] });
+}
+
 export default async function demoFetch(url: string, init: RequestInit): Promise<Response> {
   if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-  const path = new URL(url).pathname;
+  const request = new URL(url);
+  const layout = demoLayout(request, init);
+  if (layout) return layout;
+  const path = request.pathname;
   const { method } = init;
   if (method === 'GET') {
     if (path === '/api/v1/combined-devices') return Response.json(combinations);

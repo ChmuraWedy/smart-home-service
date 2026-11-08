@@ -79,6 +79,7 @@ def test_newer_schema_is_rejected_without_modification():
 def test_upgrades_a_version_one_database_without_losing_layouts():
     engine = db.make_engine(":memory:")
     with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE rooms (id INTEGER PRIMARY KEY)")
         connection.exec_driver_sql(
             "CREATE TABLE combined_devices (id INTEGER PRIMARY KEY, show_all_power BOOLEAN NOT NULL)"
         )
@@ -97,6 +98,25 @@ def test_upgrades_a_version_one_database_without_losing_layouts():
             "SELECT show_all_power, show_member_cards, aliases FROM combined_devices"
         ).one() == (0, 0, "[]")
         assert connection.exec_driver_sql("SELECT slots, hidden_devices FROM dashboard_layouts").one() == ("[null]", "[]")
+    engine.dispose()
+
+
+def test_adds_name_translations_to_existing_rooms():
+    engine = db.make_engine(":memory:")
+    db.Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("ALTER TABLE rooms DROP COLUMN generated_name_translations")
+        connection.exec_driver_sql("ALTER TABLE rooms DROP COLUMN name_translations")
+        connection.exec_driver_sql("INSERT INTO buildings (id, name) VALUES (1, 'Home')")
+        connection.exec_driver_sql("INSERT INTO rooms (id, building_id, name) VALUES (1, 1, 'Study')")
+        connection.exec_driver_sql("PRAGMA user_version = 6")
+
+    db.init_db(engine)
+
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT name, name_translations, generated_name_translations FROM rooms"
+        ).one() == ("Study", "{}", "{}")
     engine.dispose()
 
 

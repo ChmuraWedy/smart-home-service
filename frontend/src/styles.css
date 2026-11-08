@@ -1355,8 +1355,16 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view:not([data-dashboard-panel="tools"]) .control-filters > label:not(.dashboard-search-field),
 .dashboard-view:not([data-dashboard-panel="search"]):not([data-dashboard-panel="tools"]) .control-filters { @apply tw:hidden; }
 .dashboard-view[data-dashboard-panel="search"] .dashboard-search-field > span { @apply tw:sr-only; }
-.room-navigation-trigger { @apply tw:hidden; }
-.room-navigation-heading { @apply tw:my-3 tw:text-xl tw:font-semibold tw:text-(--text-strong); }
+.room-navigation-selection { @apply tw:flex tw:min-w-0 tw:items-center; }
+button.room-navigation-trigger {
+  @apply tw:flex tw:min-h-11 tw:min-w-0 tw:items-center tw:gap-1.5 tw:border-transparent tw:bg-transparent tw:px-0 tw:py-1 tw:text-start tw:text-xl tw:font-semibold tw:text-(--text-strong);
+}
+.room-navigation-trigger .ui-icon { @apply tw:size-4 tw:shrink-0; }
+.room-navigation-trigger > .ui-icon:first-child { @apply tw:hidden; }
+.room-navigation-heading { @apply tw:min-w-0 tw:wrap-anywhere; }
+:where(.control-center[data-room-background]) button.room-navigation-trigger {
+  @apply tw:rounded-lg tw:bg-(--surface) tw:px-2;
+}
 .dashboard-view:has(.room-navigation-bar) { padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
 .room-navigation-bar {
   @apply tw:fixed tw:inset-x-0 tw:bottom-0 tw:z-20 tw:border-t tw:border-(--border) tw:bg-(--surface) tw:px-4 tw:pt-1.5;
@@ -1380,31 +1388,66 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .room-picker-panel {
   @apply tw:fixed tw:inset-x-0 tw:bottom-4 tw:mx-auto tw:flex tw:max-h-[min(75dvh,640px)] tw:w-[min(92vw,440px)] tw:flex-col tw:rounded-2xl tw:border tw:border-(--border) tw:bg-(--dialog-bg) tw:p-3 tw:text-(--text) tw:shadow-xl;
 }
+.room-name-panel {
+  @apply tw:fixed tw:inset-0 tw:m-auto tw:h-fit tw:max-h-[90dvh] tw:w-[min(92vw,440px)] tw:overflow-y-auto tw:overscroll-contain tw:rounded-2xl tw:border tw:border-(--border) tw:bg-(--dialog-bg) tw:p-4 tw:text-(--text) tw:shadow-xl;
+}
+.room-name-panel h2 { @apply tw:m-0 tw:text-xl; }
+.room-name-panel .room-editor-actions { @apply tw:justify-end; }
+.room-name-translations { @apply tw:rounded-lg tw:border tw:border-(--border) tw:p-3; }
+.room-name-translations > summary { @apply tw:cursor-pointer tw:font-semibold; }
 .room-picker-heading { @apply tw:flex tw:shrink-0 tw:items-center tw:justify-between tw:gap-3 tw:px-2 tw:pb-2; }
 .room-picker-heading h2 { @apply tw:m-0 tw:text-xl; }
-.room-picker-close { @apply tw:grid tw:size-12 tw:shrink-0 tw:place-items-center tw:p-0; }
-.room-picker-close .ui-icon { @apply tw:size-6; }
+.room-picker-actions { @apply tw:flex tw:shrink-0 tw:gap-2; }
+.room-picker-action { @apply tw:grid tw:size-12 tw:shrink-0 tw:place-items-center tw:p-0; }
+.room-picker-action .ui-icon { @apply tw:size-6; }
 .room-picker-list { @apply tw:m-0 tw:grid tw:list-none tw:gap-1 tw:overflow-y-auto tw:overscroll-contain tw:p-1.5; }
 .room-picker-list .room-choice {
   @apply tw:grid tw:min-h-12 tw:w-full tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:items-center tw:gap-3 tw:border-transparent tw:bg-transparent tw:px-3 tw:py-2 tw:text-start tw:wrap-anywhere;
 }
 .room-picker-list .room-choice .ui-icon { @apply tw:size-6; }
+.room-navigation-editor-help { @apply tw:m-0 tw:px-2; }
+.room-navigation-editor-body { @apply tw:min-h-0; }
+.room-navigation-editor-list { @apply tw:m-0 tw:grid tw:list-none tw:gap-1 tw:p-0; }
+.room-navigation-editor-row {
+  @apply tw:grid tw:grid-cols-[minmax(0,1fr)_auto] tw:items-center tw:gap-1 tw:rounded-lg tw:ps-2;
+}
+.room-navigation-editor-row[data-manage] { @apply tw:grid-cols-[minmax(0,1fr)_auto_auto_auto]; }
+.room-navigation-editor-row > span { @apply tw:wrap-anywhere; }
+.room-navigation-editor-row[data-room-hidden] { @apply tw:bg-(--surface-soft) tw:text-(--muted); }
+.room-navigation-order { @apply tw:flex tw:justify-end tw:gap-1; }
+.room-navigation-editor-row > button,
+.room-navigation-order > button { @apply tw:grid tw:size-11 tw:place-items-center tw:p-0; }
+.room-navigation-editor-row .ui-icon { @apply tw:size-5; }
+.room-navigation-room-action {
+  @apply tw:col-span-full tw:my-1 tw:rounded-lg tw:border tw:border-(--border) tw:bg-(--surface) tw:p-3;
+}
+.room-navigation-room-action .room-editor-form { @apply tw:mt-0; }
+.room-navigation-room-action > p:first-child { @apply tw:mt-0; }
+.room-navigation-catalog-actions { @apply tw:flex tw:shrink-0 tw:flex-wrap tw:gap-2; }
+.room-navigation-catalog-actions:empty { @apply tw:hidden; }
+.room-navigation-new-room { @apply tw:inline-flex tw:min-h-11 tw:items-center tw:gap-2; }
+.room-navigation-new-room .ui-icon { @apply tw:size-5; }
+.room-navigation-editor-actions { @apply tw:flex tw:shrink-0 tw:justify-end tw:gap-2 tw:pt-2; }
 .room-choice-check { @apply tw:text-(--success); }
 @media (max-width:760px), (pointer:coarse) {
   .dashboard-view:has(.room-navigation-bar) { @apply tw:pb-0; }
-  .room-navigation-bar, .room-navigation-heading { @apply tw:hidden; }
+  .room-navigation-bar { @apply tw:hidden; }
   .dashboard-layout-room { @apply tw:flex-1; }
-  .room-navigation-trigger {
-    @apply tw:grid tw:min-h-14 tw:w-full tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:items-center tw:gap-3 tw:px-3 tw:text-start tw:text-lg tw:wrap-anywhere;
+  button.room-navigation-trigger {
+    @apply tw:grid tw:min-h-14 tw:flex-1 tw:grid-cols-[auto_minmax(0,1fr)_auto] tw:gap-3 tw:border-(--border) tw:bg-(--surface-soft) tw:px-3 tw:text-lg;
   }
   .room-navigation-trigger .ui-icon { @apply tw:size-6; }
+  .room-navigation-trigger > .ui-icon:first-child { @apply tw:block; }
   .room-picker-panel {
     @apply tw:inset-y-0 tw:right-auto tw:left-0 tw:m-0 tw:max-h-none tw:w-[min(82vw,360px)] tw:rounded-none;
     padding-top:max(12px,env(safe-area-inset-top));
     padding-bottom:max(12px,env(safe-area-inset-bottom));
   }
   .room-picker-list .room-choice { @apply tw:min-h-[60px] tw:text-lg; }
-  .room-picker-close { @apply tw:size-14; }
+  .room-picker-action { @apply tw:size-14; }
+  .room-navigation-editor-row[data-manage] { @apply tw:grid-cols-[minmax(0,1fr)_auto_auto]; }
+  .room-navigation-editor-row[data-manage] > span { @apply tw:col-span-2; }
+  .room-navigation-editor-row[data-manage] .room-navigation-order { @apply tw:col-span-2; }
 }
 .dashboard-view .dashboard-device {
   --dashboard-card-inset:12px;
@@ -1433,7 +1476,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
   text-shadow:0 0 4px var(--page-bg),0 0 2px var(--page-bg);
 }
 .dashboard-view:has(.control-center) > main > .notice:not(:empty) { @apply tw:pb-6; }
-.control-center[data-room-background] :is(.room-navigation-heading, .dashboard-intro) {
+.control-center[data-room-background] .dashboard-intro {
   @apply tw:w-fit tw:rounded-lg tw:bg-(--surface) tw:px-2 tw:py-1;
 }
 .dashboard-view .control-center[data-room-appearance] .dashboard-device {

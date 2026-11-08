@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { ApiError } from '../api';
 import type { Room } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
+import useRoomName from '../room-names';
 
 export default function DeviceRoomEditor({
   rooms, roomId, onSave, onAuthError,
@@ -13,6 +14,7 @@ export default function DeviceRoomEditor({
   onAuthError: () => void;
 }) {
   const selectId = useId();
+  const roomLabel = useRoomName();
   const disclosure = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState<number | null>();
   const [busy, setBusy] = useState(false);
@@ -44,7 +46,7 @@ export default function DeviceRoomEditor({
         <label htmlFor={selectId}>{t(MSG.DEVICE_ROOM_IN_APP)}</label>
         <select id={selectId} value={selected ?? ''} disabled={busy} onChange={(event) => setDraft(Number(event.target.value) || null)}>
           <option value="">{t(MSG.NO_ROOM)}</option>
-          {rooms.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
+          {rooms.map((room) => <option key={room.id} value={room.id}>{roomLabel(room)}</option>)}
         </select>
         <button className="secondary compact" type="submit" disabled={busy || !valid || selected === roomId}>{t(MSG.SAVE_DEVICE_ROOM)}</button>
         {error && <p role="alert" className="field-error">{error}</p>}

@@ -1,11 +1,14 @@
 import { MSG, t } from "./i18n";
-import { useEffect, useRef, useState } from 'react';
+import {
+  useCallback, useEffect, useRef, useState,
+} from 'react';
 import { ApiError } from './api';
 import type { HomeApi, Topology } from './home-api';
 
 export function useTopology(api: HomeApi, ready: boolean, onSynced: () => void, onAuthError: () => void) {
   const [record, setRecord] = useState<{ api: HomeApi; data?: Topology; error?: string; starting?: boolean } | null>(null);
   const [revision, setRevision] = useState(0);
+  const reload = useCallback(() => setRevision((value) => value + 1), []);
   const starting = useRef<AbortController | null>(null), completion = useRef(false);
   const callbacks = useRef({ onSynced, onAuthError });
   callbacks.current = { onSynced, onAuthError };
@@ -47,12 +50,18 @@ export function useTopology(api: HomeApi, ready: boolean, onSynced: () => void, 
       if (controller.signal.aborted) return;
       // Reload once even if the job finishes before our first progress read.
       completion.current = true;
-      setRevision(value => value + 1);
+      reload();
     } catch (failure) {
       if (controller.signal.aborted) return;
       setRecord(previous => ({ ...(previous?.api === api ? previous : {}), api, starting: false, error: failure instanceof Error ? failure.message : t(MSG.COULD_NOT_START_SYNCHRONIZATION) }));
       if (failure instanceof ApiError && failure.status === 401) callbacks.current.onAuthError();
     }
   }
-  return { data: current?.data, error: current?.error, busy: Boolean(current?.starting || (!current?.error && current?.data?.job.status === 'running')), sync };
+  return {
+    data: current?.data,
+    error: current?.error,
+    busy: Boolean(current?.starting || (!current?.error && current?.data?.job.status === 'running')),
+    sync,
+    reload,
+  };
 }

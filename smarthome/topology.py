@@ -8,9 +8,11 @@ from datetime import timezone
 
 from fastapi import Depends, HTTPException, Request, Response
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .api_dependencies import get_session
+from .auto_label_translations import translate_room_names
 from .cloud_api import router
 from .cloud_scope import scope_for
 from .models import (
@@ -27,7 +29,10 @@ from .schemas import DevicePatch
 from .service import patch_device
 
 MAX_DEVICES = 2000
+MAX_ROOMS_PER_HOME = 500
 MAX_SECONDS = 300
+ROOM_LOOKUP_RETRY_SECONDS = 60
+ROOM_LOOKUPS_PER_READ = 4
 
 
 def external_id(value):
@@ -106,7 +111,85 @@ def room_name(session, building_id, name, identity, own_id=None):
     return candidate
 
 
-def apply_snapshot(session, scope, homes, devices):
+def read_developer_rooms(developer, home_id):
+    if developer is None:
+        return None
+    with developer.lock:
+        if developer.client is None:
+            return None
+        try:
+            result = developer.client.request("GET", f"/v1.0/homes/{home_id}/rooms")
+            if external_id(result["home_id"]) != home_id:
+                return None
+            rows = result["rooms"]
+            if not isinstance(rows, list) or len(rows) > MAX_ROOMS_PER_HOME:
+                return None
+            rooms = {external_id(row["room_id"]): title(row["name"]) for row in rows}
+            return rooms if len(rooms) == len(rows) else None
+        except (KeyError, TypeError, ValueError, OSError, HTTPException):
+            return None
+
+
+def discover_device_placements(session, bridge, scope, device_ids):
+    """Resolve newly seen devices against imported rooms without creating rooms."""
+    topology = cached(session, scope)
+    homes = {home["home_id"] for home in topology["homes"]}
+    if not homes:
+        return {}
+    placements = {row["device_id"]: row for row in topology["placements"]}
+    now = time.monotonic()
+    new_ids = [
+        device_id for device_id in device_ids
+        if device_id not in placements and bridge.next_room_lookup.get(device_id, 0) <= now
+    ]
+    bridge.next_room_lookup = {
+        device_id: until for device_id, until in bridge.next_room_lookup.items()
+        if until > now and device_id not in placements
+    }
+    if new_ids:
+        read_room = getattr(bridge._manager(), "query_room_by_device", None)
+        if read_room:
+            try:
+                added = match_device_rooms(session, bridge, scope, homes, new_ids[:ROOM_LOOKUPS_PER_READ], read_room)
+                if added:
+                    session.commit()
+                    placements = {row["device_id"]: row for row in cached(session, scope)["placements"]}
+            except SQLAlchemyError:
+                session.rollback()
+    return placements
+
+
+def match_device_rooms(session, bridge, scope, homes, device_ids, read_room):
+    known_rooms = {}
+    for mapping in session.scalars(select(CloudRoom).where(
+        CloudRoom.scope == scope, CloudRoom.home_id.in_(homes),
+    )):
+        known_rooms.setdefault(mapping.room_id, []).append(mapping.home_id)
+    added = False
+    for device_id in device_ids:
+        bridge.next_room_lookup[device_id] = time.monotonic() + ROOM_LOOKUP_RETRY_SECONDS
+        try:
+            device_id = external_id(device_id)
+        except ValueError:
+            continue
+        try:
+            reported = read_room(device_id)
+            room_id = external_id(reported.id) if reported else None
+        except Exception:
+            break  # Retry on a later inventory read without delaying other device controls.
+        matching_homes = known_rooms.get(room_id, [])
+        if len(matching_homes) == 1:
+            home_id = matching_homes[0]
+        elif len(homes) == 1:
+            home_id = next(iter(homes))
+        else:
+            continue  # Sharing supplies a room ID but no home ID for this lookup.
+        session.merge(CloudPlacement(scope=scope, device_id=device_id, home_id=home_id, room_id=room_id))
+        added = True
+    return added
+
+
+def apply_snapshot(session, scope, homes, room_names, devices):
     """One transaction after network reads; missing rooms never mean delete local objects."""
     home_maps = {
         h.home_id: h for h in session.scalars(select(CloudHome).where(CloudHome.scope == scope))
@@ -116,6 +199,7 @@ def apply_snapshot(session, scope, homes, devices):
         for r in session.scalars(select(CloudRoom).where(CloudRoom.scope == scope))
     }
     warnings = 0
+    imported_rooms = []
     for mapping in home_maps.values():
         mapping.active = False
     for home_id, name in homes.items():
@@ -134,11 +218,8 @@ def apply_snapshot(session, scope, homes, devices):
             session.add(mapping)
             home_maps[home_id] = mapping
         mapping.building_id, mapping.name, mapping.active = building.id, name, True
-    for row in devices.values():
-        home_id, room = row["home_id"], row["room"]
-        if room is None:
-            continue
-        key = (home_id, room["id"])
+    for key, name in room_names.items():
+        home_id, room_id = key
         mapping = room_maps.get(key)
         local = (
             session.get(Room, mapping.local_room_id) if mapping and mapping.local_room_id else None
@@ -150,20 +231,21 @@ def apply_snapshot(session, scope, homes, devices):
         if local is None or local.building_id != building_id:
             local = Room(
                 building_id=building_id,
-                name=room_name(session, building_id, room["name"], ":".join(key)),
+                name=room_name(session, building_id, name, ":".join(key)),
             )
             session.add(local)
             session.flush()
         elif follow_name:
-            candidate = room_name(session, building_id, room["name"], ":".join(key), local.id)
+            candidate = room_name(session, building_id, name, ":".join(key), local.id)
             local.name = candidate
         if mapping is None:
-            mapping = CloudRoom(scope=scope, home_id=home_id, room_id=room["id"])
+            mapping = CloudRoom(scope=scope, home_id=home_id, room_id=room_id)
             session.add(mapping)
             room_maps[key] = mapping
-        mapping.local_room_id, mapping.name = local.id, room["name"]
+        mapping.local_room_id, mapping.name = local.id, name
         if follow_name:
             mapping.imported_name = local.name
+        imported_rooms.append(local.id)
     old = {
         p.device_id: p
         for p in session.scalars(select(CloudPlacement).where(CloudPlacement.scope == scope))
@@ -183,12 +265,8 @@ def apply_snapshot(session, scope, homes, devices):
             session.add(mapping)
         mapping.home_id = row["home_id"]
         mapping.room_id = row["room"]["id"] if row["room"] else None
-        desired = (
-            home_maps[mapping.home_id].building_id,
-            room_maps[(mapping.home_id, mapping.room_id)].local_room_id
-            if mapping.room_id
-            else None,
-        )
+        local_room = room_maps.get((mapping.home_id, mapping.room_id))
+        desired = (home_maps[mapping.home_id].building_id, local_room.local_room_id if local_room else None)
         item = locals_by_id.get(device_id)
         if item:
             current = (item.building_id, item.room_id)
@@ -217,6 +295,7 @@ def apply_snapshot(session, scope, homes, devices):
     state.synced_at, state.warnings = utcnow(), warnings
     session.add(state)
     session.commit()
+    return imported_rooms
 
 
 class TopologySync:
@@ -239,7 +318,7 @@ class TopologySync:
         with self.lock:
             self.job.update(values)
 
-    def start(self, bridge, engine):
+    def start(self, bridge, engine, developer=None):
         with bridge.lock:
             scope = scope_for(bridge, "sharing")
             authorization = bridge.auth
@@ -254,14 +333,14 @@ class TopologySync:
                 self.job = {"status": "running", "processed": 0, "total": 0, "message": None}
                 self.thread = threading.Thread(
                     target=self.run,
-                    args=(bridge, engine, scope, authorization),
+                    args=(bridge, engine, scope, authorization, developer),
                     daemon=True,
                     name="smart-life-topology",
                 )
                 self.thread.start()
                 return dict(self.job)
 
-    def run(self, bridge, engine, scope, authorization):
+    def run(self, bridge, engine, scope, authorization, developer):
         deadline = time.monotonic() + MAX_SECONDS
 
         def guard():
@@ -286,12 +365,15 @@ class TopologySync:
             home_rows = query("/v1.0/m/life/users/homes")
             if not isinstance(home_rows, list) or len(home_rows) > 100:
                 raise ValueError("Invalid home list")
-            homes, devices = {}, {}
+            homes, devices, catalogs = {}, {}, {}
             for row in home_rows:
                 home_id = external_id(row["ownerId"])
                 if home_id in homes:
                     raise ValueError("Duplicate home")
                 homes[home_id] = title(row["name"])
+                catalog = read_developer_rooms(developer, home_id)
+                if catalog is not None:
+                    catalogs[home_id] = catalog
                 rows = query("/v1.0/m/life/ha/home/devices", {"homeId": home_id})
                 if not isinstance(rows, list):
                     raise ValueError("Invalid device list")
@@ -312,9 +394,13 @@ class TopologySync:
                 # Give concurrent UI reads a chance to acquire the account lock.
                 if self.stop_event.wait(0.01):
                     raise ValueError("Sync stopped")
-            room_names = {}
+            room_names = {
+                (home_id, room_id): name
+                for home_id, catalog in catalogs.items()
+                for room_id, name in catalog.items()
+            }
             for row in devices.values():
-                if row["room"]:
+                if row["room"] and row["home_id"] not in catalogs:
                     key = (row["home_id"], row["room"]["id"])
                     name = row["room"]["name"]
                     if key in room_names and room_names[key] != name:
@@ -323,8 +409,10 @@ class TopologySync:
             with bridge.lock:
                 guard()
                 with Session(engine) as session:
-                    apply_snapshot(session, scope, homes, devices)
-            self.update(status="done")
+                    imported_rooms = apply_snapshot(session, scope, homes, room_names, devices)
+            with Session(engine) as session:
+                translate_room_names(session, bridge.settings.label_translator_url, imported_rooms, deadline)
+            self.update(status="done", empty_rooms_available=bool(homes) and len(catalogs) == len(homes))
         except Exception:
             # Cloud exceptions can include credentials and raw responses. Never publish them.
             self.update(
@@ -344,10 +432,13 @@ def get_topology(request: Request, response: Response, session: Session = Depend
     with bridge.lock:
         scope = scope_for(bridge, "sharing")
         result = cached(session, scope)
+    job = request.app.state.topology.view(scope)
+    result["empty_rooms_available"] = job.pop("empty_rooms_available", False)
     response.headers["Cache-Control"] = "no-store"
-    return {**result, "job": request.app.state.topology.view(scope)}
+    return {**result, "job": job}
 
 
 @router.post("/topology/sync", status_code=202)
 def sync_topology(request: Request):
-    return request.app.state.topology.start(request.app.state.cloud, request.app.state.engine)
+    state = request.app.state
+    return state.topology.start(state.cloud, state.engine, state.developer_cloud)

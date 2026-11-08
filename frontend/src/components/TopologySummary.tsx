@@ -36,7 +36,9 @@ export function TopologySummary({ data, error, busy, onSync }: {
         {t(MSG.CHECK_THE_RELEVANT_DEVICES_ROOMS)}
       </p>
 )}
-      <p className="help topology-note">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
+      {!data?.empty_rooms_available && (
+        <p className="help topology-note">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
+      )}
     </div>
   );
 }
