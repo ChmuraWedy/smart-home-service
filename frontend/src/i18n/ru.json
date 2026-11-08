@@ -1125,6 +1125,7 @@
   "DEVICE_TRANSLATION_OUTDATED": "Название или алиас изменились. Откройте устройство заново и повторите попытку.",
   "DEVICE_TRANSLATIONS_SAVED": "Переводы сохранены.",
   "SAVE_DEVICE_TRANSLATIONS": "Сохранить переводы",
+  "EDIT_ROOM": "Редактировать комнату",
   "ROOM_EDITOR_TITLE": "Управление комнатами",
   "ROOM_EDITOR_NEEDS_BUILDING": "Создайте здание, прежде чем добавить первую комнату.",
   "ROOM_CREATE_BUILDING": "Создать здание",

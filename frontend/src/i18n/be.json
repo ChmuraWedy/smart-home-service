@@ -1125,6 +1125,7 @@
   "DEVICE_TRANSLATION_OUTDATED": "Назва ці псеўданім змяніліся. Адкрыйце прыладу нанова і паўтарыце спробу.",
   "DEVICE_TRANSLATIONS_SAVED": "Пераклады захаваныя.",
   "SAVE_DEVICE_TRANSLATIONS": "Захаваць пераклады",
+  "EDIT_ROOM": "Рэдагаваць пакой",
   "ROOM_EDITOR_TITLE": "Кіраванне пакоямі",
   "ROOM_EDITOR_NEEDS_BUILDING": "Стварыце будынак, перш чым дадаць першы пакой.",
   "ROOM_CREATE_BUILDING": "Стварыць будынак",

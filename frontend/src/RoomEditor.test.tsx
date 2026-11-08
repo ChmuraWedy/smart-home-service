@@ -112,11 +112,16 @@ it('creates a first building and room, renames it, and preserves it after a bloc
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
 });
 
-it('uploads and saves opacity from dashboard settings and shows them only for the chosen room', async () => {
+it('opens the selected room from its header and saves its background and opacity', async () => {
   const { uploads, changes } = fixture([building], [kitchen, bedroom]);
   const user = userEvent.setup();
-  const app = openApp('/settings/dashboard?room=1');
-  await user.click(await screen.findByRole('button', { name: 'Manage rooms' }));
+  const app = openApp('/rooms/1');
+  const editRoom = await screen.findByRole('button', { name: 'Edit room' });
+  const heading = editRoom.closest('.dashboard-layout-heading') as HTMLElement;
+  expect(within(heading).getByText('Kitchen', { selector: '.room-navigation-heading' })).toBeInTheDocument();
+  expect(within(heading).getByRole('button', { name: 'Edit layout' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Manage rooms' })).not.toBeInTheDocument();
+  await user.click(editRoom);
   expect(window.location.pathname).toBe('/settings/rooms');
   expect(await screen.findByRole('combobox', { name: 'Room' })).toHaveValue('1');
 
@@ -140,6 +145,16 @@ it('uploads and saves opacity from dashboard settings and shows them only for th
   openApp('/rooms/2');
   await waitFor(() => expect(document.querySelector('.control-center')).toHaveStyle('--room-card-opacity: 100%'));
   expect(document.querySelector('.control-center')).not.toHaveAttribute('data-room-background');
+});
+
+it('opens room management from All rooms even before a room exists', async () => {
+  fixture([building], []);
+  openApp('/');
+  const editRooms = await screen.findByRole('button', { name: 'Manage rooms' });
+  expect(editRooms).toHaveTextContent(/^$/);
+  await userEvent.setup().click(editRooms);
+  expect(window.location.pathname + window.location.search).toBe('/settings/rooms');
+  expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
 });
 
 it('shrinks a large photo before sending it through the existing upload limit', async () => {

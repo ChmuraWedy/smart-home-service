@@ -1125,6 +1125,7 @@
   "DEVICE_TRANSLATION_OUTDATED": "This name or alias has changed. Reload the device and try again.",
   "DEVICE_TRANSLATIONS_SAVED": "Translations saved.",
   "SAVE_DEVICE_TRANSLATIONS": "Save translations",
+  "EDIT_ROOM": "Edit room",
   "ROOM_EDITOR_TITLE": "Manage rooms",
   "ROOM_EDITOR_NEEDS_BUILDING": "Create a building before adding your first room.",
   "ROOM_CREATE_BUILDING": "Create building",

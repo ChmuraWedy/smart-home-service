@@ -223,6 +223,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const building = query.get('building') ?? '';
   const room = dashboardRoom(location.pathname, query);
   const activeRoomId = inventory?.rooms.find(({ id }) => String(id) === room)?.id;
+  const canOpenRoomEditor = import.meta.env.MODE !== 'demo' && Boolean(inventory && (activeRoomId !== undefined || room === ''));
+  const roomEditorLabel = t(activeRoomId !== undefined ? MSG.EDIT_ROOM : MSG.ROOM_EDITOR_TITLE);
   const roomAppearance = useRoomAppearance(api, activeRoomId)?.value;
   const search = query.get('q') ?? '';
   const requestedPage = Number(query.get('page') ?? 1);
@@ -724,18 +726,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           </h2>
         </div>
         <div className="survey-toolbar dashboard-actions">
-          {import.meta.env.MODE !== 'demo' && (
-            <button
-              type="button"
-              className="secondary compact"
-              aria-label={t(MSG.ROOM_EDITOR_TITLE)}
-              title={t(MSG.ROOM_EDITOR_TITLE)}
-              onClick={openRoomEditor}
-            >
-              <Icon name="room" className="dashboard-action-icon" />
-              <span>{t(MSG.ROOM_EDITOR_TITLE)}</span>
-            </button>
-          )}
           <button className="secondary compact" disabled={!inventory || busy} aria-label={t(MSG.SET_UP_LOCAL_DEVICE)} title={t(MSG.SET_UP_LOCAL_DEVICE)} onClick={() => choose({ kind: 'survey' })}>
             <Icon name="add" className="dashboard-action-icon" />
             <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
@@ -794,6 +784,17 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             view={canUseLayout ? { building, room, page: page + 1 } : undefined}
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
             navigation={<RoomNavigation rooms={filteredRooms} selected={room} onSelect={selectRoom} />}
+            roomAction={canOpenRoomEditor ? (
+              <button
+                type="button"
+                className="secondary dashboard-layout-icon"
+                aria-label={roomEditorLabel}
+                title={roomEditorLabel}
+                onClick={openRoomEditor}
+              >
+                <Icon name="edit" />
+              </button>
+            ) : undefined}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />
           {entries.length > PAGE_SIZE && (

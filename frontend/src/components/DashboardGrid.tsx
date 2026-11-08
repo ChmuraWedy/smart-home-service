@@ -109,7 +109,7 @@ function LayoutTarget({
 }
 
 export default function DashboardGrid<T>({
-  api, density, items, view, editable, navigation, renderCard,
+  api, density, items, view, editable, navigation, roomAction, renderCard,
 }: {
   api: HomeApi;
   density: 'small' | 'large';
@@ -117,6 +117,7 @@ export default function DashboardGrid<T>({
   view?: GridView;
   editable: boolean;
   navigation?: ReactNode;
+  roomAction?: ReactNode;
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
 }) {
   const { grid, columns } = useGridColumns(density);
@@ -282,7 +283,7 @@ export default function DashboardGrid<T>({
   }
 
   let editLabel = t(MSG.EDIT_DASHBOARD_LAYOUT);
-  let editIcon: 'edit' | 'close' | 'refresh-list' = 'edit';
+  let editIcon: 'move' | 'close' | 'refresh-list' = 'move';
   if (draft) {
     editLabel = t(MSG.CANCEL);
     editIcon = 'close';
@@ -293,10 +294,11 @@ export default function DashboardGrid<T>({
 
   return (
     <>
-      {(navigation || showEditor) && (
+      {(navigation || roomAction || showEditor) && (
         <div className="dashboard-layout-toolbar" data-editing={Boolean(draft) || undefined}>
           <div className="dashboard-layout-heading">
             {navigation && <div className="dashboard-layout-room">{navigation}</div>}
+            {!draft && roomAction && <div className="dashboard-layout-actions">{roomAction}</div>}
             {showEditor && (
               <div className="dashboard-layout-actions">
                 <button

@@ -1125,6 +1125,7 @@
   "DEVICE_TRANSLATION_OUTDATED": "Nazwa lub alias uległy zmianie. Otwórz urządzenie ponownie i spróbuj jeszcze raz.",
   "DEVICE_TRANSLATIONS_SAVED": "Zapisano tłumaczenia.",
   "SAVE_DEVICE_TRANSLATIONS": "Zapisz tłumaczenia",
+  "EDIT_ROOM": "Edytuj pokój",
   "ROOM_EDITOR_TITLE": "Zarządzaj pokojami",
   "ROOM_EDITOR_NEEDS_BUILDING": "Utwórz budynek, aby dodać pierwszy pokój.",
   "ROOM_CREATE_BUILDING": "Utwórz budynek",
