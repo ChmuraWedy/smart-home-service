@@ -1712,9 +1712,16 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-sheet .combined-member + .combined-member { @apply tw:border-t tw:border-(--border); }
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
 .combined-member-unavailable { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
-.combined-actions, .combined-power, .combined-delete { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
+.combined-actions, .combined-delete { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-2; }
 .combined-actions { @apply tw:border-t tw:border-(--border) tw:p-2; }
 .combined-results { @apply tw:my-1 tw:w-full tw:list-none tw:p-0 tw:text-xs; }
+.combined-device-card .device-card-actions .dashboard-power-button {
+  @apply tw:grid tw:size-9 tw:min-h-0 tw:place-items-center tw:rounded-md tw:border-0 tw:bg-(--surface-raised) tw:p-0 tw:text-(--muted);
+}
+.combined-device-card .device-card-actions .dashboard-power-button[data-checked] {
+  @apply tw:bg-(--toggle-on) tw:text-(--toggle-thumb-on);
+}
+.combined-device-card .device-card-actions .dashboard-power-button .parameter-icon { @apply tw:size-5; }
 .combined-device-options { @apply tw:flex tw:list-none tw:flex-col tw:gap-2 tw:p-0; }
 .combined-device-options button { @apply tw:w-full tw:text-start; }
 .combined-device-management { @apply tw:mx-auto tw:w-full tw:max-w-[760px]; }

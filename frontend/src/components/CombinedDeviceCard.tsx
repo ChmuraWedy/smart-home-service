@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import {
+  useCallback, useId, useRef, useState,
+} from 'react';
 import type {
   CombinedDevice, CombinedMember, CombinedPowerOutcome, HomeApi,
 } from '../home-api';
@@ -17,8 +19,10 @@ import DashboardCardFooter from './DashboardCardFooter';
 import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
 import type { GridCardPlacement } from './DashboardGrid';
 import { DashboardSheet } from './DashboardSheet';
-import { DeviceIcon } from './DevicePresentation';
+import { DeviceIcon, ParameterIcon } from './DevicePresentation';
+import { PowerButton } from './PowerButton';
 import { Card } from './ui/card';
+import { Icon } from './ui/icon';
 
 export type ResolvedMember = { member: CombinedMember; device?: UnifiedDevice };
 
@@ -36,8 +40,9 @@ const powerLabels = {
   unknown: MSG.STATUS_UNKNOWN,
 };
 
-const outcomeLabels: Record<CombinedPowerOutcome, keyof typeof MSG> = {
-  accepted: MSG.COMMAND_ACCEPTED_NOTICE,
+type PowerFailure = Exclude<CombinedPowerOutcome, 'accepted'>;
+
+const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
   unavailable: MSG.UNAVAILABLE,
   unsupported: MSG.COMBINED_NO_POWER_CONTROL,
   unknown: MSG.COMBINED_OUTCOME_UNKNOWN,
@@ -75,7 +80,7 @@ function MemberControls({
           now={now}
           paused={paused}
           embeddedQuick={quick}
-          onPower={recordPower}
+          onPower={quick ? undefined : recordPower}
           onBusy={recordBusy}
           onAuthError={onAuthError}
         />
@@ -101,6 +106,7 @@ export default function CombinedDeviceCard({
   onAuthError: () => void;
 }) {
   const id = `combined-${combined.id}`;
+  const powerId = useId();
   const displayName = useDeviceDisplayName();
   const trigger = useRef<HTMLButtonElement>(null);
   const dispatch = useAppDispatch();
@@ -112,31 +118,39 @@ export default function CombinedDeviceCard({
   )));
   const busy = aggregateBusy || memberBusy;
   const [powers, setPowers] = useState<Record<string, MemberPower>>({});
-  const [outcomes, setOutcomes] = useState<Record<string, CombinedPowerOutcome>>({});
+  const [failures, setFailures] = useState<Partial<Record<string, PowerFailure>>>({});
   const [sendError, setSendError] = useState(false);
   const onPower = useCallback((deviceId: string, power: MemberPower) => {
     setPowers((values) => (values[deviceId] === power ? values : { ...values, [deviceId]: power }));
   }, []);
-  const power = aggregatePower(members.map(({ member, device }) => (device ? powers[member.device_id] ?? 'unknown' : 'unknown')));
+  const memberPowers = members.map(({ member, device }) => (device ? powers[member.device_id] ?? 'unknown' : 'unknown'));
+  const power = aggregatePower(memberPowers);
+  const knownPowers = memberPowers.filter((value) => value !== 'unknown');
+  const allKnownOn = knownPowers.length > 0 && knownPowers.every((value) => value === 'on');
   const canSend = !busy && !paused && members.some(({ device }) => device);
 
-  async function setPower(value: boolean) {
+  const setPower = useCallback(async (value: boolean) => {
     if (!canSend || sending.current) return;
     sending.current = true;
-    setOutcomes({});
+    setFailures({});
     setSendError(false);
     dispatch(setCommandPending({ deviceId: id, pending: true }));
     try {
       const { results } = await api.combinationPower(combined.id, value);
-      setOutcomes(Object.fromEntries(results.map((result) => [result.device_id, result.outcome])));
-      const reads = members.filter(({ device }) => device).map(({ member, device }) => {
+      setFailures(Object.fromEntries(results.flatMap(({ device_id: memberId, outcome }) => (
+        outcome === 'accepted' ? [] : [[memberId, outcome]]
+      ))));
+      const refreshIds = new Set(results.filter(({ outcome }) => outcome === 'accepted' || outcome === 'unknown').map(({ device_id: memberId }) => memberId));
+      // Acknowledgement and cached reports can arrive at different times for each member.
+      const reads = members.filter(({ member, device }) => device && refreshIds.has(member.device_id)).map(({ member, device }) => {
         if (member.route === 'local') {
-          return device?.local ? dispatch(readLocalDevice(api, device.local.id, false, undefined, true)) : undefined;
+          return device?.local ? dispatch(readLocalDevice(api, device.local.id, true)) : undefined;
         }
         const key = cloudDeviceKey(api, member.device_id, member.route);
-        return dispatch(readCloudDevice(api, key, { refresh: member.route === 'developer', watch: true }));
+        return dispatch(readCloudDevice(api, key, { refresh: true }));
       });
-      await Promise.allSettled(reads);
+      const refreshed = await Promise.allSettled(reads);
+      if (refreshed.some((result) => result.status === 'rejected' && result.reason instanceof ApiError && result.reason.status === 401)) onAuthError();
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
       else setSendError(true);
@@ -144,7 +158,7 @@ export default function CombinedDeviceCard({
       sending.current = false;
       dispatch(setCommandPending({ deviceId: id, pending: false }));
     }
-  }
+  }, [api, canSend, combined.id, dispatch, id, members, onAuthError]);
 
   function renderMember(entry: ResolvedMember, quick = false) {
     const { member } = entry;
@@ -163,19 +177,13 @@ export default function CombinedDeviceCard({
     );
   }
 
-  const groupPower = (
-    <div className="combined-power" role="group" aria-label={t(MSG.COMBINED_POWER)}>
-      <button className="secondary compact" type="button" disabled={!canSend} onClick={() => setPower(true)}>{t(MSG.ALL_ON)}</button>
-      <button className="secondary compact" type="button" disabled={!canSend} onClick={() => setPower(false)}>{t(MSG.ALL_OFF)}</button>
-    </div>
-  );
   const feedback = (
     <>
       {sendError && <p className="field-error" role="alert">{t(MSG.COMBINED_OUTCOME_UNKNOWN)}</p>}
-      {Object.keys(outcomes).length > 0 && (
+      {Object.keys(failures).length > 0 && (
         <ul className="combined-results" aria-live="polite">
           {members.map(({ member, device }) => {
-            const outcome = outcomes[member.device_id];
+            const outcome = failures[member.device_id];
             return outcome && <li key={member.device_id}>{displayName(device, member.device_id)} · {t(outcomeLabels[outcome])}</li>;
           })}
         </ul>
@@ -202,30 +210,41 @@ export default function CombinedDeviceCard({
             <p className="device-location">{t(MSG.COMBINED_MEMBER_COUNT, [members.length])} · {t(powerLabels[power])}</p>
           </>
         )}
-        actions={<CardDetailsButton label={t(MSG.DETAILS)} disabled={busy || paused} onClick={onDetails} />}
+        actions={(
+          <>
+            <PowerButton
+              id={powerId}
+              label={t(MSG.COMBINED_POWER)}
+              checked={allKnownOn}
+              disabled={!canSend}
+              variant="button"
+              icon={<ParameterIcon code="switch" />}
+              known
+              onChange={setPower}
+            />
+            <button
+              className="secondary tile-icon-action"
+              type="button"
+              ref={trigger}
+              aria-label={t(MSG.QUICK_DEVICE_CONTROLS)}
+              title={t(MSG.QUICK_DEVICE_CONTROLS)}
+              aria-haspopup="dialog"
+              aria-expanded={quickOpen}
+              disabled={busy || paused}
+              onClick={onQuickOpen}
+            >
+              <Icon name="sliders" />
+            </button>
+            <CardDetailsButton label={t(MSG.DETAILS)} disabled={busy || paused} onClick={onDetails} />
+          </>
+        )}
       />
       <DashboardCardFooter>
         {members.map((entry) => renderMember(entry))}
-        <div className="combined-actions">
-          {groupPower}
-          <button
-            className="secondary compact"
-            type="button"
-            ref={trigger}
-            aria-haspopup="dialog"
-            aria-expanded={quickOpen}
-            disabled={busy || paused}
-            onClick={onQuickOpen}
-          >
-            {t(MSG.QUICK_DEVICE_CONTROLS)}
-          </button>
-          {!quickOpen && feedback}
-        </div>
+        {(sendError || Object.keys(failures).length > 0) && <div className="combined-actions">{feedback}</div>}
       </DashboardCardFooter>
       {quickOpen && (
         <DashboardSheet title={combined.name} onClose={onQuickClose} returnFocus={trigger} busy={busy}>
-          {groupPower}
-          {feedback}
           {members.map((entry) => renderMember(entry, true))}
         </DashboardSheet>
       )}

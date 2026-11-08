@@ -37,8 +37,10 @@ const bulbs: CloudDevice[] = Array.from({ length: 3 }, (_, index) => {
   return { id, name, translations, online, has_local_key: false, controls: { ready: true, definitions, snapshot } };
 });
 
-function backend(initial?: CombinedDevice, developerConnected = false) {
+function backend(initial?: CombinedDevice, developerConnected = false, allMembersReachable = false) {
   let combined = initial;
+  const refreshedPower = new Map<string, boolean>();
+  const refreshedMembers: string[] = [];
   const writes: { path: string; method: string; body?: CombinedInput | Record<string, unknown> }[] = [];
   vi.mocked(fetch).mockImplementation(async (input, init) => {
     const url = new URL(String(input));
@@ -65,9 +67,15 @@ function backend(initial?: CombinedDevice, developerConnected = false) {
       combined = undefined;
       return new Response(null, { status: 204 });
     }
-    if (path === '/combined-devices/1/power/on') return json({
-      results: bulbs.map((bulb) => ({ device_id: bulb.id, outcome: bulb.online ? 'accepted' : 'unavailable' })),
-    });
+    if (path === '/combined-devices/1/power/on' || path === '/combined-devices/1/power/off') {
+      const power = path.endsWith('/on');
+      const results = bulbs.map((bulb) => {
+        if (!allMembersReachable && !bulb.online) return { device_id: bulb.id, outcome: 'unavailable' };
+        refreshedPower.set(bulb.id, power);
+        return { device_id: bulb.id, outcome: 'accepted' };
+      });
+      return json({ results });
+    }
     if (path === '/cloud/topology') return json({
       synced_at: null, warnings: 0,
       placements: bulbs.map((bulb) => ({ device_id: bulb.id, building_id: room.building_id, room_id: room.id })),
@@ -81,11 +89,18 @@ function backend(initial?: CombinedDevice, developerConnected = false) {
     const [, id, action] = /^\/cloud\/devices\/([^/]+)\/([^/]+)$/.exec(path) ?? [];
     const bulb = bulbs.find((item) => item.id === id);
     if (action === 'functions') return json(bulb?.controls?.definitions);
-    if (action === 'status') return json(bulb?.controls?.snapshot);
+    if (action === 'status') {
+      const snapshot = bulb?.controls?.snapshot;
+      if (snapshot && url.searchParams.get('refresh') === 'true' && refreshedPower.has(id)) {
+        refreshedMembers.push(id);
+        return json({ ...snapshot, online: true, status: { ...snapshot.status, switch_led: refreshedPower.get(id) } });
+      }
+      return json(snapshot);
+    }
     if (action === 'commands') return json({ acknowledged: true, state_confirmed: false });
     throw new Error(`Unexpected request ${path}`);
   });
-  return writes;
+  return { writes, refreshedMembers };
 }
 
 function openApp(path: string) {
@@ -97,7 +112,7 @@ function openApp(path: string) {
 
 describe('combined devices', () => {
   it('saves three cloud bulbs, keeps quick settings independent, routes details, and edits and dissolves the combination', async () => {
-    const writes = backend();
+    const { writes } = backend();
     const user = userEvent.setup();
     const app = openApp('/settings/dashboard?room=3');
     await screen.findByRole('listitem', { name: bulbs[0].name });
@@ -161,16 +176,18 @@ describe('combined devices', () => {
     await waitFor(() => expect(writes[1]).toMatchObject({
       path: '/cloud/devices/bulb-2/commands', body: { commands: [{ code: 'bright_value_v2', value: 600 }] },
     }));
-    const allOn = sheet.getByRole('button', { name: 'All on' });
-    await waitFor(() => expect(allOn).toBeEnabled());
-    await user.click(allOn);
-    await waitFor(() => expect(writes[2]).toMatchObject({ path: '/combined-devices/1/power/on', method: 'POST' }));
-    expect(await sheet.findByText(/Light Kitchen 3 · Unavailable/)).toBeInTheDocument();
-    expect(card).toHaveTextContent('Status unknown');
+    expect(sheet.queryByRole('button', { name: 'Power for all devices' })).toBeNull();
     const close = sheet.getByRole('button', { name: 'Close' });
     await waitFor(() => expect(close).toBeEnabled());
     await user.click(close);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const power = within(card).getByRole('button', { name: 'Power for all devices' });
+    expect(card.querySelector('header')).toContainElement(power);
+    await user.click(power);
+    await waitFor(() => expect(writes[2]).toMatchObject({ path: '/combined-devices/1/power/on', method: 'POST' }));
+    expect(await within(card).findByText(/Light Kitchen 3 · Unavailable/)).toBeInTheDocument();
+    expect(within(card).queryByText(/Command accepted/)).toBeNull();
+    expect(card).toHaveTextContent('Status unknown');
 
     await user.click(within(card).getByRole('button', { name: 'Details' }));
     const chooser = within(await screen.findByRole('dialog', { name: 'Kitchen Lights' }));
@@ -201,8 +218,39 @@ describe('combined devices', () => {
     expect(writes[4]).toMatchObject({ path: '/combined-devices/1', method: 'DELETE' });
   }, 15000);
 
+  it('uses one header button and refreshes every member after all-on and all-off', async () => {
+    const { writes, refreshedMembers } = backend({
+      id: 1, name: 'Kitchen Lights', room_id: room.id,
+      members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    }, false, true);
+    const user = userEvent.setup();
+    openApp('/rooms/3');
+    const card = within(await screen.findByRole('listitem', { name: 'Kitchen Lights' }));
+    const power = card.getByRole('button', { name: 'Power for all devices' });
+    const members = bulbs.map(({ name }) => within(card.getByRole('region', { name })));
+    await waitFor(() => expect(members[1].getByRole('switch')).toHaveAttribute('aria-checked', 'false'));
+
+    await user.click(power);
+    await waitFor(() => {
+      for (const member of members) expect(member.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+      expect(power).toHaveAttribute('aria-pressed', 'true');
+      expect(power).toBeEnabled();
+    });
+    expect(refreshedMembers.slice().sort()).toEqual(bulbs.map(({ id }) => id));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(card.queryByText(/Command accepted/)).toBeNull();
+
+    await user.click(power);
+    await waitFor(() => {
+      for (const member of members) expect(member.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      expect(power).toHaveAttribute('aria-pressed', 'false');
+    });
+    expect(refreshedMembers.slice(3).sort()).toEqual(bulbs.map(({ id }) => id));
+    expect(writes.map(({ path }) => path)).toEqual(['/combined-devices/1/power/on', '/combined-devices/1/power/off']);
+  });
+
   it('uses the default control route at creation and offers changes only in edit', async () => {
-    const writes = backend(undefined, true);
+    const { writes } = backend(undefined, true);
     const user = userEvent.setup();
     openApp('/combined-devices/new?room=3');
     const creation = within(await screen.findByRole('form', { name: 'Create combined device' }));
