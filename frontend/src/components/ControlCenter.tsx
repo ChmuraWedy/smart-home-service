@@ -211,8 +211,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const combinedQuickOpen = Boolean(combinedQuick);
   const combinedEdit = matchPath(combinationEditPattern, location.pathname);
   const combinedDetails = matchPath(combinationPattern, location.pathname);
-  const combinedNew = location.pathname === combinationNewPath;
-  const combinationList = location.pathname === appPaths['combined-devices'];
+  const combinedNew = Boolean(matchPath(combinationNewPath, location.pathname));
+  const combinationList = Boolean(matchPath(appPaths['combined-devices'], location.pathname));
   const managingCombinations = combinationList || combinedNew || Boolean(combinedEdit);
   const combinedId = combinedNew ? undefined : (combinedQuick ?? combinedEdit ?? combinedDetails)?.params.combinedId;
   const [revision, setRevision] = useState(0);
