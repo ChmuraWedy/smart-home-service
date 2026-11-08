@@ -1747,6 +1747,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-device [data-power-layout] > .combined-relay-channel + .channel-control,
 .combined-relay-devices { @apply tw:border-t tw:border-(--border); }
+.combined-relay-devices { border-block-end:6px solid var(--surface-raised); }
 .combined-relay-heading { @apply tw:grid tw:grid-cols-[minmax(0,1fr)_44px] tw:items-center; }
 .combined-relay-heading .combined-relay-toggle {
   @apply tw:grid tw:size-11 tw:place-items-center tw:border-0 tw:bg-transparent tw:p-0 tw:text-(--muted);
