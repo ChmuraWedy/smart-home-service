@@ -261,6 +261,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const deviceRoom = useCallback((device: UnifiedDevice) => (device.local || placements.get(device.id))?.room_id ?? null, [placements]);
   function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === placementOf(device)?.room_id)?.name || t(MSG.NO_ROOM); }
   const [busy, setBusy] = useState(false);
+  const combinationRevision = useRef(0);
   const [survey, setSurvey] = useState<{ api: HomeApi; mask: string; key: string; value: Extract<Selection, { kind: 'survey' }> } | null>(null);
   const [groupStates, setGroupStates] = useState<Record<number, GroupState>>({});
   const dispatch = useAppDispatch();
@@ -308,9 +309,10 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       }
     };
     const readCombinations = async () => {
+      const startedAt = combinationRevision.current;
       try {
         const result = await api.combinations(controller.signal);
-        if (controller.signal.aborted || !Array.isArray(result)) return;
+        if (controller.signal.aborted || startedAt !== combinationRevision.current || !Array.isArray(result)) return;
         setRecord(previous => previous?.api === api && previous.mask === mask ? { ...previous, combinations: result } : previous);
       } catch (failure) {
         if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
@@ -380,13 +382,16 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     [building, inventory?.rooms],
   );
   const entries = useMemo(() => {
-    const needle = search.trim().toLocaleLowerCase();
+    const needle = search.trim().normalize('NFC').toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
     const roomBuilding = (id: number | null) => inventory?.rooms.find((item) => item.id === id)?.building_id;
     const combinedInRoom = combinations.filter((item) => inRoom(item.room_id) && (!building || String(roomBuilding(item.room_id)) === building));
-    const displayed = combinedInRoom.filter((item) => item.name.toLocaleLowerCase().includes(needle)
+    const displayed = combinedInRoom.filter((item) => item.name.normalize('NFC').toLocaleLowerCase().includes(needle)
+      || item.aliases?.some((alias) => alias.toLocaleLowerCase().includes(needle))
       || resolvedMembers.get(item.id)?.some(({ device }) => device && matchesDevice(device, needle)));
-    const combinedMembers = new Set(displayed.flatMap((item) => (resolvedMembers.get(item.id) ?? []).map(({ device }) => device?.id)));
+    const combinedMembers = new Set(displayed
+      .filter((item) => !item.show_member_cards)
+      .flatMap((item) => (resolvedMembers.get(item.id) ?? []).map(({ device }) => device?.id)));
     const filtered = devices.filter((device) => !combinedMembers.has(device.id)
       && (!building || String(placementOf(device)?.building_id) === building)
       && inRoom(placementOf(device)?.room_id ?? null) && matchesDevice(device, needle));
@@ -484,7 +489,18 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
     choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
   }
+  const saveCombinationAliases = useCallback((id: number, aliases: string[]) => {
+    combinationRevision.current += 1;
+    setRecord((previous) => {
+      if (!previous || previous.api !== api || previous.mask !== mask) return previous;
+      return {
+        ...previous,
+        combinations: previous.combinations?.map((item) => (item.id === id ? { ...item, aliases } : item)),
+      };
+    });
+  }, [api, mask]);
   const saveCombination = useCallback((saved?: CombinedDevice) => {
+    combinationRevision.current += 1;
     setRecord((previous) => {
       if (!previous || previous.api !== api || previous.mask !== mask) return previous;
       const list = previous.combinations ?? [];
@@ -577,7 +593,13 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const gridItems = visible.map((entry) => {
     if (entry.kind === 'group') return { id: `group-${entry.group.id}`, cardName: entry.group.name, entry };
     if (entry.kind === 'combined') return { id: `combined-${entry.combined.id}`, cardName: entry.combined.name, entry };
-    return { id: `device-${entry.device.id}`, cardName: entry.device.name, entry };
+    return {
+      id: `device-${entry.device.id}`,
+      cardName: entry.device.name,
+      entry,
+      hideable: true,
+      forceVisible: quick && entry.device === linked,
+    };
   });
 
   if (managingCombinations) {
@@ -748,7 +770,10 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   )}
       {combined && combinedDetails && (
         <CombinedDeviceDetails
+          api={api}
           combined={combined}
+          onAliasesSaved={saveCombinationAliases}
+          onAuthError={onAuthError}
           members={resolvedMembers.get(combined.id) ?? []}
           onChoose={(device, route) => choose({ kind: 'device', device, route, combinedParent: combined })}
           onEdit={() => openOverlay(overlayHref(`/combined-devices/${combined.id}/edit`))}

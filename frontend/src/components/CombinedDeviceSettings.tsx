@@ -11,6 +11,7 @@ import type {
   CombinedDevice, CombinedMemberInput, CombinedPowerSource, HomeApi, Room,
 } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
+import { AliasRow, validDeviceAlias } from './AliasRow';
 import { ControlDialog } from './DeviceControls';
 import CombinedDeviceCard from './CombinedDeviceCard';
 import type { ResolvedMember } from './CombinedDeviceCard';
@@ -29,17 +30,51 @@ const editingSteps = [
 ] as const;
 
 export function CombinedDeviceDetails({
-  combined, members, onChoose, onEdit, onClose,
+  api, combined, members, onChoose, onEdit, onClose, onAliasesSaved, onAuthError,
 }: {
+  api: HomeApi;
   combined: CombinedDevice;
   members: ResolvedMember[];
   onChoose: (device: UnifiedDevice, route: DeviceRoute) => void;
   onEdit: () => void;
   onClose: () => void;
+  onAliasesSaved: (id: number, aliases: string[]) => void;
+  onAuthError: () => void;
 }) {
   const displayName = useDeviceDisplayName();
+  const [savingAliases, setSavingAliases] = useState(false);
+
+  const saveAliases = useCallback(async (values: string[]) => {
+    setSavingAliases(true);
+    try {
+      const { aliases } = await api.saveCombinationAliases(combined.id, values);
+      onAliasesSaved(combined.id, aliases);
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 401) onAuthError();
+      throw failure;
+    } finally {
+      setSavingAliases(false);
+    }
+  }, [api, combined.id, onAliasesSaved, onAuthError]);
+
   return (
-    <ControlDialog title={combined.name} busy={false} onClose={onClose}>
+    <ControlDialog
+      title={combined.name}
+      busy={savingAliases}
+      onClose={onClose}
+      titleContent={(
+        <div className="device-alias-heading">
+          <h2>{combined.name}</h2>
+          <AliasRow
+            label={t(MSG.ALIASES_LABEL)}
+            aliases={combined.aliases ?? []}
+            disabled={savingAliases}
+            onSave={saveAliases}
+            validate={validDeviceAlias}
+          />
+        </div>
+      )}
+    >
       <p>{t(MSG.CHOOSE_COMBINED_MEMBER)}</p>
       <ul className="combined-device-options">
         {members.map(({ member, device }) => (
@@ -47,7 +82,7 @@ export function CombinedDeviceDetails({
             <button
               type="button"
               className="secondary"
-              disabled={!device}
+              disabled={!device || savingAliases}
               onClick={() => device && onChoose(device, member.route)}
             >
               {displayName(device, member.device_id)}
@@ -56,7 +91,7 @@ export function CombinedDeviceDetails({
           </li>
         ))}
       </ul>
-      <button type="button" className="secondary" onClick={onEdit}>{t(MSG.EDIT_COMBINATION)}</button>
+      <button type="button" className="secondary" disabled={savingAliases} onClick={onEdit}>{t(MSG.EDIT_COMBINATION)}</button>
     </ControlDialog>
   );
 }
@@ -124,6 +159,7 @@ export function CombinedDeviceSettings({
   const displayName = useDeviceDisplayName();
   const [nameDraft, setName] = useState(existing?.name);
   const [showAllPower, setShowAllPower] = useState(existing?.show_all_power ?? true);
+  const [showMemberCards, setShowMemberCards] = useState(existing?.show_member_cards ?? false);
   const [draftStep, setDraftStep] = useState<'devices' | 'details'>(existing ? 'details' : 'devices');
   const step = previewing ? 'preview' : draftStep;
   const activeStep = useRef<HTMLLIElement>(null);
@@ -188,7 +224,11 @@ export function CombinedDeviceSettings({
     setBusy(true);
     try {
       const saved = await api.saveCombination({
-        name: name.trim(), room_id: room, members, show_all_power: showAllPower,
+        name: name.trim(),
+        room_id: room,
+        members,
+        show_all_power: showAllPower,
+        show_member_cards: showMemberCards,
       }, existing?.id);
       if (active.current) onSaved(saved);
     } catch (failure) {
@@ -331,6 +371,15 @@ export function CombinedDeviceSettings({
                   onChange={setShowAllPower}
                 />
               </label>
+              <label className="combined-power-option" htmlFor={`${formId}-show-member-cards`}>
+                {t(MSG.COMBINED_SHOW_MEMBER_CARDS)}
+                <Switch
+                  id={`${formId}-show-member-cards`}
+                  checked={showMemberCards}
+                  disabled={busy}
+                  onChange={setShowMemberCards}
+                />
+              </label>
               <CombinedDeviceOrder members={previewMembers} disabled={busy} onMove={moveMember} />
             </div>
             <fieldset className="combined-preview dashboard-view" data-card-size={cardSize}>
@@ -339,7 +388,7 @@ export function CombinedDeviceSettings({
               <ul className="dashboard-device-column">
                 <CombinedDeviceCard
                   api={api}
-                  combined={{ name: name.trim(), show_all_power: showAllPower }}
+                  combined={{ name: name.trim(), show_all_power: showAllPower, aliases: existing?.aliases }}
                   members={previewMembers}
                   room={roomName ?? t(MSG.NO_ROOM)}
                   now={now}

@@ -154,24 +154,41 @@ def test_power_button_visibility_upgrades_existing_combinations_and_persists(tmp
         )
     settings = Settings(database_path=str(db), display_poll_interval=0)
     with TestClient(create_app(settings)) as client:
-        assert client.get(PATH).json()[0]["show_all_power"] is True
+        saved = client.get(PATH).json()[0]
+        assert saved["show_all_power"] is True
+        assert saved["show_member_cards"] is False
+        assert saved["aliases"] == []
         url = f"{PATH}/1"
-        hidden = client.put(url, json={"name": "Existing lights", "members": members, "show_all_power": False})
+        hidden = client.put(url, json={
+            "name": "Existing lights", "members": members, "show_all_power": False, "show_member_cards": True,
+        })
         assert hidden.status_code == 200, hidden.text
         assert hidden.json()["show_all_power"] is False
         legacy_update = client.put(url, json={"name": "Renamed lights", "members": members})
         assert legacy_update.status_code == 200, legacy_update.text
         assert legacy_update.json()["show_all_power"] is False
+        assert legacy_update.json()["show_member_cards"] is True
+        alias_url = f"{url}/aliases"
+        assert client.put(alias_url, json={"aliases": ["Святло", "ŁÓDŹ"]}).json() == {"aliases": ["святло", "łódź"]}
+        assert client.put(alias_url, json={"aliases": ["Святло", "святло"]}).status_code == 422
 
     with TestClient(create_app(settings)) as client:
         saved = client.get(PATH).json()[0]
         assert saved["name"] == "Renamed lights"
         assert saved["show_all_power"] is False
-        restored = client.put(url, json={"name": saved["name"], "members": members, "show_all_power": True})
+        assert saved["show_member_cards"] is True
+        assert saved["aliases"] == ["святло", "łódź"]
+        restored = client.put(url, json={
+            "name": saved["name"], "members": members, "show_all_power": True, "show_member_cards": False,
+        })
         assert restored.status_code == 200, restored.text
         assert restored.json()["show_all_power"] is True
+        assert restored.json()["show_member_cards"] is False
+        assert restored.json()["aliases"] == ["святло", "łódź"]
+        assert client.put(alias_url, json={"aliases": []}).json() == {"aliases": []}
+        assert client.get(PATH).json()[0]["aliases"] == []
     with sqlite3.connect(db) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
+        assert connection.execute("PRAGMA user_version").fetchone() == (3,)
 
 
 def wired(target, source="relay", channel="switch_1", route="sharing"):

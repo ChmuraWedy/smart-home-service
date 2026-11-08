@@ -70,8 +70,13 @@ function backend(initial?: CombinedDevice, developerConnected = false, allMember
       return json(combined ? [combined] : []);
     }
     if (path === '/combined-devices/1' && method === 'PUT') {
-      combined = { id: 1, ...body, members: body.members.map((entry: object) => ({ ...entry, accessible: true })) };
+      combined = { ...combined, id: 1, ...body, members: body.members.map((entry: object) => ({ ...entry, accessible: true })) };
       return json(combined);
+    }
+    if (path === '/combined-devices/1/aliases' && method === 'PUT' && combined) {
+      const aliases = (body.aliases as string[]).map((alias) => alias.normalize('NFC').toLowerCase());
+      combined = { ...combined, aliases };
+      return json({ aliases });
     }
     if (path === '/combined-devices/1' && method === 'DELETE') {
       combined = undefined;
@@ -272,7 +277,7 @@ describe('combined devices', () => {
     const card = await screen.findByRole('listitem', { name: 'Kitchen Lights' });
     expect(writes).toEqual([{
       path: '/combined-devices', method: 'POST',
-      body: { name: 'Kitchen Lights', room_id: room.id, show_all_power: true, members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing' })) },
+      body: { name: 'Kitchen Lights', room_id: room.id, show_all_power: true, show_member_cards: false, members: bulbs.map(({ id }) => ({ device_id: id, route: 'sharing' })) },
     }]);
     for (const bulb of bulbs) {
       expect(screen.queryByRole('listitem', { name: bulb.name })).toBeNull();
@@ -469,6 +474,59 @@ describe('combined devices', () => {
     const savedMember = within(card.getByRole('region', { name: bulbs[0].name }));
     const memberPower = await savedMember.findByRole('switch');
     await waitFor(() => expect(memberPower).toBeEnabled());
+  });
+
+  it('saves Unicode aliases inline, updates card tags, and finds the combination by alias', async () => {
+    const { writes } = backend({
+      id: 1,
+      name: 'Kitchen lights',
+      room_id: room.id,
+      members: bulbs.slice(0, 2).map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    });
+    const user = userEvent.setup();
+    openApp('/rooms/3');
+    const card = within(await screen.findByRole('listitem', { name: 'Kitchen lights' }));
+    await user.click(card.getByRole('button', { name: 'Details' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Kitchen lights' }));
+    await user.click(dialog.getByRole('button', { name: 'Add alias' }));
+    await user.type(dialog.getByRole('textbox', { name: 'New alias' }), 'Святло Łódź');
+    await user.click(dialog.getByRole('button', { name: 'Save' }));
+    expect(await dialog.findByText('святло łódź')).toBeInTheDocument();
+    expect(await card.findByText('святло łódź')).toBeInTheDocument();
+    expect(writes).toEqual([{
+      path: '/combined-devices/1/aliases',
+      method: 'PUT',
+      body: { aliases: ['Святло Łódź'] },
+    }]);
+    await user.click(dialog.getByRole('button', { name: 'Close' }));
+    const search = screen.getByRole('searchbox');
+    fireEvent.change(search, { target: { value: 'ŁÓDŹ' } });
+    expect(await screen.findByRole('listitem', { name: 'Kitchen lights' })).toBeInTheDocument();
+    expect(screen.queryByRole('listitem', { name: bulbs[2].name })).toBeNull();
+  });
+
+  it('can show original cards next to a combination and hide them again from the edit preview', async () => {
+    const { writes } = backend({
+      id: 1,
+      name: 'Kitchen lights',
+      room_id: room.id,
+      show_member_cards: true,
+      members: bulbs.slice(0, 2).map(({ id }) => ({ device_id: id, route: 'sharing', accessible: true })),
+    });
+    const user = userEvent.setup();
+    const app = openApp('/rooms/3');
+    await screen.findByRole('listitem', { name: 'Kitchen lights' });
+    expect(screen.getByRole('listitem', { name: bulbs[0].name })).toBeInTheDocument();
+    app.unmount();
+
+    openApp('/combined-devices/1/edit/preview');
+    const visibility = await screen.findByRole('switch', { name: 'Show original device cards' });
+    expect(visibility).toBeChecked();
+    await user.click(visibility);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writes[0]).toMatchObject({
+      path: '/combined-devices/1', method: 'PUT', body: { show_member_cards: false },
+    }));
   });
 
   it('returns a direct creation preview without a draft to device selection', async () => {

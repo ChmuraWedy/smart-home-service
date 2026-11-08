@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/v1/dashboard-layouts", dependencies=[Depends(aut
 
 BrowserID = Annotated[str, Path(pattern=r"^[0-9a-f]{32}$")]
 CardID = Annotated[str, StringConstraints(pattern=r"^(device|group|combined)-.+$", max_length=140)]
+DeviceCardID = Annotated[str, StringConstraints(pattern=r"^device-.+$", max_length=140)]
 
 
 class LayoutView(BaseModel):
@@ -28,36 +29,40 @@ class LayoutView(BaseModel):
 
 class LayoutSlots(BaseModel):
     slots: list[CardID | None] = Field(max_length=96)
+    hidden_devices: list[DeviceCardID] = Field(default_factory=list, max_length=96)
 
     @model_validator(mode="after")
     def unique_cards(self):
         occupied = [card for card in self.slots if card is not None]
         if len(set(occupied)) != len(occupied):
             raise ValueError("A card can only occupy one slot")
+        if len(set(self.hidden_devices)) != len(self.hidden_devices):
+            raise ValueError("A device can only be hidden once")
         return self
 
 
-@router.get("/{browser_id}", response_model=LayoutSlots, tags=["Dashboard layouts"])
+@router.get("/{browser_id}", response_model=LayoutSlots, response_model_exclude_unset=True, tags=["Dashboard layouts"])
 def read_layout(
     browser_id: BrowserID, view: Annotated[LayoutView, Query()], session: Session = Depends(get_session)
 ):
     layout = session.get(DashboardLayout, (browser_id, view.key))
-    return LayoutSlots(slots=layout.slots if layout else [])
+    if layout is None:
+        return LayoutSlots(slots=[])
+    return LayoutSlots(slots=layout.slots, hidden_devices=layout.hidden_devices) if layout.hidden_devices else LayoutSlots(slots=layout.slots)
 
 
-@router.put("/{browser_id}", response_model=LayoutSlots, tags=["Dashboard layouts"])
+@router.put("/{browser_id}", response_model=LayoutSlots, response_model_exclude_unset=True, tags=["Dashboard layouts"])
 def save_layout(
     browser_id: BrowserID,
     view: Annotated[LayoutView, Query()],
     body: LayoutSlots,
     session: Session = Depends(get_session),
 ):
-    statement = insert(DashboardLayout).values(
-        browser_id=browser_id, view=view.key, slots=body.slots
-    )
+    changes = body.model_dump(exclude_unset=True)
+    statement = insert(DashboardLayout).values(browser_id=browser_id, view=view.key, **changes)
     session.execute(statement.on_conflict_do_update(
         index_elements=[DashboardLayout.browser_id, DashboardLayout.view],
-        set_={"slots": statement.excluded.slots},
+        set_=changes,
     ))
     commit(session)
-    return body
+    return read_layout(browser_id, view, session)

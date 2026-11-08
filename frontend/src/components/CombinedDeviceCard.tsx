@@ -120,7 +120,7 @@ export default function CombinedDeviceCard({
   onQuickOpen = noAction, onQuickClose = noAction, onDetails = noAction, onAuthError,
 }: {
   api: HomeApi;
-  combined: Pick<CombinedDevice, 'name' | 'show_all_power'> & Partial<Pick<CombinedDevice, 'id'>>;
+  combined: Pick<CombinedDevice, 'name' | 'show_all_power' | 'aliases'> & Partial<Pick<CombinedDevice, 'id'>>;
   members: ResolvedMember[];
   room: string;
   now: number;
@@ -248,6 +248,7 @@ export default function CombinedDeviceCard({
       <DashboardCardHeader
         icon={<DeviceIcon group />}
         title={combined.name}
+        aliases={combined.aliases}
         metadata={(
           <>
             <p className="device-location">{room}</p>

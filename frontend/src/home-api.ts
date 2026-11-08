@@ -3,7 +3,7 @@ import { CloudApi } from './api';
 import type { JsonValue, Provider } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { DeviceTranslations } from './device-translations';
-import type { LayoutSlots } from './dashboard-layout';
+import type { DashboardLayout } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
 export type Capability = {
@@ -30,9 +30,9 @@ export type GroupResult = { all_acknowledged: boolean; results: { device_id: num
 export type Inventory = { buildings: Building[]; rooms: Room[]; devices: LocalDevice[]; groups: Group[] };
 export type CombinedPowerSource = { 'device_id': string; channel: string };
 export type CombinedMemberInput = { 'device_id': string; route: DeviceRoute; 'power_source'?: CombinedPowerSource | null };
-export type CombinedInput = { 'name': string; 'room_id': number | null; members: CombinedMemberInput[]; 'show_all_power'?: boolean };
+export type CombinedInput = { 'name': string; 'room_id': number | null; members: CombinedMemberInput[]; 'show_all_power'?: boolean; 'show_member_cards'?: boolean };
 export type CombinedMember = CombinedMemberInput & { accessible: boolean };
-export type CombinedDevice = Omit<CombinedInput, 'members'> & { id: number; members: CombinedMember[] };
+export type CombinedDevice = Omit<CombinedInput, 'members'> & { id: number; members: CombinedMember[]; aliases?: string[] };
 export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 'unknown';
 export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
 export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
@@ -86,11 +86,11 @@ export class HomeApi extends CloudApi {
   }
 
   dashboardLayout(browser: string, view: string, signal: AbortSignal) {
-    return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
+    return this.request<DashboardLayout>(`/dashboard-layouts/${browser}?${view}`, 'GET', undefined, signal);
   }
 
-  saveDashboardLayout(browser: string, view: string, slots: LayoutSlots) {
-    return this.request<{ slots: LayoutSlots }>(`/dashboard-layouts/${browser}?${view}`, 'PUT', { slots });
+  saveDashboardLayout(browser: string, view: string, layout: DashboardLayout) {
+    return this.request<DashboardLayout>(`/dashboard-layouts/${browser}?${view}`, 'PUT', layout);
   }
 
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {
@@ -122,6 +122,10 @@ export class HomeApi extends CloudApi {
 
   saveCombination(input: CombinedInput, id?: number) {
     return this.request<CombinedDevice>(id === undefined ? '/combined-devices' : `/combined-devices/${id}`, id === undefined ? 'POST' : 'PUT', input);
+  }
+
+  saveCombinationAliases(id: number, aliases: string[]) {
+    return this.request<{ aliases: string[] }>(`/combined-devices/${id}/aliases`, 'PUT', { aliases });
   }
 
   async removeCombination(id: number) {

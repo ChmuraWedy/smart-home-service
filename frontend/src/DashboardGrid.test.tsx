@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import DashboardGrid from './components/DashboardGrid';
 import { ensureDashboardBrowserId, MAX_LAYOUT_SLOTS, moveCard, placeCards } from './dashboard-layout';
-import type { LayoutSlots } from './dashboard-layout';
+import type { DashboardLayout, LayoutSlots } from './dashboard-layout';
 import { HomeApi } from './home-api';
 import { setLocale } from './i18n';
 
 const items = ['device-a', 'group-1', 'device-b'].map((id, index) => ({
-  id, cardName: `Card ${index + 1}`, entry: { id, title: `Card ${index + 1}` },
+  id, cardName: `Card ${index + 1}`, entry: { id, title: `Card ${index + 1}` }, hideable: id.startsWith('device-'),
 }));
 const api = new HomeApi({ baseUrl: 'http://dashboard.test', token: 'fixture-key' });
 const view = { building: '', room: '3', page: 1 };
@@ -94,6 +94,43 @@ describe('dashboard layout', () => {
     mount('4');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
     cardAt('device-a', 1, 1);
+  });
+
+  it('hides individual cards persistently and reveals them temporarily with Show all', async () => {
+    let stored: DashboardLayout = { slots: [] };
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method === 'PUT') stored = JSON.parse(String(init.body));
+      return Response.json(stored);
+    });
+    const first = mount();
+    click('Edit layout');
+    fireEvent.click(screen.getByText('Visible individual devices'));
+    expect(screen.getByRole('checkbox', { name: 'Card 1' })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: 'Card 2' })).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Card 1' }));
+    click('Save');
+    expect(await screen.findByRole('button', { name: 'Show all' })).toHaveAttribute('aria-pressed', 'false');
+    expect(stored.hidden_devices).toEqual(['device-a']);
+    expect(screen.queryByTestId('device-a')).toBeNull();
+    expect(screen.getByTestId('group-1')).toBeInTheDocument();
+
+    click('Show all');
+    cardAt('device-a', 1, 1);
+    expect(screen.getByRole('button', { name: 'Show all' })).toHaveAttribute('aria-pressed', 'true');
+
+    first.unmount();
+    mount();
+    await screen.findByRole('button', { name: 'Show all' });
+    expect(screen.queryByTestId('device-a')).toBeNull();
+    click('Edit layout');
+    fireEvent.click(screen.getByText('Visible individual devices'));
+    const checkbox = screen.getByRole('checkbox', { name: 'Card 1' });
+    expect(checkbox).not.toBeChecked();
+    fireEvent.click(checkbox);
+    click('Save');
+    await waitFor(() => expect(stored.hidden_devices).toEqual([]));
+    expect(screen.getByTestId('device-a')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull();
   });
 
   it('keeps a previously saved card beyond the editor slots accessible', async () => {

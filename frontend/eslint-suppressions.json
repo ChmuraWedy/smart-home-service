@@ -234,9 +234,6 @@
     "import/order": {
       "count": 1
     },
-    "import/prefer-default-export": {
-      "count": 1
-    },
     "indent": {
       "count": 9
     },

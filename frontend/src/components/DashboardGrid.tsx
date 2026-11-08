@@ -1,11 +1,11 @@
 import {
-  useEffect, useLayoutEffect, useRef, useState,
+  useEffect, useId, useLayoutEffect, useRef, useState,
 } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import {
   dashboardBrowserId, ensureDashboardBrowserId, moveCard, placeCards, trimSlots,
 } from '../dashboard-layout';
-import type { LayoutSlots } from '../dashboard-layout';
+import type { DashboardLayout, LayoutSlots } from '../dashboard-layout';
 import type { HomeApi } from '../home-api';
 import { MSG, t } from '../i18n';
 import { Icon } from './ui/icon';
@@ -16,9 +16,9 @@ export type GridCardPlacement = {
   style?: CSSProperties; inert?: boolean; slot?: number; nudge?: DropTarget['nudge'];
 };
 type GridView = { building: string; room: string; page: number };
-type GridItem<T> = { id: string; cardName: string; entry: T };
-type SavedLayout = { api: HomeApi; view: string; slots?: LayoutSlots; error?: boolean };
-type LayoutDraft = { columns: number; slots: LayoutSlots; selected?: number };
+type GridItem<T> = { id: string; cardName: string; entry: T; hideable?: boolean; forceVisible?: boolean };
+type SavedLayout = { api: HomeApi; view: string; layout?: DashboardLayout; error?: boolean };
+type LayoutDraft = { columns: number; slots: LayoutSlots; hiddenDevices: string[]; selected?: number };
 const EDITOR_SLOTS = 20;
 
 function useGridColumns(density: string) {
@@ -105,11 +105,13 @@ export default function DashboardGrid<T>({
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
 }) {
   const { grid, columns } = useGridColumns(density);
+  const visibilityId = useId();
   const [browserId, setBrowserId] = useState(dashboardBrowserId);
   const [saved, setSaved] = useState<SavedLayout>();
   const [readAttempt, setReadAttempt] = useState(0);
   const [draft, setDraft] = useState<LayoutDraft>();
   const [saving, setSaving] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const pendingSave = useRef<symbol | null>(null);
   const scope = view && new URLSearchParams({
@@ -120,6 +122,7 @@ export default function DashboardGrid<T>({
 
   useLayoutEffect(() => {
     setDraft(undefined);
+    setShowAll(false);
     setSaving(false);
     setSaveError(false);
     return () => { pendingSave.current = null; };
@@ -128,8 +131,8 @@ export default function DashboardGrid<T>({
   useEffect(() => {
     if (!browserId || !viewKey) return undefined;
     const request = new AbortController();
-    api.dashboardLayout(browserId, viewKey, request.signal).then(({ slots }) => {
-      if (!request.signal.aborted) setSaved({ api, view: viewKey, slots });
+    api.dashboardLayout(browserId, viewKey, request.signal).then((layout) => {
+      if (!request.signal.aborted) setSaved({ api, view: viewKey, layout });
     }).catch(() => {
       if (!request.signal.aborted) setSaved({ api, view: viewKey, error: true });
     });
@@ -137,12 +140,20 @@ export default function DashboardGrid<T>({
   }, [api, browserId, readAttempt, viewKey]);
 
   const current = saved?.api === api && saved.view === viewKey ? saved : undefined;
-  const slots = placeCards(items.map(({ id }) => id), draft?.slots ?? current?.slots ?? []);
-  const cards = new Map(items.map((item) => [item.id, item]));
+  const hidden = new Set(current?.layout?.hidden_devices);
+  const visibleItems = draft || showAll ? items : items.filter((item) => !item.hideable || item.forceVisible || !hidden.has(item.id));
+  const slots = placeCards(visibleItems.map(({ id }) => id), draft?.slots ?? current?.layout?.slots ?? []);
+  const cards = new Map(visibleItems.map((item) => [item.id, item]));
+  const individualDevices = items.filter((item) => item.hideable);
+  const hasHiddenDevices = individualDevices.some(({ id }) => hidden.has(id));
   const showEditor = Boolean(viewKey && (draft || (editable && items.length)));
 
   const drag = useDashboardDrag(scope, (from, target) => {
-    setDraft({ columns: activeColumns, slots: moveCard(slots, from, target.slot, activeColumns, target.nudge === 'up') });
+    setDraft((value) => value && {
+      ...value,
+      slots: moveCard(slots, from, target.slot, activeColumns, target.nudge === 'up'),
+      selected: undefined,
+    });
   });
   const dropPreview = drag.over;
 
@@ -153,14 +164,30 @@ export default function DashboardGrid<T>({
     else if (current?.error) {
       setSaved(undefined);
       setReadAttempt((attempt) => attempt + 1);
-    } else setDraft({ columns, slots });
+    } else {
+      setDraft({
+        columns,
+        slots: placeCards(items.map(({ id }) => id), current?.layout?.slots ?? []),
+        hiddenDevices: [...hidden],
+      });
+    }
   }
 
   function selectSlot(slot: number) {
     if (!draft) return;
     const { selected } = draft;
     if (selected === undefined) setDraft({ ...draft, selected: slot });
-    else setDraft({ columns: activeColumns, slots: moveCard(slots, selected, slot, activeColumns) });
+    else setDraft({ ...draft, slots: moveCard(slots, selected, slot, activeColumns), selected: undefined });
+  }
+
+  function setDeviceVisibility(id: string, visible: boolean) {
+    setDraft((value) => {
+      if (!value) return value;
+      const hiddenDevices = new Set(value.hiddenDevices);
+      if (visible) hiddenDevices.delete(id);
+      else hiddenDevices.add(id);
+      return { ...value, hiddenDevices: [...hiddenDevices] };
+    });
   }
 
   function renderSlot(id: string | null, column: number, index: number) {
@@ -211,18 +238,21 @@ export default function DashboardGrid<T>({
   }
 
   async function saveLayout() {
-    if (!viewKey || pendingSave.current) return;
+    if (!viewKey || !draft || pendingSave.current) return;
     const request = Symbol('dashboard-layout-save');
     pendingSave.current = request;
     setSaving(true);
     setSaveError(false);
     try {
       const id = ensureDashboardBrowserId();
-      const result = await api.saveDashboardLayout(id, viewKey, slots);
+      const changes: DashboardLayout = { slots };
+      if (hidden.size || draft.hiddenDevices.length) changes.hidden_devices = draft.hiddenDevices;
+      const result = await api.saveDashboardLayout(id, viewKey, changes);
       setBrowserId(id);
       if (pendingSave.current !== request) return;
-      setSaved({ api, view: viewKey, slots: result.slots });
+      setSaved({ api, view: viewKey, layout: result });
       setDraft(undefined);
+      setShowAll(false);
     } catch {
       if (pendingSave.current === request) setSaveError(true);
     } finally {
@@ -255,10 +285,36 @@ export default function DashboardGrid<T>({
               {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
             </button>
           )}
+          {!draft && hasHiddenDevices && (
+            <button type="button" className="secondary compact" aria-pressed={showAll} onClick={() => setShowAll((value) => !value)}>
+              {t(MSG.DASHBOARD_LAYOUT_SHOW_ALL)}
+            </button>
+          )}
           {draft && <p className="help">{t(MSG.DASHBOARD_LAYOUT_INSTRUCTIONS)}</p>}
           {saveError && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
           {current?.error && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_LOAD_FAILED)}</p>}
         </div>
+      )}
+      {draft && individualDevices.length > 0 && (
+        <details className="dashboard-layout-visibility">
+          <summary>{t(MSG.DASHBOARD_LAYOUT_DEVICE_VISIBILITY)}</summary>
+          <ul>
+            {individualDevices.map(({ id, cardName }) => (
+              <li key={id}>
+                <label htmlFor={`${visibilityId}-${id}`}>
+                  <input
+                    id={`${visibilityId}-${id}`}
+                    type="checkbox"
+                    checked={!draft.hiddenDevices.includes(id)}
+                    disabled={saving}
+                    onChange={(event) => setDeviceVisibility(id, event.target.checked)}
+                  />
+                  {cardName}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
       <div
         className="dashboard-device-grid"

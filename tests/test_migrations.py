@@ -56,7 +56,7 @@ def test_adopts_an_unversioned_database_that_already_has_the_column():
 
     db.init_db(engine)
 
-    assert schema_version(engine) == 1
+    assert schema_version(engine) == len(db.MIGRATIONS)
     with engine.connect() as connection:
         assert connection.exec_driver_sql("SELECT show_all_power FROM combined_devices").scalar_one() == 0
     engine.dispose()
@@ -73,4 +73,28 @@ def test_newer_schema_is_rejected_without_modification():
     assert schema_version(engine) == 999
     with engine.connect() as connection:
         assert connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall() == []
+    engine.dispose()
+
+
+def test_upgrades_a_version_one_database_without_losing_layouts():
+    engine = db.make_engine(":memory:")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE combined_devices (id INTEGER PRIMARY KEY, show_all_power BOOLEAN NOT NULL)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE dashboard_layouts (browser_id TEXT, view TEXT, slots JSON, PRIMARY KEY (browser_id, view))"
+        )
+        connection.exec_driver_sql("INSERT INTO combined_devices VALUES (1, 0)")
+        connection.exec_driver_sql("INSERT INTO dashboard_layouts VALUES ('browser', 'all/all/3/1', '[null]')")
+        connection.exec_driver_sql("PRAGMA user_version = 1")
+
+    db.init_db(engine)
+
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT show_all_power, show_member_cards, aliases FROM combined_devices"
+        ).one() == (0, 0, "[]")
+        assert connection.exec_driver_sql("SELECT slots, hidden_devices FROM dashboard_layouts").one() == ("[null]", "[]")
     engine.dispose()

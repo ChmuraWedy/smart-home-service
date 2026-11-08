@@ -13,7 +13,7 @@ from .cloud_api import CloudCommand, cloud_bridge, execute_cloud_commands
 from .cloud_mappings import scope_for
 from .control import run_command
 from .models import CombinedDevice, Device, Room
-from .schemas import Identifier, Name, PositiveID, Schema
+from .schemas import DeviceAliases, Identifier, Name, PositiveID, Schema
 from .service import capability_values_dps, commit, effective_capabilities, get_or_404
 
 router = APIRouter(
@@ -40,6 +40,7 @@ class CombinedInput(Schema):
     room_id: PositiveID | None = None
     members: list[Member] = Field(min_length=2, max_length=16)
     show_all_power: bool = True
+    show_member_cards: bool = False
 
     @field_validator("members")
     @classmethod
@@ -59,6 +60,8 @@ class CombinedRead(Schema):
     room_id: PositiveID | None
     members: list[CombinedMember]
     show_all_power: bool
+    show_member_cards: bool
+    aliases: list[str]
 
 
 class PowerResult(Schema):
@@ -93,7 +96,13 @@ def read_combination(request, item, scopes):
         wiring = {"power_source": member["power_source"]} if "power_source" in member else {}
         members.append(CombinedMember(device_id=member["device_id"], route=route, accessible=accessible, **wiring))
     return CombinedRead(
-        id=item.id, name=item.name, room_id=item.room_id, members=members, show_all_power=item.show_all_power
+        id=item.id,
+        name=item.name,
+        room_id=item.room_id,
+        members=members,
+        show_all_power=item.show_all_power,
+        show_member_cards=item.show_member_cards,
+        aliases=item.aliases,
     )
 
 
@@ -168,6 +177,8 @@ def configure_combination(session, request, item, body):
     item.name, item.room_id, item.members = body.name.strip(), body.room_id, members
     if "show_all_power" in body.model_fields_set:
         item.show_all_power = body.show_all_power
+    if "show_member_cards" in body.model_fields_set:
+        item.show_member_cards = body.show_member_cards
 
 
 @router.get("", response_model=list[CombinedRead], response_model_exclude_unset=True)
@@ -194,6 +205,14 @@ def update_combined(
     configure_combination(session, request, item, body)
     commit(session)
     return read_combination(request, item, {})
+
+
+@router.put("/{item_id}/aliases", response_model=DeviceAliases)
+def save_combination_aliases(item_id: PositiveID, body: DeviceAliases, session: Session = Depends(get_session)):
+    item = get_or_404(session, CombinedDevice, item_id)
+    item.aliases = body.aliases
+    commit(session)
+    return DeviceAliases(aliases=item.aliases)
 
 
 @router.delete("/{item_id}", status_code=204)

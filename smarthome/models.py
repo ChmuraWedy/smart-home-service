@@ -1,6 +1,16 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, true
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+    false,
+    true,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -17,6 +27,7 @@ class DashboardLayout(Base):
     browser_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     view: Mapped[str] = mapped_column(String(64), primary_key=True)
     slots: Mapped[list[str | None]] = mapped_column(JSON)
+    hidden_devices: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
 
 
 class LightPreset(Base):
@@ -41,6 +52,8 @@ class CombinedDevice(Base):
     room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
     members: Mapped[list[dict[str, str | None]]] = mapped_column(JSON)
     show_all_power: Mapped[bool] = mapped_column(Boolean, server_default=true())
+    show_member_cards: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    aliases: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
 
 
 class CloudChannelLabel(Base):

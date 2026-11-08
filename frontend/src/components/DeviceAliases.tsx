@@ -5,7 +5,7 @@ import type { CloudApi, Provider } from '../api';
 import { cloudAccountScope } from '../cloud-account-scope';
 import { cloudMetadataKey, localMetadataKey, nextDeviceMetadataRevision, saveDeviceAliases } from '../device-metadata';
 import { useAppDispatch, useAppSelector } from '../store';
-import { AliasRow } from './AliasRow';
+import { AliasRow, validDeviceAlias } from './AliasRow';
 import { translationFor, useDeviceText } from '../device-translations';
 import type { DeviceTranslations } from '../device-translations';
 
@@ -49,7 +49,7 @@ export function DeviceAliases({ api, deviceId, name, translations, initialAliase
         displayAlias={(alias) => localize(alias, translationFor(variants, 'alias', alias))}
         disabled={disabled}
         onSave={(values) => save(values)}
-        validate={(value) => /^[\p{L}][\p{L}\p{M}\p{N} ._-]*$/u.test(value)}
+        validate={validDeviceAlias}
       />
     </div>
   );
