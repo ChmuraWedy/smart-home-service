@@ -170,6 +170,8 @@ def test_power_button_visibility_upgrades_existing_combinations_and_persists(tmp
         restored = client.put(url, json={"name": saved["name"], "members": members, "show_all_power": True})
         assert restored.status_code == 200, restored.text
         assert restored.json()["show_all_power"] is True
+    with sqlite3.connect(db) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone() == (1,)
 
 
 def wired(target, source="relay", channel="switch_1", route="sharing"):

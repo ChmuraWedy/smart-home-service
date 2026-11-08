@@ -4,6 +4,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool
 
+from .migrations import MIGRATIONS
 from .models import Base
 from .search import fold_name
 
@@ -37,12 +38,15 @@ def make_engine(path: str):
 
 
 def init_db(engine):
-    Base.metadata.create_all(engine)
-    # create_all leaves existing tables intact. Serialize this upgrade with other writers.
     with engine.begin() as connection:
+        # SQLite's driver may otherwise run DDL outside a transaction.
         connection.exec_driver_sql("BEGIN IMMEDIATE")
-        columns = connection.exec_driver_sql("PRAGMA table_info(combined_devices)").fetchall()
-        if not any(column[1] == "show_all_power" for column in columns):
-            connection.exec_driver_sql(
-                "ALTER TABLE combined_devices ADD COLUMN show_all_power BOOLEAN NOT NULL DEFAULT 1"
-            )
+        current = connection.exec_driver_sql("PRAGMA user_version").scalar_one()
+        if not 0 <= current <= len(MIGRATIONS):
+            raise RuntimeError(f"Unsupported database schema version {current}. This build supports up to {len(MIGRATIONS)}.")
+        if current == 0:
+            # Bootstrap new databases and create missing tables on unversioned installations.
+            Base.metadata.create_all(connection)
+        for version, upgrade in enumerate(MIGRATIONS[current:], start=current + 1):
+            upgrade(connection)
+            connection.exec_driver_sql(f"PRAGMA user_version = {version}")
