@@ -1087,6 +1087,8 @@
   "CHOOSE_COMBINED_DEVICES": "Wybierz od 2 do 16 urządzeń",
   "COMBINED_SELECT_DEVICES": "Wybierz urządzenia",
   "COMBINED_NAME_AND_ROOM": "Nazwa i pokój",
+  "COMBINED_CARD_PREVIEW": "Podgląd karty",
+  "COMBINED_CARD_PREVIEW_HELP": "Tak połączone urządzenie będzie wyglądać na ekranie głównym. Sterowanie w podglądzie jest wyłączone.",
   "COMBINED_WIRING": "Okablowanie (opcjonalne)",
   "COMBINED_WIRING_HELP": "Wybierz kanał przełącznika, który fizycznie zasila dane urządzenie. Te powiązania zapisuje się ręcznie.",
   "COMBINED_WIRING_LOOKUP_FAILED": "Nie udało się wczytać niektórych kanałów przekaźników.",

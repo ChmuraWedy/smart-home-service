@@ -96,6 +96,7 @@ type CardProps = EmbeddedControls & {
   route: DeviceRoute;
   now: number;
   paused: boolean;
+  loadWhenPaused?: boolean;
   onAuthError: () => void;
   onBusy: (busy: boolean) => void;
   onStatus?: (status: CardStatus) => void;
@@ -108,7 +109,7 @@ export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
   const {
-    device, displayName, route, paused, embeddedQuick, sheet,
+    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused,
   } = props;
   const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
@@ -125,7 +126,7 @@ export function CardControls(props: CardProps) {
     return () => observer.disconnect();
   }, [paused]);
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
-  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick;
+  const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick || loadWhenPaused;
   const pollingVisible = visible && !paused;
   let controls: ReactNode;
   if (!active) {

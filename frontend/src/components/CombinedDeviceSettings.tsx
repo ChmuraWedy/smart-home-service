@@ -12,8 +12,15 @@ import type {
 } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
 import { ControlDialog } from './DeviceControls';
+import CombinedDeviceCard from './CombinedDeviceCard';
 import type { ResolvedMember } from './CombinedDeviceCard';
 import CombinedDeviceWiring from './CombinedDeviceWiring';
+
+const creationSteps = [
+  ['devices', MSG.COMBINED_SELECT_DEVICES],
+  ['details', MSG.COMBINED_NAME_AND_ROOM],
+  ['preview', MSG.COMBINED_CARD_PREVIEW],
+] as const;
 
 export function CombinedDeviceDetails({
   combined, members, onChoose, onEdit, onClose,
@@ -90,7 +97,7 @@ export function CombinedDeviceList({
 }
 
 export function CombinedDeviceSettings({
-  api, existing, devices, rooms, initialRoom, deviceRoom, onClose, onSaved, onAuthError,
+  api, existing, devices, rooms, initialRoom, deviceRoom, now, cardSize, onClose, onSaved, onAuthError,
 }: {
   api: HomeApi;
   existing?: CombinedDevice;
@@ -98,6 +105,8 @@ export function CombinedDeviceSettings({
   rooms: Room[];
   initialRoom: number | null;
   deviceRoom: (device: UnifiedDevice) => number | null;
+  now: number;
+  cardSize: 'small' | 'large';
   onClose: () => void;
   onSaved: (saved?: CombinedDevice) => void;
   onAuthError: () => void;
@@ -105,7 +114,7 @@ export function CombinedDeviceSettings({
   const formId = useId();
   const displayName = useDeviceDisplayName();
   const [nameDraft, setName] = useState(existing?.name);
-  const [step, setStep] = useState<'devices' | 'details'>('devices');
+  const [step, setStep] = useState<(typeof creationSteps)[number][0]>('devices');
   const activeStep = useRef<HTMLLIElement>(null);
   useEffect(() => { activeStep.current?.focus(); }, [step]);
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
@@ -132,6 +141,7 @@ export function CombinedDeviceSettings({
   const roomName = rooms.find(({ id }) => id === room)?.name;
   const name = nameDraft ?? (roomName ? t(MSG.COMBINED_SUGGESTED_NAME, [roomName]).slice(0, 120) : '');
   const pickingDevices = !existing && step === 'devices';
+  const previewing = !existing && step === 'preview';
   const canSubmit = !busy && members.length >= 2 && (pickingDevices || Boolean(roomName && name.trim()));
   const options = [...new Set([...selected.keys(), ...devices.map((device) => device.id)])].filter((id) => {
     const device = byId.get(id);
@@ -146,12 +156,12 @@ export function CombinedDeviceSettings({
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) return;
-    if (pickingDevices) {
-      setStep('details');
+    setError('');
+    if (!existing && !previewing) {
+      setStep(pickingDevices ? 'details' : 'preview');
       return;
     }
     setBusy(true);
-    setError('');
     try {
       const saved = await api.saveCombination({ name: name.trim(), room_id: room, members }, existing?.id);
       if (active.current) onSaved(saved);
@@ -197,12 +207,11 @@ export function CombinedDeviceSettings({
       <form className="combined-device-form" aria-label={t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)} aria-busy={busy} onSubmit={(event) => save(event)}>
         {!existing && (
           <ol className="combined-creation-steps">
-            <li ref={pickingDevices ? activeStep : undefined} tabIndex={-1} aria-current={pickingDevices ? 'step' : undefined}>
-              {t(MSG.COMBINED_SELECT_DEVICES)}
-            </li>
-            <li ref={pickingDevices ? undefined : activeStep} tabIndex={-1} aria-current={pickingDevices ? undefined : 'step'}>
-              {t(MSG.COMBINED_NAME_AND_ROOM)}
-            </li>
+            {creationSteps.map(([key, label]) => (
+              <li key={key} ref={step === key ? activeStep : undefined} tabIndex={-1} aria-current={step === key ? 'step' : undefined}>
+                {t(label)}
+              </li>
+            ))}
           </ol>
         )}
         {Boolean(existing || pickingDevices) && (
@@ -234,8 +243,8 @@ export function CombinedDeviceSettings({
             </fieldset>
           </>
         )}
-        {!existing && !pickingDevices && <p className="help">{t(MSG.COMBINED_MEMBER_COUNT, [members.length])}</p>}
-        {!pickingDevices && (
+        {!existing && step === 'details' && <p className="help">{t(MSG.COMBINED_MEMBER_COUNT, [members.length])}</p>}
+        {Boolean(existing || step === 'details') && (
           <>
             <label className="field" htmlFor={`${formId}-name`}>
               {t(MSG.NAME)}
@@ -272,6 +281,22 @@ export function CombinedDeviceSettings({
             />
           </>
         )}
+        {previewing && (
+          <fieldset className="combined-preview dashboard-view" data-card-size={cardSize} disabled>
+            <legend className="sr-only">{t(MSG.COMBINED_CARD_PREVIEW)}</legend>
+            <p className="help">{t(MSG.COMBINED_CARD_PREVIEW_HELP)}</p>
+            <ul className="dashboard-device-column">
+              <CombinedDeviceCard
+                api={api}
+                combined={{ name: name.trim() }}
+                members={members.map((member) => ({ member, device: byId.get(member.device_id) }))}
+                room={roomName ?? t(MSG.NO_ROOM)}
+                now={now}
+                onAuthError={onAuthError}
+              />
+            </ul>
+          </fieldset>
+        )}
         {error && <p className="field-error" role="alert">{translateText(error)}</p>}
         <div className="survey-footer">
           {existing && (
@@ -279,9 +304,11 @@ export function CombinedDeviceSettings({
           )}
           <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t(MSG.CANCEL)}</button>
           {!existing && !pickingDevices && (
-            <button type="button" className="secondary" disabled={busy} onClick={() => setStep('devices')}>{t(MSG.BACK)}</button>
+            <button type="button" className="secondary" disabled={busy} onClick={() => setStep(previewing ? 'details' : 'devices')}>
+              {t(MSG.BACK)}
+            </button>
           )}
-          <button type="submit" disabled={!canSubmit}>{t(pickingDevices ? MSG.NEXT : MSG.SAVE)}</button>
+          <button type="submit" disabled={!canSubmit}>{t(existing || previewing ? MSG.SAVE : MSG.NEXT)}</button>
         </div>
         {confirmDelete && (
           <div className="combined-delete">

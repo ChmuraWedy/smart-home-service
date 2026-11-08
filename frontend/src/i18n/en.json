@@ -1087,6 +1087,8 @@
   "CHOOSE_COMBINED_DEVICES": "Choose 2 to 16 devices",
   "COMBINED_SELECT_DEVICES": "Select devices",
   "COMBINED_NAME_AND_ROOM": "Name and room",
+  "COMBINED_CARD_PREVIEW": "Card preview",
+  "COMBINED_CARD_PREVIEW_HELP": "This is how the combination will look on your dashboard. Controls are disabled in the preview.",
   "COMBINED_WIRING": "Wiring (optional)",
   "COMBINED_WIRING_HELP": "Choose the switch channel that physically supplies power to each device. These links are recorded manually.",
   "COMBINED_WIRING_LOOKUP_FAILED": "Could not load some relay channels.",

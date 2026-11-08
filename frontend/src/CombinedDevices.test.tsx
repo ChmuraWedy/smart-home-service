@@ -143,6 +143,25 @@ describe('combined devices', () => {
     await user.selectOptions(first, `${relay.name} · Channel 1`);
     await user.selectOptions(await source(1), `${relay.name} · Channel 2`);
     await user.selectOptions(await source(2), `${relay.name} · Channel 2`);
+    await user.click(form.getByRole('button', { name: 'Next' }));
+    expect(form.getByText('Card preview', { selector: 'li' })).toHaveAttribute('aria-current', 'step');
+    const preview = within(form.getByRole('group', { name: 'Card preview' }));
+    const draftCard = within(preview.getByRole('listitem', { name: 'Devices in Kitchen' }));
+    expect(draftCard.getByText('Kitchen')).toBeInTheDocument();
+    expect(draftCard.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
+    expect(draftCard.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
+    const power = draftCard.getByRole('button', { name: 'Power for all devices' });
+    expect(power).toBeDisabled();
+    expect(draftCard.getByRole('button', { name: 'Quick controls' })).toBeDisabled();
+    const lamp = within(draftCard.getByRole('region', { name: bulbs[0].name }));
+    expect(await lamp.findByRole('switch')).toBeDisabled();
+    await user.click(power);
+    expect(writes).toHaveLength(0);
+
+    await user.click(form.getByRole('button', { name: 'Back' }));
+    const restored = await form.findByRole('combobox', { name: `Power source for ${bulbs[0].name}` });
+    expect(restored).toHaveDisplayValue(`${relay.name} · Channel 1`);
+    await user.click(form.getByRole('button', { name: 'Next' }));
     await user.click(form.getByRole('button', { name: 'Save' }));
     await screen.findByRole('heading', { name: 'Devices in Kitchen' });
     expect(writes).toHaveLength(1);
@@ -190,8 +209,9 @@ describe('combined devices', () => {
     await user.type(form.getByLabelText('Name'), 'Kitchen Lights');
     const roomField = form.getByRole('combobox', { name: 'Room' });
     await user.selectOptions(roomField, '');
-    expect(form.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(form.getByRole('button', { name: 'Next' })).toBeDisabled();
     await user.selectOptions(roomField, '3');
+    await user.click(form.getByRole('button', { name: 'Next' }));
     await user.click(form.getByRole('button', { name: 'Save' }));
     expect(await screen.findByRole('heading', { name: 'Kitchen Lights' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/combined-devices');
@@ -309,6 +329,7 @@ describe('combined devices', () => {
     await user.click(creation.getByRole('checkbox', { name: bulbs[0].name }));
     await user.click(creation.getByRole('checkbox', { name: bulbs[1].name }));
     expect(creation.queryByRole('combobox')).toBeNull();
+    await user.click(creation.getByRole('button', { name: 'Next' }));
     await user.click(creation.getByRole('button', { name: 'Next' }));
     await user.click(creation.getByRole('button', { name: 'Save' }));
     const edit = await screen.findByRole('button', { name: 'Edit Devices in Kitchen' });

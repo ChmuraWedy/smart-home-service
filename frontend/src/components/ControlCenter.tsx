@@ -597,6 +597,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           rooms={rooms}
           initialRoom={Number(room) || null}
           deviceRoom={deviceRoom}
+          now={now}
+          cardSize={cardSize}
           onClose={closeManagement}
           onSaved={saveCombination}
           onAuthError={onAuthError}

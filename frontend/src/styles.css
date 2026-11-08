@@ -1731,6 +1731,8 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-device-form { @apply tw:grid tw:gap-3; }
 .combined-creation-steps { @apply tw:m-0 tw:flex tw:flex-wrap tw:gap-x-7 tw:gap-y-1 tw:pl-5 tw:text-sm tw:text-(--muted); }
 .combined-creation-steps [aria-current="step"] { @apply tw:font-semibold tw:text-(--text); }
+.combined-preview { @apply tw:m-0 tw:grid tw:min-w-0 tw:gap-3 tw:border-0 tw:p-0; }
+.combined-preview > p { @apply tw:m-0; }
 .combined-members { @apply tw:max-h-[min(50dvh,30rem)] tw:min-w-0 tw:overflow-y-auto tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
 .combined-wiring { @apply tw:grid tw:min-w-0 tw:gap-2 tw:rounded-lg tw:border tw:border-(--border) tw:p-2; }
 .combined-wiring p { @apply tw:m-0; }

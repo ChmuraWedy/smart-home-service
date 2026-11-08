@@ -2,7 +2,7 @@ import {
   useCallback, useId, useRef, useState,
 } from 'react';
 import type {
-  CombinedDevice, CombinedMember, CombinedPowerOutcome, HomeApi,
+  CombinedDevice, CombinedMemberInput, CombinedPowerOutcome, HomeApi,
 } from '../home-api';
 import { useDeviceDisplayName } from '../devices';
 import type { UnifiedDevice } from '../devices';
@@ -25,7 +25,7 @@ import { PowerButton } from './PowerButton';
 import { Card } from './ui/card';
 import { Icon } from './ui/icon';
 
-export type ResolvedMember = { member: CombinedMember; device?: UnifiedDevice };
+export type ResolvedMember = { member: CombinedMemberInput; device?: UnifiedDevice };
 
 function aggregatePower(powers: MemberPower[]): MemberPower {
   if (powers.includes('unknown')) return 'unknown';
@@ -50,12 +50,13 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, quick, onPower, onAuthError, commandKey, sourceLabel,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
   now: number;
   paused: boolean;
+  preview: boolean;
   quick?: boolean;
   commandKey: string;
   sourceLabel?: string;
@@ -82,6 +83,7 @@ function MemberControls({
           route={member.route}
           now={now}
           paused={paused}
+          loadWhenPaused={preview}
           embeddedQuick={quick}
           onPower={quick ? undefined : recordPower}
           onBusy={recordBusy}
@@ -92,24 +94,29 @@ function MemberControls({
   );
 }
 
+const noAction = () => undefined;
+
 export default function CombinedDeviceCard({
-  api, combined, members, room, now, placement, paused, quickOpen, onQuickOpen, onQuickClose, onDetails, onAuthError,
+  api, combined, members, room, now, placement, paused = false, quickOpen = false,
+  onQuickOpen = noAction, onQuickClose = noAction, onDetails = noAction, onAuthError,
 }: {
   api: HomeApi;
-  combined: CombinedDevice;
+  combined: Pick<CombinedDevice, 'name'> & Partial<Pick<CombinedDevice, 'id'>>;
   members: ResolvedMember[];
   room: string;
   now: number;
-  placement: GridCardPlacement;
-  paused: boolean;
-  quickOpen: boolean;
-  onQuickOpen: () => void;
-  onQuickClose: () => void;
-  onDetails: () => void;
+  placement?: GridCardPlacement;
+  paused?: boolean;
+  quickOpen?: boolean;
+  onQuickOpen?: () => void;
+  onQuickClose?: () => void;
+  onDetails?: () => void;
   onAuthError: () => void;
 }) {
-  const id = `combined-${combined.id}`;
   const powerId = useId();
+  const { id: savedId } = combined;
+  const preview = savedId === undefined;
+  const id = preview ? `combined-preview-${powerId}` : `combined-${savedId}`;
   const displayName = useDeviceDisplayName();
   const trigger = useRef<HTMLButtonElement>(null);
   const dispatch = useAppDispatch();
@@ -130,16 +137,17 @@ export default function CombinedDeviceCard({
   const power = aggregatePower(memberPowers);
   const knownPowers = memberPowers.filter((value) => value !== 'unknown');
   const allKnownOn = knownPowers.length > 0 && knownPowers.every((value) => value === 'on');
-  const canSend = !busy && !paused && members.some(({ device }) => device);
+  const controlsPaused = paused || preview;
+  const canSend = !busy && !controlsPaused && members.some(({ device }) => device);
 
   const setPower = useCallback(async (value: boolean) => {
-    if (!canSend || sending.current) return;
+    if (savedId === undefined || !canSend || sending.current) return;
     sending.current = true;
     setFailures({});
     setSendError(false);
     dispatch(setCommandPending({ deviceId: id, pending: true }));
     try {
-      const { results } = await api.combinationPower(combined.id, value);
+      const { results } = await api.combinationPower(savedId, value);
       setFailures(Object.fromEntries(results.flatMap(({ device_id: memberId, outcome }) => (
         outcome === 'accepted' ? [] : [[memberId, outcome]]
       ))));
@@ -161,7 +169,7 @@ export default function CombinedDeviceCard({
       sending.current = false;
       dispatch(setCommandPending({ deviceId: id, pending: false }));
     }
-  }, [api, canSend, combined.id, dispatch, id, members, onAuthError]);
+  }, [api, canSend, dispatch, id, members, onAuthError, savedId]);
 
   function renderMember(entry: ResolvedMember, quick = false) {
     const { member } = entry;
@@ -174,7 +182,8 @@ export default function CombinedDeviceCard({
         api={api}
         entry={entry}
         now={now}
-        paused={paused || aggregateBusy || (quickOpen && !quick)}
+        paused={controlsPaused || aggregateBusy || (quickOpen && !quick)}
+        preview={preview}
         quick={quick}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
@@ -203,10 +212,10 @@ export default function CombinedDeviceCard({
       id={id}
       className="device-card dashboard-device combined-device-card"
       aria-label={combined.name}
-      data-layout-slot={placement.slot}
-      data-layout-nudge={placement.nudge}
-      style={placement.style}
-      inert={placement.inert}
+      data-layout-slot={placement?.slot}
+      data-layout-nudge={placement?.nudge}
+      style={placement?.style}
+      inert={placement?.inert}
     >
       <DashboardCardHeader
         icon={<DeviceIcon group />}
@@ -237,12 +246,12 @@ export default function CombinedDeviceCard({
               title={t(MSG.QUICK_DEVICE_CONTROLS)}
               aria-haspopup="dialog"
               aria-expanded={quickOpen}
-              disabled={busy || paused}
+              disabled={busy || controlsPaused}
               onClick={onQuickOpen}
             >
               <Icon name="sliders" />
             </button>
-            <CardDetailsButton label={t(MSG.DETAILS)} disabled={busy || paused} onClick={onDetails} />
+            <CardDetailsButton label={t(MSG.DETAILS)} disabled={busy || controlsPaused} onClick={onDetails} />
           </>
         )}
       />
