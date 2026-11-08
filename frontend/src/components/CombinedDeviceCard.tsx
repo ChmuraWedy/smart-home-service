@@ -84,8 +84,10 @@ function MemberControls({
       aria-label={displayName}
       style={depth ? { '--combined-depth': depth } as CSSProperties : undefined}
     >
-      <h3 className="combined-member-name">{displayName}</h3>
-      {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
+      <header className="combined-member-header">
+        <h3 className="combined-member-name">{displayName}</h3>
+        {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
+      </header>
       {device ? (
         <CardControls
           api={api}

@@ -1753,6 +1753,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-view:not([data-dashboard-panel="tools"]) .combined-device-card .dashboard-power-state-summary,
 .combined-device-card .camera-card-privacy { margin-inline:0; }
 .combined-device-card :is(.camera-card-switches, .card-sensor-values) { padding-inline:var(--dashboard-card-inset); }
+.combined-device-card .combined-member-header { @apply tw:border-b tw:border-(--border) tw:pb-1; }
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
 .combined-member-source { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
 .combined-member-unavailable { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
@@ -1761,6 +1762,9 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-results { @apply tw:my-1 tw:w-full tw:list-none tw:p-0 tw:text-xs; }
 .dashboard-device [data-power-layout] > .combined-relay-channel {
   border-block-start:2px solid var(--border);
+}
+.combined-device-card .combined-member > .card-quick-controls > [data-power-layout] > .combined-relay-channel:first-child {
+  border-block-start:0;
 }
 .dashboard-device [data-power-layout] > .combined-relay-channel + .channel-control {
   @apply tw:border-t tw:border-(--border);
@@ -1793,7 +1797,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   border-block-start:2px solid var(--combined-branch-color);
 }
 .combined-member:has(> .card-quick-controls > .card-primary-controls > .channel-control .combined-member-inline) {
-  > :is(.combined-member-name, .combined-member-source) { @apply tw:sr-only; }
+  > .combined-member-header { @apply tw:sr-only; }
   &::before { content:none; }
 }
 .combined-member-inline {
