@@ -535,7 +535,7 @@
       "count": 2
     },
     "arrow-parens": {
-      "count": 10
+      "count": 9
     },
     "brace-style": {
       "count": 2
@@ -577,7 +577,7 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 12
+      "count": 10
     },
     "object-curly-spacing": {
       "count": 10
