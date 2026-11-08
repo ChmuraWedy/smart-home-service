@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api';
 import {
@@ -45,6 +45,47 @@ export function CombinedDeviceDetails({
   );
 }
 
+export function CombinedDeviceList({
+  combinations, rooms, canCreate, onCreate, onEdit,
+}: {
+  combinations: CombinedDevice[];
+  rooms: Room[];
+  canCreate: boolean;
+  onCreate: () => void;
+  onEdit: (id: number) => void;
+}) {
+  return (
+    <>
+      <div className="card-heading">
+        <div>
+          <h1>{t(MSG.COMBINED_DEVICES)}</h1>
+          <p className="help">{t(MSG.COMBINED_DEVICES_HELP)}</p>
+        </div>
+        <button type="button" disabled={!canCreate} onClick={onCreate}>{t(MSG.CREATE_COMBINED_DEVICE)}</button>
+      </div>
+      {combinations.length ? (
+        <ul className="group-members">
+          {combinations.map((item) => (
+            <li key={item.id}>
+              <div>
+                <h2>{item.name}</h2>
+                <p className="help">
+                  {rooms.find(({ id }) => id === item.room_id)?.name ?? t(MSG.NO_ROOM)}
+                  {' · '}
+                  {t(MSG.COMBINED_MEMBER_COUNT, [item.members.length])}
+                </p>
+              </div>
+              <button type="button" className="secondary compact" aria-label={`${t(MSG.EDIT)} ${item.name}`} onClick={() => onEdit(item.id)}>
+                {t(MSG.EDIT)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="saved-summary">{t(MSG.NO_COMBINED_DEVICES)}</p>}
+    </>
+  );
+}
+
 export function CombinedDeviceSettings({
   api, existing, devices, rooms, initialRoom, deviceRoom, onClose, onSaved, onAuthError,
 }: {
@@ -64,6 +105,11 @@ export function CombinedDeviceSettings({
   const [chosenRoom, setRoom] = useState(existing ? existing.room_id : initialRoom ?? undefined);
   const [members, setMembers] = useState<CombinedMemberInput[]>(() => existing?.members.map(({ device_id: id, route }) => ({ device_id: id, route })) ?? []);
   const [busy, setBusy] = useState(false);
+  const active = useRef(false);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, []);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [search, setSearch] = useState('');
@@ -92,9 +138,9 @@ export function CombinedDeviceSettings({
     setError('');
     try {
       const saved = await api.saveCombination({ name: name.trim(), room_id: room, members }, existing?.id);
-      onSaved(saved);
+      if (active.current) onSaved(saved);
     } catch (failure) {
-      handleFailure(failure);
+      if (active.current) handleFailure(failure);
     } finally {
       setBusy(false);
     }
@@ -106,9 +152,9 @@ export function CombinedDeviceSettings({
     setError('');
     try {
       await api.removeCombination(existing.id);
-      onSaved();
+      if (active.current) onSaved();
     } catch (failure) {
-      handleFailure(failure);
+      if (active.current) handleFailure(failure);
     } finally {
       setBusy(false);
     }
@@ -124,8 +170,10 @@ export function CombinedDeviceSettings({
   }
 
   return (
-    <ControlDialog title={t(existing ? MSG.EDIT_COMBINATION : MSG.COMBINE_DEVICES)} busy={busy} onClose={onClose}>
-      <form className="combined-device-form" onSubmit={(event) => save(event)}>
+    <>
+      <h1>{t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)}</h1>
+      <p className="help">{t(MSG.COMBINED_DEVICES_HELP)}</p>
+      <form className="combined-device-form" aria-label={t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)} aria-busy={busy} onSubmit={(event) => save(event)}>
         <label className="field" htmlFor={`${formId}-name`}>
           {t(MSG.NAME)}
           <input
@@ -183,10 +231,11 @@ export function CombinedDeviceSettings({
         </fieldset>
         {error && <p className="field-error" role="alert">{translateText(error)}</p>}
         <div className="survey-footer">
-          <button type="submit" disabled={busy || members.length < 2 || !name.trim()}>{t(MSG.SAVE)}</button>
           {existing && (
             <button type="button" className="secondary" disabled={busy} onClick={() => setConfirmDelete(true)}>{t(MSG.DISSOLVE_COMBINATION)}</button>
           )}
+          <button type="button" className="secondary" disabled={busy} onClick={onClose}>{t(MSG.CANCEL)}</button>
+          <button type="submit" disabled={busy || members.length < 2 || !name.trim()}>{t(MSG.SAVE)}</button>
         </div>
         {confirmDelete && (
           <div className="combined-delete">
@@ -196,6 +245,6 @@ export function CombinedDeviceSettings({
           </div>
         )}
       </form>
-    </ControlDialog>
+    </>
   );
 }

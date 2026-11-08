@@ -100,11 +100,24 @@ describe('combined devices', () => {
     const writes = backend();
     const user = userEvent.setup();
     const app = openApp('/settings/dashboard?room=3');
-    await user.click(await screen.findByRole('button', { name: 'Combine devices' }));
-    const form = within(await screen.findByRole('dialog', { name: 'Combine devices' }));
+    await screen.findByRole('listitem', { name: bulbs[0].name });
+    expect(screen.queryByRole('button', { name: 'Create combined device' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    await user.click(screen.getByRole('button', { name: 'Combined devices' }));
+    await user.click(await screen.findByRole('button', { name: 'Create combined device' }));
+    const form = within(await screen.findByRole('form', { name: 'Create combined device' }));
     await user.type(form.getByLabelText('Name'), 'Kitchen Lights');
     for (const bulb of bulbs) await user.click(form.getByRole('checkbox', { name: bulb.name }));
     await user.click(form.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('heading', { name: 'Kitchen Lights' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/combined-devices');
+    await user.click(screen.getByRole('button', { name: 'Edit Kitchen Lights' }));
+    const managementEditor = within(await screen.findByRole('form', { name: 'Edit combination' }));
+    expect(managementEditor.getByLabelText('Name')).toHaveValue('Kitchen Lights');
+    await user.click(managementEditor.getByRole('button', { name: 'Cancel' }));
+    await screen.findByRole('heading', { name: 'Combined devices' });
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    await user.click(screen.getByRole('button', { name: 'Control' }));
     const card = await screen.findByRole('listitem', { name: 'Kitchen Lights' });
     expect(writes).toEqual([{
       path: '/combined-devices', method: 'POST',
@@ -149,7 +162,7 @@ describe('combined devices', () => {
     expect(window.location.pathname).toBe('/devices/bulb-2');
     await user.click(screen.getByRole('button', { name: 'Back to combination' }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Kitchen Lights' })).getByRole('button', { name: 'Edit combination' }));
-    const editor = within(await screen.findByRole('dialog', { name: 'Edit combination' }));
+    const editor = within(await screen.findByRole('form', { name: 'Edit combination' }));
     await user.click(editor.getByRole('checkbox', { name: bulbs[2].name }));
     await user.click(editor.getByRole('button', { name: 'Save' }));
     expect(writes[3]).toMatchObject({ path: '/combined-devices/1', method: 'PUT' });
@@ -160,13 +173,28 @@ describe('combined devices', () => {
     expect(reloaded.queryByRole('button', { name: bulbs[2].name })).toBeNull();
     expect(screen.getByRole('listitem', { name: bulbs[2].name })).toBeInTheDocument();
     await user.click(reloaded.getByRole('button', { name: 'Edit combination' }));
-    const dissolve = within(await screen.findByRole('dialog', { name: 'Edit combination' }));
+    const dissolve = within(await screen.findByRole('form', { name: 'Edit combination' }));
     await user.click(dissolve.getByRole('button', { name: 'Dissolve combination' }));
     await user.click(dissolve.getAllByRole('button', { name: 'Dissolve combination' })[1]);
+    expect(await screen.findByText('There are no combined devices yet.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    await user.click(screen.getByRole('button', { name: 'Control' }));
     expect(await screen.findByRole('listitem', { name: bulbs[0].name })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: 'Kitchen Lights' })).toBeNull();
     expect(writes[4]).toMatchObject({ path: '/combined-devices/1', method: 'DELETE' });
   }, 15000);
+
+  it('opens old dashboard creation links in the dedicated editor and cancels to the list', async () => {
+    backend();
+    const user = userEvent.setup();
+    openApp('/combined-devices/new?panel=tools&room=3');
+    const editor = within(await screen.findByRole('form', { name: 'Create combined device' }));
+    expect(editor.getByRole('combobox', { name: 'Room' })).toHaveValue('3');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(editor.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('heading', { name: 'Combined devices' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/combined-devices');
+  });
 
   it('keeps a direct member details link usable while the combined card hides its individual tile', async () => {
     backend({

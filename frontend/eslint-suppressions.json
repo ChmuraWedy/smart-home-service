@@ -4,7 +4,7 @@
       "count": 9
     },
     "@stylistic/max-len": {
-      "count": 6
+      "count": 5
     },
     "arrow-parens": {
       "count": 11
@@ -67,7 +67,7 @@
       "count": 1
     },
     "react/button-has-type": {
-      "count": 8
+      "count": 7
     },
     "react/jsx-closing-bracket-location": {
       "count": 1

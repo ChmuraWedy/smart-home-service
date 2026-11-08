@@ -10,7 +10,7 @@ import { HomeApi } from '../home-api';
 import type { CombinedDevice, Group, GroupState, Inventory, LocalDevice } from '../home-api';
 import { CloudControl } from './CloudControl';
 import CombinedDeviceCard from './CombinedDeviceCard';
-import { CombinedDeviceDetails, CombinedDeviceSettings } from './CombinedDeviceSettings';
+import { CombinedDeviceDetails, CombinedDeviceList, CombinedDeviceSettings } from './CombinedDeviceSettings';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
 import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
@@ -26,10 +26,10 @@ import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
 import DashboardCardFooter from './DashboardCardFooter';
 import DashboardGrid from './DashboardGrid';
 import type { GridCardPlacement } from './DashboardGrid';
-import type { MouseEvent } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
 import {
-  combinationEditPattern, combinationNewPath, combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery,
+  appPaths, combinationEditPattern, combinationNewPath, combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery,
 } from '../navigation';
 import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
@@ -212,6 +212,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const combinedEdit = matchPath(combinationEditPattern, location.pathname);
   const combinedDetails = matchPath(combinationPattern, location.pathname);
   const combinedNew = location.pathname === combinationNewPath;
+  const combinationList = location.pathname === appPaths['combined-devices'];
+  const managingCombinations = combinationList || combinedNew || Boolean(combinedEdit);
   const combinedId = combinedNew ? undefined : (combinedQuick ?? combinedEdit ?? combinedDetails)?.params.combinedId;
   const [revision, setRevision] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -233,6 +235,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
   function placementOf(device: UnifiedDevice) { return device.local || placements.get(device.id); }
+  const deviceRoom = useCallback((device: UnifiedDevice) => (device.local || placements.get(device.id))?.room_id ?? null, [placements]);
   function roomName(device: UnifiedDevice) { return inventory?.rooms.find(item => item.id === placementOf(device)?.room_id)?.name || t(MSG.NO_ROOM); }
   const [busy, setBusy] = useState(false);
   const [survey, setSurvey] = useState<{ api: HomeApi; mask: string; key: string; value: Extract<Selection, { kind: 'survey' }> } | null>(null);
@@ -343,7 +346,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const knownGatewayId = detailCloud?.gateway_id || detailDevice?.cloud.developer?.gateway_id;
   const detailGateway = inventory?.devices.find((device) => device.id === detailDevice?.local?.parent_id)
     ?? inventory?.devices.find((device) => device.device_id === knownGatewayId);
-  const detailsOpen = selected !== null || Boolean(combined || (combinedNew && current?.combinations));
+  const detailsOpen = selected !== null || Boolean(combined && !combinedEdit);
   useEffect(() => {
     if (!detailsOpen) return;
     dispatch(setDetailsOpen(true));
@@ -389,6 +392,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     return pageEntries;
   }, [entries, page, quick, linked, validRoute, linkedIndex, combined, combinedQuickOpen]);
   useEffect(() => {
+    if (managingCombinations) return undefined;
     const controller = new AbortController();
     setGroupStates({});
     // Initial list reads use SQLite only. Visible card controls separately
@@ -404,7 +408,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       }).catch(failure => { if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError(); });
     });
     return () => controller.abort();
-  }, [api, dispatch, visible]);
+  }, [api, dispatch, managingCombinations, visible]);
   function setPage(value: number) {
     if (value > 0) query.set('page', String(value + 1)); else query.delete('page');
     void navigate(dashboardHref(room, query, dashboardPanel));
@@ -418,9 +422,15 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (combination) params.set('combined', String(combination.id)); else params.delete('combined');
     return withQuery(path, params);
   }
-  function openOverlay(href: string) {
+  const openOverlay = useCallback((href: string) => {
     if (href !== location.pathname + location.search) void navigate(href, { state: { dashboardOverlay: true } });
-  }
+  }, [location.pathname, location.search, navigate]);
+  const createCombination = useCallback(() => openOverlay(combinationNewPath), [openOverlay]);
+  const editCombination = useCallback((id: number) => openOverlay(`/combined-devices/${id}/edit`), [openOverlay]);
+  const closeManagement = useCallback(() => {
+    if (location.state?.dashboardOverlay) navigate(-1);
+    else navigate(appPaths['combined-devices'], { replace: true });
+  }, [location.state, navigate]);
   function choose(value: Selection) {
     if (value.kind === 'survey') { setSurvey({ api, mask, key: location.key, value }); return; }
     setSurvey(null);
@@ -443,7 +453,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     const provider = detailDevice.cloud.sharing ? 'sharing' : detailDevice.cloud.developer ? 'developer' : undefined;
     choose({ kind: 'survey', existing: detailDevice.local, provider, device: provider ? detailDevice.cloud[provider] : undefined });
   }
-  function saveCombination(saved?: CombinedDevice) {
+  const saveCombination = useCallback((saved?: CombinedDevice) => {
     setRecord((previous) => {
       if (!previous || previous.api !== api || previous.mask !== mask) return previous;
       const list = previous.combinations ?? [];
@@ -451,9 +461,9 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       const found = list.some((item) => item.id === saved.id);
       return { ...previous, combinations: found ? list.map((item) => (item.id === saved.id ? saved : item)) : [...list, saved] };
     });
-    if (!saved) navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
-    else closeOverlay();
-  }
+    if (!saved) navigate(appPaths['combined-devices'], { replace: true });
+    else closeManagement();
+  }, [api, closeManagement, combined?.id, mask, navigate]);
   function renderCard(entry: DashboardEntry, placement: GridCardPlacement) {
     if (entry.kind === 'combined') {
       const item = entry.combined;
@@ -539,6 +549,54 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     return { id: `device-${entry.device.id}`, cardName: entry.device.name, entry };
   });
 
+  if (managingCombinations) {
+    const rooms = inventory?.rooms ?? [];
+    let content: ReactNode;
+    if (!ready || !current || busy) {
+      content = <p role="status">{t(MSG.LOADING_LIST)}</p>;
+    } else if (!current.combinations) {
+      content = (
+        <>
+          <p role="alert">{t(MSG.COULD_NOT_LOAD_DEVICES)}</p>
+          <button type="button" className="secondary" onClick={() => setRevision((value) => value + 1)}>{t(MSG.REFRESH_LIST)}</button>
+        </>
+      );
+    } else if (combinationList) {
+      content = (
+        <CombinedDeviceList
+          combinations={combinations}
+          rooms={rooms}
+          canCreate={devices.filter((device) => deviceRoutes(device).length > 0).length >= 2}
+          onCreate={createCombination}
+          onEdit={editCombination}
+        />
+      );
+    } else if (combinedNew || combined) {
+      content = (
+        <CombinedDeviceSettings
+          api={api}
+          key={combined?.id ?? 'new'}
+          existing={combined}
+          devices={devices}
+          rooms={rooms}
+          initialRoom={Number(room) || null}
+          deviceRoom={deviceRoom}
+          onClose={closeManagement}
+          onSaved={saveCombination}
+          onAuthError={onAuthError}
+        />
+      );
+    } else {
+      content = (
+        <>
+          <p role="alert">{t(MSG.COMBINATION_UNAVAILABLE)}</p>
+          <button type="button" className="secondary" onClick={closeManagement}>{t(MSG.BACK)}</button>
+        </>
+      );
+    }
+    return <section className="card combined-device-management">{content}</section>;
+  }
+
   if (activeSurvey && inventory) {
     const { device, existing, provider } = activeSurvey;
 
@@ -587,17 +645,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             <Icon name="add" className="dashboard-action-icon" />
             <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
           </button>
-          {current?.combinations && (
-            <button
-              type="button"
-              className="secondary compact"
-              disabled={busy || devices.length < 2}
-              onClick={() => openOverlay(overlayHref(combinationNewPath))}
-            >
-              <Icon name="add" className="dashboard-action-icon" />
-              <span>{t(MSG.COMBINE_DEVICES)}</span>
-            </button>
-          )}
           <button className="secondary compact" disabled={!ready || busy} aria-label={t(MSG.REFRESH_LIST)} title={t(MSG.REFRESH_LIST)} onClick={() => setRevision(value => value + 1)}>
             <Icon name="refresh-list" className="dashboard-action-icon" />
             <span>{t(MSG.REFRESH_LIST)}</span>
@@ -670,20 +717,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           onChoose={(device, route) => choose({ kind: 'device', device, route, combinedParent: combined })}
           onEdit={() => openOverlay(overlayHref(`/combined-devices/${combined.id}/edit`))}
           onClose={() => closeOverlay()}
-        />
-      )}
-      {((combined && combinedEdit) || (combinedNew && current?.combinations)) && (
-        <CombinedDeviceSettings
-          api={api}
-          key={combined?.id ?? 'new'}
-          existing={combined}
-          devices={devices}
-          rooms={inventory?.rooms ?? []}
-          initialRoom={Number(room) || null}
-          deviceRoom={(device) => placementOf(device)?.room_id ?? null}
-          onClose={() => closeOverlay()}
-          onSaved={(saved) => saveCombination(saved)}
-          onAuthError={onAuthError}
         />
       )}
       {selected?.kind === 'device' && selected.route === 'local' && detailDevice?.local && (

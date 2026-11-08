@@ -63,10 +63,11 @@ export function createAppRouter() {
     screenRoute(devicePattern, 'control'),
     screenRoute(quickPattern, 'control'),
     screenRoute(groupPattern, 'control'),
-    screenRoute(combinationNewPath, 'control'),
+    screenRoute(appPaths['combined-devices'], 'combined-devices'),
+    screenRoute(combinationNewPath, 'combined-devices'),
     screenRoute(combinationPattern, 'control'),
     screenRoute(combinationQuickPattern, 'control'),
-    screenRoute(combinationEditPattern, 'control'),
+    screenRoute(combinationEditPattern, 'combined-devices'),
     screenRoute(dashboardToolsPath, 'control'),
     screenRoute(appPaths.settings, 'settings'),
     ...(!demo ? [
@@ -306,7 +307,18 @@ function AppContent() {
           </button>
           {menuOpen && (
           <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>
-            {([['control', t(MSG.CONTROL)], ['network', t(MSG.NETWORK_AND_PACKETS)], ['local-connections', t(MSG.LOCAL_CONNECTIONS)], ['settings', t(MSG.SETTINGS)], ['connections', t(MSG.CONNECTIONS)]] as const).filter(([key]) => !demo || key === 'control' || key === 'settings').map(([key, label]) => <button key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>{label}</button>)}
+            {([
+              ['control', t(MSG.CONTROL)],
+              ['combined-devices', t(MSG.COMBINED_DEVICES)],
+              ['network', t(MSG.NETWORK_AND_PACKETS)],
+              ['local-connections', t(MSG.LOCAL_CONNECTIONS)],
+              ['settings', t(MSG.SETTINGS)],
+              ['connections', t(MSG.CONNECTIONS)],
+            ] as const).filter(([key]) => !demo || key === 'control' || key === 'settings').map(([key, label]) => (
+              <button type="button" key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>
+                {label}
+              </button>
+            ))}
             {view === 'control' && status && (
             <button className="secondary dashboard-tools-menu" disabled={locked} aria-expanded={dashboardPanel === 'tools'} onClick={() => {
           changeDashboardPanel(dashboardPanel === 'tools' ? null : 'tools');
@@ -424,6 +436,7 @@ function AppContent() {
         network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
         'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
         control: controlCenter,
+          'combined-devices': controlCenter,
       } satisfies Record<View, ReactNode> }}
         />
         <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">

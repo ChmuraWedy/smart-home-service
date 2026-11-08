@@ -3,6 +3,7 @@ import { deviceHref, readDeviceLink } from './device-links';
 
 export const appPaths = {
   control: '/',
+  'combined-devices': '/combined-devices',
   settings: '/settings',
   connections: '/settings/connections',
   network: '/network',
@@ -11,8 +12,8 @@ export const appPaths = {
 
 export const dashboardToolsPath = '/settings/dashboard';
 export const roomPattern = '/rooms/:roomId';
-export const combinationNewPath = '/combined-devices/new';
-export const combinationPattern = '/combined-devices/:combinedId';
+export const combinationNewPath = `${appPaths['combined-devices']}/new`;
+export const combinationPattern = `${appPaths['combined-devices']}/:combinedId`;
 export const combinationQuickPattern = `${combinationPattern}/quick`;
 export const combinationEditPattern = `${combinationPattern}/edit`;
 export const groupPattern = '/groups/:groupId';
