@@ -95,6 +95,7 @@ function MemberControls({
           onAuthError={onAuthError}
           channelChildren={channelChildren}
           powerSide={powerSide}
+          inlineMemberName={Boolean(sourceLabel) && !quick}
         />
       ) : (
         <>

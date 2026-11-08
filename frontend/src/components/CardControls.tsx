@@ -90,6 +90,7 @@ export type MemberPower = 'on' | 'off' | 'mixed' | 'unknown';
 type EmbeddedControls = {
   embeddedQuick?: boolean;
   powerSide?: PowerSide;
+  inlineMemberName?: boolean;
   onPower?: (power: MemberPower) => void;
   channelChildren?: ReadonlyMap<string, ReactNode>;
 };
@@ -172,7 +173,7 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
 
 function StandardCardControls({
   api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy,
-  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren, powerSide,
+  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName,
 }: EmbeddedControls & {
   api: HomeApi; tuyaApi?: HomeApi; name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[];
   reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean;
@@ -225,6 +226,16 @@ function StandardCardControls({
 )}
     </span>
   ) : undefined;
+  const inlineName = inlineMemberName && powerLayout === 'single' && !channelChildren?.size;
+  const renderSummary = inlineName ? (power: boolean | null) => {
+    const powerLabel = power ? MSG.ON : MSG.OFF;
+    return (
+      <span className="combined-member-inline">
+        <span className="combined-member-inline-name" title={name} aria-hidden="true">{name}</span>
+        {summary ? summary(power) : <span className="combined-member-inline-state">{t(power === null ? MSG.NO_DATA : powerLabel)}</span>}
+      </span>
+    );
+  } : summary;
   const sensors = specs.filter(spec => spec !== brightness && spec !== temperature && sensorReading(spec));
   const disabled = paused || busy || !readOK || sending || (!!summary && !online);
   const unplaced = unplacedChannelChildren(channelChildren, powers);
@@ -244,7 +255,7 @@ function StandardCardControls({
       powerIcon={powerLayout === 'single'
         ? <DeviceIcon category={category} codes={specs.map((item) => item.key)} />
         : <ParameterIcon code={spec.key} />}
-      powerSummary={showSummary && summary ? (power) => summary(online ? power : null) : undefined}
+      powerSummary={showSummary && renderSummary ? (power) => renderSummary(online ? power : null) : undefined}
       disabled={disabled}
       onSend={(value) => toggle(spec, value)}
       aliasEditor={spec.aliases?.length ? (
@@ -335,7 +346,7 @@ function StandardCardControls({
 }
 
 function CloudCardControls({
-  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower, channelChildren, powerSide,
+  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
@@ -407,12 +418,13 @@ function CloudCardControls({
         onPower={onPower}
         channelChildren={channelChildren}
         powerSide={powerSide}
+        inlineMemberName={inlineMemberName}
       />
     );
 }
 
 function LocalCardControls({
-  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren, powerSide,
+  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName,
 }: CardProps & { visible: boolean }) {
   const item = device.local!;
   const dispatch = useAppDispatch();
@@ -452,6 +464,7 @@ function LocalCardControls({
       onPower={onPower}
       channelChildren={channelChildren}
       powerSide={powerSide}
+      inlineMemberName={inlineMemberName}
       {...commands}
     />
   );

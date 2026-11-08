@@ -182,7 +182,12 @@ describe('combined devices', () => {
     const lamp = within(draftCard.getByRole('region', { name: bulbs[0].name }));
     const lampPower = await lamp.findByRole('switch');
     expect(lampPower).toBeDisabled();
-    expect(lampPower.closest('.capability-row')).toHaveAttribute('data-power-side', 'start');
+    const lampRow = lampPower.closest('.capability-row');
+    expect(lampRow).toHaveAttribute('data-power-side', 'start');
+    const inline = lampRow?.querySelector('.combined-member-inline');
+    expect(inline).toHaveTextContent(bulbs[0].name);
+    expect(inline).toHaveTextContent('Brightness');
+    expect(inline).toHaveTextContent('Color');
     await user.click(power);
     expect(writes).toHaveLength(0);
 
