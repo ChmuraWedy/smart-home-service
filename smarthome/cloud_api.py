@@ -296,6 +296,7 @@ def devices(
     from .cloud_scope import scope_for
     from .device_aliases import aliases_for_devices
     from .device_translations import cloud_translations
+    from .topology import discover_device_placements
 
     response.headers["Cache-Control"] = "no-store"
     bridge = cloud_bridge(request, provider)
@@ -308,6 +309,7 @@ def devices(
         if rows:
             scope = scope_for(bridge, provider)
             ids = [row["id"] for row in rows]
+            placements = discover_device_placements(session, bridge, scope, ids) if provider == "sharing" else {}
             aliases = aliases_for_devices(session, scope, ids)
             cloud_translations(session, scope, rows, aliases)
             overrides = {
@@ -325,6 +327,9 @@ def devices(
                 row["aliases"] = aliases[row["id"]]
                 if device.id in overrides:
                     row["app_room"] = overrides[device.id]
+                if device.id in placements:
+                    placement = placements[device.id]
+                    row["synced_room"] = {"room_id": placement["room_id"], "building_id": placement["building_id"]}
                 functions, ranges = row["functions"], safe_status_ranges(device)
                 for spec in functions + ranges:
                     if (device.id, spec["code"]) in labels:

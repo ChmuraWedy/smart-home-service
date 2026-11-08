@@ -109,6 +109,24 @@ describe('Smart Life topology', () => {
     expect(calls.filter(call => call.method === 'POST')).toHaveLength(1);
   });
 
+  it('starts room sync from the room editor and shows the imported room', async () => {
+    vi.useFakeTimers();
+    const calls = server({ empty: true });
+    setup();
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    fireEvent.click(screen.getByRole('button', { name: /Выбрать комнату/ }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Комнаты' })).getByRole('button', { name: 'Редактировать комнаты' }));
+    const editor = within(screen.getByRole('dialog', { name: 'Редактировать комнаты' }));
+    expect(calls.every(call => call.method === 'GET')).toBe(true);
+    const syncRooms = editor.getByRole('button', { name: 'Синхронизировать комнаты из Smart Life' });
+    await act(async () => { fireEvent.click(syncRooms); });
+    expect(syncRooms).toBeDisabled();
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(syncRooms).toBeEnabled();
+    expect(editor.getByRole('button', { name: 'Переименовать «Кухня»' })).toBeInTheDocument();
+    expect(calls.filter(call => call.method === 'POST')).toEqual([{ path: '/api/v1/cloud/topology/sync', method: 'POST' }]);
+  });
+
   it('hides topology immediately when the account disconnects and does not poll the old account', async () => {
     vi.useFakeTimers(); const calls = server(); const view = setup();
     await act(() => vi.advanceTimersByTimeAsync(0));

@@ -2322,7 +2322,7 @@
       "count": 2
     },
     "arrow-parens": {
-      "count": 4
+      "count": 3
     },
     "consistent-return": {
       "count": 1
@@ -2340,7 +2340,7 @@
       "count": 2
     },
     "object-curly-newline": {
-      "count": 8
+      "count": 6
     },
     "one-var": {
       "count": 2

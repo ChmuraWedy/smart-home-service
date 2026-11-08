@@ -32,6 +32,7 @@ class CloudBridge:
         self.manager = None
         self.next_inventory_refresh = 0.0
         self.next_light_refresh = {}
+        self.next_room_lookup = {}
         self.state = SharingState(self, mq_factory)
         if settings.cloud_enabled and self.path.exists():
             if self.path.is_symlink():
@@ -270,6 +271,7 @@ class CloudBridge:
                 ) from None
             self.state.stop()
             self.next_light_refresh.clear()
+            self.next_room_lookup.clear()
             self.manager = None
             self.pending.clear()
             return {"connected": True, "tokens_stored_on_server": True}
@@ -377,6 +379,7 @@ class CloudBridge:
         with self.lock:
             self.state.stop()
             self.next_light_refresh.clear()
+            self.next_room_lookup.clear()
 
     def send_commands(self, id, commands):
         self.device(id)
@@ -430,6 +433,7 @@ class CloudBridge:
             # Local deletion only. SDK unload() can revoke the shared HA terminal remotely.
             self.state.stop()
             self.next_light_refresh.clear()
+            self.next_room_lookup.clear()
             if self.auth is not None:
                 self.state.stored("clear")
             self.auth, self.saved_user_code, self.manager, self.pending = None, None, None, {}

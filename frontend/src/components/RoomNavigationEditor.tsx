@@ -6,9 +6,22 @@ import {
 } from 'react';
 import { ensureDashboardBrowserId } from '../dashboard-layout';
 import type { RoomNavigationEntry, RoomNavigationLayout } from '../dashboard-layout';
-import type { HomeApi, Room } from '../home-api';
+import type { Building, HomeApi, Room } from '../home-api';
 import { MSG, t } from '../i18n';
 import { Icon } from './ui/icon';
+import { NameForm, removeRoomOrExplain, useRoomAction } from './RoomEditor';
+
+export type RoomManagement = {
+  buildings: Building[];
+  onSaved: (room: Room) => void;
+  onDeleted: (id: number) => void;
+  onAuthError: () => void;
+  sync?: {
+    run: () => Promise<void>; busy: boolean; error?: string | null; emptyRoomsAvailable: boolean;
+  };
+};
+
+type EditAction = { kind: 'create' } | { kind: 'rename' | 'delete'; roomId: number };
 
 export function orderRooms(rooms: Room[], saved: RoomNavigationEntry[]) {
   const byId = new Map(rooms.map((room) => [room.id, room]));
@@ -21,22 +34,35 @@ export function orderRooms(rooms: Room[], saved: RoomNavigationEntry[]) {
 }
 
 export default function RoomNavigationEditor({
-  api, rooms, layout, onClose, onSave,
+  api, rooms, layout, onClose, onSave, management,
 }: {
   api: HomeApi;
   rooms: Room[];
   layout: RoomNavigationLayout;
   onClose: () => void;
   onSave: (layout: RoomNavigationLayout) => void;
+  management?: RoomManagement;
 }) {
   const [draft, setDraft] = useState(() => layout.rooms);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [action, setAction] = useState<EditAction>();
+  const {
+    busy, error, run, setError,
+  } = useRoomAction(management?.onAuthError);
   const request = useRef<AbortController | null>(null);
+  const actionPanel = useRef<HTMLDivElement>(null);
   const ordered = orderRooms(rooms, draft);
   const hidden = new Set(draft.filter((entry) => entry.hidden).map(({ id }) => id));
+  const syncing = management?.sync;
+  const locked = busy || saving || Boolean(syncing?.busy);
 
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (!action) return;
+    actionPanel.current?.scrollIntoView?.({ block: 'nearest' });
+    actionPanel.current?.querySelector<HTMLElement>('input, button')?.focus({ preventScroll: true });
+  }, [action]);
 
   function move(index: number, direction: -1 | 1) {
     const destination = index + direction;
@@ -52,12 +78,47 @@ export default function RoomNavigationEditor({
     })));
   }
 
+  function edit(next?: EditAction) {
+    setError('');
+    setAction(next);
+  }
+
+  const create = useCallback(async (name: string, buildingId: number) => {
+    if (!management) return;
+    await run(async () => {
+      management.onSaved(await api.createRoom(name, buildingId));
+      setAction(undefined);
+    });
+  }, [api, management, run]);
+
+  const rename = useCallback(async (name: string) => {
+    if (!management || action?.kind !== 'rename') return;
+    await run(async () => {
+      management.onSaved(await api.renameRoom(action.roomId, name));
+      setAction(undefined);
+    });
+  }, [action, api, management, run]);
+
+  async function remove(id: number) {
+    if (!management) return;
+    await run(async () => {
+      await removeRoomOrExplain(api, id);
+      setDraft((previous) => previous.filter((room) => room.id !== id));
+      management.onDeleted(id);
+      setAction(undefined);
+    });
+  }
+
+  function cancelAction() {
+    edit();
+  }
+
   const close = useCallback(() => {
-    if (!request.current) onClose();
-  }, [onClose]);
+    if (!request.current && !busy) onClose();
+  }, [busy, onClose]);
 
   async function save() {
-    if (request.current) return;
+    if (request.current || busy || action) return;
     const controller = new AbortController();
     request.current = controller;
     setSaving(true);
@@ -83,50 +144,145 @@ export default function RoomNavigationEditor({
       <DialogBackdrop className="room-picker-backdrop" />
       <DialogPanel className="room-picker-panel">
         <header className="room-picker-heading">
-          <DialogTitle as="h2">{t(MSG.EDIT_ROOM_NAVIGATION)}</DialogTitle>
+          <DialogTitle as="h2">{t(MSG.EDIT_ROOMS)}</DialogTitle>
         </header>
         <p className="help room-navigation-editor-help">{t(MSG.ROOM_NAVIGATION_LAYOUT_HELP)}</p>
-        <ol className="room-picker-list">
-          {ordered.map(({ id, name }, index) => (
-            <li className="room-navigation-editor-row" key={id} data-room-hidden={hidden.has(id) || undefined}>
-              <span>{name}</span>
-              <button
-                type="button"
-                className="secondary"
-                aria-label={t(MSG.COMBINED_MOVE_MEMBER_UP, [name])}
-                disabled={saving || index === 0}
-                onClick={() => move(index, -1)}
-              >
-                <Icon name="chevron-down" className="tw:rotate-180" />
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                aria-label={t(MSG.COMBINED_MOVE_MEMBER_DOWN, [name])}
-                disabled={saving || index === ordered.length - 1}
-                onClick={() => move(index, 1)}
-              >
-                <Icon name="chevron-down" />
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                aria-label={t(MSG.ROOM_NAVIGATION_VISIBILITY, [name])}
-                aria-pressed={!hidden.has(id)}
-                disabled={saving}
-                onClick={() => toggleVisibility(id)}
-              >
-                <Icon name={hidden.has(id) ? 'eye-off' : 'eye'} />
-              </button>
-            </li>
-          ))}
-        </ol>
+        <div className="room-picker-list room-navigation-editor-body">
+          <ol className="room-navigation-editor-list">
+            {ordered.map(({ id, name }, index) => (
+              <li className="room-navigation-editor-row" key={id} data-room-hidden={hidden.has(id) || undefined} data-manage={Boolean(management) || undefined}>
+                <span>{name}</span>
+                {management && (
+                  <button
+                    type="button"
+                    className="secondary room-navigation-rename"
+                    aria-label={t(MSG.ROOM_RENAME_NAMED, [name])}
+                    title={t(MSG.ROOM_RENAME_NAMED, [name])}
+                    disabled={locked}
+                    onClick={() => edit({ kind: 'rename', roomId: id })}
+                  >
+                    <Icon name="edit" />
+                  </button>
+                )}
+                <div className="room-navigation-order">
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-label={t(MSG.COMBINED_MOVE_MEMBER_UP, [name])}
+                    disabled={locked || index === 0}
+                    onClick={() => move(index, -1)}
+                  >
+                    <Icon name="chevron-down" className="tw:rotate-180" />
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-label={t(MSG.COMBINED_MOVE_MEMBER_DOWN, [name])}
+                    disabled={locked || index === ordered.length - 1}
+                    onClick={() => move(index, 1)}
+                  >
+                    <Icon name="chevron-down" />
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-label={t(MSG.ROOM_NAVIGATION_VISIBILITY, [name])}
+                    aria-pressed={!hidden.has(id)}
+                    disabled={locked}
+                    onClick={() => toggleVisibility(id)}
+                  >
+                    <Icon name={hidden.has(id) ? 'eye-off' : 'eye'} />
+                  </button>
+                </div>
+                {management && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-label={t(MSG.ROOM_DELETE_NAMED, [name])}
+                    title={t(MSG.ROOM_DELETE_NAMED, [name])}
+                    disabled={locked}
+                    onClick={() => edit({ kind: 'delete', roomId: id })}
+                  >
+                    <Icon name="delete" />
+                  </button>
+                )}
+                {action?.kind === 'rename' && action.roomId === id && (
+                  <div className="room-navigation-room-action" ref={actionPanel}>
+                    <NameForm
+                      title={t(MSG.ROOM_RENAME)}
+                      initial={name}
+                      submitLabel={t(MSG.ROOM_RENAME)}
+                      busy={locked}
+                      onSave={rename}
+                    />
+                    <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>
+                      {t(MSG.CANCEL)}
+                    </button>
+                  </div>
+                )}
+                {action?.kind === 'delete' && action.roomId === id && (
+                  <div className="room-navigation-room-action" role="group" aria-label={t(MSG.ROOM_DELETE_NAMED, [name])} ref={actionPanel}>
+                    <p>{t(MSG.ROOM_DELETE_CONFIRM, [name])}</p>
+                    <p className="help">{t(MSG.ROOM_DELETE_SYNC_HINT)}</p>
+                    <div className="room-navigation-editor-actions">
+                      <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>{t(MSG.CANCEL)}</button>
+                      <button type="button" disabled={locked} onClick={() => remove(id)}>{t(MSG.ROOM_DELETE)}</button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ol>
+          {management && action?.kind === 'create' && (
+            <div className="room-navigation-room-action" ref={actionPanel}>
+              <NameForm
+                title={t(MSG.ROOM_CREATE)}
+                submitLabel={t(MSG.ROOM_CREATE)}
+                buildings={management.buildings}
+                busy={locked}
+                onSave={create}
+              />
+              <button type="button" className="secondary" disabled={locked} onClick={cancelAction}>{t(MSG.CANCEL)}</button>
+            </div>
+          )}
+        </div>
+        {error && <p className="field-error" role="alert">{error}</p>}
         {failed && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
+        {syncing?.error && <p className="field-error" role="alert">{syncing.error}</p>}
+        {syncing?.busy && <p className="help" role="status">{t(MSG.SYNCHRONIZATION_RUNS_IN_THE_BACKGROUND)}</p>}
+        {syncing && !syncing.busy && !syncing.emptyRoomsAvailable && (
+          <p className="help room-navigation-editor-help">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
+        )}
+        <div className="room-navigation-catalog-actions">
+          {management && action?.kind !== 'create' && (
+            <button
+              type="button"
+              className="secondary room-navigation-new-room"
+              disabled={locked || !management.buildings.length}
+              title={management.buildings.length ? undefined : t(MSG.ROOM_EDITOR_NEEDS_BUILDING)}
+              onClick={() => edit({ kind: 'create' })}
+            >
+              <Icon name="add" />
+              {t(MSG.ROOM_NEW)}
+            </button>
+          )}
+          {syncing && (
+            <button
+              type="button"
+              className="secondary room-navigation-new-room"
+              disabled={locked || Boolean(action)}
+              onClick={syncing.run}
+            >
+              <Icon name="refresh-list" />
+              {t(MSG.ROOM_SYNC_SMART_LIFE)}
+            </button>
+          )}
+        </div>
         <footer className="room-navigation-editor-actions">
-          <button type="button" className="secondary" disabled={saving} onClick={close}>
+          <button type="button" className="secondary" disabled={busy || saving} onClick={close}>
             {t(MSG.CANCEL)}
           </button>
-          <button type="button" disabled={saving} onClick={save}>
+          <button type="button" disabled={locked || Boolean(action)} onClick={save}>
             {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
           </button>
         </footer>

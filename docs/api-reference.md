@@ -112,7 +112,9 @@ Read or replace the layout as `{"slots":[null,"device-physical-id","group-2"]}`.
 
 `POST /cloud/topology/sync` starts a background job; `GET /cloud/topology` returns the saved topology and progress. Refreshes preserve manual names, aliases, and placement. Automatically placed devices follow later cloud moves until placement is changed manually. Existing dependency constraints still apply; skipped moves appear as warnings.
 
-A failed sync or account change does not partially replace the previous snapshot. Cache and jobs are account-scoped. Empty rooms cannot initially be discovered through this SDK; missing cloud entries do not automatically delete known rooms. This process does not change keys, IPs, capabilities, or Smart Life itself. Limits are 2,000 devices, 100 homes, and five minutes per job.
+A failed sync or account change does not partially replace the previous snapshot. Cache and jobs are account-scoped. Sharing discovers rooms through device assignments. A connected Tuya Developer project with access to the same homes can also provide the full room list, including empty rooms. Missing cloud entries do not automatically delete known rooms. This process does not change keys, IPs, capabilities, or Smart Life itself. Limits are 2,000 devices, 100 homes, and five minutes per job.
+
+Device discovery uses existing room mappings and leaves unmatched devices under **No room**. Explicit room sync imports the rooms returned by Tuya, including rooms deleted locally, and refreshes device placement. App room assignments take precedence.
 
 ## Find, verify, and save local connections
 

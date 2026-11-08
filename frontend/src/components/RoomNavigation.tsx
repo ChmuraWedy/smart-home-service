@@ -11,6 +11,7 @@ import type { HomeApi, Room } from '../home-api';
 import { MSG, t } from '../i18n';
 import { Icon } from './ui/icon';
 import RoomNavigationEditor, { orderRooms } from './RoomNavigationEditor';
+import type { RoomManagement } from './RoomNavigationEditor';
 
 type RoomIcon = ComponentProps<typeof Icon>['name'];
 type RoomChoice = { id: string; label: string; icon: RoomIcon };
@@ -107,13 +108,14 @@ function roomChoice(room: Room): RoomChoice {
 }
 
 export default function RoomNavigation({
-  api, allRooms, rooms, selected, onSelect,
+  api, allRooms, rooms, selected, onSelect, management,
 }: {
   api: HomeApi;
   allRooms: Room[] | undefined;
   rooms: Room[];
   selected: string;
   onSelect: (id: string) => void;
+  management?: RoomManagement;
 }) {
   const [open, setOpen] = useState(false);
   const [editingApi, setEditingApi] = useState<HomeApi>();
@@ -158,7 +160,7 @@ export default function RoomNavigation({
   const current = selectedRoom ? roomChoice(selectedRoom) : options.find((option) => option.id === selected);
   const currentName = current?.label ?? t(MSG.ROOMS);
   const moreActive = options.some((choice) => choice.id === selected) && !quick.some((choice) => choice.id === selected);
-  const editLabel = t(readFailed ? MSG.RETRY_DASHBOARD_LAYOUT : MSG.EDIT_ROOM_NAVIGATION);
+  const editLabel = t(readFailed ? MSG.RETRY_DASHBOARD_LAYOUT : MSG.EDIT_ROOMS);
 
   function openEditor() {
     if (readFailed) {
@@ -188,6 +190,17 @@ export default function RoomNavigation({
     onSelect(id);
   }, [onSelect]);
 
+  function roomDeleted(id: number) {
+    setRead((value) => {
+      if (value?.api !== api || !value.layout) return value;
+      return { api, layout: { rooms: value.layout.rooms.filter((room) => room.id !== id) } };
+    });
+    management?.onDeleted(id);
+    if (selected === String(id)) onSelect('');
+  }
+
+  const editorManagement = management && { ...management, onDeleted: roomDeleted };
+
   return (
     <>
       <div className="room-navigation-selection">
@@ -211,6 +224,7 @@ export default function RoomNavigation({
           layout={layout}
           onClose={closeEditor}
           onSave={applyLayout}
+          management={editorManagement}
         />
       )}
       <nav className="room-navigation-bar" aria-label={t(MSG.ROOMS)}>
@@ -245,7 +259,7 @@ export default function RoomNavigation({
           <header className="room-picker-heading">
             <DialogTitle as="h2">{t(MSG.ROOMS)}</DialogTitle>
             <div className="room-picker-actions">
-              {Boolean(allRooms?.length) && (
+              {(management || Boolean(allRooms?.length)) && (
                 <button
                   type="button"
                   className="secondary room-picker-action"

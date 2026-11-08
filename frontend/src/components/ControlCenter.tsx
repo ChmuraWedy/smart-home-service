@@ -232,10 +232,13 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const [appearanceRevision, setAppearanceRevision] = useState(0);
   const roomAppearance = useRoomAppearance(api, activeRoom?.id, appearanceRevision)?.value;
   const refreshRoomAppearance = useCallback(() => setAppearanceRevision((value) => value + 1), []);
-  const updateRoomName = useCallback((updated: Room) => {
+  const updateRoom = useCallback((updated: Room) => {
     setRecord((value) => {
       if (value?.api !== api || value.mask !== mask || !value.inventory) return value;
-      const rooms = value.inventory.rooms.map((item) => (item.id === updated.id ? updated : item));
+      const existing = value.inventory.rooms;
+      const rooms = existing.some((item) => item.id === updated.id)
+        ? existing.map((item) => (item.id === updated.id ? updated : item))
+        : [...existing, updated];
       return { ...value, inventory: { ...value.inventory, rooms } };
     });
   }, [api, mask]);
@@ -289,10 +292,20 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   }
 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
+  function roomDeleted(id: number) {
+    setRecord((value) => {
+      if (value?.api !== api || value.mask !== mask || !value.inventory) return value;
+      const rooms = value.inventory.rooms.filter((item) => item.id !== id);
+      return { ...value, inventory: { ...value.inventory, rooms } };
+    });
+    topology.reload();
+    setRevision((value) => value + 1);
+  }
   const placements = useMemo(() => new Map(topology.data?.placements.map(item => [item.device_id, item])), [topology.data]);
   const placementOf = useCallback((device: UnifiedDevice) => {
     if (device.local) return device.local;
-    const synced = placements.get(device.id);
+    const listed = device.cloud.sharing?.synced_room;
+    const synced = placements.get(device.id) ?? (listed && { ...listed, device_id: device.id });
     const override = device.cloud.sharing?.app_room ?? device.cloud.developer?.app_room;
     return override ? { ...override, device_id: device.id, building_id: override.building_id ?? synced?.building_id ?? null } : synced;
   }, [placements]);
@@ -807,7 +820,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           api={api}
           room={activeRoom}
           onAuthError={onAuthError}
-          onRenamed={updateRoomName}
+          onRenamed={updateRoom}
           onAppearanceSaved={refreshRoomAppearance}
         />
       );
@@ -905,6 +918,18 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
                 rooms={filteredRooms}
                 selected={room}
                 onSelect={selectRoom}
+                management={inventory && import.meta.env.MODE !== 'demo' ? {
+                  buildings: inventory.buildings,
+                  onSaved: updateRoom,
+                  onDeleted: roomDeleted,
+                  onAuthError,
+                  sync: sharingReady ? {
+                    run: topology.sync,
+                    busy: topology.busy,
+                    error: topology.error || topology.data?.job.message,
+                    emptyRoomsAvailable: Boolean(topology.data?.empty_rooms_available),
+                  } : undefined,
+                } : undefined}
               />
             )}
             roomAction={roomAction}

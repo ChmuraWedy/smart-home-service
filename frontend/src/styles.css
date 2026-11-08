@@ -1399,13 +1399,27 @@ button.room-navigation-trigger {
 }
 .room-picker-list .room-choice .ui-icon { @apply tw:size-6; }
 .room-navigation-editor-help { @apply tw:m-0 tw:px-2; }
+.room-navigation-editor-body { @apply tw:min-h-0; }
+.room-navigation-editor-list { @apply tw:m-0 tw:grid tw:list-none tw:gap-1 tw:p-0; }
 .room-navigation-editor-row {
-  @apply tw:grid tw:grid-cols-[minmax(0,1fr)_auto_auto_auto] tw:items-center tw:gap-1 tw:rounded-lg tw:ps-2;
+  @apply tw:grid tw:grid-cols-[minmax(0,1fr)_auto] tw:items-center tw:gap-1 tw:rounded-lg tw:ps-2;
 }
+.room-navigation-editor-row[data-manage] { @apply tw:grid-cols-[minmax(0,1fr)_auto_auto_auto]; }
 .room-navigation-editor-row > span { @apply tw:wrap-anywhere; }
 .room-navigation-editor-row[data-room-hidden] { @apply tw:bg-(--surface-soft) tw:text-(--muted); }
-.room-navigation-editor-row > button { @apply tw:grid tw:size-11 tw:place-items-center tw:p-0; }
+.room-navigation-order { @apply tw:flex tw:justify-end tw:gap-1; }
+.room-navigation-editor-row > button,
+.room-navigation-order > button { @apply tw:grid tw:size-11 tw:place-items-center tw:p-0; }
 .room-navigation-editor-row .ui-icon { @apply tw:size-5; }
+.room-navigation-room-action {
+  @apply tw:col-span-full tw:my-1 tw:rounded-lg tw:border tw:border-(--border) tw:bg-(--surface) tw:p-3;
+}
+.room-navigation-room-action .room-editor-form { @apply tw:mt-0; }
+.room-navigation-room-action > p:first-child { @apply tw:mt-0; }
+.room-navigation-catalog-actions { @apply tw:flex tw:shrink-0 tw:flex-wrap tw:gap-2; }
+.room-navigation-catalog-actions:empty { @apply tw:hidden; }
+.room-navigation-new-room { @apply tw:inline-flex tw:min-h-11 tw:items-center tw:gap-2; }
+.room-navigation-new-room .ui-icon { @apply tw:size-5; }
 .room-navigation-editor-actions { @apply tw:flex tw:shrink-0 tw:justify-end tw:gap-2 tw:pt-2; }
 .room-choice-check { @apply tw:text-(--success); }
 @media (max-width:760px), (pointer:coarse) {
@@ -1424,6 +1438,9 @@ button.room-navigation-trigger {
   }
   .room-picker-list .room-choice { @apply tw:min-h-[60px] tw:text-lg; }
   .room-picker-action { @apply tw:size-14; }
+  .room-navigation-editor-row[data-manage] { @apply tw:grid-cols-[minmax(0,1fr)_auto_auto]; }
+  .room-navigation-editor-row[data-manage] > span { @apply tw:col-span-2; }
+  .room-navigation-editor-row[data-manage] .room-navigation-order { @apply tw:col-span-2; }
 }
 .dashboard-view .dashboard-device {
   --dashboard-card-inset:12px;

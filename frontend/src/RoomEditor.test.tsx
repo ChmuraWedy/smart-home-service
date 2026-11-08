@@ -38,7 +38,7 @@ function fixture(initialBuildings: Building[], initialRooms: Room[], devices: Lo
     }
     if (path === '/rooms') {
       if (method === 'POST') {
-        const result = { ...kitchen, ...JSON.parse(String(init?.body)) };
+        const result = { ...kitchen, id: Math.max(0, ...rooms.map(item => item.id)) + 1, ...JSON.parse(String(init?.body)) };
         rooms = [...rooms, result];
         return json(result, 201);
       }
@@ -46,6 +46,7 @@ function fixture(initialBuildings: Building[], initialRooms: Room[], devices: Lo
     }
     if (path === '/devices') return json(devices);
     if (path === '/groups' || path === '/combined-devices') return json([]);
+    if (path.endsWith('/room-navigation')) return json({ rooms: [] });
     if (path.startsWith('/dashboard-layouts/')) return json({ slots: [] });
     const match = /^\/rooms\/(\d+)(?:\/(appearance|background))?$/.exec(path);
     if (!match) return json({ detail: 'Not found' }, 404);
@@ -112,6 +113,43 @@ it('creates a first building and room, renames it, and preserves it after a bloc
   enableDelete();
   await user.click(screen.getByRole('button', { name: 'Delete room' }));
   expect(await screen.findByRole('form', { name: 'Create room' })).toBeInTheDocument();
+});
+
+it('creates, renames, and confirms deletion from the room picker and keeps No room available', async () => {
+  const { changes, enableDelete } = fixture([building], [kitchen, bedroom]);
+  const user = userEvent.setup();
+  openApp('/rooms/2');
+  await user.click(await screen.findByRole('button', { name: 'Change room, current room is Bedroom' }));
+  const picker = within(await screen.findByRole('dialog', { name: 'Rooms' }));
+  const edit = picker.getByRole('button', { name: 'Edit rooms' });
+  await waitFor(() => expect(edit).toBeEnabled());
+  await user.click(edit);
+  const dialog = await screen.findByRole('dialog', { name: 'Edit rooms' });
+  const editor = within(dialog);
+  expect(editor.queryByRole('button', { name: 'Delete No room' })).not.toBeInTheDocument();
+  await user.click(editor.getByRole('button', { name: 'New room' }));
+  const create = within(editor.getByRole('form', { name: 'Create room' }));
+  fireEvent.change(create.getByLabelText('Name'), { target: { value: 'Workshop' } });
+  await user.click(create.getByRole('button', { name: 'Create room' }));
+  await user.click(await editor.findByRole('button', { name: 'Rename Workshop' }));
+  const rename = within(editor.getByRole('form', { name: 'Rename room' }));
+  fireEvent.change(rename.getByLabelText('Name'), { target: { value: 'Studio' } });
+  await user.click(rename.getByRole('button', { name: 'Rename room' }));
+  expect(await editor.findByRole('button', { name: 'Delete Studio' })).toBeEnabled();
+
+  await user.click(editor.getByRole('button', { name: 'Delete Bedroom' }));
+  const confirm = within(editor.getByRole('group', { name: 'Delete Bedroom' }));
+  expect(confirm.getByText(/Devices assigned to this room in Smart Life will appear under No room/)).toBeInTheDocument();
+  expect(changes).not.toContain('DELETE /rooms/2');
+  enableDelete();
+  await user.click(confirm.getByRole('button', { name: 'Delete room' }));
+  await waitFor(() => expect(window.location.pathname).toBe('/'));
+  await user.click(editor.getByRole('button', { name: 'Cancel' }));
+  const updated = within(await screen.findByRole('dialog', { name: 'Rooms' }));
+  expect(updated.getByRole('button', { name: 'Studio' })).toBeInTheDocument();
+  expect(updated.queryByRole('button', { name: 'Bedroom' })).not.toBeInTheDocument();
+  expect(updated.getByRole('button', { name: 'No room' })).toBeInTheDocument();
+  expect(changes).toEqual(['POST /rooms', 'PATCH /rooms/3', 'DELETE /rooms/2']);
 });
 
 it('edits the name and appearance inline without clearing a grid draft', async () => {

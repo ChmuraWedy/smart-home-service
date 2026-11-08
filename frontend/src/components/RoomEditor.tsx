@@ -18,7 +18,7 @@ function failureMessage(failure: unknown) {
   return failure instanceof Error ? translateText(failure.message) : t(MSG.COULD_NOT_COMPLETE_THE_ACTION);
 }
 
-function NameForm({
+export function NameForm({
   title, initial = '', submitLabel, buildings, busy, onSave,
 }: {
   title: string;
@@ -173,7 +173,7 @@ function RoomAppearanceForm({
   );
 }
 
-function useRoomAction(onAuthError: () => void) {
+export function useRoomAction(onAuthError?: () => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const run: RunAction = useCallback(async (work) => {
@@ -183,7 +183,7 @@ function useRoomAction(onAuthError: () => void) {
     try {
       await work();
     } catch (failure) {
-      if (failure instanceof ApiError && failure.status === 401) onAuthError();
+      if (failure instanceof ApiError && failure.status === 401 && onAuthError) onAuthError();
       else setError(failureMessage(failure));
     } finally {
       setBusy(false);
@@ -193,6 +193,15 @@ function useRoomAction(onAuthError: () => void) {
   return {
     busy, error, run, setError,
   };
+}
+
+export async function removeRoomOrExplain(api: HomeApi, id: number) {
+  try {
+    await api.deleteRoom(id);
+  } catch (failure) {
+    if (failure instanceof ApiError && failure.status === 409) throw new Error(t(MSG.ROOM_DELETE_BLOCKED));
+    throw failure;
+  }
 }
 
 function RoomNameAndAppearance({
@@ -320,12 +329,7 @@ export default function RoomEditor({
   async function removeRoom() {
     if (!data || !selected) return;
     await run(async () => {
-      try {
-        await api.deleteRoom(selected.id);
-      } catch (failure) {
-        if (failure instanceof ApiError && failure.status === 409) throw new Error(t(MSG.ROOM_DELETE_BLOCKED));
-        throw failure;
-      }
+      await removeRoomOrExplain(api, selected.id);
       setCatalog({ api, data: { ...data, rooms: data.rooms.filter((item) => item.id !== selected.id) } });
       setSelectedId(undefined);
       setConfirmDelete(false);
