@@ -4,6 +4,7 @@ import { deviceHref, readDeviceLink } from './device-links';
 export const appPaths = {
   control: '/',
   settings: '/settings',
+  rooms: '/settings/rooms',
   connections: '/settings/connections',
   network: '/network',
   'local-connections': '/local-connections',

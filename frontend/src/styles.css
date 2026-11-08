@@ -1398,6 +1398,29 @@ button.header-icon:hover:enabled { background:var(--hover); }
   padding-inline:var(--dashboard-card-inset);
 }
 .dashboard-view .dashboard-device[data-unavailable] { @apply tw:bg-(--surface-soft); }
+.dashboard-view .control-center[data-room-background] {
+  --room-background-tint:color-mix(in srgb,var(--page-bg) 40%,transparent);
+  @apply tw:rounded-xl tw:bg-cover tw:bg-center tw:p-3;
+  background-image:linear-gradient(var(--room-background-tint),var(--room-background-tint)),var(--room-background-image);
+}
+.control-center[data-room-background] :is(.room-navigation-heading, .dashboard-intro) {
+  @apply tw:w-fit tw:rounded-lg tw:bg-(--surface) tw:px-2 tw:py-1;
+}
+.dashboard-view .control-center[data-room-appearance] .dashboard-device {
+  background-color:color-mix(in srgb,var(--surface) var(--room-card-opacity),transparent);
+}
+.dashboard-view .control-center[data-room-appearance] .dashboard-device[data-unavailable] {
+  background-color:color-mix(in srgb,var(--surface-soft) var(--room-card-opacity),transparent);
+}
+.room-editor { @apply tw:mx-auto tw:w-full tw:max-w-[680px]; }
+.room-editor .card-heading { @apply tw:flex-wrap; }
+.room-editor-actions { @apply tw:flex tw:flex-wrap tw:items-center tw:gap-3; }
+.room-editor-actions select { @apply tw:min-w-0 tw:flex-1; }
+.room-editor-form, .room-appearance-settings { @apply tw:my-4 tw:grid tw:gap-2; }
+.room-editor-form button, .room-appearance-settings button { @apply tw:w-fit; }
+.room-appearance-settings { @apply tw:border-y tw:border-(--border) tw:py-4; }
+.room-appearance-settings :is(h2,p) { @apply tw:m-0; }
+.room-background-preview { @apply tw:max-h-60 tw:w-full tw:rounded-lg tw:object-cover; }
 .dashboard-device[data-unavailable] .card-primary-controls { @apply tw:grayscale; }
 .dashboard-card-header {
   @apply tw:grid tw:grid-cols-[28px_minmax(0,1fr)_auto] tw:items-center tw:gap-x-2;

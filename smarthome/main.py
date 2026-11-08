@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from .db import init_db, make_engine
 from .importer import import_tinytuya
 from .models import (
     Building,
+    DashboardLayout,
     Device,
     DeviceType,
     Room,
@@ -202,6 +203,8 @@ def edit_room(item_id: EntityRef, body: RoomPatch, session: Session = Depends(ge
 def delete_room(item_id: EntityRef, session: Session = Depends(get_session)):
     item = get_by_ref(session, Room, item_id)
     assert_empty(session, Device, Device.room_id == item.id)
+    # The persisted layout view is building/room/columns/page.
+    session.execute(delete(DashboardLayout).where(DashboardLayout.view.like(f"%/{item.id}/%/%")))
     session.delete(item)
     commit(session)
     return Response(status_code=204)
@@ -665,6 +668,10 @@ def create_app(settings: Settings | None = None, controller=None):
     from .dashboard_layout_api import router as dashboard_layout_router
 
     app.include_router(dashboard_layout_router)
+
+    from .room_appearance import router as room_appearance_router
+
+    app.include_router(room_appearance_router)
     from .light_presets import router as light_presets_router
 
     app.include_router(light_presets_router)

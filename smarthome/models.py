@@ -1,6 +1,15 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -155,6 +164,14 @@ class Room(AliasOwner, Base):
         lazy="selectin",
         order_by="RoomAlias.alias",
     )
+
+
+class RoomAppearance(Base):
+    __tablename__ = "room_appearances"
+    room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    card_opacity: Mapped[int] = mapped_column(default=100)
+    background_version: Mapped[str | None] = mapped_column(String(64))
+    background: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
 
 
 class DeviceType(Base):

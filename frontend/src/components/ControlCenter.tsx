@@ -24,9 +24,9 @@ import { CardDetailsButton, DashboardCardHeader } from './DashboardCardHeader';
 import DashboardCardFooter from './DashboardCardFooter';
 import DashboardGrid from './DashboardGrid';
 import type { GridCardPlacement } from './DashboardGrid';
-import type { MouseEvent } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
-import { dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery } from '../navigation';
+import { appPaths, dashboardHref, dashboardRoom, groupPattern, quickPattern, withQuery } from '../navigation';
 import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
 import { readLocalDevice } from '../local-device-cache';
@@ -35,6 +35,7 @@ import { cacheDeviceMetadata, cloudMetadataKey, labelsFromCloudDefinitions, loca
 import { useLocalDeviceState } from '../use-local-device-state';
 import { useDeviceText } from '../device-translations';
 import type { DeviceTranslations } from '../device-translations';
+import { useRoomAppearance } from '../room-appearance';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
 type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice };
@@ -180,6 +181,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const query = new URLSearchParams(location.search);
   const building = query.get('building') ?? '';
   const room = dashboardRoom(location.pathname, query);
+  const activeRoomId = inventory?.rooms.find(({ id }) => String(id) === room)?.id;
+  const roomAppearance = useRoomAppearance(api, activeRoomId)?.value;
   const search = query.get('q') ?? '';
   const requestedPage = Number(query.get('page') ?? 1);
   const deviceLink = readDeviceLink(location.pathname + location.search);
@@ -195,6 +198,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   function setBuilding(value: string) {
     if (value) query.set('building', value); else query.delete('building');
     selectRoom('', query);
+  }
+  function openRoomEditor() {
+    const params = new URLSearchParams();
+    if (activeRoomId) params.set('room', String(activeRoomId));
+    navigate(withQuery(appPaths.rooms, params));
   }
   function setSearch(value: string) {
     if (value) query.set('q', value); else query.delete('q');
@@ -466,7 +474,16 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     );
   }
   return (
-    <section className="card control-center" aria-labelledby="control-center-heading">
+    <section
+      className="card control-center"
+      aria-labelledby="control-center-heading"
+      data-room-appearance={Boolean(roomAppearance) || undefined}
+      data-room-background={Boolean(roomAppearance?.backgroundUrl) || undefined}
+      style={roomAppearance && {
+        '--room-card-opacity': `${roomAppearance.appearance.card_opacity}%`,
+        '--room-background-image': roomAppearance.backgroundUrl ? `url("${roomAppearance.backgroundUrl}")` : undefined,
+      } as CSSProperties | undefined}
+    >
       <div className="card-heading">
         <div>
           <p className="eyebrow">{t(MSG.YOUR_HOME)}</p>
@@ -475,6 +492,18 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           </h2>
         </div>
         <div className="survey-toolbar dashboard-actions">
+          {import.meta.env.MODE !== 'demo' && (
+            <button
+              type="button"
+              className="secondary compact"
+              aria-label={t(MSG.ROOM_EDITOR_TITLE)}
+              title={t(MSG.ROOM_EDITOR_TITLE)}
+              onClick={openRoomEditor}
+            >
+              <Icon name="room" className="dashboard-action-icon" />
+              <span>{t(MSG.ROOM_EDITOR_TITLE)}</span>
+            </button>
+          )}
           <button className="secondary compact" disabled={!inventory || busy} aria-label={t(MSG.SET_UP_LOCAL_DEVICE)} title={t(MSG.SET_UP_LOCAL_DEVICE)} onClick={() => choose({ kind: 'survey' })}>
             <Icon name="add" className="dashboard-action-icon" />
             <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>

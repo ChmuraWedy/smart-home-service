@@ -63,9 +63,6 @@
     "quotes": {
       "count": 11
     },
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    },
     "react/button-has-type": {
       "count": 8
     },
@@ -83,9 +80,6 @@
     },
     "react/jsx-max-props-per-line": {
       "count": 5
-    },
-    "react/jsx-no-bind": {
-      "count": 3
     },
     "react/jsx-no-useless-fragment": {
       "count": 1
@@ -2214,7 +2208,7 @@
       "count": 58
     },
     "lines-between-class-members": {
-      "count": 17
+      "count": 16
     },
     "no-await-in-loop": {
       "count": 1

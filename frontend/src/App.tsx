@@ -1,5 +1,5 @@
 import { MSG, t, useLocale, translateText } from "./i18n";
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Provider as StoreProvider } from 'react-redux';
 import { createBrowserRouter, createHashRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext } from 'react-router';
@@ -16,6 +16,7 @@ import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
+import RoomEditor from './components/RoomEditor';
 import { Icon, IconGlyph } from './components/ui/icon';
 import { appPaths, dashboardHref, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomPattern } from './navigation';
 import type { DashboardPanel } from './navigation';
@@ -63,6 +64,7 @@ export function createAppRouter() {
     screenRoute(dashboardToolsPath, 'control'),
     screenRoute(appPaths.settings, 'settings'),
     ...(!demo ? [
+      screenRoute(appPaths.rooms, 'rooms'),
       screenRoute(appPaths.connections, 'connections'),
       screenRoute(appPaths.network, 'network'),
       screenRoute(appPaths['local-connections'], 'local-connections'),
@@ -125,13 +127,13 @@ function AppContent() {
     }
   }, [location, matched.id, needsAccess, navigate]);
 
-  function invalidateConnection() {
+  const invalidateConnection = useCallback(() => {
     const next = { ...connection, token: '' };
     try { saveConnection(next); } catch { /* Still invalidate the in-memory token. */ }
     verified.current = next;
     setConnection(next); setStatus(null); setQR(null);
     setLocalConnectionLocked(false);
-  }
+  }, [connection]);
 
   useEffect(() => {
     if (!connection.token || verified.current === connection) return;
@@ -150,7 +152,7 @@ function AppContent() {
       if (error instanceof ApiError && error.status === 401) invalidateConnection();
     });
     return () => { active = false; controller.abort(); };
-  }, [api, connection]);
+  }, [api, connection, invalidateConnection]);
 
   useEffect(() => {
     if (!qr) return;
@@ -417,6 +419,7 @@ function AppContent() {
         network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
         'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
         control: controlCenter,
+          rooms: <RoomEditor api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
       } satisfies Record<View, ReactNode> }}
         />
         <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">
