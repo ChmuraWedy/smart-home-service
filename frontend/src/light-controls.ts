@@ -3,7 +3,7 @@ import { supportsSimpleScenes } from './light-scenes';
 
 export default function lightControls(specs: ControlSpec[], singlePower: boolean) {
   const available = singlePower ? specs : [];
-  const brightness = available.find((spec) => spec.readable && spec.kind === 'number' && spec.unit === '%'
+  const brightness = available.find((spec) => spec.readable && spec.kind === 'number'
     && /^(brightness|bright_value(?:_v2)?)$/.test(spec.key));
   const temperature = available.find((spec) => spec.readable && spec.kind === 'number'
     && /^(temp_value(?:_v2)?|color_temperature)$/.test(spec.key));
