@@ -6,6 +6,7 @@ import {
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
 import { localSpec } from '../controls';
+import { resolveCombinedMember } from '../combined-power';
 import { deviceAliases, deviceRoutes, deviceTextVariants, matchesDevice, mergeDevices, routeLabel } from '../devices';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import { HomeApi } from '../home-api';
@@ -404,10 +405,9 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   }, [api, inventory, cloud, identity]);
   const resolvedMembers = useMemo(() => {
     const byId = new Map(devices.map((device) => [device.id, device]));
-    return new Map(combinations.map((combined) => [combined.id, combined.members.map((member) => {
-      const device = byId.get(member.device_id);
-      return { member, device: member.accessible && device && deviceRoutes(device).includes(member.route) ? device : undefined };
-    })]));
+    return new Map(combinations.map(({ id, members }) => [
+      id, members.map((member) => resolveCombinedMember(member, byId.get(member.device_id))),
+    ]));
   }, [combinations, devices]);
   const combined = combinations.find((item) => String(item.id) === combinedId);
   const combinedParent = combinations.find((item) => String(item.id) === query.get('combined')
@@ -481,7 +481,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     const roomBuilding = (id: number | null) => inventory?.rooms.find((item) => item.id === id)?.building_id;
     const combinedInRoom = combinations.filter((item) => inRoom(item.room_id)
       && (!building || String(roomBuilding(item.room_id)) === building)
-      && (!localOnly || item.members.some((member) => member.route === 'local')));
+      && (!localOnly || resolvedMembers.get(item.id)?.some(({ member }) => member.route === 'local')));
     const displayed = combinedInRoom.filter((item) => item.name.normalize('NFC').toLocaleLowerCase().includes(needle)
       || item.aliases?.some((alias) => alias.toLocaleLowerCase().includes(needle))
       || resolvedMembers.get(item.id)?.some(({ device }) => device && matchesDevice(device, needle)));
