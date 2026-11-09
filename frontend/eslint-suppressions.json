@@ -1594,7 +1594,7 @@
       "count": 6
     },
     "curly": {
-      "count": 2
+      "count": 1
     },
     "indent": {
       "count": 7
@@ -1633,7 +1633,7 @@
       "count": 5
     },
     "react/button-has-type": {
-      "count": 4
+      "count": 3
     },
     "react/jsx-first-prop-new-line": {
       "count": 1
@@ -2005,7 +2005,7 @@
       "count": 58
     },
     "lines-between-class-members": {
-      "count": 15
+      "count": 14
     },
     "no-await-in-loop": {
       "count": 1

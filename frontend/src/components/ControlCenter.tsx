@@ -988,6 +988,13 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           routes={deviceRoutes(detailDevice)}
           onAuthError={onAuthError}
           onSetup={inventory && !api.isMember ? () => setupDetailDevice() : undefined}
+          onMappingsSaved={(updated) => {
+            setRecord((previous) => {
+              if (previous?.api !== api || !previous.inventory) return previous;
+              const local = previous.inventory.devices.map((device) => (device.id === updated.id ? updated : device));
+              return { ...previous, inventory: { ...previous.inventory, devices: local } };
+            });
+          }}
           closeLabel={detailCloseLabel}
           onClose={close}
         />

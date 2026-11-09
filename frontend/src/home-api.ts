@@ -10,6 +10,7 @@ import type { DashboardLayout, RoomNavigationLayout } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
 export type Capability = {
+  dp?: string; 'read_dp'?: string | null;
   type: 'boolean' | 'integer' | 'number' | 'string' | 'object';
   readable: boolean; writable: boolean; minimum?: number | null; maximum?: number | null;
   step?: number | null; enum?: JsonValue[] | null; unit?: string | null; encoding?: string;
@@ -74,7 +75,7 @@ export type ConnectionFinding = {
   requested_device_id: string; connection_device_id: string; route: 'direct' | 'gateway';
   device: { device_id: string; existing_id: number | null; name: string; aliases: string[];
     building_id: number | null; room_id: number | null; ip: string; version: string;
-    changed_fields: ('ip' | 'version' | 'local_key')[]; is_gateway: boolean };
+    changed_fields: ('ip' | 'version' | 'local_key')[]; is_gateway: boolean; 'timer_mappings'?: string[] };
 };
 export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; verified: true;
   key_source: 'device' | 'child'; interface_address: string };
@@ -257,6 +258,11 @@ export class HomeApi extends CloudApi {
   }
 
   device(id: number, signal?: AbortSignal) { return this.request<LocalDevice>(`/devices/${id}`, 'GET', undefined, signal); }
+
+  editLocalMapping(id: number, name: string, expected: Capability, mapping: Capability) {
+    return this.request<LocalDevice>(`/commissioning/devices/${id}/mappings/${encodeURIComponent(name)}`, 'PATCH', { expected, mapping });
+  }
+
   state(id: number, refresh = false, signal?: AbortSignal, watch = false) {
     return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60${watch ? "&watch=true" : ""}`, 'GET', undefined, signal);
   }

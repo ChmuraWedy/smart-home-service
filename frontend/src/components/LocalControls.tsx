@@ -13,6 +13,7 @@ import { localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import DeviceInformation from './DeviceInformation';
+import LocalDeviceMappings from './LocalDeviceMappings';
 import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import DeviceTranslationEditor from './DeviceTranslationEditor';
@@ -22,13 +23,15 @@ import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 
 export function LocalControl({
-  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup, roomEditor,
+  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup, roomEditor, onMappingsSaved,
 }: {
   api: HomeApi; device: LocalDevice; gateway?: LocalDevice; cloudDevice?: CloudDevice; routes?: DeviceRoute[];
   onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
   roomEditor?: ReactNode;
+  onMappingsSaved?: (device: LocalDevice) => void;
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
+  const [savedMappings, setSavedMappings] = useState<LocalDevice>();
   const dispatch = useAppDispatch();
   const metadataKey = localMetadataKey(api, device.id);
   const identity = useAppSelector(state => state.deviceMetadata.devices[metadataKey]);
@@ -41,9 +44,12 @@ export function LocalControl({
       dispatch(readLocalDevice(api, device.id, refresh, signal, document.visibilityState !== 'hidden')),
     ]);
     if (metadata.id !== device.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
-    if (!signal?.aborted) dispatch(cacheDeviceMetadata([{
-      key: metadataKey, revision, name: metadata.name, aliases: metadata.aliases, translations: metadata.translations,
-    }]));
+    if (!signal?.aborted) {
+      setSavedMappings(undefined);
+      dispatch(cacheDeviceMetadata([{
+        key: metadataKey, revision, name: metadata.name, aliases: metadata.aliases, translations: metadata.translations,
+      }]));
+    }
     return { metadata, state };
   }, [api, device.id, dispatch, metadataKey]);
   const poll = useCallback(async (current: {metadata: LocalDevice; state: DeviceState}, signal: AbortSignal) => {
@@ -52,7 +58,7 @@ export function LocalControl({
   }, [api, device.id, dispatch]);
   const session = useControlSession(load, onAuthError, poll), now = useClock();
   const state = cached ?? session.data?.state;
-  const item = session.data?.metadata || device;
+  const item = savedMappings ?? session.data?.metadata ?? device;
   const originalName = identity?.name?.value ?? item.name;
   const translations = identity?.translations?.value ?? item.translations;
   const name = localize(originalName, translationFor(translations, 'name', originalName));
@@ -65,6 +71,11 @@ export function LocalControl({
   }), !session.busy && !aliasBusy && session.readOK && !!state?.enabled);
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
+  const applySavedMappings = useCallback((updated: LocalDevice) => {
+    setSavedMappings(updated);
+    onMappingsSaved?.(updated);
+  }, [onMappingsSaved]);
+
   return (
     <ControlDialog onRefresh={session.refresh}
       information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />}
@@ -98,10 +109,7 @@ export function LocalControl({
       {session.data && !Object.keys(item.capabilities).length && (
       <div className="saved-summary">
         {item.is_gateway ? <p>{t(MSG.THE_GATEWAY_IS_CONFIGURED_FOR_LOCAL_CHILD_DEVICE)}</p> : (
-          <>
-            <p>{t(MSG.MAP_LOCAL_PARAMETERS_AFTER_SAVING)}</p>
-            {onSetup && <button disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>{t(MSG.SET_UP_FUNCTIONS)}</button>}
-          </>
+          <p>{t(MSG.MAP_LOCAL_PARAMETERS_AFTER_SAVING)}</p>
     )}
       </div>
 )}
@@ -129,6 +137,16 @@ export function LocalControl({
         gateway={gateway}
         onAuthError={onAuthError}
       />
+      )}
+      {!api.isMember && !item.is_gateway && (
+        <LocalDeviceMappings
+          api={api}
+          device={item}
+          disabled={session.busy || aliasBusy}
+          onSetup={onSetup}
+          onSaved={applySavedMappings}
+          onAuthError={onAuthError}
+        />
       )}
       <ControlFeedback busy={session.busy} notice={session.notice} />
     </ControlDialog>

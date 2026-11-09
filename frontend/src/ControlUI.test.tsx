@@ -409,6 +409,45 @@ describe('cloud device control', () => {
 });
 
 describe('local device and group controls', () => {
+  it('lists and edits the saved timer mapping in full local settings', async () => {
+    const timer: Capability = { dp: '7', type: 'integer', readable: true, writable: false, unit: 's' };
+    const device = { ...light, capabilities: { switch: boolean, countdown_1: timer } };
+    localServer({ lamp: device });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const edits: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/api/v1/commissioning/devices/1/mappings/countdown_1' && init?.method === 'PATCH') {
+        const body = JSON.parse(String(init.body));
+        edits.push(body);
+        return json({ ...device, capabilities: { ...device.capabilities, countdown_1: body.mapping } });
+      }
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    const setup = vi.fn();
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} onSetup={setup} />);
+    await screen.findByRole('region', { name: 'Таймер канала 1' });
+    const summary = screen.getByText('Локальные сопоставления и команды');
+    await user.click(summary);
+    const mappings = within(summary.closest('details')!);
+    const edit = mappings.getByRole('button', { name: 'Изменить сопоставление: Таймер канала 1' });
+    await user.click(edit);
+    const form = within(mappings.getByRole('form', { name: 'Таймер канала 1' }));
+    expect(form.getByLabelText('DP')).toHaveValue('7');
+    await user.click(form.getByRole('checkbox', { name: 'Разрешить команды' }));
+    await user.type(form.getByLabelText('Минимальное значение'), '0');
+    await user.type(form.getByLabelText('Максимальное значение'), '86400');
+    await user.type(form.getByLabelText('Шаг'), '1');
+    await user.click(form.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(edits).toEqual([{
+      expected: timer, mapping: { ...timer, writable: true, minimum: 0, maximum: 86400, step: 1 },
+    }]));
+    await waitFor(() => expect(mappings.queryByRole('form')).toBeNull());
+    await user.click(mappings.getByRole('button', { name: 'Настроить функции' }));
+    expect(setup).toHaveBeenCalledOnce();
+  });
+
   it('converts a local brightness percentage back to the mapped units in full settings', async () => {
     const lamp: LocalDevice = {
       ...light,
