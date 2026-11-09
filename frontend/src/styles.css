@@ -1253,7 +1253,7 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
   display:grid; place-items:center; width:44px; height:44px; padding:0;
 }
 .app-icon {
-  display:block; width:28px; height:28px; padding:2px; border-radius:6px; background:#e6f5ee;
+  display:block; width:28px; height:28px;
 }
 .app-menu-panel { position:absolute; top:calc(100% + 10px); left:0; z-index:100; display:grid; gap:6px; min-width:220px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 36px var(--shadow); }
 .app-menu-panel button { text-align:left; }
