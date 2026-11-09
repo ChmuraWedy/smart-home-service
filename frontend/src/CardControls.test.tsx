@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { CloudDevice, CloudFunctions, CloudSnapshot } from './api';
 import { HomeApi } from './home-api';
+import type { LocalDevice } from './home-api';
 import type { ComponentProps } from 'react';
 import { CardControls } from './components/CardControls';
 import { ControlDialog } from './components/DeviceControls';
@@ -447,6 +448,74 @@ describe('main controls on device cards', () => {
     await waitFor(() => expect(power).toBeEnabled());
     expect(calls).toEqual([{path:'http://api.test/api/v1/devices/7/commands/capabilities',body:{values:{switch:true}}}]);
   });
+  it.each([false, true])('shows local bulb levels and keeps settings out of the dashboard footer, embedded=%s', async (embeddedQuick) => {
+    const local: LocalDevice = {
+      id: 7, device_id: 'physical', name: 'Лампа', transport: 'wifi', parent_id: null, cid: null,
+      aliases: [], building_id: null, room_id: null, enabled: true,
+      capabilities: {
+        switch_led: { type: 'boolean', readable: true, writable: true },
+        work_mode: { type: 'string', readable: true, writable: true, enum: ['white', 'colour', 'scene'] },
+        bright_value_v2: { type: 'integer', readable: true, writable: true, minimum: 10, maximum: 1000, step: 1 },
+        temp_value_v2: { type: 'integer', readable: true, writable: false },
+        colour_data_v2: { type: 'object', readable: true, writable: true, encoding: 'tuya_hsv' },
+        countdown_1: { type: 'integer', readable: true, writable: false, unit: 's' },
+        do_not_disturb: { type: 'boolean', readable: true, writable: false },
+        remote_switch: { type: 'boolean', readable: true, writable: false },
+        relay_status: { type: 'string', readable: true, writable: false, enum: ['last'] },
+        switch_backlight: { type: 'boolean', readable: true, writable: false },
+        scene_data_v2: { type: 'string', readable: true, writable: false },
+      },
+    };
+    const values = Object.fromEntries(Object.entries({
+      switch_led: true, work_mode: 'white', bright_value_v2: 469, temp_value_v2: 0,
+      countdown_1: 0, do_not_disturb: false, remote_switch: true, relay_status: 'last', switch_backlight: true, scene_data_v2: 'raw-scene',
+    })
+      .map(([key, value]) => [key, {
+        value, known: true, stale: false, observed_at: new Date().toISOString(),
+      }]));
+    const writes: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(async (_input, init) => {
+      if (init?.method === 'POST') {
+        writes.push(JSON.parse(String(init.body)));
+        return json({ acknowledged: true });
+      }
+      return json({ device_id: local.id, enabled: true, available: true, values });
+    });
+
+    renderWithStore(
+      <CardControls
+        api={new HomeApi(connection)}
+        device={{ id: local.device_id, name: local.name, local, cloud: {} }}
+        route="local"
+        now={Date.now()}
+        paused={false}
+        onAuthError={vi.fn()}
+        onBusy={vi.fn()}
+        embeddedQuick={embeddedQuick}
+        sheet={embeddedQuick ? undefined : { open: true, close: vi.fn(), trigger: { current: null } }}
+      />,
+    );
+
+    const sheet = within(embeddedQuick
+      ? screen.getByRole('group', { name: /Лампа/ })
+      : await screen.findByRole('dialog', { name: local.name }));
+    const brightness = await sheet.findByRole('slider', { name: 'Яркость' });
+    await waitFor(() => expect(brightness).toBeEnabled());
+    expect(brightness).toHaveAttribute('min', '1');
+    expect(brightness).toHaveAttribute('max', '100');
+    expect(brightness).toHaveValue('46.9');
+    expect(sheet.getByText('46.9 %')).toBeInTheDocument();
+    expect(document.querySelector('.card-sensor-values')).toBeNull();
+    expect(sheet.queryByRole('slider', { name: 'Цветовая температура' })).toBeNull();
+    const temperature = within(sheet.getByRole('region', { name: 'Цветовая температура' }));
+    expect(temperature.getByText('0', { exact: true })).toBeInTheDocument();
+    expect(temperature.getByText('Только чтение')).toBeInTheDocument();
+    expect(sheet.getByRole('button', { name: 'Сцена' })).toBeDisabled();
+    fireEvent.change(brightness, { target: { value: '52.5' } });
+    fireEvent.pointerUp(brightness);
+    await waitFor(() => expect(writes).toEqual([{ values: { bright_value_v2: 525 } }]));
+  });
+
   it('shows sensor values with accessible labels and no settings editors', async () => {
     const sensorDefinitions:CloudFunctions={device_id:'lamp',functions:[{code:'temp_unit_convert',type:'Enum',values:{range:['c','f']}}],status_range:[{code:'va_temperature',type:'Integer',values:{unit:'℃',scale:1}},{code:'va_humidity',type:'Integer',values:{unit:'%',scale:0}}]};
     mount({...lamp,controls:{ready:true,definitions:sensorDefinitions,snapshot:{...snapshot,status:{va_temperature:225,va_humidity:48}}}});

@@ -382,21 +382,13 @@ input[type=hidden] {
   place-items:center;
   width:44px;
   height:44px;
-  border:1px solid var(--success-border);
-  background:var(--success-bg);
-  color:var(--success);
+  border:0;
+  background:transparent;
   border-radius:12px;
   padding:0;
 }
 
-:is(.brand-icon, .app-menu-button) > .ui-icon {
-  width:28px;
-  height:28px;
-  stroke-linecap:round;
-  stroke-linejoin:round;
-}
-
-.brand-power-mark { stroke:var(--warning); }
+.app-icon { display:block; width:28px; height:28px; }
 
 .brand strong {
   font-size:18px;
@@ -1313,7 +1305,6 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
   .network-filters { grid-template-columns:1fr; }
   .network-toolbar button { min-height:44px; flex:1 1 180px; }
   .app-header { gap:10px; }
-  .app-header .brand-icon { display:none; }
 }
 
 .network-interface { display:flex; align-items:end; gap:12px; margin:16px 0; flex-wrap:wrap; }
@@ -1352,7 +1343,6 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view .app-header { @apply tw:flex-nowrap tw:gap-2 tw:py-3; }
 .dashboard-view .brand { @apply tw:min-w-0; }
 .dashboard-view .brand-tagline,
-.dashboard-view .brand-icon,
 .dashboard-view .app-header > .api-presence { @apply tw:hidden; }
 .dashboard-view .brand .dashboard-connection { @apply tw:flex tw:items-center tw:gap-1.5 tw:text-xs; }
 .dashboard-connection i { @apply tw:size-1.5 tw:shrink-0 tw:rounded-full tw:bg-(--neutral-indicator); }
@@ -1845,6 +1835,13 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-sheet-range input { @apply tw:col-span-full tw:m-0 tw:h-11 tw:w-full tw:cursor-pointer; accent-color:var(--toggle-on); }
 .dashboard-sheet-range-value { color:var(--muted); }
+.dashboard-sheet .capability-number > .capability-row:has(> .reading-meta > .read-only) {
+  grid-template-columns:minmax(0,1fr) auto auto;
+}
+.dashboard-sheet .capability-number .reading-meta:has(> .read-only) {
+  display:flex;
+  grid-column:3;
+}
 .dashboard-sheet-temperature-labels { @apply tw:col-span-full tw:flex tw:justify-between tw:text-xs tw:font-normal tw:text-(--muted); }
 .dashboard-sheet-range input[data-temperature]::-webkit-slider-runnable-track {
   height:8px; border-radius:99px; background:linear-gradient(to right,#ffbf56,#fff4d9,#b8daff);
@@ -1927,7 +1924,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   border-block-start:2px solid var(--combined-branch-color);
 }
 .combined-member:has(> .card-quick-controls > .card-primary-controls > .channel-control .combined-member-inline) {
-  > .combined-member-header { @apply tw:sr-only; }
+  > .combined-member-header { @apply tw:hidden; }
   &::before { content:none; }
 }
 .combined-member-inline {
@@ -1936,6 +1933,24 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-inline-name {
   @apply tw:truncate tw:border-b tw:border-(--border) tw:px-3 tw:py-1 tw:text-xs tw:font-semibold tw:text-(--text-strong);
 }
+button.combined-member-quick-button {
+  display:block;
+  width:100%;
+  min-height:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:none;
+  color:inherit;
+  font:inherit;
+  text-align:start;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.dashboard-power-state-summary > button.combined-member-quick-button { display:flex; }
+button.combined-member-quick-button:hover:enabled,
+button.combined-member-quick-button:active:enabled { background:var(--hover); text-decoration:underline; }
+button.combined-member-quick-button:focus-visible { outline-color:var(--toggle-on); outline-offset:-2px; }
 .combined-member-inline-state { @apply tw:self-center tw:px-3; }
 .dashboard-view {
   @variant narrow-dashboard-controls {

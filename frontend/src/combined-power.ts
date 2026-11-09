@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { shallowEqual } from 'react-redux';
 import { ApiError } from './api';
 import { cloudDeviceCache, cloudDeviceKey, readCloudDevice } from './cloud-device-cache';
 import type combinedLayout from './combined-layout';
@@ -6,7 +7,7 @@ import { isStale } from './controls';
 import type { UnifiedDevice } from './devices';
 import type { CombinedMemberInput, HomeApi } from './home-api';
 import { localDeviceCache, localDeviceKey, readLocalDevice } from './local-device-cache';
-import { useAppDispatch } from './store';
+import { useAppDispatch, useAppSelector } from './store';
 import type { AppDispatch, RootState } from './store';
 
 export type ResolvedMember = { member: CombinedMemberInput; device?: UnifiedDevice };
@@ -56,6 +57,37 @@ export function wiredSupply(state: RootState, api: HomeApi, layout: ReturnType<t
   }
   walk(layout.roots, true);
   return supplies;
+}
+
+// Allow two five-second LAN polls plus time for the browser to read the cache.
+const LOCAL_SUPPLY_EVIDENCE_MS = 15_000;
+
+export function useLocalSupplyEvidence(api: HomeApi, members: ResolvedMember[], supplies: Partial<Record<string, boolean>>, now: number) {
+  const [cutSince, setCutSince] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const cut = members.filter(({ member, device }) => (
+      member.route === 'local' && device?.local && supplies[member.device_id] === false
+    ));
+    const at = Date.now();
+    setCutSince((previous) => {
+      const next = Object.fromEntries(cut.map(({ member }) => (
+        [member.device_id, previous[member.device_id] ?? at]
+      )));
+      return shallowEqual(previous, next) ? previous : next;
+    });
+  }, [members, supplies]);
+
+  return useAppSelector((state) => members.filter(({ member, device }) => {
+    const since = cutSince[member.device_id];
+    if (since === undefined || supplies[member.device_id] !== false || member.route !== 'local') return false;
+    const reading = localReading(state, api, device?.local?.id);
+    return Boolean(reading?.enabled && reading.available && Object.values(reading.values).some((value) => {
+      if (!value.known || value.stale || !value.observed_at) return false;
+      const observed = Date.parse(value.observed_at);
+      return observed > since && now - observed < LOCAL_SUPPLY_EVIDENCE_MS;
+    }));
+  }).map(({ member }) => member.device_id), shallowEqual);
 }
 
 export async function refreshCombinedMember(dispatch: AppDispatch, api: HomeApi, entry: ResolvedMember, signal?: AbortSignal) {

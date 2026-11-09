@@ -15,6 +15,7 @@ import type {
   CloudStatus, Connection, DeveloperCredentials, Provider, RedroidCredentials,
 } from './api';
 import { loadConnection, saveConnection } from './connection';
+import appIcon from './assets/home-power.svg?no-inline';
 import AiChatButton from './components/AiChat';
 import VoiceDemo from './demo/VoiceDemo';
 import { ConnectionSettings } from './components/ConnectionSettings';
@@ -616,7 +617,7 @@ function AppContent() {
               disabled={locked}
               onClick={() => setMenuOpen((value) => !value)}
             >
-              <Icon name="home-power" />
+              <img src={appIcon} alt="" className="app-icon" />
             </button>
             {menuOpen && (
             <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>
@@ -670,7 +671,7 @@ function AppContent() {
         <div className="brand">
           {view === 'setup' && (
             <span className="brand-icon">
-              <Icon name="home-power" />
+              <img src={appIcon} alt="" className="app-icon" />
             </span>
           )}
           <div>
