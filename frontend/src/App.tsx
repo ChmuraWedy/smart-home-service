@@ -558,6 +558,7 @@ function AppContent() {
       className={`app-shell${view === 'control' ? ' dashboard-view' : ''}`}
       data-dashboard-panel={dashboardPanel ?? undefined}
       data-card-size={cardSize}
+      data-setup-view={view === 'setup' ? '' : undefined}
     >
       <header className="app-header">
         {view !== 'setup' && (

@@ -1967,10 +1967,24 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-option input[type="checkbox"] { @apply tw:size-4 tw:shrink-0; }
 .combined-delete p { @apply tw:w-full; }
 
+.app-shell[data-setup-view] {
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+  min-height:100dvh;
+}
+.app-shell[data-setup-view] > footer {
+  margin-block-start:auto;
+  border-top:1px solid var(--border);
+  padding:12px 0 max(12px, env(safe-area-inset-bottom));
+}
 .setup-wizard { width:min(100%, 54rem); margin-inline:auto; }
-.setup-wizard-body { display:grid; gap:1rem; }
+.setup-wizard-body { display:grid; gap:1rem; padding:clamp(1rem, 3vw, 2rem); }
 .setup-wizard-body > h1 { margin:0; }
-.setup-welcome-picture { display:block; max-width:100%; height:auto; margin-inline:auto; }
+.setup-wizard-body[data-step="welcome"] { text-align:center; }
+.setup-wizard-body[data-step="welcome"] > p { max-width:42ch; margin:0 auto; }
+.setup-welcome-picture { display:block; width:min(100%, 30rem); height:auto; margin-inline:auto; border-radius:12px; }
 .setup-initialize { border-top:1px solid var(--border); padding-top:1rem; }
 .setup-created-key input { font-family:monospace; }
 .setup-wizard-actions { justify-content:flex-end; }
+.setup-wizard-body[data-step="welcome"] > .setup-wizard-actions { justify-content:center; }

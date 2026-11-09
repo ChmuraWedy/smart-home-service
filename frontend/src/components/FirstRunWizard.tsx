@@ -2,7 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import type { HomeApi } from '../home-api';
 import { MSG, t } from '../i18n';
-import welcomeHome from '../assets/welcome-home.svg';
+import welcomeHome from '../assets/welcome-home.jpg';
 
 export type SetupStep = 'welcome' | 'access' | 'tuya' | 'devices';
 
@@ -108,7 +108,7 @@ export default function FirstRunWizard(props: Props) {
           </li>
         ))}
       </ol>
-      <div className="card setup-wizard-body">
+      <div className="card setup-wizard-body" data-step={step}>
         <h1 id="setup-heading">{t(steps[index][1])}</h1>
         {step === 'welcome' && (
           <>
@@ -116,8 +116,8 @@ export default function FirstRunWizard(props: Props) {
               className="setup-welcome-picture"
               src={welcomeHome}
               alt=""
-              width="420"
-              height="230"
+              width="960"
+              height="640"
             />
             <p>{t(MSG.SETUP_WELCOME_DESCRIPTION)}</p>
           </>
