@@ -98,8 +98,10 @@ def test_root_and_members_manage_device_keys_without_sharing_other_users(secured
     with TestClient(secured_app) as client:
         status = client.get(API + "/cloud/status", headers=OWNER).json()["account"]
         assert status["needs_name"] and status["login"] == "root"
-        result = client.put(API + "/accounts/owner", headers=OWNER, json={"name": "  Dmitry  "})
+        result = client.put(API + "/accounts/owner", headers=OWNER, json={"name": "  Dmitry  ", "login": "Dmitry"})
         assert result.json()["name"] == "Dmitry" and not result.json()["needs_name"]
+        assert result.json()["login"] == "Dmitry"
+        assert client.post(API + "/accounts", headers=OWNER, json={"name": "Another", "login": "dmitry"}).status_code == 409
         alex = client.post(API + "/accounts", headers=OWNER, json={
             "name": "Alex", "login": "alex", "device_name": "Laptop",
         }).json()
@@ -111,6 +113,7 @@ def test_root_and_members_manage_device_keys_without_sharing_other_users(secured
         assert client.post(login_path, headers=laptop, json={"login": "sam"}).status_code == 401
         assert client.post(login_path, headers=laptop, json={"login": " Alex "}).json()["id"] == alex["id"]
         assert client.put(API + "/accounts/owner", headers=laptop, json={"name": "Alex"}).status_code == 403
+        assert client.put(API + "/accounts/owner", headers=OWNER, json={"name": "Dmitry", "login": "Alex"}).status_code == 409
         keys_path = API + "/accounts/" + alex["id"] + "/keys"
         assert client.get(keys_path, headers=sam_key).status_code == 403
         for headers in (OWNER, laptop):
@@ -138,8 +141,9 @@ def test_root_and_members_manage_device_keys_without_sharing_other_users(secured
         root_path = root_keys + "/" + root_device["id"]
         assert client.get(root_path, headers=laptop).status_code == 403
         device = {"X-API-Key": client.get(root_path, headers=OWNER).json()["access_key"]}
-        root = client.post(login_path, headers=device, json={"login": "root"}).json()
-        assert root["name"] == "Dmitry" and root["role"] == "owner"
+        root = client.post(login_path, headers=device, json={"login": "dmitry"}).json()
+        assert root["login"] == "Dmitry" and root["name"] == "Dmitry" and root["role"] == "owner"
+        assert client.post(login_path, headers=device, json={"login": "root"}).status_code == 200
         assert client.delete(root_path, headers=device).status_code == 204
         assert client.get(API + "/accounts", headers=device).status_code == 401
         assert client.get(API + "/accounts", headers=OWNER).status_code == 200

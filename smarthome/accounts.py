@@ -34,6 +34,10 @@ class NameInput(Schema):
         return name
 
 
+class OwnerName(NameInput):
+    login: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$")
+
+
 class LoginInput(Schema):
     login: str = Field(min_length=1, max_length=40)
 
@@ -134,7 +138,8 @@ def create_member(
     lock_access(session, account)
     member_id = secrets.token_hex(16)
     login = body.login or f"user-{member_id}"
-    if login == ROOT_LOGIN or session.scalar(select(HouseholdMember.id).where(HouseholdMember.login == login)):
+    reserved = {ROOT_LOGIN, owner_account(session).login.casefold()}
+    if login in reserved or session.scalar(select(HouseholdMember.id).where(HouseholdMember.login == login)):
         raise HTTPException(409, "This login is already in use")
     initial, token = new_device_key(request, member_id, member_id, body.device_name or "")
     member = HouseholdMember(id=member_id, name=body.name, login=login, key_digest=initial.key_digest)
@@ -156,7 +161,10 @@ def current_account(response: Response, account: Account = Depends(require_accou
 
 @router.post("/login")
 def verify_login(body: LoginInput, response: Response, account: Account = Depends(require_account)):
-    if body.login.strip().casefold() != account.login:
+    accepted = {account.login.casefold()}
+    if account.role == "owner":
+        accepted.add(ROOT_LOGIN)
+    if body.login.strip().casefold() not in accepted:
         raise HTTPException(401, "Missing or invalid X-API-Key", headers=PRIVATE)
     private(response)
     return account
@@ -164,12 +172,16 @@ def verify_login(body: LoginInput, response: Response, account: Account = Depend
 
 @router.put("/owner")
 def name_owner(
-    body: NameInput, response: Response, account: Account = Depends(require_owner),
+    body: OwnerName, response: Response, account: Account = Depends(require_owner),
     session: Session = Depends(get_session),
 ):
     lock_access(session, account)
-    statement = insert(HouseholdOwner).values(id=OWNER_ID, name=body.name)
-    session.execute(statement.on_conflict_do_update(index_elements=[HouseholdOwner.id], set_={"name": body.name}))
+    login = body.login or owner_account(session).login
+    if session.scalar(select(HouseholdMember.id).where(HouseholdMember.login == login.casefold())):
+        raise HTTPException(409, "This login is already in use")
+    changes = {"name": body.name, "login": login}
+    statement = insert(HouseholdOwner).values(id=OWNER_ID, **changes)
+    session.execute(statement.on_conflict_do_update(index_elements=[HouseholdOwner.id], set_=changes))
     commit(session)
     private(response)
     return owner_account(session, account.key_id)

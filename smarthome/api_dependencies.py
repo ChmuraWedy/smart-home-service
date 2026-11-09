@@ -65,7 +65,9 @@ class Account:
 
 def owner_account(session: Session, key_id: str | None = None) -> Account:
     profile = session.get(HouseholdOwner, OWNER_ID)
-    return Account(OWNER_ID, profile.name if profile else "Owner", "owner", ROOT_LOGIN, key_id, profile is None)
+    if profile is None:
+        return Account(OWNER_ID, "Owner", "owner", ROOT_LOGIN, key_id, True)
+    return Account(OWNER_ID, profile.name, "owner", profile.login, key_id)
 
 
 def get_session(request: Request):

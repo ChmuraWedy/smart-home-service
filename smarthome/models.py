@@ -53,6 +53,7 @@ class HouseholdOwner(Base):
     __tablename__ = "household_owner"
     id: Mapped[str] = mapped_column(String(16), primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
+    login: Mapped[str] = mapped_column(String(40), server_default="root")
 
 
 class AccountDashboardLayout(Base):

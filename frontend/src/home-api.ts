@@ -132,8 +132,8 @@ export class HomeApi extends CloudApi {
     return this.request<IssuedMember>('/accounts', 'POST', { name, login, device_name: deviceName });
   }
 
-  nameHouseholdOwner(name: string) {
-    return this.request<AccountIdentity>('/accounts/owner', 'PUT', { name });
+  nameHouseholdOwner(name: string, login: string) {
+    return this.request<AccountIdentity>('/accounts/owner', 'PUT', { name, login });
   }
 
   householdDeviceKeys(id: string, signal?: AbortSignal) {

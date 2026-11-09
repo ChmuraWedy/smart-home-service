@@ -181,3 +181,18 @@ def test_migrates_existing_user_keys_to_device_keys_without_changing_their_diges
         ).one()
         assert key == ("a" * 32, "a" * 32, "d" * 64, b"existing-encrypted-key")
     engine.dispose()
+
+
+def test_existing_owner_profile_gets_legacy_login_during_upgrade():
+    engine = db.make_engine(":memory:")
+    db.init_db(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version = 11")
+        connection.exec_driver_sql("DROP TABLE household_owner")
+        connection.exec_driver_sql("CREATE TABLE household_owner (id VARCHAR(16) PRIMARY KEY, name VARCHAR(80))")
+        connection.exec_driver_sql("INSERT INTO household_owner VALUES ('owner', 'Existing owner')")
+    db.init_db(engine)
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT name, login FROM household_owner").one() == ("Existing owner", "root")
+    engine.dispose()

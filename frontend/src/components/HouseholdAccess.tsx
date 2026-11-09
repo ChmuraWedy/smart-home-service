@@ -12,7 +12,7 @@ type Props = {
   api: HomeApi;
   account: AccountIdentity;
   onAuthError: () => void;
-  onNameOwner: (ownerName: string) => Promise<void>;
+  onNameOwner: (ownerName: string, ownerLogin: string) => Promise<void>;
 };
 
 type Revealed = { id: string; token: string };
@@ -31,6 +31,8 @@ export default function HouseholdAccess({
   const [deviceName, setDeviceName] = useState('');
   const [firstDevice, setFirstDevice] = useState('');
   const [ownerName, setOwnerName] = useState('');
+  const [ownerLogin, setOwnerLogin] = useState('');
+  const [editingOwner, setEditingOwner] = useState(false);
   const [revealed, setRevealed] = useState<Revealed>();
   const [removal, setRemoval] = useState<Removal>();
   const [busy, setBusy] = useState(false);
@@ -137,7 +139,19 @@ export default function HouseholdAccess({
 
   function submitOwnerName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (ownerName.trim()) change(() => onNameOwner(ownerName.trim()));
+    if (!ownerName.trim() || !ownerLogin.trim()) return;
+    change(async () => {
+      await onNameOwner(ownerName.trim(), ownerLogin.trim());
+      setEditingOwner(false);
+    });
+  }
+
+  function editOwner() {
+    setOwnerName(account.name);
+    setOwnerLogin(account.login);
+    setRevealed(undefined);
+    setError('');
+    setEditingOwner(true);
   }
 
   function selectUser(id: string) {
@@ -147,10 +161,10 @@ export default function HouseholdAccess({
   }
 
   const alert = error && <p className="field-error" role="alert">{translateText(error)}</p>;
-  if (account.needs_name) {
+  if (account.needs_name || editingOwner) {
     return (
       <section className="card">
-        <h1>{t(MSG.SET_OWNER_NAME)}</h1>
+        <h1>{t(editingOwner ? MSG.EDIT_OWNER : MSG.SET_OWNER_NAME)}</h1>
         <form className="actions" onSubmit={submitOwnerName}>
           <label htmlFor={`${prefix}-owner`}>
             {t(MSG.OWNER_NAME)}
@@ -163,7 +177,22 @@ export default function HouseholdAccess({
               onChange={(event) => setOwnerName(event.target.value)}
             />
           </label>
-          <button type="submit" disabled={busy || !ownerName.trim()}>{t(MSG.SAVE)}</button>
+          <label htmlFor={`${prefix}-owner-login`}>
+            {t(MSG.USER_LOGIN)}
+            <input
+              id={`${prefix}-owner-login`}
+              value={ownerLogin}
+              pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,39}"
+              maxLength={40}
+              required
+              disabled={busy}
+              onChange={(event) => setOwnerLogin(event.target.value)}
+            />
+          </label>
+          <button type="submit" disabled={busy || !ownerName.trim() || !ownerLogin.trim()}>{t(MSG.SAVE)}</button>
+          {editingOwner && (
+            <button type="button" className="secondary" disabled={busy} onClick={() => setEditingOwner(false)}>{t(MSG.CANCEL)}</button>
+          )}
         </form>
         {alert}
       </section>
@@ -173,6 +202,7 @@ export default function HouseholdAccess({
   return (
     <section className="card household-access">
       <h1>{t(root ? MSG.USERS : MSG.MY_DEVICE_KEYS)}</h1>
+      {root && <button type="button" className="secondary compact" disabled={busy} onClick={editOwner}>{t(MSG.EDIT_OWNER)}</button>}
       {root && (
         <form className="actions" onSubmit={createUser}>
           <label htmlFor={`${prefix}-name`}>

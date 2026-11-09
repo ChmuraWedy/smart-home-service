@@ -21,6 +21,7 @@ function mockHousehold(options: { exists?: boolean; needsName?: boolean } = {}) 
   const requests: { path: string; token: string; method: string }[] = [];
   let exists = Boolean(options.exists);
   let ownerName = options.needsName ? '' : 'Dmitry';
+  let ownerLogin = 'root';
   let keys = exists ? [laptop] : [];
   vi.mocked(fetch).mockImplementation(async (input, init) => {
     const { pathname: path } = new URL(String(input));
@@ -30,7 +31,7 @@ function mockHousehold(options: { exists?: boolean; needsName?: boolean } = {}) 
     if (token !== ownerKey && token !== memberKey) return Response.json({}, { status: 401 });
     const owner = token === ownerKey;
     const account = owner
-      ? { id: 'owner', name: ownerName || 'Owner', login: 'root', role: 'owner', needs_name: !ownerName }
+      ? { id: 'owner', name: ownerName || 'Owner', login: ownerLogin, role: 'owner', needs_name: !ownerName }
       : { ...member, role: 'member', key_id: laptop.id };
     if (path === '/api/v1/cloud/status') {
       return Response.json({ account, enabled: false, connected: false, developer: { configured: false, connected: false } });
@@ -39,8 +40,8 @@ function mockHousehold(options: { exists?: boolean; needsName?: boolean } = {}) 
       return JSON.parse(String(init?.body)).login === account.login ? Response.json(account) : Response.json({}, { status: 401 });
     }
     if (path === '/api/v1/accounts/owner' && method === 'PUT' && owner) {
-      ownerName = JSON.parse(String(init?.body)).name;
-      return Response.json({ ...account, name: ownerName, needs_name: false });
+      ({ name: ownerName, login: ownerLogin } = JSON.parse(String(init?.body)));
+      return Response.json({ ...account, name: ownerName, login: ownerLogin, needs_name: false });
     }
     if (path === '/api/v1/accounts' && !owner) return Response.json({}, { status: 403 });
     if (path === '/api/v1/accounts' && method === 'GET') return Response.json(exists ? [member] : []);
@@ -96,9 +97,13 @@ it('asks root for the owner name on first sign-in and shows it in Users', async 
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Set up the owner' })).toBeVisible();
   await user.type(screen.getByLabelText('Owner name'), 'Dmitry');
+  await user.type(screen.getByLabelText('Login'), 'Dmitry');
   await user.click(screen.getByRole('button', { name: 'Save' }));
   expect(await screen.findByRole('heading', { name: 'Device keys for Dmitry' })).toBeVisible();
   expect(window.location.pathname).toBe('/settings/users');
+  expect(screen.getByText('Login Dmitry')).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Edit owner' }));
+  expect(screen.getByLabelText('Login')).toHaveValue('Dmitry');
 });
 
 it('creates a user with a masked device key and reveals a fragment-only sign-in link on demand', async () => {

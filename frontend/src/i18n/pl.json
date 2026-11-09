@@ -1171,5 +1171,6 @@
   "SIGN_IN_LINK": "Link do logowania",
   "SHARE_DEVICE_KEY_PRIVATELY": "Udostępnij link lub klucz prywatnie. Każdy, kto go ma, może się zalogować.",
   "SET_OWNER_NAME": "Skonfiguruj właściciela",
-  "OWNER_NAME": "Nazwa właściciela"
+  "OWNER_NAME": "Nazwa właściciela",
+  "EDIT_OWNER": "Edytuj właściciela"
 }

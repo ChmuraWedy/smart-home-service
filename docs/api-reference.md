@@ -29,14 +29,14 @@ Swagger at `/docs` and the generated `/openapi.json` describe request bodies, li
 
 ## Household access
 
-The existing service key is the root credential. On first sign-in, enter the owner's name. In **Menu → Users**, root can create users, set their login, and issue and revoke a separate key for each device. A user can open **My device keys** to manage their own keys. Keys stay masked until explicitly revealed.
+The existing service key is the root credential. On first sign-in, enter the owner's name and login. In **Menu → Users**, root can create users, set their login, and issue and revoke a separate key for each device. A user can open **My device keys** to manage their own keys. Keys stay masked until explicitly revealed.
 
-Reveal a device key to copy its sign-in link. The login and key travel in the URL fragment, which the browser removes from the address after reading it. The recipient confirms sign-in before the app saves the connection. Each link grants the permissions of its key, so share it privately. Revoking a device key preserves the user's other keys and private dashboard.
+Reveal a device key to copy its sign-in link. The login and key travel in the URL fragment, which the browser removes from the address after reading it. The recipient confirms sign-in before the app saves the connection. Each link grants the permissions of its key, so share it privately. Existing owner links using the original `root` login continue to work. Revoking a device key preserves the user's other keys and private dashboard.
 
 | Endpoint | Access |
 | --- | --- |
 | `GET, POST /api/v1/accounts` | Root. Lists users or creates a user with a login and initial device key. |
-| `PUT /api/v1/accounts/owner` | Root. Saves the owner's display name. |
+| `PUT /api/v1/accounts/owner` | Root. Saves the owner's display name and login. |
 | `POST /api/v1/accounts/login` | Verifies a login against the key supplied in the request header. |
 | `GET, POST /api/v1/accounts/{account_id}/keys` | Root or the account holder. Lists masked key metadata or issues a new key. The root account ID is `owner`. |
 | `GET, DELETE /api/v1/accounts/{account_id}/keys/{key_id}` | Root or the account holder. Reveals or revokes one device key. |

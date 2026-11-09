@@ -92,6 +92,12 @@ def add_device_access_keys(connection: Connection) -> None:
     connection.exec_driver_sql("UPDATE household_members SET sealed_key = NULL WHERE sealed_key IS NOT NULL")
 
 
+def add_owner_login(connection: Connection) -> None:
+    columns = {column[1] for column in connection.exec_driver_sql("PRAGMA table_info(household_owner)")}
+    if "login" not in columns:
+        connection.exec_driver_sql("ALTER TABLE household_owner ADD COLUMN login VARCHAR(40) NOT NULL DEFAULT 'root'")
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
@@ -105,4 +111,5 @@ MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_household_accounts,
     add_recoverable_member_keys,
     add_device_access_keys,
+    add_owner_login,
 )

@@ -282,8 +282,8 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     else if (invitation || nextStatus.account?.role === 'member') navigate(appPaths.control, { replace: true });
   });
 
-  const nameOwner = async (name: string) => {
-    const updated = await api.nameHouseholdOwner(name);
+  const nameOwner = async (name: string, login: string) => {
+    const updated = await api.nameHouseholdOwner(name, login);
     if (currentConnection.current === connection) setStatus((current) => (current ? { ...current, account: updated } : null));
   };
 
