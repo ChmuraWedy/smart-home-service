@@ -115,7 +115,8 @@ export function CardControls(props: CardProps) {
   const cloud = route !== 'local' ? device.cloud[route] : undefined;
   const active = activated || route === 'local' || cloud?.controls?.ready || sheetOpen || embeddedQuick
     || loadWhenPaused || Boolean(channelChildren?.size) || supplyPower !== undefined || previewOnly;
-  const pollingVisible = visible && !paused && supplyPower !== false;
+  // Continue local checks so a confirmed reply can disprove the inferred cutoff.
+  const pollingVisible = visible && !paused && (supplyPower !== false || route === 'local');
   let controls: ReactNode;
   if (!active) {
     controls = <button type="button" className="secondary compact full-width" disabled={paused} onClick={() => setActivated(true)}>{t(MSG.SHOW_STATE)}</button>;

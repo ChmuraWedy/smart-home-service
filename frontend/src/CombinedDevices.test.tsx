@@ -11,6 +11,7 @@ import CombinedDeviceCard from './components/CombinedDeviceCard';
 import { STORAGE_KEY } from './connection';
 import { setDeviceTextMode } from './device-translations';
 import { setLocale } from './i18n';
+import { readLocalDevice } from './local-device-cache';
 import { createAppStore } from './store';
 import { App } from './test/App';
 
@@ -386,6 +387,69 @@ describe('combined devices', () => {
     expect(power).not.toBeChecked();
     expect(bulb).not.toHaveAttribute('data-unavailable');
     expect(refreshes).toHaveLength(1);
+  });
+
+  it('uses fresh LAN readings for a wired lamp that responds with its relay off', async () => {
+    setLocale('en', false);
+    const api = new HomeApi({ baseUrl: 'http://combined.test', token: 'fixture' });
+    const store = createAppStore();
+    const source: LocalDevice = {
+      ...localLamp, id: 8, name: relay.name, device_id: relay.id,
+      capabilities: { switch_1: { type: 'boolean', readable: true, writable: true } },
+    };
+    const members = [source, localLamp].map((device) => ({
+      member: {
+        device_id: device.device_id,
+        route: 'local' as const,
+        power_source: device === localLamp ? { device_id: source.device_id, channel: 'switch_1' } : undefined,
+      },
+      device: { id: device.device_id, name: device.name, local: device, cloud: {} },
+    }));
+    const at = Date.now();
+    let lampObservedAt = at - 1_000;
+    vi.mocked(fetch).mockImplementation(async (input, options) => {
+      expect(options?.method).toBe('GET');
+      const id = Number(new URL(String(input)).pathname.match(/\/devices\/(\d+)\/state$/)?.[1]);
+      const isRelay = id === source.id;
+      return json({
+        device_id: id, enabled: true, available: true,
+        values: {
+          [isRelay ? 'switch_1' : 'switch_led']: {
+            value: !isRelay, known: true, stale: false, observed_at: new Date(isRelay ? at : lampObservedAt).toISOString(),
+          },
+        },
+      });
+    });
+    const card = (now: number) => (
+      <Provider store={store}>
+        <MemoryRouter>
+          <CombinedDeviceCard
+            api={api}
+            combined={{ id: 1, name: 'Wired devices' }}
+            members={members}
+            room={room.name}
+            now={now}
+            onAuthError={vi.fn()}
+          />
+        </MemoryRouter>
+      </Provider>
+    );
+    const view = render(card(at));
+    const lamp = screen.getByRole('region', { name: localLamp.name });
+    const power = await within(lamp).findByRole('switch', { name: 'Power' });
+    await waitFor(() => expect(lamp).toHaveAttribute('data-unavailable'));
+    expect(power).toBeDisabled();
+    expect(power).not.toBeChecked();
+
+    lampObservedAt = Date.now() + 1;
+    await act(async () => { await store.dispatch(readLocalDevice(api, localLamp.id, false, undefined, true)); });
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(power).toBeChecked();
+    expect(lamp).not.toHaveAttribute('data-unavailable');
+
+    view.rerender(card(lampObservedAt + 16_000));
+    expect(lamp).toHaveAttribute('data-unavailable');
+    expect(power).toBeDisabled();
   });
 
   it.each([false, true])('keeps an online camera controllable when its offline socket last reported %s', async (lastPower) => {

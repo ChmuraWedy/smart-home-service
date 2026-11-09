@@ -11,7 +11,7 @@ import { ApiError } from '../api';
 import { labelFor } from '../controls';
 import combinedLayout from '../combined-layout';
 import {
-  memberOnline, refreshCombinedMember, useRestoredWiring, wiredSupply,
+  memberOnline, refreshCombinedMember, useLocalSupplyEvidence, useRestoredWiring, wiredSupply,
 } from '../combined-power';
 import type { ResolvedMember } from '../combined-power';
 import { MSG, t } from '../i18n';
@@ -174,11 +174,12 @@ export default function CombinedDeviceCard({
   const [sendError, setSendError] = useState(false);
   const layout = combinedLayout(members);
   const supplies = useAppSelector((state) => wiredSupply(state, api, layout, now), shallowEqual);
+  const reachableWithRelayOff = useLocalSupplyEvidence(api, members, supplies, now);
   const waiting = useRestoredWiring(api, members, supplies, paused || preview, onAuthError);
   const allOffline = useAppSelector((state) => members.length > 0 && members.every((entry) => !entry.device || memberOnline(state, api, entry) === false));
 
   function suppliedPower(deviceId: string) {
-    if (supplies[deviceId] === false) return false;
+    if (supplies[deviceId] === false && !reachableWithRelayOff.includes(deviceId)) return false;
     if (supplies[deviceId] === true && waiting.has(deviceId)) return null;
     return undefined;
   }
