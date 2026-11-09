@@ -214,15 +214,24 @@ class CloudBridge:
         return item
 
     def qr_svg(self, id):
+        return self._render_qr(id, png=False)
+
+    def qr_png(self, id):
+        return self._render_qr(id, png=True)
+
+    def _render_qr(self, id, *, png):
         self.require_enabled()
         with self.lock:
             item = self._pending(id)
             try:
                 import qrcode
-                from qrcode.image.svg import SvgPathImage
+                if png:
+                    from qrcode.image.pil import PilImage as image_factory
+                else:
+                    from qrcode.image.svg import SvgPathImage as image_factory
             except ImportError:
                 raise HTTPException(503, "Install the cloud extra for QR rendering") from None
-            qr = qrcode.make("tuyaSmart--qrLogin?token=" + item["qr"], image_factory=SvgPathImage)
+            qr = qrcode.make("tuyaSmart--qrLogin?token=" + item["qr"], image_factory=image_factory)
             output = io.BytesIO()
             qr.save(output)
             return output.getvalue()

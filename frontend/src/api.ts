@@ -22,6 +22,7 @@ export type CloudStatus = {
   connected: boolean;
   has_saved_user_code: boolean;
   saved_user_code_requires_login: boolean;
+  redroid_available?: boolean;
   developer: DeveloperStatus;
 };
 export type CodeStatus = Pick<CloudStatus, 'connected' | 'has_saved_user_code' | 'saved_user_code_requires_login'>;
@@ -51,6 +52,7 @@ export type DeveloperCredentials = {
   sample_device_id: string | null;
 };
 export type QRLogin = { session_id: string; qr_url: string; expires_in: number };
+export type RedroidCredentials = { region: string; account: string; password: string };
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type CloudFunction = { code: string; type: string; values: string | Record<string, unknown> | null; dp_id?: number; dp_ids?: number[]; user_label?: string };
 export type CloudFunctions = { device_id: string; functions: CloudFunction[]; status_range?: CloudFunction[] };
@@ -196,6 +198,8 @@ export class CloudApi {
   saveDeveloper(body: DeveloperCredentials) { return this.json<DeveloperStatus>('/developer/credentials', 'PUT', body); }
   connectDeveloper() { return this.json<DeveloperStatus>('/developer/connect', 'POST'); }
   beginQR() { return this.json<QRLogin>('/login/qr', 'POST', {}); }
+  loginRedroid(body: RedroidCredentials) { return this.json<{ screen: 'home' | 'verification' }>('/login/redroid/credentials', 'POST', body); }
+  beginRedroidQR() { return this.json<QRLogin & { scan_submitted: boolean }>('/login/redroid/qr', 'POST'); }
   confirmQR(session: string) { return this.json<{ connected: boolean }>('/login/' + encodeURIComponent(session) + '/confirm', 'POST'); }
   devices(provider: Provider, signal?: AbortSignal) { return this.json<CloudDevice[]>('/devices?refresh=true&provider=' + provider, 'GET', undefined, signal); }
   cameraStream(id: string, provider: Provider, signal?: AbortSignal) {

@@ -1203,5 +1203,18 @@
   "SHARE_DEVICE_KEY_PRIVATELY": "Udostępnij link lub klucz prywatnie. Każdy, kto go ma, może się zalogować.",
   "SET_OWNER_NAME": "Skonfiguruj właściciela",
   "OWNER_NAME": "Nazwa właściciela",
-  "EDIT_OWNER": "Edytuj właściciela"
+  "EDIT_OWNER": "Edytuj właściciela",
+  "SMART_LIFE_COUNTRY_OR_REGION": "Kraj lub region Smart Life",
+  "SMART_LIFE_EMAIL_OR_PHONE": "E-mail lub numer telefonu Smart Life",
+  "SMART_LIFE_PASSWORD": "Hasło Smart Life",
+  "CONNECT_THROUGH_ANDROID": "Połącz przez Androida",
+  "SMART_LIFE_THROUGH_ANDROID": "Smart Life przez Androida",
+  "SMART_LIFE_ANDROID_NOT_CONFIGURED": "Kontroler Smart Life dla Androida jest nieskonfigurowany.",
+  "OPEN_CONNECTIONS_THROUGH_A_LOCALHOST_TUNNEL": "Otwórz Połączenia przez HTTPS lub uruchom to polecenie SSH i otwórz stronę lokalną, aby wpisać hasło.",
+  "OPEN_LOCAL_CONNECTIONS": "Otwórz lokalne Połączenia",
+  "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Zatwierdź dostęp panelu w Smart Life na Androidzie, a następnie potwierdź tutaj. Pozostało sekund: {0}.",
+  "SMART_LIFE_ANDROID_LOGIN_HELP": "Wpisz nazwę kraju wyświetlaną w Smart Life. Panel przekaże hasło do Androida na czas logowania i usunie je po zakończeniu żądania.",
+  "USE_EXISTING_ANDROID_SESSION": "Użyj istniejącej sesji Androida",
+  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Zakończ weryfikację w Smart Life na Androidzie, a następnie wybierz „Użyj istniejącej sesji Androida”.",
+  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Jeśli na Androidzie nie ma prośby o potwierdzenie, zeskanuj kod QR w Smart Life na innym urządzeniu zalogowanym na to samo konto. Pozostało sekund: {0}."
 }
