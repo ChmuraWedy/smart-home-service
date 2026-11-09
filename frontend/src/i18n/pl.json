@@ -1175,5 +1175,6 @@
   "SETUP_REQUIRES_HTTPS": "Pierwsza konfiguracja klucza wymaga HTTPS lub adresu localhost.",
   "SETUP_UNAVAILABLE": "Pierwsza konfiguracja klucza jest niedostępna.",
   "SETUP_INVALID_CODE": "Nieprawidłowy kod konfiguracji.",
+  "SETUP_USE_SERVER_KEY": "Użyj klucza dostępu ustawionego na tym serwerze.",
   "SETUP_REQUIRED": "Dokończ pierwszą konfigurację klucza, aby korzystać z usługi."
 }

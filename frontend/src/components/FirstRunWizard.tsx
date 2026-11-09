@@ -124,6 +124,7 @@ export default function FirstRunWizard(props: Props) {
         )}
         {step === 'access' && (
           <>
+            <p className="muted">{t(MSG.SETUP_USE_SERVER_KEY)}</p>
             {access}
             <InitializeKey api={api} busy={busy} hasAccess={hasAccess} initialize={initialize} />
           </>

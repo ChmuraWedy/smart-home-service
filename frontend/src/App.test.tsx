@@ -329,14 +329,17 @@ describe('cloud UI journeys', () => {
     const backend = fakeApi({ connected: false, redroid_available: true });
     render(<App />);
     const user = userEvent.setup();
+    expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Начать' }));
     expect(window.location.search).toBe('?step=access');
+    expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Адрес API'), { target: { value: BASE } });
     await user.type(screen.getByLabelText('Ключ доступа к сервису'), TOKEN);
     await user.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
     await screen.findByText('Подключение сохранено.');
     await user.click(screen.getByRole('button', { name: 'Далее' }));
+    expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Smart Life / QR' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Smart Life / Android' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
@@ -345,10 +348,12 @@ describe('cloud UI journeys', () => {
     await screen.findByText(/Tuya Developer подключён/);
     await user.click(screen.getByRole('button', { name: 'Далее' }));
     expect(await screen.findByRole('heading', { name: 'Импорт устройств' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
     expect(backend.calls.some(({ path }) => /\/(find|save)$/.test(path))).toBe(false);
     await user.click(screen.getByRole('button', { name: 'Открыть панель' }));
     expect(window.location.pathname).toBe('/');
+    expect(screen.getByRole('button', { name: 'Меню' })).toBeInTheDocument();
   });
 
   it('creates a first key only after the user enters the one-time code', async () => {

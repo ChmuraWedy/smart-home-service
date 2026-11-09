@@ -1175,5 +1175,6 @@
   "SETUP_REQUIRES_HTTPS": "First-time key setup requires HTTPS or localhost.",
   "SETUP_UNAVAILABLE": "First-time key setup is unavailable.",
   "SETUP_INVALID_CODE": "Invalid setup code.",
+  "SETUP_USE_SERVER_KEY": "Use the service access key configured on this server.",
   "SETUP_REQUIRED": "Complete first-time key setup before using the service."
 }

@@ -9,9 +9,6 @@
     "import/prefer-default-export": {
       "count": 1
     },
-    "indent": {
-      "count": 2
-    },
     "jsx-a11y/label-has-associated-control": {
       "count": 1
     },
