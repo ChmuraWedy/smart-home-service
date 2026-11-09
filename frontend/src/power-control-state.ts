@@ -8,7 +8,7 @@ export default function powerControlState({
   draft: string;
   dirty: boolean;
   reading?: Reading;
-  fresh: boolean;
+  fresh?: boolean;
   awaiting: boolean;
   displayPower?: boolean | null;
 }) {
