@@ -112,10 +112,12 @@ it('sends credentials once and waits for Smart Life approval before connecting t
   const backend = fakeApi({ redroid_available: true, connected: false });
   render(<App />);
   const user = userEvent.setup();
-  await user.type(await screen.findByLabelText('Страна или регион Smart Life'), 'Poland');
+  const region = await screen.findByRole('combobox', { name: 'Страна или регион Smart Life' });
+  expect(region).toHaveValue('');
+  await user.selectOptions(region, screen.getByRole('option', { name: 'Польша' }));
   await user.type(screen.getByLabelText('Электронная почта или телефон Smart Life'), 'demo@example.invalid');
   await user.type(screen.getByLabelText('Пароль Smart Life'), 'temporary-password');
-  await user.click(screen.getByRole('button', { name: 'Подключиться через Android' }));
+  await user.click(screen.getByRole('button', { name: 'Подключить аккаунт SmartLife' }));
   await screen.findByText(/Smart Life готов подтвердить доступ/);
   const posts = () => backend.calls.filter(call => call.method === 'POST');
   expect(posts().map(call => call.path)).toEqual(['/api/v1/cloud/login/redroid/credentials', '/api/v1/cloud/login/redroid/qr']);
