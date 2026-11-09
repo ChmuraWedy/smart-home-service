@@ -238,6 +238,7 @@ describe('cloud UI journeys', () => {
     await screen.findByText('Лампа кухни');
     expect(screen.getByText('<script>alert(1)</script>')).toBeInTheDocument();
     expect(document.querySelector('script')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Поиск' }));
     const search = screen.getByRole('searchbox');
     await user.type(search, 'КУХНИ');
     expect(screen.getByText('Лампа кухни')).toBeInTheDocument();

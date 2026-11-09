@@ -1345,6 +1345,8 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-connection i { @apply tw:size-1.5 tw:shrink-0 tw:rounded-full tw:bg-(--neutral-indicator); }
 .dashboard-connection.online i { @apply tw:bg-(--accent); }
 .dashboard-view .dashboard-tools-menu { @apply tw:block; }
+.dashboard-header-search { @apply tw:flex tw:min-w-0 tw:items-center tw:gap-1; }
+.dashboard-header-search > input { @apply tw:m-0 tw:min-w-0; width:clamp(7rem, 38vw, 18rem); }
 .dashboard-view .dashboard-search-button { @apply tw:grid tw:size-11 tw:shrink-0 tw:place-items-center tw:p-0; }
 .dashboard-view .app-menu-button,
 .dashboard-view .dashboard-search-button { @apply tw:border-transparent tw:bg-transparent; }
@@ -1353,9 +1355,7 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view:not([data-dashboard-panel="tools"]) .control-center > .card-heading > :first-child { @apply tw:sr-only; }
 .dashboard-view:not([data-dashboard-panel="tools"]) :is(.dashboard-actions, .dashboard-intro) { @apply tw:hidden; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .topology-summary:not(:has([role="status"], [role="alert"])),
-.dashboard-view:not([data-dashboard-panel="tools"]) .control-filters > label:not(.dashboard-search-field),
-.dashboard-view:not([data-dashboard-panel="search"]):not([data-dashboard-panel="tools"]) .control-filters { @apply tw:hidden; }
-.dashboard-view[data-dashboard-panel="search"] .dashboard-search-field > span { @apply tw:sr-only; }
+.dashboard-view:not([data-dashboard-panel="tools"]) .control-filters { @apply tw:hidden; }
 .room-navigation-selection { @apply tw:flex tw:min-w-0 tw:items-center; }
 button.room-navigation-trigger {
   @apply tw:flex tw:min-h-11 tw:min-w-0 tw:items-center tw:gap-1.5 tw:border-transparent tw:bg-transparent tw:px-0 tw:py-1 tw:text-start tw:text-xl tw:font-semibold tw:text-(--text-strong);

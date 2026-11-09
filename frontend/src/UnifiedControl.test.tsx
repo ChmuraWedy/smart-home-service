@@ -350,7 +350,7 @@ describe('unified device identity and management', () => {
 
   it('shows one room-scoped card with aliases and explicit routes, with no physical/status polling on browse', async () => {
     const calls = server(); const user = userEvent.setup();
-    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready dashboardPanel="tools" sharingReady developerReady onAuthError={vi.fn()} />);
     await screen.findByRole('listitem', { name: 'Только в аккаунте' });
     const card = screen.getByRole('listitem', { name: local.name });
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
