@@ -373,17 +373,6 @@ input[type=hidden] {
   align-items:center;
 }
 
-.brand-icon {
-  display:grid;
-  place-items:center;
-  font-size:32px;
-  width:44px;
-  height:44px;
-  border:1px solid var(--success-border);
-  background:var(--success-bg);
-  color:var(--success);
-  border-radius:12px;
-}
 
 .brand strong {
   font-size:18px;
@@ -1260,7 +1249,12 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
 .camera-stream-info > .help { flex-basis:100%; margin:0; font-size:11px; }
 
 .app-menu { position:relative; flex-shrink:0; }
-.app-menu-button { width:44px; height:44px; padding:0; font-size:24px; }
+.app-menu-button {
+  display:grid; place-items:center; width:44px; height:44px; padding:0;
+}
+.app-icon {
+  display:block; width:28px; height:28px; padding:2px; border-radius:6px; background:#e6f5ee;
+}
 .app-menu-panel { position:absolute; top:calc(100% + 10px); left:0; z-index:100; display:grid; gap:6px; min-width:220px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 36px var(--shadow); }
 .app-menu-panel button { text-align:left; }
 .app-menu-panel button[aria-current=page] { color:var(--success); border-color:var(--success-border); background:var(--success-bg); }
@@ -1301,7 +1295,6 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
   .network-filters { grid-template-columns:1fr; }
   .network-toolbar button { min-height:44px; flex:1 1 180px; }
   .app-header { gap:10px; }
-  .app-header .brand-icon { display:none; }
 }
 
 .network-interface { display:flex; align-items:end; gap:12px; margin:16px 0; flex-wrap:wrap; }
@@ -1340,7 +1333,6 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-view .app-header { @apply tw:flex-nowrap tw:gap-2 tw:py-3; }
 .dashboard-view .brand { @apply tw:min-w-0; }
 .dashboard-view .brand-tagline,
-.dashboard-view .brand-icon,
 .dashboard-view .app-header > .api-presence { @apply tw:hidden; }
 .dashboard-view .brand .dashboard-connection { @apply tw:flex tw:items-center tw:gap-1.5 tw:text-xs; }
 .dashboard-connection i { @apply tw:size-1.5 tw:shrink-0 tw:rounded-full tw:bg-(--neutral-indicator); }
@@ -1923,7 +1915,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
   border-block-start:2px solid var(--combined-branch-color);
 }
 .combined-member:has(> .card-quick-controls > .card-primary-controls > .channel-control .combined-member-inline) {
-  > .combined-member-header { @apply tw:sr-only; }
+  > .combined-member-header { @apply tw:hidden; }
   &::before { content:none; }
 }
 .combined-member-inline {
@@ -1932,6 +1924,22 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-inline-name {
   @apply tw:truncate tw:border-b tw:border-(--border) tw:px-3 tw:py-1 tw:text-xs tw:font-semibold tw:text-(--text-strong);
 }
+button.combined-member-quick-button {
+  display:block;
+  width:100%;
+  min-height:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:none;
+  color:inherit;
+  font:inherit;
+  text-align:start;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+button.combined-member-quick-button:hover:not(:disabled) { text-decoration:underline; }
+button.combined-member-quick-button:focus-visible { outline-offset:-2px; }
 .combined-member-inline-state { @apply tw:self-center tw:px-3; }
 .dashboard-view {
   @variant narrow-dashboard-controls {

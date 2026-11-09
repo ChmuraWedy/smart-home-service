@@ -527,6 +527,41 @@ describe('combined devices', () => {
     });
   });
 
+  it('opens a single wired member from its name while its individual card is hidden', async () => {
+    const combined: CombinedDevice = {
+      id: 1, name: 'Workroom lamps', room_id: room.id, aliases: [], show_all_power: true, show_member_cards: false,
+      members: [
+        { device_id: relay.id, route: 'sharing', accessible: true },
+        {
+          device_id: bulbs[0].id, route: 'sharing', accessible: true,
+          power_source: { device_id: relay.id, channel: 'switch_1' },
+        },
+        { device_id: bulbs[1].id, route: 'sharing', accessible: true },
+      ],
+    };
+    const { writes } = backend(combined, false, false, true);
+    const user = userEvent.setup();
+    openApp('/rooms/3');
+    const card = within(await screen.findByRole('listitem', { name: combined.name }));
+    const member = within(card.getByRole('region', { name: bulbs[0].name }));
+    const inline = await waitFor(() => {
+      const label = member.getByRole('switch').closest('.capability-row')?.querySelector<HTMLElement>('.combined-member-inline');
+      expect(label).not.toBeNull();
+      return label!;
+    });
+    await user.click(within(inline).getByRole('button', { name: bulbs[0].name }));
+    const sheet = within(await screen.findByRole('dialog', { name: bulbs[0].name }));
+    expect(window.location.pathname).toBe('/combined-devices/1/quick');
+    expect(new URLSearchParams(window.location.search).get('member')).toBe(bulbs[0].id);
+    expect(await sheet.findByRole('slider', { name: 'Brightness' })).toBeInTheDocument();
+    expect(sheet.queryByRole('region', { name: bulbs[1].name })).toBeNull();
+    expect(sheet.queryByRole('region', { name: relay.name })).toBeNull();
+    await user.click(sheet.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/rooms/3'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(writes).toHaveLength(0);
+  });
+
   it('saves three cloud bulbs, keeps quick settings independent, routes details, and edits and dissolves the combination', async () => {
     const { writes } = backend();
     const user = userEvent.setup();

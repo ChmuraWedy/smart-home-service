@@ -63,7 +63,7 @@ export type MemberPower = 'on' | 'off' | 'mixed' | 'unknown';
 type EmbeddedControls = {
   embeddedQuick?: boolean;
   powerSide?: PowerSide;
-  inlineMemberName?: boolean;
+  inlineMemberName?: ReactNode;
   onPower?: (power: MemberPower) => void;
   channelChildren?: ReadonlyMap<string, ReactNode>;
   supplyPower?: false | null;
@@ -229,7 +229,7 @@ function StandardCardControls({
     const powerLabel = power ? MSG.ON : MSG.OFF;
     return (
       <span className="combined-member-inline">
-        <span className="combined-member-inline-name" title={name} aria-hidden="true">{name}</span>
+        <span className="combined-member-inline-name">{inlineMemberName}</span>
         {summary ? summary(power) : <span className="combined-member-inline-state">{t(power === null ? MSG.NO_DATA : powerLabel)}</span>}
       </span>
     );

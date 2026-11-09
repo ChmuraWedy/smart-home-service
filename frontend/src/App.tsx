@@ -17,6 +17,7 @@ import type {
 import {
   clearConnection, DEFAULT_API_BASE, loadConnection, saveConnection, STORAGE_KEY,
 } from './connection';
+import appIcon from './assets/home-power.svg';
 import AiChatButton from './components/AiChat';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import HouseholdAccess from './components/HouseholdAccess';
@@ -467,7 +468,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       <header className="app-header">
         <div className="app-menu" ref={menuRef} onKeyDown={event => { if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); } }}>
           <button className="secondary app-menu-button" ref={menuButton} aria-label={t(MSG.MENU)} aria-expanded={menuOpen} aria-controls="app-sections" disabled={locked} onClick={() => setMenuOpen(value => !value)}>
-            <IconGlyph name="menu" />
+            <img src={appIcon} alt="" className="app-icon" />
           </button>
           {menuOpen && (
           <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>
@@ -499,7 +500,6 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
 )}
         </div>
         <div className="brand">
-          <IconGlyph name="home" className="brand-icon" />
           <div>
             <strong>Smart Home</strong>
             <span className="brand-tagline">{t(MSG.YOUR_HOME_UNDER_CONTROL)}</span>
