@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { App } from './test/App';
 import { STORAGE_KEY } from './connection';
 import type { CloudStatus } from './api';
+import appIcon from './assets/home-power.svg?no-inline';
 
 const BASE = 'http://api.test:8765';
 const TOKEN = 'valid-service-key';
@@ -359,6 +360,7 @@ describe('cloud UI journeys', () => {
     render(<App />);
     const user = userEvent.setup();
     expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
+    expect(document.querySelector('.brand-icon img')).toHaveAttribute('src', appIcon);
     await user.click(screen.getByRole('button', { name: 'Начать' }));
     expect(window.location.search).toBe('?step=access');
     expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
@@ -416,8 +418,8 @@ it('opens LAN observations from the menu without a connected Tuya account', asyn
   expect(await screen.findByRole('option', { name: /192.168.40.0/ })).toBeInTheDocument();
   expect(backend.calls.map(call => call.path)).toEqual(['/api/v1/cloud/status', '/api/v1/network/interfaces']);
   const menu = screen.getByRole('button', { name: 'Меню' });
-  expect(menu.querySelector('[data-icon="home-power"]')).toBeInTheDocument();
-  expect(document.querySelectorAll('[data-icon="home-power"]')).toHaveLength(1);
+  expect(menu.querySelector('img.app-icon')).toHaveAttribute('src', appIcon);
+  expect(document.querySelectorAll('img.app-icon')).toHaveLength(1);
   fireEvent.click(menu); expect(screen.getByRole('navigation', { name: 'Раздел приложения' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Мониторинг сети' })).toHaveAttribute('aria-current', 'page');
   fireEvent.keyDown(menu, { key: 'Escape' }); expect(screen.queryByRole('navigation')).toBeNull();

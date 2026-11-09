@@ -11,7 +11,7 @@ import { ApiError } from '../api';
 import { labelFor } from '../controls';
 import combinedLayout from '../combined-layout';
 import {
-  memberOnline, refreshCombinedMember, useRestoredWiring, wiredSupply,
+  memberOnline, refreshCombinedMember, useLocalSupplyEvidence, useRestoredWiring, wiredSupply,
 } from '../combined-power';
 import type { ResolvedMember } from '../combined-power';
 import { MSG, t } from '../i18n';
@@ -19,7 +19,7 @@ import {
   selectCommandPending, setCommandPending, useAppDispatch, useAppSelector,
 } from '../store';
 import { CardControls } from './CardControls';
-import type { MemberPower } from './CardControls';
+import type { MemberPower } from './PowerCardControls';
 import ControlRow from './ControlRow';
 import type { PowerSide } from './ControlRow';
 import DashboardCardFooter from './DashboardCardFooter';
@@ -56,7 +56,7 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth, supplyPower,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth, supplyPower, onOpen, hideName,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
@@ -65,11 +65,13 @@ function MemberControls({
   preview: boolean;
   depth: number;
   quick?: boolean;
+  hideName?: boolean;
   commandKey: string;
   sourceLabel?: string;
   channelChildren?: ReadonlyMap<string, ReactNode>;
   powerSide?: PowerSide;
   supplyPower?: false | null;
+  onOpen?: (button: HTMLButtonElement) => void;
   onPower: (deviceId: string, power: MemberPower) => void;
   onAuthError: () => void;
 }) {
@@ -82,6 +84,17 @@ function MemberControls({
     dispatch(setCommandPending({ deviceId: commandKey, pending }));
   }, [commandKey, dispatch]);
   const recordPower = useCallback((power: MemberPower) => onPower(id, power), [id, onPower]);
+  const renderQuickTarget = onOpen ? (content: ReactNode) => (
+    <button
+      className="combined-member-quick-button"
+      type="button"
+      aria-haspopup="dialog"
+      disabled={paused}
+      onClick={(event) => onOpen(event.currentTarget)}
+    >
+      {content}
+    </button>
+  ) : undefined;
   return (
     <section
       className="combined-member"
@@ -89,10 +102,12 @@ function MemberControls({
       data-unavailable={!device || online === false || supplyPower !== undefined || undefined}
       style={depth ? { '--combined-depth': depth } as CSSProperties : undefined}
     >
-      <header className="combined-member-header">
-        <h3 className="combined-member-name">{displayName}</h3>
-        {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
-      </header>
+      {(!hideName || sourceLabel) && (
+        <header className="combined-member-header">
+          {!hideName && <h3 className="combined-member-name">{renderQuickTarget?.(displayName) ?? displayName}</h3>}
+          {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
+        </header>
+      )}
       {device ? (
         <CardControls
           api={api}
@@ -108,7 +123,8 @@ function MemberControls({
           onAuthError={onAuthError}
           channelChildren={channelChildren}
           powerSide={powerSide}
-          inlineMemberName={Boolean(sourceLabel) && !quick}
+          inlineMemberName={sourceLabel && !quick ? displayName : undefined}
+          renderQuickTarget={renderQuickTarget}
           supplyPower={supplyPower}
         />
       ) : (
@@ -124,7 +140,7 @@ function MemberControls({
 const noAction = () => undefined;
 
 export default function CombinedDeviceCard({
-  api, combined, members, room, now, placement, paused = false, quickOpen = false,
+  api, combined, members, room, now, placement, paused = false, quickOpen = false, quickMemberId, onMemberQuickOpen,
   onQuickOpen = noAction, onQuickClose = noAction, onDetails = noAction, onAuthError,
 }: {
   api: HomeApi;
@@ -135,6 +151,8 @@ export default function CombinedDeviceCard({
   placement?: GridCardPlacement;
   paused?: boolean;
   quickOpen?: boolean;
+  quickMemberId?: string;
+  onMemberQuickOpen?: (deviceId: string) => void;
   onQuickOpen?: () => void;
   onQuickClose?: () => void;
   onDetails?: () => void;
@@ -146,6 +164,7 @@ export default function CombinedDeviceCard({
   const id = preview ? `combined-preview-${powerId}` : `combined-${savedId}`;
   const displayName = useDeviceDisplayName();
   const trigger = useRef<HTMLButtonElement>(null);
+  const memberTrigger = useRef<HTMLButtonElement>(null);
   const dispatch = useAppDispatch();
   const sending = useRef(false);
   const memberKey = (memberId: string, quick = false) => `${id}:${memberId}:${quick}`;
@@ -159,11 +178,12 @@ export default function CombinedDeviceCard({
   const [sendError, setSendError] = useState(false);
   const layout = combinedLayout(members);
   const supplies = useAppSelector((state) => wiredSupply(state, api, layout, now), shallowEqual);
+  const reachableWithRelayOff = useLocalSupplyEvidence(api, members, supplies, now);
   const waiting = useRestoredWiring(api, members, supplies, paused || preview, onAuthError);
   const allOffline = useAppSelector((state) => members.length > 0 && members.every((entry) => !entry.device || memberOnline(state, api, entry) === false));
 
   function suppliedPower(deviceId: string) {
-    if (supplies[deviceId] === false) return false;
+    if (supplies[deviceId] === false && !reachableWithRelayOff.includes(deviceId)) return false;
     if (supplies[deviceId] === true && waiting.has(deviceId)) return null;
     return undefined;
   }
@@ -209,6 +229,8 @@ export default function CombinedDeviceCard({
     }
   }, [api, canSend, dispatch, id, members, onAuthError, savedId]);
 
+  const quickMember = quickMemberId ? layout.byId.get(quickMemberId) : undefined;
+
   function renderMember(entry: ResolvedMember, quick = false, depth = 0): ReactNode {
     const { member } = entry;
     const source = member.power_source;
@@ -219,6 +241,11 @@ export default function CombinedDeviceCard({
       code,
       entries.map((child) => renderMember(child, false, depth + 1)),
     ]));
+    const open = !quick && !preview && entry.device && onMemberQuickOpen
+      ? (button: HTMLButtonElement) => {
+        memberTrigger.current = button;
+        onMemberQuickOpen(member.device_id);
+      } : undefined;
     return (
       <MemberControls
         key={`${member.device_id}:${member.route}`}
@@ -229,11 +256,13 @@ export default function CombinedDeviceCard({
         preview={preview}
         depth={depth}
         quick={quick}
+        hideName={quick && entry === quickMember}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
         powerSide={!quick && source ? 'start' : undefined}
         supplyPower={suppliedPower(member.device_id)}
         channelChildren={channelChildren}
+        onOpen={open}
         onPower={onPower}
         onAuthError={onAuthError}
       />
@@ -323,8 +352,13 @@ export default function CombinedDeviceCard({
         )}
       </DashboardCardFooter>
       {quickOpen && (
-        <DashboardSheet title={combined.name} onClose={onQuickClose} returnFocus={trigger} busy={busy}>
-          {members.map((entry) => renderMember(entry, true))}
+        <DashboardSheet
+          title={quickMember ? displayName(quickMember.device, quickMember.member.device_id) : combined.name}
+          onClose={onQuickClose}
+          returnFocus={quickMember ? memberTrigger : trigger}
+          busy={busy}
+        >
+          {(quickMember ? [quickMember] : members).map((entry) => renderMember(entry, true))}
         </DashboardSheet>
       )}
     </Card>

@@ -8,6 +8,7 @@ import type { ControlSpec, HSV } from '../controls';
 import type { Reading } from '../home-api';
 import type { DraftStage } from '../control-drafts';
 import { usePendingDeviceValue } from '../use-pending-device-value';
+import powerControlState from '../power-control-state';
 import { defaultObject } from '../lighting';
 import { JsonFields, PowerMemoryFields, RawScheduleFields } from './LightingFields';
 import { hasScheduleWizard, ScheduleWizard, scheduleSummary } from './ScheduleWizard';
@@ -298,7 +299,6 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
     } });
   }, [stage, spec.key, draftInput, draftColor, dirty, error, begin]);
   useEffect(() => () => { stage?.(spec.key, null); }, [stage, spec.key]);
-  const selectedPower = dirty ? draft === 'true' : value === true;
   async function send(value?: JsonValue) {
     try {
       let parsed = value;
@@ -321,9 +321,11 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
     if (immediatePower) void send(checked);
     else change(String(checked));
   }
-  const shownPower = displayPower === undefined ? selectedPower : displayPower === true;
-  const powerKnown = displayPower === undefined ? awaiting || (reading?.known && typeof reading.value === 'boolean') : displayPower !== null;
-  const showPending = displayPower === undefined && awaiting;
+  const {
+    selectedPower, shownPower, powerKnown, showPending, showStale, actionPower,
+  } = powerControlState({
+    value, draft, dirty, reading, fresh, awaiting, displayPower,
+  });
   let powerVariant: PowerButtonVariant = dashboardSwitch ? 'dashboard-switch' : 'switch';
   if (booleanButton) powerVariant = 'button';
   if (quickRange) {
@@ -373,7 +375,7 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
   const state = powerIcon && (
     <span className={`dashboard-power-state${powerSummary ? ' dashboard-power-state-summary' : ''}`}>
       {powerSummary ? powerSummary(powerKnown ? shownPower : null) : powerKnown ? t(shownPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
-      {displayPower === undefined && powerKnown && !fresh && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+      {showStale && <span className="stale-tag">{t(MSG.STALE)}</span>}
       <span role="status" className="dashboard-power-pending" title={showPending ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
         {showPending && (
           <>
@@ -530,8 +532,7 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
         </form>
         )}
       </ControlRow>
-      {booleanActions?.(awaiting ? (selectedPower ? true : null) : reading?.known && typeof reading.value === 'boolean' ? reading.value : null,
-      () => changePower(!selectedPower))}
+      {booleanActions?.(actionPower, () => changePower(!selectedPower))}
       {awaiting && !powerIcon && <p className="help pending-reading">{t(MSG.WAITING_FOR_A_NEW_READING)}</p>}
       {spec.reason && <p className="help">{spec.reason}</p>}
       {spec.help && <p className="help">{spec.help}</p>}

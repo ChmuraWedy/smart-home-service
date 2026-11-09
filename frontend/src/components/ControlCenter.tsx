@@ -543,6 +543,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (route) params.set('route', route); else params.delete('route');
     if (group) params.set('group', String(group.id)); else params.delete('group');
     if (combination) params.set('combined', String(combination.id)); else params.delete('combined');
+    params.delete('member');
     return withQuery(path, params);
   }
   const openOverlay = useCallback((href: string) => {
@@ -573,6 +574,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (parent) { void navigate(overlayHref('/groups/' + parent.id), { replace: true }); return; }
     if (combinedParent) { navigate(overlayHref(`/combined-devices/${combinedParent.id}`), { replace: true }); return; }
     if (page > 0) query.set('page', String(page + 1));
+    query.delete('member');
     void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
   }
   function close() {
@@ -629,6 +631,12 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       const locationRoom = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id);
       const name = locationRoom ? roomLabel(locationRoom) : t(MSG.NO_ROOM);
       const quickOpen = combinedQuickOpen && item === combined;
+      const quickHref = overlayHref(`${href}/quick`);
+      const openMember = (deviceId: string) => {
+        const params = new URLSearchParams(quickHref.split('?')[1]);
+        params.set('member', deviceId);
+        openOverlay(withQuery(`${href}/quick`, params));
+      };
       return (
         <CombinedDeviceCard
           key={`combined-${item.id}`}
@@ -640,7 +648,9 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           placement={placement}
           paused={Boolean((detailsOpen && !quickOpen) || placement.inert)}
           quickOpen={quickOpen}
-          onQuickOpen={() => openOverlay(overlayHref(`${href}/quick`))}
+          quickMemberId={quickOpen ? query.get('member') ?? undefined : undefined}
+          onMemberQuickOpen={openMember}
+          onQuickOpen={() => openOverlay(quickHref)}
           onQuickClose={() => closeOverlay()}
           onDetails={() => openOverlay(overlayHref(href))}
           onAuthError={onAuthError}

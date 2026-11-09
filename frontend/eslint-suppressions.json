@@ -484,13 +484,10 @@
       "count": 2
     },
     "key-spacing": {
-      "count": 9
+      "count": 8
     },
     "no-confusing-arrow": {
       "count": 2
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "no-restricted-globals": {
       "count": 1
@@ -502,10 +499,10 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 8
+      "count": 6
     },
     "object-curly-spacing": {
-      "count": 10
+      "count": 8
     },
     "object-property-newline": {
       "count": 10
@@ -515,9 +512,6 @@
     },
     "one-var-declaration-per-line": {
       "count": 2
-    },
-    "operator-linebreak": {
-      "count": 1
     },
     "prefer-template": {
       "count": 2
@@ -1005,14 +999,11 @@
     "consistent-return": {
       "count": 2
     },
-    "function-paren-newline": {
-      "count": 2
-    },
     "import/order": {
       "count": 1
     },
     "indent": {
-      "count": 19
+      "count": 18
     },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
@@ -1030,7 +1021,7 @@
       "count": 2
     },
     "no-nested-ternary": {
-      "count": 11
+      "count": 10
     },
     "no-plusplus": {
       "count": 5
@@ -1561,7 +1552,7 @@
       "count": 8
     },
     "arrow-parens": {
-      "count": 18
+      "count": 17
     },
     "brace-style": {
       "count": 1
@@ -1881,7 +1872,7 @@
       "count": 2
     },
     "object-property-newline": {
-      "count": 78
+      "count": 74
     },
     "one-var": {
       "count": 6

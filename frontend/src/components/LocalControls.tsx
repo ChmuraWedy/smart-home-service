@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { MSG, t } from "../i18n";
 import type { CloudDevice } from '../api';
 import type { DeviceRoute } from '../devices';
-import { displayReading, isStale, localSpec, validateControlValue } from '../controls';
+import { displayReading, isStale, localCommandValue, localReading, localSpec, validateControlValue } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
 import { readLocalDevice } from '../local-device-cache';
@@ -59,7 +59,7 @@ export function LocalControl({
   const pendingScope = localPendingScope(api, item.id);
   const drafts = useAutomaticControls(changes => session.execute(async () => {
     for (const change of changes) validateControlValue(change.spec, change.value!);
-    const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(change => [change.spec.key, change.value!])));
+    const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(({ spec, value }) => [spec.key, localCommandValue(spec, value!)])));
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
     return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
   }), !session.busy && !aliasBusy && session.readOK && !!state?.enabled);
@@ -76,9 +76,9 @@ export function LocalControl({
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
       {primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
       <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>
-        {session.data && state && Object.entries(item.capabilities).filter(([key]) => !isBattery(key)).map(([key, cap]) => (
-          <CapabilityField pendingScope={pendingScope} key={key} spec={localSpec(key, cap)} stage={cap.type === 'boolean' ? undefined : drafts.stage} immediatePower reading={state.values[key]} now={now} local={true} disabled={session.busy || !session.readOK || !state.enabled} onSend={value => session.execute(async () => {
-      const result = await api.setCapability(item.id, key, value);
+        {session.data && state && specs.filter((spec) => !isBattery(spec.key)).map((spec) => (
+          <CapabilityField pendingScope={pendingScope} key={spec.key} spec={spec} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower reading={localReading(spec, state.values[spec.key])} now={now} local={true} disabled={session.busy || !session.readOK || !state.enabled} onSend={value => session.execute(async () => {
+      const result = await api.setCapability(item.id, spec.key, localCommandValue(spec, value));
       if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
       return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
     })}
