@@ -667,7 +667,9 @@ function AppContent() {
           </div>
         )}
         <div className="brand">
-          <IconGlyph name="home" className="brand-icon" />
+          <span className="brand-icon">
+            <Icon name="home-power" />
+          </span>
           <div>
             <strong>Smart Home</strong>
             <span className="brand-tagline">{t(MSG.YOUR_HOME_UNDER_CONTROL)}</span>

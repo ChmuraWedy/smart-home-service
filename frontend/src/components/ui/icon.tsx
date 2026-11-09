@@ -33,6 +33,12 @@ const drawings = {
       <path d="M12 11v6M12 7h.01" />
     </>
   ),
+  'home-power': (
+    <>
+      <path d="M2 11 12 3l10 8M5 10v11h14V10" />
+      <path className="brand-power-mark" d="M12 11v3m-2.4-1.5a3.2 3.2 0 1 0 4.8 0" />
+    </>
+  ),
   more: (
     <>
       <circle cx="5" cy="12" r="1" />
@@ -109,7 +115,6 @@ const glyphs = {
   check: '✓',
   close: '×',
   fullscreen: '⛶',
-  home: '⌂',
   info: 'i',
   menu: '☰',
   more: '…',

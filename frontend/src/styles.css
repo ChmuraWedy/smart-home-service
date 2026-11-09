@@ -380,7 +380,6 @@ input[type=hidden] {
 .brand-icon {
   display:grid;
   place-items:center;
-  font-size:32px;
   width:44px;
   height:44px;
   border:1px solid var(--success-border);
@@ -388,6 +387,15 @@ input[type=hidden] {
   color:var(--success);
   border-radius:12px;
 }
+
+.brand-icon > .ui-icon {
+  width:28px;
+  height:28px;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.brand-power-mark { stroke:var(--warning); }
 
 .brand strong {
   font-size:18px;
