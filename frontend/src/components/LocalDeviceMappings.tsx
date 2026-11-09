@@ -9,23 +9,54 @@ import type { Capability, HomeApi, LocalDevice } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
 import { Icon } from './ui/icon';
 
-type TimerRange = { minimum: number; maximum: number; step: number };
+type MappingSuggestion = {
+  minimum?: number;
+  maximum?: number;
+  step?: number;
+  choices?: string[];
+};
 const timerCode = /^countdown(?:_[1-9][0-9]*)?$/;
+const powerOnCode = /^relay_status(?:_[1-9][0-9]*)?$/;
 
-function matchingTimerRange(definitions: CloudFunctions, deviceId: string, code: string, mapping: Capability): TimerRange | undefined {
-  if (definitions.device_id !== deviceId || !Array.isArray(definitions.functions)) return undefined;
-  const point = Number(mapping.dp);
-  const matches = definitions.functions.filter((entry) => entry.dp_id === point || entry.dp_ids?.includes(point));
-  const [spec] = matches;
-  if (matches.length !== 1 || spec.code !== code || spec.type !== 'Integer') return undefined;
-  if ((spec.dp_id !== undefined && spec.dp_id !== point) || spec.dp_ids?.some((id) => id !== point)) return undefined;
+function isPowerOnMapping(code: string, mapping: Capability) {
+  return mapping.type === 'string' && powerOnCode.test(code);
+}
+
+function needsSuggestion(code: string, mapping: Capability) {
+  if (isPowerOnMapping(code, mapping)) return !mapping.enum?.length;
+  return mapping.type === 'integer' && timerCode.test(code)
+    && (mapping.minimum == null || mapping.maximum == null || mapping.step == null);
+}
+
+function validChoices(choices: unknown): choices is string[] {
+  return Array.isArray(choices) && choices.length > 0 && choices.length <= 64
+    && new Set(choices).size === choices.length
+    && choices.every((choice) => typeof choice === 'string' && choice.trim() && !/[\r\n]/.test(choice));
+}
+
+function timerRange(limits: Record<string, unknown>, mapping: Capability): MappingSuggestion | undefined {
   const {
     min, max, step, scale = 0, unit = '',
-  } = limitsOf(spec.values);
+  } = limits;
   if (scale !== 0 || (unit !== '' && unit !== 's') || typeof min !== 'number' || typeof max !== 'number' || typeof step !== 'number') return undefined;
   if (![min, max, step].every(Number.isSafeInteger) || min < 0 || min > max || step <= 0) return undefined;
   if ((mapping.minimum ?? min) > (mapping.maximum ?? max)) return undefined;
   return { minimum: min, maximum: max, step };
+}
+
+function matchingSuggestion(definitions: CloudFunctions, deviceId: string, code: string, mapping: Capability): MappingSuggestion | undefined {
+  if (definitions.device_id !== deviceId || !Array.isArray(definitions.functions)) return undefined;
+  const point = Number(mapping.dp);
+  const matches = definitions.functions.filter((entry) => entry.dp_id === point || entry.dp_ids?.includes(point));
+  const [spec] = matches;
+  if (matches.length !== 1 || spec.code !== code) return undefined;
+  if ((spec.dp_id !== undefined && spec.dp_id !== point) || spec.dp_ids?.some((id) => id !== point)) return undefined;
+
+  const limits = limitsOf(spec.values);
+  if (isPowerOnMapping(code, mapping)) {
+    return spec.type === 'Enum' && validChoices(limits.range) ? { choices: limits.range } : undefined;
+  }
+  return spec.type === 'Integer' ? timerRange(limits, mapping) : undefined;
 }
 
 function numberField(data: FormData, name: string) {
@@ -44,7 +75,7 @@ export default function LocalDeviceMappings({
   onSaved: (device: LocalDevice) => void;
   onAuthError: () => void;
 }) {
-  const [edit, setEdit] = useState<{ code: string; mapping: Capability; suggestion?: TimerRange }>();
+  const [edit, setEdit] = useState<{ code: string; mapping: Capability; suggestion?: MappingSuggestion }>();
   const [operation, setOperation] = useState<'lookup' | 'save'>();
   const busy = operation !== undefined;
   const [error, setError] = useState('');
@@ -54,14 +85,12 @@ export default function LocalDeviceMappings({
 
   async function beginEdit(key: string, mapping: Capability) {
     setError('');
-    const { dp } = mapping;
-    const needsRange = mapping.minimum == null || mapping.maximum == null || mapping.step == null;
-    if (!dp || mapping.type !== 'integer' || !timerCode.test(key) || !needsRange || sharingDevice?.id !== device.device_id) {
+    if (!mapping.dp || !needsSuggestion(key, mapping) || sharingDevice?.id !== device.device_id) {
       setEdit({ code: key, mapping });
       return;
     }
     const cached = sharingDevice.controls?.definitions;
-    const suggested = cached && matchingTimerRange(cached, device.device_id, key, mapping);
+    const suggested = cached && matchingSuggestion(cached, device.device_id, key, mapping);
     if (suggested) {
       setEdit({ code: key, mapping, suggestion: suggested });
       return;
@@ -72,10 +101,10 @@ export default function LocalDeviceMappings({
     const timeout = window.setTimeout(() => controller.abort(), 3000);
     setEdit(undefined);
     setOperation('lookup');
-    let suggestion: TimerRange | undefined;
+    let suggestion: MappingSuggestion | undefined;
     try {
       const definitions = await api.deviceFunctions(device.device_id, 'sharing', controller.signal);
-      suggestion = matchingTimerRange(definitions, device.device_id, key, mapping);
+      suggestion = matchingSuggestion(definitions, device.device_id, key, mapping);
     } catch (failure) {
       if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
     } finally {
@@ -98,6 +127,14 @@ export default function LocalDeviceMappings({
       next.minimum = numberField(form, 'minimum');
       next.maximum = numberField(form, 'maximum');
       next.step = numberField(form, 'step');
+    }
+    if (isPowerOnMapping(code, mapping)) {
+      const choices = String(form.get('choices') ?? '').split(/\r?\n/).filter((choice) => choice.trim());
+      if (choices.length && !validChoices(choices)) {
+        setError(t(MSG.INVALID_LOCAL_MAPPING_CHOICES));
+        return;
+      }
+      next.enum = choices.length ? choices : null;
     }
     setOperation('save');
     setError('');
@@ -146,7 +183,9 @@ export default function LocalDeviceMappings({
       {operation === 'lookup' && <p role="status">{t(MSG.LOADING)}</p>}
       {edit && (
         <form key={edit.code} aria-label={labelFor(edit.code)} onSubmit={save}>
-          {edit.suggestion && <p className="help">{t(MSG.TIMER_RANGE_SUGGESTED_BY_SMART_LIFE)}</p>}
+          {needsSuggestion(edit.code, edit.mapping) && (
+            <p className="help">{t(edit.suggestion ? MSG.MAPPING_VALUES_SUGGESTED_BY_SMART_LIFE : MSG.NO_MATCHING_SMART_LIFE_MAPPING)}</p>
+          )}
           <fieldset disabled={disabled || busy} className="survey-form-grid">
             <legend>{labelFor(edit.code)}</legend>
             <label htmlFor={`${formId}-dp`}>
@@ -197,6 +236,17 @@ export default function LocalDeviceMappings({
                   />
                 </label>
               </>
+            )}
+            {isPowerOnMapping(edit.code, edit.mapping) && (
+              <label htmlFor={`${formId}-choices`}>
+                {t(MSG.LOCAL_MAPPING_CHOICES)}
+                <textarea
+                  id={`${formId}-choices`}
+                  name="choices"
+                  rows={4}
+                  defaultValue={(edit.suggestion?.choices ?? edit.mapping.enum)?.join('\n')}
+                />
+              </label>
             )}
           </fieldset>
           {error && <p role="alert" className="field-error">{translateText(error)}</p>}

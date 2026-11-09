@@ -514,6 +514,77 @@ describe('local device and group controls', () => {
     },
   );
 
+  it.each(['matching', 'different-dp', 'offline'] as const)(
+    'edits Power-on state choices and uses the saved list for local commands (%s)',
+    async (metadata) => {
+      const mapping: Capability = { dp: '14', type: 'string', readable: true, writable: true, enum: [] };
+      const device = { ...light, capabilities: { relay_status: mapping } };
+      const cloud = { id: device.device_id, name: device.name, online: true, has_local_key: true };
+      const { states, writes } = localServer({ lamp: device });
+      states[device.id].values.relay_status.value = 'last';
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const edits: unknown[] = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        if (path.endsWith('/functions')) {
+          if (metadata === 'offline') return json({ detail: 'Complete QR login first' }, 409);
+          return json({
+            device_id: device.device_id,
+            functions: [{
+              code: 'relay_status',
+              dp_id: metadata === 'matching' ? 14 : 15,
+              type: 'Enum',
+              values: { range: ['power_off', 'power_on', 'last'] },
+            }],
+          });
+        }
+        if (init?.method === 'PATCH') {
+          const body = JSON.parse(String(init.body));
+          edits.push(body);
+          return json({ ...device, capabilities: { relay_status: body.mapping } });
+        }
+        return original(input, init);
+      });
+      const user = userEvent.setup();
+      renderWithStore(
+        <LocalControl
+          api={new HomeApi(connection)}
+          device={device}
+          cloudDevice={cloud}
+          routes={['sharing', 'local']}
+          onClose={vi.fn()}
+          onAuthError={vi.fn()}
+        />,
+      );
+      const label = 'Состояние после подачи питания';
+      const control = within(await screen.findByRole('region', { name: label }));
+      expect(control.queryByRole('combobox')).toBeNull();
+      await user.click(screen.getByText('Локальные сопоставления и команды'));
+      await user.click(screen.getByRole('button', { name: `Изменить сопоставление: ${label}` }));
+      const form = within(await screen.findByRole('form', { name: label }));
+      const choices = form.getByRole('textbox', { name: /Допустимые варианты/ });
+      expect(choices).toHaveValue(metadata === 'matching' ? 'power_off\npower_on\nlast' : '');
+      expect(edits).toEqual([]);
+      expect(writes).toEqual([]);
+      if (metadata === 'different-dp') return;
+
+      await user.clear(choices);
+      await user.type(choices, 'last{enter}power_on');
+      await user.click(form.getByRole('button', { name: 'Сохранить' }));
+      await waitFor(() => expect(edits).toEqual([{
+        expected: mapping, mapping: { ...mapping, enum: ['last', 'power_on'] },
+      }]));
+      const selector = await control.findByRole('combobox');
+      expect(within(selector).getByRole('option', { name: 'Восстановить предыдущее состояние' })).toBeInTheDocument();
+      expect(within(selector).queryByRole('option', { name: 'Выключено' })).toBeNull();
+      expect(writes).toEqual([]);
+      await user.selectOptions(selector, within(selector).getByRole('option', { name: 'Включено' }));
+      await waitFor(() => expect(writes).toEqual([{
+        path: '/api/v1/devices/1/commands/capabilities', body: { values: { relay_status: 'power_on' } },
+      }]));
+    },
+  );
+
   it('converts a local brightness percentage back to the mapped units in full settings', async () => {
     const lamp: LocalDevice = {
       ...light,
