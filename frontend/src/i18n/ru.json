@@ -1159,5 +1159,21 @@
   "USE_EXISTING_ANDROID_SESSION": "Использовать текущий сеанс Android",
   "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Завершите проверку в Smart Life на Android, затем выберите «Использовать текущий сеанс Android».",
   "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Если на Android не появилось подтверждение, отсканируйте QR-код в Smart Life на другом устройстве с тем же аккаунтом. Осталось секунд: {0}.",
-  "APPROVE_IN_ANDROID_AND_CONNECT": "Подтвердить в Android и подключиться"
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Подтвердить в Android и подключиться",
+  "SETUP_WELCOME": "Добро пожаловать домой",
+  "SETUP_WELCOME_DESCRIPTION": "Настройте умный дом, чтобы управлять устройствами на одной панели.",
+  "SETUP_DEVICES": "Импорт устройств",
+  "SETUP_DEVICES_DESCRIPTION": "Устройства Smart Life появятся на панели после входа. Чтобы управлять устройствами по локальной сети, найдите и сохраните их здесь.",
+  "SETUP_GET_STARTED": "Начать",
+  "SETUP_CONTINUE_LOCALLY": "Продолжить с локальными устройствами",
+  "SETUP_OPEN_DASHBOARD": "Открыть панель",
+  "SETUP_OPEN_WIZARD": "Открыть мастер настройки",
+  "SETUP_CODE": "Одноразовый код настройки",
+  "SETUP_KEEP_NEW_KEY": "Сохраните этот ключ доступа для входа с других устройств.",
+  "SETUP_INITIALIZE_DESCRIPTION": "Сервер готов создать первый ключ доступа. Введите одноразовый код, заданный на сервере.",
+  "SETUP_INITIALIZE_KEY": "Создать ключ доступа",
+  "SETUP_REQUIRES_HTTPS": "Для первичной настройки ключа нужен HTTPS или localhost.",
+  "SETUP_UNAVAILABLE": "Первичная настройка ключа недоступна.",
+  "SETUP_INVALID_CODE": "Неверный код настройки.",
+  "SETUP_REQUIRED": "Завершите первичную настройку ключа, чтобы использовать сервис."
 }

@@ -631,7 +631,10 @@ for resource, model, schema in (
 
 
 def create_app(settings: Settings | None = None, controller=None):
-    settings = settings or Settings()
+    from .setup_api import load_managed_key
+    from .setup_api import router as setup_router
+
+    settings = load_managed_key(settings or Settings())
 
     @asynccontextmanager
     async def lifespan(app):
@@ -698,6 +701,7 @@ def create_app(settings: Settings | None = None, controller=None):
         )
     app.state.controller = controller or TuyaController(settings)
     app.include_router(router)
+    app.include_router(setup_router)
     from .assistant_api import router as assistant_router
     from .assistant_sessions import AssistantSessions
 

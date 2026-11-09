@@ -72,6 +72,7 @@ describe('appearance preferences', () => {
   });
 
   it('offers appearance preferences in the menu before connecting and preserves a live API/key draft', () => {
+    window.history.replaceState(null, '', '/settings/connections');
     render(<App/>);
     const address=screen.getByLabelText('Адрес API');
     const key=screen.getByLabelText('Ключ доступа к сервису');

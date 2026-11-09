@@ -1159,5 +1159,21 @@
   "USE_EXISTING_ANDROID_SESSION": "Use existing Android session",
   "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Finish verification in Smart Life on Android, then choose Use existing Android session.",
   "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "If Android shows no approval prompt, scan this QR in Smart Life on another device signed into the same account. {0} seconds left.",
-  "APPROVE_IN_ANDROID_AND_CONNECT": "Approve in Android and connect"
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Approve in Android and connect",
+  "SETUP_WELCOME": "Welcome home",
+  "SETUP_WELCOME_DESCRIPTION": "Set up Smart Home to control your devices from one dashboard.",
+  "SETUP_DEVICES": "Import devices",
+  "SETUP_DEVICES_DESCRIPTION": "Smart Life devices appear on your dashboard after sign-in. Use the steps below to find and save devices for local control.",
+  "SETUP_GET_STARTED": "Get started",
+  "SETUP_CONTINUE_LOCALLY": "Continue with local devices",
+  "SETUP_OPEN_DASHBOARD": "Open dashboard",
+  "SETUP_OPEN_WIZARD": "Open setup wizard",
+  "SETUP_CODE": "One-time setup code",
+  "SETUP_KEEP_NEW_KEY": "Save this service access key for signing in on other devices.",
+  "SETUP_INITIALIZE_DESCRIPTION": "This server is ready to create its first service access key. Enter the one-time code configured on the server.",
+  "SETUP_INITIALIZE_KEY": "Create service access key",
+  "SETUP_REQUIRES_HTTPS": "First-time key setup requires HTTPS or localhost.",
+  "SETUP_UNAVAILABLE": "First-time key setup is unavailable.",
+  "SETUP_INVALID_CODE": "Invalid setup code.",
+  "SETUP_REQUIRED": "Complete first-time key setup before using the service."
 }

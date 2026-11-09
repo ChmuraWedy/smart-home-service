@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      SMART_HOME_API_TOKEN: ${SMART_HOME_API_TOKEN:?Set SMART_HOME_API_TOKEN in .env}
+      SMART_HOME_API_TOKEN: ${SMART_HOME_API_TOKEN:-}
       SMART_HOME_DB: /app/data/smarthome.db
       SMART_HOME_CLOUD_SESSION: /app/data/tuya-cloud.json
       SMART_HOME_DEVELOPER_SESSION: /app/data/tuya-cloud.json.developer.json

@@ -6701,6 +6701,66 @@
           }
         }
       }
+    },
+    "/api/v1/setup": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Setup Status",
+        "operationId": "setup_status_api_v1_setup_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupAvailability"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Initialize Setup",
+        "operationId": "initialize_setup_api_v1_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10137,6 +10197,47 @@
           "key"
         ],
         "title": "ChatSession"
+      },
+      "SetupAvailability": {
+        "properties": {
+          "can_initialize": {
+            "type": "boolean",
+            "title": "Can Initialize"
+          }
+        },
+        "type": "object",
+        "required": [
+          "can_initialize"
+        ],
+        "title": "SetupAvailability"
+      },
+      "SetupRequest": {
+        "properties": {
+          "setup_code": {
+            "type": "string",
+            "format": "password",
+            "title": "Setup Code",
+            "writeOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "setup_code"
+        ],
+        "title": "SetupRequest"
+      },
+      "SetupResult": {
+        "properties": {
+          "access_key": {
+            "type": "string",
+            "title": "Access Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_key"
+        ],
+        "title": "SetupResult"
       }
     },
     "securitySchemes": {

@@ -1159,5 +1159,21 @@
   "USE_EXISTING_ANDROID_SESSION": "Użyj istniejącej sesji Androida",
   "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Zakończ weryfikację w Smart Life na Androidzie, a następnie wybierz „Użyj istniejącej sesji Androida”.",
   "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Jeśli na Androidzie nie ma prośby o potwierdzenie, zeskanuj kod QR w Smart Life na innym urządzeniu zalogowanym na to samo konto. Pozostało sekund: {0}.",
-  "APPROVE_IN_ANDROID_AND_CONNECT": "Zatwierdź w Androidzie i połącz"
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Zatwierdź w Androidzie i połącz",
+  "SETUP_WELCOME": "Witaj w domu",
+  "SETUP_WELCOME_DESCRIPTION": "Skonfiguruj inteligentny dom, aby sterować urządzeniami z jednego panelu.",
+  "SETUP_DEVICES": "Import urządzeń",
+  "SETUP_DEVICES_DESCRIPTION": "Urządzenia Smart Life pojawią się w panelu po zalogowaniu. Wyszukaj i zapisz urządzenia poniżej, aby sterować nimi w sieci lokalnej.",
+  "SETUP_GET_STARTED": "Rozpocznij",
+  "SETUP_CONTINUE_LOCALLY": "Kontynuuj z urządzeniami lokalnymi",
+  "SETUP_OPEN_DASHBOARD": "Otwórz panel",
+  "SETUP_OPEN_WIZARD": "Otwórz kreator konfiguracji",
+  "SETUP_CODE": "Jednorazowy kod konfiguracji",
+  "SETUP_KEEP_NEW_KEY": "Zapisz ten klucz dostępu, aby logować się na innych urządzeniach.",
+  "SETUP_INITIALIZE_DESCRIPTION": "Serwer jest gotowy do utworzenia pierwszego klucza dostępu. Wpisz jednorazowy kod ustawiony na serwerze.",
+  "SETUP_INITIALIZE_KEY": "Utwórz klucz dostępu",
+  "SETUP_REQUIRES_HTTPS": "Pierwsza konfiguracja klucza wymaga HTTPS lub adresu localhost.",
+  "SETUP_UNAVAILABLE": "Pierwsza konfiguracja klucza jest niedostępna.",
+  "SETUP_INVALID_CODE": "Nieprawidłowy kod konfiguracji.",
+  "SETUP_REQUIRED": "Dokończ pierwszą konfigurację klucza, aby korzystać z usługi."
 }

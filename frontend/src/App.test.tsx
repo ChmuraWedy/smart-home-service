@@ -2,14 +2,14 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './test/App';
-import { DEFAULT_API_BASE, STORAGE_KEY } from './connection';
+import { STORAGE_KEY } from './connection';
 import type { CloudStatus } from './api';
 
 const BASE = 'http://api.test:8765';
 const TOKEN = 'valid-service-key';
 function stored(baseUrl = BASE) { localStorage.setItem(STORAGE_KEY, JSON.stringify({ baseUrl, token: TOKEN })); }
 function json(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } }); }
-function fakeApi(initial: Partial<CloudStatus> = {}) {
+function fakeApi(initial: Partial<CloudStatus> = {}, setupCode?: string) {
   const status: CloudStatus = {
     enabled: true, connected: true, has_saved_user_code: true, saved_user_code_requires_login: false,
     developer: { configured: true, connected: false, region: 'eu' }, ...initial,
@@ -20,6 +20,10 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
     const body = options?.body ? JSON.parse(String(options.body)) : undefined;
     const token = (options?.headers as Record<string, string> | undefined)?.['X-API-Key'];
     calls.push({ path, method: options?.method || 'GET', body, token });
+    if (path === '/api/v1/setup') {
+      if (options?.method !== 'POST') return json({ can_initialize: Boolean(setupCode) });
+      return body?.setup_code === setupCode ? json({ access_key: TOKEN }, 201) : json({ detail: 'Invalid setup code.' }, 403);
+    }
     if (token !== TOKEN) return json({ detail: 'Unauthorized' }, 401);
     if (path === '/api/v1/network/interfaces') return json([{name:'en1', address:'192.168.40.147', network:'192.168.40.0/24', broadcast:'192.168.40.255'}]);
     if (path === '/api/v1/cloud/topology') return json({ synced_at: null, warnings: 0, placements: [], job: { status: 'idle', processed: 0, total: 0, message: null } });
@@ -162,6 +166,7 @@ describe('cloud UI journeys', () => {
   });
 
   it('verifies a new browser connection before saving it', async () => {
+    window.history.replaceState(null, '', '/settings/connections');
     fakeApi(); render(<App />); const user = userEvent.setup();
     const address = screen.getByLabelText('Адрес API');
     await user.clear(address); await user.type(address, BASE);
@@ -311,14 +316,58 @@ describe('cloud UI journeys', () => {
     fakeApi(); render(<App />);
     await screen.findByRole('alert');
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).token).toBe('');
-    expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
+    expect(await screen.findByRole('heading', { name: 'Добро пожаловать домой' })).toBeInTheDocument();
   });
 
   it('starts without credentials and never sends a request before access is entered', () => {
     fakeApi(); render(<App />);
-    expect(screen.getByLabelText('Адрес API')).toHaveValue(DEFAULT_API_BASE);
+    expect(screen.getByRole('heading', { name: 'Добро пожаловать домой' })).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Получить QR-код' })).toBeDisabled();
+  });
+
+  it('guides an existing key through Tuya sign-in and optional local import', async () => {
+    const backend = fakeApi({ connected: false, redroid_available: true });
+    render(<App />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Начать' }));
+    expect(window.location.search).toBe('?step=access');
+    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Адрес API'), { target: { value: BASE } });
+    await user.type(screen.getByLabelText('Ключ доступа к сервису'), TOKEN);
+    await user.click(screen.getByRole('button', { name: 'Сохранить подключение' }));
+    await screen.findByText('Подключение сохранено.');
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    expect(screen.getByRole('button', { name: 'Smart Life / QR' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Smart Life / Android' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Access ID / Secret' }));
+    await user.click(screen.getByRole('button', { name: 'Проверить и подключить' }));
+    await screen.findByText(/Tuya Developer подключён/);
+    await user.click(screen.getByRole('button', { name: 'Далее' }));
+    expect(await screen.findByRole('heading', { name: 'Импорт устройств' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
+    expect(backend.calls.some(({ path }) => /\/(find|save)$/.test(path))).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Открыть панель' }));
+    expect(window.location.pathname).toBe('/');
+  });
+
+  it('creates a first key only after the user enters the one-time code', async () => {
+    const backend = fakeApi({}, 'initial-setup-code');
+    window.history.replaceState(null, '', '/setup?step=access');
+    render(<App />);
+    const user = userEvent.setup();
+    const code = await screen.findByLabelText('Одноразовый код настройки');
+    expect(backend.calls).toEqual([
+      expect.objectContaining({ path: '/api/v1/setup', method: 'GET' }),
+    ]);
+    await user.type(code, 'initial-setup-code');
+    await user.click(screen.getByRole('button', { name: 'Создать ключ доступа' }));
+    expect(await screen.findByLabelText('Сохраните этот ключ доступа для входа с других устройств.')).toHaveValue(TOKEN);
+    expect(backend.calls).toContainEqual({
+      path: '/api/v1/setup', method: 'POST', body: { setup_code: 'initial-setup-code' }, token: '',
+    });
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).token).toBe(TOKEN);
+    expect(localStorage.getItem(STORAGE_KEY)).not.toContain('initial-setup-code');
   });
 });
 

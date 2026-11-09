@@ -1159,5 +1159,21 @@
   "USE_EXISTING_ANDROID_SESSION": "Выкарыстаць бягучы сеанс Android",
   "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Завяршыце праверку ў Smart Life на Android, потым выберыце «Выкарыстаць бягучы сеанс Android».",
   "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Калі Android не паказаў запыт, адсканіруйце QR-код у Smart Life на іншай прыладзе з тым жа акаўнтам. Засталося секунд: {0}.",
-  "APPROVE_IN_ANDROID_AND_CONNECT": "Пацвердзіць у Android і падключыцца"
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Пацвердзіць у Android і падключыцца",
+  "SETUP_WELCOME": "Вітаем дома",
+  "SETUP_WELCOME_DESCRIPTION": "Наладзьце разумны дом, каб кіраваць прыладамі з адной панэлі.",
+  "SETUP_DEVICES": "Імпарт прылад",
+  "SETUP_DEVICES_DESCRIPTION": "Прылады Smart Life з'явяцца на панэлі пасля ўваходу. Знайдзіце і захавайце прылады ніжэй, каб кіраваць імі ў лакальнай сетцы.",
+  "SETUP_GET_STARTED": "Пачаць",
+  "SETUP_CONTINUE_LOCALLY": "Працягнуць з лакальнымі прыладамі",
+  "SETUP_OPEN_DASHBOARD": "Адкрыць панэль",
+  "SETUP_OPEN_WIZARD": "Адкрыць майстар наладкі",
+  "SETUP_CODE": "Аднаразовы код наладкі",
+  "SETUP_KEEP_NEW_KEY": "Захавайце гэты ключ доступу для ўваходу з іншых прылад.",
+  "SETUP_INITIALIZE_DESCRIPTION": "Сервер гатовы стварыць першы ключ доступу. Увядзіце аднаразовы код, зададзены на серверы.",
+  "SETUP_INITIALIZE_KEY": "Стварыць ключ доступу",
+  "SETUP_REQUIRES_HTTPS": "Для першай наладкі ключа патрэбны HTTPS або localhost.",
+  "SETUP_UNAVAILABLE": "Першая наладка ключа недаступная.",
+  "SETUP_INVALID_CODE": "Няправільны код наладкі.",
+  "SETUP_REQUIRED": "Завяршыце першую наладку ключа, каб карыстацца сэрвісам."
 }

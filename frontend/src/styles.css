@@ -1966,3 +1966,11 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-option { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }
 .combined-member-option input[type="checkbox"] { @apply tw:size-4 tw:shrink-0; }
 .combined-delete p { @apply tw:w-full; }
+
+.setup-wizard { width:min(100%, 54rem); margin-inline:auto; }
+.setup-wizard-body { display:grid; gap:1rem; }
+.setup-wizard-body > h1 { margin:0; }
+.setup-welcome-picture { display:block; max-width:100%; height:auto; margin-inline:auto; }
+.setup-initialize { border-top:1px solid var(--border); padding-top:1rem; }
+.setup-created-key input { font-family:monospace; }
+.setup-wizard-actions { justify-content:flex-end; }

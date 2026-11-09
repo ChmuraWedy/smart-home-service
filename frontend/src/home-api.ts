@@ -78,6 +78,14 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
   key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  setupAvailability(signal: AbortSignal) {
+    return this.request<{ 'can_initialize': boolean }>('/setup', 'GET', undefined, signal);
+  }
+
+  initializeSetup(setupCode: string) {
+    return this.request<{ 'access_key': string }>('/setup', 'POST', { setup_code: setupCode });
+  }
+
   assistantEmbed(signal: AbortSignal) {
     return this.request<{ url: string | null; ticket: string | null }>('/assistant/embed', 'POST', undefined, signal);
   }
