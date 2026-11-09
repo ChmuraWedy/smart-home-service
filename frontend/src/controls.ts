@@ -89,11 +89,36 @@ export function localSpec(key: string, cap: Capability): ControlSpec {
   if (cap.enum?.length) return { ...base, kind: 'enum', choices: cap.enum };
   switch (cap.type) {
     case 'boolean': return { ...base, kind: 'boolean' };
-    case 'integer': case 'number': return { ...base, kind: 'number', integer: cap.type === 'integer',
-      minimum: cap.minimum ?? undefined, maximum: cap.maximum ?? undefined, step: cap.step ?? (cap.type === 'integer' ? 1 : undefined) };
+    case 'integer': case 'number': {
+      const { minimum, maximum } = cap;
+      const step = cap.step ?? (cap.type === 'integer' ? 1 : undefined);
+      if (!base.unit && /^bright_value(?:_v2)?$/.test(key) && finite(minimum) && finite(maximum)
+        && minimum >= 0 && minimum < maximum) {
+        const factor = 100 / maximum;
+        return {
+          ...base,
+          kind: 'number',
+          unit: '%',
+          factor,
+          minimum: rounded(minimum * factor),
+          maximum: 100,
+          step: step === undefined ? undefined : rounded(step * factor),
+        };
+      }
+      return { ...base, kind: 'number', integer: cap.type === 'integer', minimum: minimum ?? undefined, maximum: maximum ?? undefined, step };
+    }
     case 'string': return { ...base, kind: 'text' };
     case 'object': return { ...base, kind: cap.encoding && cap.encoding !== 'raw' ? 'color' : 'json' };
   }
+}
+
+export function localReading(spec: ControlSpec, reading: Reading | undefined): Reading | undefined {
+  if (!spec.factor || !reading?.known || !finite(reading.value)) return reading;
+  return { ...reading, value: rounded(reading.value * spec.factor) };
+}
+
+export function localCommandValue(spec: ControlSpec, value: JsonValue): JsonValue {
+  return spec.factor && finite(value) ? rounded(value / spec.factor) : value;
 }
 
 function cloudColorScale(fn: CloudFunction, limits: Record<string, unknown>): { s: number; v: number } | undefined {

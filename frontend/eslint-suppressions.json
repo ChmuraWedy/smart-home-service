@@ -523,7 +523,7 @@
       "count": 2
     },
     "key-spacing": {
-      "count": 9
+      "count": 8
     },
     "no-confusing-arrow": {
       "count": 2
@@ -541,10 +541,10 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 8
+      "count": 6
     },
     "object-curly-spacing": {
-      "count": 10
+      "count": 8
     },
     "object-property-newline": {
       "count": 10
@@ -910,7 +910,7 @@
       "count": 3
     },
     "comma-spacing": {
-      "count": 25
+      "count": 22
     },
     "consistent-return": {
       "count": 1
@@ -928,7 +928,7 @@
       "count": 1
     },
     "key-spacing": {
-      "count": 7
+      "count": 4
     },
     "no-mixed-operators": {
       "count": 4
@@ -943,7 +943,7 @@
       "count": 10
     },
     "object-curly-spacing": {
-      "count": 4
+      "count": 2
     },
     "one-var": {
       "count": 2
@@ -1579,13 +1579,13 @@
   },
   "src/components/LocalControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 7
+      "count": 6
     },
     "@stylistic/max-len": {
-      "count": 8
+      "count": 7
     },
     "arrow-parens": {
-      "count": 18
+      "count": 16
     },
     "brace-style": {
       "count": 1
@@ -1597,7 +1597,7 @@
       "count": 2
     },
     "indent": {
-      "count": 12
+      "count": 7
     },
     "key-spacing": {
       "count": 1
@@ -1635,14 +1635,11 @@
     "react/button-has-type": {
       "count": 4
     },
-    "react/jsx-boolean-value": {
+    "react/jsx-first-prop-new-line": {
       "count": 1
     },
-    "react/jsx-first-prop-new-line": {
-      "count": 2
-    },
     "react/jsx-max-props-per-line": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/NetworkPage.tsx": {
@@ -1922,7 +1919,7 @@
       "count": 2
     },
     "object-property-newline": {
-      "count": 78
+      "count": 74
     },
     "one-var": {
       "count": 6

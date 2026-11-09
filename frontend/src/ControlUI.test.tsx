@@ -21,11 +21,11 @@ const sensor: LocalDevice = { ...child, id: 4, device_id: 'motion-sensor', name:
 const group = { id: 1, name: 'Свет кухни', room_id: 1, device_ids: [1, 2] };
 const cloudDevice = { id: 'cloud-lamp', name: 'Облачная лампа', online: true, has_local_key: false };
 
-function localServer(options: { partial?: boolean; postError?: boolean; disabled?: boolean; stale?: boolean } = {}) {
-  const devices = [light, child, thermostat, sensor];
+function localServer(options: { partial?: boolean; postError?: boolean; disabled?: boolean; stale?: boolean; lamp?: LocalDevice } = {}) {
+  const devices = [options.lamp ?? light, child, thermostat, sensor];
   const states: Record<number, DeviceState> = {};
   for (const device of devices) states[device.id] = { device_id: device.id, name: device.name, enabled: !options.disabled, available: true,
-    values: Object.fromEntries(Object.keys(device.capabilities).map(key => [key, { value: key === 'switch' ? false : key === 'color' ? { h: 0, s: 1000, v: 1000 } : key === 'motion' ? null : key === 'mode' ? 0 : key === 'target_temperature' ? 22.5 : 45,
+    values: Object.fromEntries(Object.keys(device.capabilities).map(key => [key, { value: key === 'switch' ? false : key === 'color' ? { h: 0, s: 1000, v: 1000 } : key === 'motion' ? null : key === 'mode' ? 0 : key === 'target_temperature' ? 22.5 : key === 'bright_value_v2' ? 469 : 45,
       known: key !== 'motion', stale: !!options.stale, observed_at: new Date().toISOString() }])) };
   const writes: { path: string; body?: unknown }[] = [], reads: string[] = [];
   vi.mocked(fetch).mockImplementation(async (input, init) => {
@@ -409,6 +409,26 @@ describe('cloud device control', () => {
 });
 
 describe('local device and group controls', () => {
+  it('converts a local brightness percentage back to the mapped units in full settings', async () => {
+    const lamp: LocalDevice = {
+      ...light,
+      capabilities: {
+        bright_value_v2: { type: 'integer', readable: true, writable: true, minimum: 10, maximum: 1000, step: 1 },
+      },
+    };
+    const { writes } = localServer({ lamp });
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={lamp} onClose={vi.fn()} onAuthError={vi.fn()} />);
+
+    const brightness = await screen.findByRole('region', { name: 'Яркость' });
+    const slider = within(brightness).getByRole('slider');
+    expect(slider).toHaveValue('46.9');
+    fireEvent.change(slider, { target: { value: '63.7' } });
+    await waitFor(() => expect(writes).toEqual([{
+      path: '/api/v1/devices/1/commands/capabilities', body: { values: { bright_value_v2: 637 } },
+    }]));
+  });
+
+
   it.each([light, child])('addresses $transport device by its own inventory ID without parent/key in the browser command', async device => {
     const server = localServer(); const user = userEvent.setup();
     renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);

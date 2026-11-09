@@ -5,7 +5,10 @@ import {
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CloudDevice, JsonValue, Provider } from '../api';
-import { cloudBatchCommands, cloudReading, cloudSpecs, displayReading, hsvToHex, isStale, limitsOf, localSpec, validateControlValue, withChannelLabels } from '../controls';
+import {
+  cloudBatchCommands, cloudReading, cloudSpecs, displayReading, hsvToHex, isStale, limitsOf,
+  localCommandValue, localReading, localSpec, validateControlValue, withChannelLabels,
+} from '../controls';
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
@@ -35,6 +38,7 @@ import { LightCardReading, LightSceneReadings, temperatureTint } from './LightCa
 
 const CARD_CACHE_INTERVAL = 4000;
 const SOCKET_METER_CODES = /^(?:add_ele|cur_(?:current|power|voltage)|electric(?:ity)?_coe|power_coe|voltage_coe|current|power|voltage|energy|electricity|fault)(?:_[1-9][0-9]*)?$/;
+const DASHBOARD_SETTING_CODE = /^(?:(?:countdown|relay_status|switch_backlight)(?:_[1-9][0-9]*)?|switch_inching|do_not_disturb|remote_switch|work_mode|scene_data(?:_v2)?)$/;
 const ELECTRICAL_UNIT = /^(?:mA|A|mV|V|mW|W|kW|Wh|kWh)$/i;
 
 function powerControl(spec: ControlSpec) {
@@ -42,6 +46,7 @@ function powerControl(spec: ControlSpec) {
 }
 function sensorReading(spec: ControlSpec, socket: boolean) {
   return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key)
+    && !DASHBOARD_SETTING_CODE.test(spec.key)
     && (!socket || !(SOCKET_METER_CODES.test(spec.key) || ELECTRICAL_UNIT.test(spec.unit ?? '')))
     && ['number', 'boolean', 'enum', 'text'].includes(spec.kind);
 }
@@ -442,7 +447,7 @@ function LocalCardControls({
   const state = cached ?? session.data;
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
-    const result = await api.setCapabilities(item.id, {[spec.key]:value});
+    const result = await api.setCapabilities(item.id, { [spec.key]: localCommandValue(spec, value) });
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
   return (
@@ -457,7 +462,7 @@ function LocalCardControls({
       sheet={sheet}
       specs={specs}
       category={device.cloud.sharing?.category || device.cloud.developer?.category}
-      reading={(spec) => state?.values[spec.key]}
+      reading={(spec) => localReading(spec, state?.values[spec.key])}
       now={now}
       local
       online={!!state?.enabled && state.available}
