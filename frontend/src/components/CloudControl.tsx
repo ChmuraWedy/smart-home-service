@@ -85,7 +85,7 @@ export function CloudControl({
   const now = useClock();
   const definitions = data ? labels ? withChannelLabels(data.definitions, labels) : data.definitions : null;
   const specs = data && definitions ? cloudSpecs(definitions, data.snapshot) : [];
-  const camera = isCamera(device.category);
+  const camera = !api.isMember && isCamera(device.category);
   const storage = cameraStorage(data?.snapshot.status || {});
   const privacySpec = camera ? specs.find(spec => spec.key === 'basic_private') : undefined;
   const privacy = privacySpec?.writable && privacySpec.kind === 'boolean' ? privacySpec : undefined;
@@ -135,7 +135,7 @@ export function CloudControl({
       <CapabilityField pendingScope={pendingScope}
         headingActions={info ? <>{headingActions}{helpIcon}</> : headingActions} key={spec.key} spec={info || privacyButton ? {...spec,help:undefined} : spec}
         valueEditor={camera && spec.key==='motion_area' && ['text','json'].includes(spec.kind) ? (value,change)=><CameraArea viewingBlocked={privacyBlock} value={value} onChange={change} disabled={disabled} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} /> : undefined} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower booleanButton={privacyButton} buttonText={privacyButton ? value=>value===null ? t(MSG.NO_DATA) : value ? t(MSG.ON_FEMININE) : t(MSG.OFF_FEMININE) : undefined} reading={reading} now={now} local={false}
-        aliasEditor={/^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)}
+        aliasEditor={!api.isMember && /^switch_[1-9][0-9]*$/.test(spec.key) ? <ChannelAliases api={api} deviceId={device.id} provider={provider} code={spec.key} alias={spec.aliases?.[0]} disabled={session.busy || aliasBusy || labelBusy} onBusy={setLabelBusy} onAuthError={onAuthError} /> : undefined} disabled={disabled} onSend={value=>sendValue(spec,value)}
       />
     );
   };
@@ -183,7 +183,7 @@ export function CloudControl({
         {provider === 'sharing' && data && <p className="help">{data.snapshot.event_stream_connected ? t(MSG.DEVICE_REPORTS_ARE_CONNECTED) : t(MSG.NO_FRESH_REPORTS_YET_OR_THE_CONNECTION_IS)}</p>}
       </details>
       {data && !data.snapshot.online && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
-      {primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
+      {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
       {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
       {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.filter(spec => !pairedTimers.has(spec.key)).map(basicField)}</div>}
       {settings.length > 0 && (
@@ -212,7 +212,8 @@ export function CloudControl({
       </details>
 )}
       {data && !specs.length && <p className="empty-state">{t(MSG.THE_DEVICE_PROVIDED_NO_READINGS_OR_CONTROLS)}</p>}
-      {!primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} onAuthError={onAuthError} />}
+      {!api.isMember && !primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} onAuthError={onAuthError} />}
+      {!api.isMember && (
       <DeviceTranslationEditor
         api={api}
         deviceId={device.id}
@@ -223,6 +224,8 @@ export function CloudControl({
         localId={localDevice?.id}
         onAuthError={onAuthError}
       />
+      )}
+      {!api.isMember && (
       <DeviceInformation
         api={api}
         deviceId={device.id}
@@ -235,7 +238,8 @@ export function CloudControl({
         writable={data ? specs.some((spec) => spec.writable) : undefined}
         onAuthError={onAuthError}
       />
-      {data && (
+      )}
+      {data && !api.isMember && (
       <details className="cloud-properties">
         <summary>{t(MSG.TECHNICAL_DATA_FOR_DEVICE_MAPPINGS)}</summary>
         <p className="help">{t(MSG.PARAMETER_CODES_AND_KNOWN_DP_NUMBERS_FOR_DEVICE)}</p>

@@ -126,7 +126,7 @@ export default function RoomNavigationEditor({
     setSaving(true);
     setFailed(false);
     try {
-      const browser = ensureDashboardBrowserId();
+      const browser = api.isMember ? '' : ensureDashboardBrowserId();
       const saved = await api.saveRoomNavigationLayout(browser, {
         rooms: ordered.map(({ id }) => ({ id, hidden: hidden.has(id) })),
       }, controller.signal);

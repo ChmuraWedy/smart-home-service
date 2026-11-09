@@ -28,6 +28,10 @@ def test_chat_ticket_has_scoped_access_and_only_works_once(tmp_path, factory):
     app = create_app(settings, TuyaController(settings, factory))
     with TestClient(app) as client:
         assert client.post(EMBED).status_code == 401
+        member = client.post(API + "/accounts", headers=OWNER, json={"name": "Alex"})
+        assert member.status_code == 201
+        member_headers = {"X-API-Key": member.json()["access_key"]}
+        assert client.post(EMBED, headers=member_headers).status_code == 403
         embed = client.post(EMBED, headers=OWNER)
         assert embed.headers["Cache-Control"] == "no-store"
         assert embed.json()["url"] == URL
@@ -49,6 +53,8 @@ def test_chat_ticket_has_scoped_access_and_only_works_once(tmp_path, factory):
         assert client.get(API + "/devices", headers=chat).status_code == 200
         assert client.patch(path, headers=chat, json={"name": "Edited"}).status_code == 403
         assert client.post(EMBED, headers=chat).status_code == 403
+        assert client.get(API + "/accounts", headers=chat).status_code == 403
+        assert client.get(API + "/dashboard-layouts/me", headers=chat).status_code == 403
         assert client.post(path + "/commands/capabilities", headers=chat, json={
             "values": {"switch": True},
         }).status_code == 200

@@ -1182,5 +1182,19 @@
   "ADVANCED_SETTINGS": "Zaawansowane",
   "NETWORK_MONITORING": "Monitorowanie sieci",
   "NETWORK_MONITORING_DISABLED": "Włącz monitorowanie sieci w ustawieniach zaawansowanych, aby sprawdzać ruch w sieci lokalnej.",
-  "SMART_LIFE_NO_LOADED_ROOMS": "Nie wczytano jeszcze pokoi ze Smart Life."
+  "SMART_LIFE_NO_LOADED_ROOMS": "Nie wczytano jeszcze pokoi ze Smart Life.",
+  "HOUSEHOLD_ACCESS": "Dostęp dla domowników",
+  "HOUSEHOLD_ACCESS_HELP": "Domownicy sterują wspólnymi urządzeniami i zapisują własny układ pulpitu.",
+  "HOUSEHOLD_MEMBER_NAME": "Imię domownika",
+  "CREATE_HOUSEHOLD_ACCESS": "Utwórz klucz dostępu",
+  "HOUSEHOLD_NEW_KEY": "Klucz dostępu dla {0}",
+  "HOUSEHOLD_NEW_KEY_HELP": "Skopiuj klucz i przekaż go prywatnie. Jest wyświetlany tylko raz.",
+  "REVOKE_HOUSEHOLD_ACCESS": "Cofnij dostęp dla {0}",
+  "REVOKE_HOUSEHOLD_CONFIRM": "Cofnąć dostęp dla {0} i usunąć zapisane układy pulpitu?",
+  "SIGNED_IN_AS": "Zalogowano jako {0}",
+  "SIGN_OUT": "Wyloguj się",
+  "ACCOUNT_SIGN_IN": "Zaloguj się do Smart Home",
+  "ACCOUNT_SIGN_IN_HELP": "Wpisz klucz dostępu otrzymany od właściciela domu.",
+  "HOUSEHOLD_OWNER_REQUIRED": "Ta operacja wymaga konta właściciela",
+  "HOUSEHOLD_OWNER": "Właściciel"
 }

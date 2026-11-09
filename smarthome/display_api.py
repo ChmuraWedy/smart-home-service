@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .api_dependencies import authenticate, get_session
+from .api_dependencies import Account, authenticate, get_session
 from .control import run_command
 from .dashboard import (
     dashboard,
@@ -14,9 +14,10 @@ from .dashboard import (
     validate_group,
     validate_group_change,
 )
+from .member_controls import require_local_commands, require_local_device
 from .models import Building, Device, DeviceGroup, Display, DisplayWidget, GroupMember, Room
 from .schemas import DisplayConfig, DisplayID, DisplayRead, GroupCreate, GroupPatch, GroupRead
-from .service import capability_dps, commit, get_or_404
+from .service import capability_dps, commit, effective_capabilities, get_or_404
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(authenticate)])
 
@@ -81,21 +82,33 @@ def delete_group(group_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/groups/{group_id}/state", tags=["Groups"])
-def read_group_state(group_id: int, session: Session = Depends(get_session)):
-    return group_state(session, get_or_404(session, DeviceGroup, group_id))
+def read_group_state(
+    group_id: int, account: Account | None = Depends(authenticate), session: Session = Depends(get_session),
+):
+    group = get_or_404(session, DeviceGroup, group_id)
+    if account and account.role == "member":
+        for member in group.members:
+            item = get_or_404(session, Device, member.device_id)
+            require_local_device(item.category, effective_capabilities(session, item))
+    return group_state(session, group)
 
 
 @router.post("/groups/{group_id}/commands/{command}", tags=["Groups"])
 def group_command(
-    group_id: int, command: str, request: Request, session: Session = Depends(get_session)
+    group_id: int, command: str, request: Request,
+    account: Account | None = Depends(authenticate), session: Session = Depends(get_session),
 ):
     if command not in {"on", "off"}:
         raise HTTPException(422, "Group command must be on or off")
     group = get_or_404(session, DeviceGroup, group_id)
     # Validate every member before sending the first command. Runtime failures are per-device.
-    commands = [(get_or_404(session, Device, m.device_id), None) for m in group.members]
+    devices = [get_or_404(session, Device, member.device_id) for member in group.members]
+    member = bool(account and account.role == "member")
+    if member:
+        for item in devices:
+            require_local_commands(item.category, effective_capabilities(session, item), ("switch",))
     prepared = [
-        (item, capability_dps(session, item, "switch", command == "on")) for item, _ in commands
+        (item, capability_dps(session, item, "switch", command == "on")) for item in devices
     ]
     results = []
     for item, dps in prepared:
@@ -105,7 +118,7 @@ def group_command(
                 {
                     "device_id": item.id,
                     "acknowledged": True,
-                    "result": result.model_dump(mode="json"),
+                    "result": result.model_dump(mode="json", exclude={"dps"} if member else None),
                 }
             )
         except HTTPException as exc:

@@ -27,6 +27,23 @@ Use one worker and one service instance. Device/gateway locks and pending discov
 
 Swagger at `/docs` and the generated `/openapi.json` describe request bodies, limits, and response schemas. Select **Authorize** in Swagger and enter the service key.
 
+## Household access
+
+The existing service key is the owner credential. To add someone, open **Menu → Settings → Household access**, enter their name, and copy the access key shown once. Share it privately. They enter it in **Menu → Connections → Connection settings** with the same API address. **Sign out** clears the credential and the dashboard state from that browser.
+
+Members share the home's devices. They can view ordinary readings, use permitted power and lighting controls, and save their own card positions, hidden cards, and room navigation across browsers. Only the owner can change inventory and integrations, manage access, access cameras and Classic Chat, and use advanced device commands or network tools. Revoking a key also deletes the member's saved dashboard layouts.
+
+| Method and path | Access |
+| --- | --- |
+| `GET /api/v1/accounts` | Owner. Lists member IDs and names. |
+| `POST /api/v1/accounts` | Owner. Accepts `{"name":"Alex"}` and returns the new member and their one-time `access_key`. |
+| `DELETE /api/v1/accounts/{member_id}` | Owner. Revokes the key and deletes that member's layouts. |
+| `GET /api/v1/cloud/status` | Owner and members. The `account` field identifies the current session. |
+| `GET, PUT /api/v1/dashboard-layouts/me` | Owner and members. Reads or saves the caller's layout for the requested building, room, column count and page. |
+| `GET, PUT /api/v1/dashboard-layouts/me/room-navigation` | Reads or saves the caller's room order and visibility. The member dashboard uses this account-level route. |
+
+For existing owner dashboards, an optional `browser_id` on the account layout read loads the old browser layout until the first account-level save for that view. The old browser layout endpoints remain available with the owner key. Household access requires a configured owner key.
+
 ## Data model
 
 ```text
