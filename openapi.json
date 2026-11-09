@@ -7287,6 +7287,32 @@
           }
         }
       }
+    },
+    "/api/v1/assistant/embed": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "Chat Embed",
+        "operationId": "chat_embed_api_v1_assistant_embed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatEmbed"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -10837,6 +10863,26 @@
           "name"
         ],
         "title": "OwnerName"
+      },
+      "ChatEmbed": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "ChatEmbed"
       }
     },
     "securitySchemes": {

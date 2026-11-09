@@ -1,4 +1,9 @@
 {
+  "AI_CHAT_TITLE": "Чат са ШІ",
+  "AI_CHAT_UNAVAILABLE": "Чат са ШІ недаступны на гэтым серверы.",
+  "AI_CHAT_LOADING": "Загружаем чат…",
+  "AI_CHAT_SIGN_IN": "Калі чат не загрузіўся, увайдзіце ў новай укладцы і адкрыйце гэтую панэль зноў.",
+  "AI_CHAT_OPEN_SEPARATELY": "Адкрыць Classic Chat",
   "WARM": "Цёплае",
   "COOL": "Халоднае",
   "TURN_OFF_PRIVACY": "Выключыць прыватнасць",

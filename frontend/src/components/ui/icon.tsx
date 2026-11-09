@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 const drawings = {
   add: <path d="M12 5v14M5 12h14" />,
   back: <path d="m14 5-7 7 7 7M7 12h14" />,
+  chat: <path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 3V6a1 1 0 0 1 1-1Zm3 5h8m-8 3h5" />,
   check: <path d="m5 12 4 4L19 6" />,
   'chevron-down': <path d="m6 9 6 6 6-6" />,
   clock: (

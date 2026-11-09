@@ -10,13 +10,14 @@ export type DashboardSheetState = {
 };
 
 export function DashboardSheet({
-  title, onClose, returnFocus, children, busy,
+  title, onClose, returnFocus, children, busy, className,
 }: {
   title: string;
   onClose: () => void;
   returnFocus?: RefObject<HTMLElement | null>;
   children: ReactNode;
   busy?: boolean;
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const dragStart = useRef<number | null>(null);
@@ -36,7 +37,7 @@ export function DashboardSheet({
   return (
     <dialog
       ref={dialog}
-      className="dashboard-sheet"
+      className={className ? `dashboard-sheet ${className}` : 'dashboard-sheet'}
       aria-labelledby={titleId}
       aria-busy={busy}
       onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}

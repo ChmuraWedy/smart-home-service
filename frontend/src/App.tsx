@@ -17,6 +17,7 @@ import type {
 import {
   clearConnection, DEFAULT_API_BASE, loadConnection, saveConnection, STORAGE_KEY,
 } from './connection';
+import AiChatButton from './components/AiChat';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import HouseholdAccess from './components/HouseholdAccess';
 import { readHouseholdSignIn } from './household-login';
@@ -508,6 +509,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
         <span className={'api-presence ' + (status ? 'online' : '')}>
           <i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}
         </span>
+        {view === 'control' && status && (
+          <AiChatButton api={api} disabled={locked} onAuthError={invalidateConnection} />
+        )}
         {view === 'control' && status && (
           <div className="dashboard-header-search">
             {searchOpen && (
