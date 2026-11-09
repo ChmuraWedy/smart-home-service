@@ -1189,5 +1189,17 @@
   "SHARE_DEVICE_KEY_PRIVATELY": "Share this link or key privately. Anyone who has it can sign in.",
   "SET_OWNER_NAME": "Set up the owner",
   "OWNER_NAME": "Owner name",
-  "EDIT_OWNER": "Edit owner"
+  "EDIT_OWNER": "Edit owner",
+  "SMART_LIFE_COUNTRY_OR_REGION": "Smart Life country or region",
+  "SMART_LIFE_EMAIL_OR_PHONE": "Smart Life email or phone",
+  "SMART_LIFE_PASSWORD": "Smart Life password",
+  "CONNECT_THROUGH_ANDROID": "Connect through Android",
+  "SMART_LIFE_THROUGH_ANDROID": "Smart Life through Android",
+  "SMART_LIFE_ANDROID_NOT_CONFIGURED": "The Smart Life Android controller is not configured.",
+  "OPEN_CONNECTIONS_THROUGH_A_LOCALHOST_TUNNEL": "Open Connections over HTTPS or run this SSH command, then open the local page to enter your password.",
+  "OPEN_LOCAL_CONNECTIONS": "Open local Connections",
+  "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Approve dashboard access in Smart Life on Android, then confirm here. {0} seconds left.",
+  "SMART_LIFE_ANDROID_LOGIN_HELP": "Use the country name shown in Smart Life. The dashboard sends your password to Android for sign-in and discards it after the request.",
+  "USE_EXISTING_ANDROID_SESSION": "Use existing Android session",
+  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Finish verification in Smart Life on Android, then choose Use existing Android session."
 }

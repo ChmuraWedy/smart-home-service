@@ -12,7 +12,7 @@ import {
 } from './i18n';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type {
-  CloudStatus, Connection, DeveloperCredentials, Provider,
+  CloudStatus, Connection, DeveloperCredentials, Provider, RedroidCredentials,
 } from './api';
 import {
   clearConnection, DEFAULT_API_BASE, loadConnection, saveConnection, STORAGE_KEY,
@@ -24,6 +24,7 @@ import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
 import { ThemeSelector } from './components/ThemeSelector';
 import { DeveloperForm, REGIONS, UserCodeForm } from './components/CredentialForms';
+import RedroidConnection from './components/RedroidConnection';
 import { ControlCenter } from './components/ControlCenter';
 import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
@@ -39,7 +40,8 @@ import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 import { rotateCloudAccountScope } from './cloud-account-scope';
 
 type Notice = { text: string; error?: boolean };
-type QR = { session: string; imageUrl: string; expiresAt: number };
+type QR = { session: string; imageUrl?: string; expiresAt: number };
+type ConnectionMethod = Provider | 'android';
 type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
 type ViewContext = { pages: Record<View, ReactNode>; view: View };
@@ -137,7 +139,10 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   let view = requestedView;
   if (needsAccess) view = 'connections';
   else if (member && ownerPage(requestedView)) view = 'control';
-  const provider: Provider = query.get('provider') === 'developer' ? 'developer' : 'sharing';
+  const method = query.get('provider');
+  const provider: ConnectionMethod = method === 'developer' || method === 'android' ? method : 'sharing';
+  const redroidAvailable = Boolean(status?.redroid_available);
+  const protectedConnection = window.isSecureContext && connection.baseUrl === window.location.origin;
   const [notice, setNotice] = useState<Notice>({ text: '' });
   const [busy, setBusy] = useState(Boolean(connection.token));
   const busyRef = useRef(busy);
@@ -153,7 +158,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const ready = Boolean(status?.enabled && connection.token);
   const showCodeForm = ready && (!status?.has_saved_user_code || editingCode);
   const showDeveloperForm = ready && (!developer.configured || editingDeveloper);
-  const accountConnected = provider === 'sharing' ? Boolean(status?.connected) : developer.connected;
+  const accountConnected = provider === 'developer' ? developer.connected : Boolean(status?.connected);
 
   const blocker = useBlocker(({ historyAction }) => {
     if (historyAction !== 'POP') return false;
@@ -245,7 +250,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     };
     update();
     const timer = setInterval(update, 1000);
-    return () => { clearInterval(timer); URL.revokeObjectURL(qr.imageUrl); };
+    return () => { clearInterval(timer); if (qr.imageUrl) URL.revokeObjectURL(qr.imageUrl); };
   }, [qr]);
 
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
@@ -326,6 +331,22 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     setNotice({ text: t(MSG.SCAN_THE_CODE_IN_SMART_LIFE_TUYA_SMART) });
   }, true);
 
+  const connectRedroid = (credentials?: RedroidCredentials) => run(async () => {
+    if (!protectedConnection || !redroidAvailable) return;
+    setQR(null);
+    if (credentials) {
+      const result = await api.loginRedroid(credentials);
+      if (currentConnection.current !== connection) return;
+      if (result.screen === 'verification') {
+        setNotice({ text: t(MSG.FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID) });
+        return;
+      }
+    }
+    const login = await api.beginRedroidQR();
+    if (currentConnection.current !== connection) return;
+    setQR({ session: login.session_id, expiresAt: Date.now() + login.expires_in * 1000 });
+  }, true);
+
   const confirmQR = () => run(async () => {
     if (!qr) return;
     await api.confirmQR(qr.session);
@@ -338,10 +359,11 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     setNotice({ text: t(MSG.ACCOUNT_CONNECTED) });
   }, true);
 
-  function chooseProvider(value: Provider) {
+  function chooseProvider(value: ConnectionMethod) {
     if (busyRef.current || value === provider) return;
     setQR(null); setNotice({ text: '' });
-    void navigate(appPaths.connections + (value === 'developer' ? '?provider=developer' : ''), { state: location.state });
+    const path = value === 'sharing' ? appPaths.connections : `${appPaths.connections}?provider=${value}`;
+    void navigate(path, { state: location.state });
   }
 
   function changeCardSize(next: CardSize) {
@@ -497,6 +519,11 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
               <section className="card setup" aria-label={t(MSG.TUYA_CONNECTION)}>
                 <div className="method-tabs" role="group" aria-label={t(MSG.CONNECTION_METHOD)}>
                   <button aria-pressed={provider === 'sharing'} disabled={locked} onClick={() => chooseProvider('sharing')}>Smart Life / QR</button>
+                  {redroidAvailable && (
+                    <button type="button" aria-pressed={provider === 'android'} disabled={locked} onClick={() => chooseProvider('android')}>
+                      Smart Life / Android
+                    </button>
+                  )}
                   <button aria-pressed={provider === 'developer'} disabled={locked} onClick={() => chooseProvider('developer')}>Access ID / Secret</button>
                 </div>
                 {provider === 'sharing' ? (
@@ -519,7 +546,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   </>
           )}
                     <button className="full-width" disabled={busy || !ready || !status?.has_saved_user_code || showCodeForm} onClick={beginQR}>{t(MSG.GET_QR_CODE)}</button>
-                    {qr && (
+                    {qr?.imageUrl && (
                   <div className="qr-panel">
                     <img src={qr.imageUrl} alt={t(MSG.QR_CODE_FOR_TUYA_SIGN_IN)} />
                     <p className="help">{t(MSG.SCAN_THE_CODE_IN_THE_APP) + " "}{remaining}{" " + t(MSG.SEC)}</p>
@@ -527,7 +554,20 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   </div>
 )}
                   </div>
-) : (
+ ) : provider === 'android' ? (
+  <div className="provider-panel">
+    <h2>{t(MSG.SMART_LIFE_THROUGH_ANDROID)}</h2>
+    <RedroidConnection
+      available={redroidAvailable}
+      protectedConnection={protectedConnection}
+      ready={ready}
+      busy={locked}
+      approvalTime={qr ? remaining : null}
+      onConnect={connectRedroid}
+      onConfirm={confirmQR}
+    />
+  </div>
+ ) : (
   <div className="provider-panel">
     <p className="eyebrow">{t(MSG.SIGN_IN_WITH_A_CLOUD_PROJECT)}</p>
     <h2>Tuya Developer</h2>
