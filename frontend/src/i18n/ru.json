@@ -1141,5 +1141,20 @@
   "ROOM_BACKGROUND_UPLOAD_LIMIT": "Размер загружаемого фона превышает 1 МиБ",
   "ROOM_CARD_OPACITY": "Непрозрачность фона карточек",
   "ROOM_OPACITY_HINT": "При меньшем значении фон комнаты виден лучше.",
-  "ROOM_VIEW_DASHBOARD": "Открыть панель комнаты"
+  "ROOM_VIEW_DASHBOARD": "Открыть панель комнаты",
+  "SMART_LIFE_COUNTRY_OR_REGION": "Страна или регион Smart Life",
+  "SMART_LIFE_EMAIL_OR_PHONE": "Электронная почта или телефон Smart Life",
+  "SMART_LIFE_PASSWORD": "Пароль Smart Life",
+  "CONNECT_THROUGH_ANDROID": "Подключиться через Android",
+  "SMART_LIFE_THROUGH_ANDROID": "Smart Life через Android",
+  "SMART_LIFE_ANDROID_NOT_CONFIGURED": "Контроллер Smart Life для Android не настроен.",
+  "SMART_LIFE_SIGN_IN_REQUIRES_HTTPS": "Для ввода пароля Smart Life требуется HTTPS.",
+  "OPEN_SECURE_SMART_LIFE_SIGN_IN": "Открыть защищённый вход в Smart Life",
+  "SMART_LIFE_CONNECTED": "Smart Life подключён.",
+  "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Smart Life готов подтвердить доступ панели управления. Осталось секунд: {0}.",
+  "SMART_LIFE_ANDROID_LOGIN_HELP": "Введите название страны как в Smart Life. Панель управления передаст пароль в Android для входа и удалит его после запроса.",
+  "USE_EXISTING_ANDROID_SESSION": "Использовать текущий сеанс Android",
+  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Завершите проверку в Smart Life на Android, затем выберите «Использовать текущий сеанс Android».",
+  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Если на Android не появилось подтверждение, отсканируйте QR-код в Smart Life на другом устройстве с тем же аккаунтом. Осталось секунд: {0}.",
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Подтвердить в Android и подключиться"
 }

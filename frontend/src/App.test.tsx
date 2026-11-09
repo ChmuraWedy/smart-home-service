@@ -37,6 +37,8 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
       return json(status.developer);
     }
     if (path.endsWith('/login/qr')) return json({ session_id: 'qr-session', qr_url: '/api/v1/cloud/login/qr-session/qr.svg', expires_in: 120 });
+    if (path.endsWith('/login/redroid/credentials')) return json({ screen: 'home' });
+    if (path.endsWith('/login/redroid/qr')) return json({ session_id: 'android-session', qr_url: '/api/v1/cloud/login/android-session/qr.svg', expires_in: 90, android_approval_ready: true });
     if (path.endsWith('/qr.svg')) return new Response('<svg/>', { headers: { 'Content-Type': 'image/svg+xml' } });
     if (path.endsWith('/confirm')) {
       status.connected = true; status.saved_user_code_requires_login = false;
@@ -73,6 +75,52 @@ async function restored(connections = true) {
   if (connections) await go(userEvent.setup(), 'Подключения');
   return backend;
 }
+
+it('uses the Android Docker session from the LAN dashboard without entering a password', async () => {
+  vi.stubGlobal('isSecureContext', false);
+  vi.stubEnv('VITE_DASHBOARD_HTTPS_ORIGIN', 'https://homeassistant.dom:8443');
+  try {
+    stored(window.location.origin);
+    window.history.replaceState(null, '', '/settings/connections?provider=android');
+    const backend = fakeApi({ redroid_available: true });
+    render(<App />);
+    const user = userEvent.setup();
+    const connect = await screen.findByRole('button', { name: 'Использовать текущий сеанс Android' });
+    expect(screen.getByText('Smart Life подключён.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Открыть защищённый вход в Smart Life' }))
+      .toHaveAttribute('href', 'https://homeassistant.dom:8443/settings/connections?provider=android');
+    expect(screen.queryByLabelText('Пароль Smart Life')).toBeNull();
+    await user.click(connect);
+    await user.click(await screen.findByRole('button', { name: 'Подтвердить в Android и подключиться' }));
+    expect(backend.calls.filter(call => call.method === 'POST').map(call => call.path)).toEqual([
+      '/api/v1/cloud/login/redroid/qr', '/api/v1/cloud/login/redroid/android-session/confirm',
+    ]);
+    expect(window.location.pathname + window.location.search).toBe('/settings/connections?provider=android');
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it('sends credentials once and waits for Smart Life approval before connecting the dashboard', async () => {
+  vi.stubGlobal('isSecureContext', true);
+  stored(window.location.origin);
+  window.history.replaceState(null, '', '/settings/connections?provider=android');
+  const backend = fakeApi({ redroid_available: true, connected: false });
+  render(<App />);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText('Страна или регион Smart Life'), 'Poland');
+  await user.type(screen.getByLabelText('Электронная почта или телефон Smart Life'), 'demo@example.invalid');
+  await user.type(screen.getByLabelText('Пароль Smart Life'), 'temporary-password');
+  await user.click(screen.getByRole('button', { name: 'Подключиться через Android' }));
+  await screen.findByText(/Smart Life готов подтвердить доступ/);
+  const posts = () => backend.calls.filter(call => call.method === 'POST');
+  expect(posts().map(call => call.path)).toEqual(['/api/v1/cloud/login/redroid/credentials', '/api/v1/cloud/login/redroid/qr']);
+  expect(posts()[0].body).toEqual({ region: 'Poland', account: 'demo@example.invalid', password: 'temporary-password' });
+  expect(localStorage.getItem(STORAGE_KEY)).not.toContain('temporary-password');
+  await user.click(screen.getByRole('button', { name: 'Подтвердить в Android и подключиться' }));
+  expect(posts().at(-1)?.path).toBe('/api/v1/cloud/login/redroid/android-session/confirm');
+  expect(await screen.findByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
+});
 
 describe('cloud UI journeys', () => {
   it('opens the common device list after restoring access and uses Connections only for account settings', async () => {

@@ -4616,6 +4616,119 @@
         ]
       }
     },
+    "/api/v1/cloud/login/redroid/credentials": {
+      "post": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Redroid Login",
+        "operationId": "redroid_login_api_v1_cloud_login_redroid_credentials_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedroidCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cloud/login/redroid/qr": {
+      "post": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Redroid Qr",
+        "operationId": "redroid_qr_api_v1_cloud_login_redroid_qr_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cloud/login/redroid/{session_id}/confirm": {
+      "post": {
+        "tags": [
+          "Cloud"
+        ],
+        "summary": "Redroid Confirm",
+        "operationId": "redroid_confirm_api_v1_cloud_login_redroid__session_id__confirm_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cloud/login/{session_id}/qr.svg": {
       "get": {
         "tags": [
@@ -8537,6 +8650,40 @@
         "additionalProperties": false,
         "type": "object",
         "title": "QRLogin"
+      },
+      "RedroidCredentials": {
+        "properties": {
+          "region": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Region"
+          },
+          "account": {
+            "type": "string",
+            "maxLength": 254,
+            "minLength": 1,
+            "format": "password",
+            "title": "Account",
+            "writeOnly": true
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "region",
+          "account",
+          "password"
+        ],
+        "title": "RedroidCredentials"
       },
       "RegisterObservation": {
         "properties": {

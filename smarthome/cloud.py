@@ -162,7 +162,7 @@ class CloudBridge:
                 "saved_user_code_requires_login": self.saved_code_requires_login,
             }
 
-    def begin_login(self, user_code=None):
+    def begin_login(self, user_code=None, *, redroid=False):
         self.require_enabled()
         with self.lock:
             if user_code is None:
@@ -195,6 +195,7 @@ class CloudBridge:
                 "user_code": user_code,
                 "qr": qr,
                 "login": login,
+                "redroid": redroid,
                 "expires": now + 120,
             }
             return {
@@ -226,6 +227,14 @@ class CloudBridge:
             output = io.BytesIO()
             qr.save(output)
             return output.getvalue()
+
+    def redroid_qr_token(self, id):
+        self.require_enabled()
+        with self.lock:
+            item = self._pending(id)
+            if not item["redroid"]:
+                raise HTTPException(404, "Android login session not found")
+            return item["qr"]
 
     def confirm(self, id):
         self.require_enabled()

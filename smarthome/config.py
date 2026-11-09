@@ -33,6 +33,8 @@ class Settings:
             os.getenv("SMART_HOME_CLOUD_ENABLED", "0").lower() in {"1", "true", "yes"}
         )
     )
+    redroid_token_file: str = field(default_factory=lambda: os.getenv("SMART_HOME_REDROID_TOKEN_FILE", ""))
+    redroid_port: int = field(default_factory=lambda: int(os.getenv("SMART_HOME_REDROID_PORT", "18765")))
     cloud_session_path: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_CLOUD_SESSION", "")
     )
@@ -61,6 +63,8 @@ class Settings:
     frontend_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_FRONTEND_URL", ""))
 
     def __post_init__(self):
+        if not 1 <= self.redroid_port <= 65535:
+            raise ValueError("SMART_HOME_REDROID_PORT must be a valid port")
         if self.display_poll_interval != 0 and not 10 <= self.display_poll_interval <= 3600:
             raise ValueError("Display poll interval must be 0 (manual) or 10..3600 seconds")
         if not 0 < self.tuya_timeout <= 30 or not 0 < self.lock_timeout <= 60:

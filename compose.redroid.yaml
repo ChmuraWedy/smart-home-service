@@ -1,0 +1,16 @@
+# Pair with compose.lan.yaml when the ReDroid controller runs on this host.
+services:
+  frontend:
+    build:
+      args:
+        VITE_DASHBOARD_HTTPS_ORIGIN: ${VITE_DASHBOARD_HTTPS_ORIGIN:-}
+  backend:
+    environment:
+      SMART_HOME_REDROID_TOKEN_FILE: /run/secrets/redroid_controller_token
+      SMART_HOME_REDROID_PORT: ${SMART_HOME_REDROID_PORT:-18765}
+    secrets:
+      - redroid_controller_token
+
+secrets:
+  redroid_controller_token:
+    file: ${SMART_HOME_REDROID_TOKEN_FILE:?Set the path to the ReDroid controller token file}
