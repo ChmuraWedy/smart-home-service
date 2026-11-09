@@ -11,6 +11,7 @@ from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 
+from .db import lock_writes
 from .device_translations import LOCAL_SCOPE, save_values
 from .models import CloudDeviceAlias, Device, DeviceTranslation, Room
 from .schemas import DisplayText, Locale
@@ -122,7 +123,7 @@ def generate_missing(session, url, current_labels):
         generated = translate_batches(url, originals)
         if not any(generated.values()):
             return
-        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        lock_writes(session)
         current = set(current_labels())
         for label in candidates:
             values = generated.get(label.original)

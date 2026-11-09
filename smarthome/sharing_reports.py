@@ -1,31 +1,38 @@
-"""Latest received Tuya reports in the existing SQLite database, scoped by account."""
+"""Latest received Tuya reports, scoped by account."""
 
 import hashlib
 import json
-import sqlite3
 from contextlib import contextmanager
+
+from sqlalchemy import delete, select
+
+from .db import make_engine, upsert
+from .models import cloud_status_reports
 
 
 class SharingReports:
-    def __init__(self, bridge):
+    def __init__(self, bridge, engine):
         self.bridge = bridge
+        self.engine = engine
 
     @contextmanager
     def connection(self):
-        # The optional adapter also supports injected in-memory test settings.
-        if self.bridge.settings.database_path == ":memory:":
+        settings = self.bridge.settings
+        if settings.database_path == ":memory:" and not settings.database_url:
             yield None
             return
-        db = sqlite3.connect(self.bridge.settings.database_path, timeout=2)
+        if self.engine is not None:
+            with self.engine.begin() as connection:
+                yield connection
+            return
+        # Standalone bridge instances can persist reports without an application engine.
+        engine = make_engine(settings.database_path, settings.database_url)
         try:
-            with db:
-                db.execute("""CREATE TABLE IF NOT EXISTS cloud_status_reports (
-                    scope TEXT NOT NULL, device_id TEXT NOT NULL, code TEXT NOT NULL,
-                    value TEXT NOT NULL, observed_at TEXT, received_at TEXT NOT NULL,
-                    PRIMARY KEY(scope, device_id, code))""")
-                yield db
+            with engine.begin() as connection:
+                cloud_status_reports.create(connection, checkfirst=True)
+                yield connection
         finally:
-            db.close()
+            engine.dispose()
 
     @property
     def scope(self):
@@ -33,46 +40,50 @@ class SharingReports:
         return hashlib.sha256(("sharing:" + uid).encode()).hexdigest()
 
     def load(self, id):
-        with self.connection() as db:
-            if db is None:
+        table = cloud_status_reports
+        with self.connection() as connection:
+            if connection is None:
                 return {}
+            rows = connection.execute(
+                select(table.c.code, table.c.value, table.c.observed_at, table.c.received_at)
+                .where(table.c.scope == self.scope, table.c.device_id == id)
+            )
             return {
                 code: {"value": json.loads(value), "observed_at": observed, "received_at": received}
-                for code, value, observed, received in db.execute(
-                    "SELECT code,value,observed_at,received_at FROM cloud_status_reports "
-                    "WHERE scope=? AND device_id=?",
-                    (self.scope, id),
-                )
+                for code, value, observed, received in rows
             }
 
     def save(self, id, reports):
-        with self.connection() as db:
-            if db is None:
+        if not reports:
+            return
+        table = cloud_status_reports
+        with self.connection() as connection:
+            if connection is None:
                 return
-            db.executemany(
-                "INSERT INTO cloud_status_reports VALUES (?,?,?,?,?,?) "
-                "ON CONFLICT(scope,device_id,code) DO UPDATE SET "
-                "value=excluded.value,observed_at=excluded.observed_at,received_at=excluded.received_at",
+            statement = upsert(connection, table)
+            connection.execute(
+                statement.on_conflict_do_update(
+                    index_elements=list(table.primary_key.columns),
+                    set_={key: statement.excluded[key] for key in ("value", "observed_at", "received_at")},
+                ),
                 [
-                    (
-                        self.scope,
-                        id,
-                        code,
-                        json.dumps(report["value"]),
-                        report["observed_at"],
-                        report["received_at"],
-                    )
+                    {
+                        "scope": self.scope,
+                        "device_id": id,
+                        "code": code,
+                        "value": json.dumps(report["value"]),
+                        "observed_at": report["observed_at"],
+                        "received_at": report["received_at"],
+                    }
                     for code, report in reports.items()
                 ],
             )
 
     def clear(self, id=None):
-        with self.connection() as db:
-            if db is not None:
-                if id is None:
-                    db.execute("DELETE FROM cloud_status_reports WHERE scope=?", (self.scope,))
-                else:
-                    db.execute(
-                        "DELETE FROM cloud_status_reports WHERE scope=? AND device_id=?",
-                        (self.scope, id),
-                    )
+        table = cloud_status_reports
+        with self.connection() as connection:
+            if connection is not None:
+                statement = delete(table).where(table.c.scope == self.scope)
+                if id is not None:
+                    statement = statement.where(table.c.device_id == id)
+                connection.execute(statement)

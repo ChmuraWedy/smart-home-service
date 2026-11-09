@@ -40,7 +40,7 @@ RUN apt-get update \
     && chown smarthome:smarthome /app/data
 COPY pyproject.toml requirements.txt requirements-cloud.txt ./
 COPY smarthome/ ./smarthome/
-RUN pip install --no-cache-dir '.[cloud]'
+RUN pip install --no-cache-dir '.[cloud,postgres]'
 COPY deploy/docker-entrypoint.sh /app/deploy/docker-entrypoint.sh
 USER smarthome
 EXPOSE 8000

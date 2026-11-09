@@ -5,11 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from PIL import Image, ImageOps
 from pydantic import Field
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from .api_dependencies import authenticate, get_session
+from .db import lock_writes, upsert
 from .models import Room, RoomAppearance
 from .schemas import PositiveID, Schema
 from .service import commit, get_or_404
@@ -34,9 +34,9 @@ def read_appearance(session: Session, room_id: int) -> AppearanceRead:
 
 
 def save_appearance(session: Session, room_id: int, **values) -> AppearanceRead:
-    session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    lock_writes(session)
     get_or_404(session, Room, room_id)
-    statement = insert(RoomAppearance).values(room_id=room_id, **values)
+    statement = upsert(session.get_bind(), RoomAppearance).values(room_id=room_id, **values)
     session.execute(statement.on_conflict_do_update(index_elements=[RoomAppearance.room_id], set_=values))
     appearance = read_appearance(session, room_id)
     commit(session)

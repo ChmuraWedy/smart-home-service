@@ -184,7 +184,7 @@ pnpm build
 
 ## Architecture and data
 
-The React + TypeScript + Vite interface calls a FastAPI service. SQLAlchemy and SQLite store configuration, mappings, and observations. TinyTuya handles local devices; the optional Sharing SDK and Developer connection handle cloud access. Production serves the built interface and proxies the API through nginx in one container.
+The React + TypeScript + Vite interface calls a FastAPI service. SQLAlchemy stores configuration, mappings, and observations in SQLite by default. An existing installation can [move to PostgreSQL](deploy/docker.md#move-an-existing-sqlite-database-to-postgresql). TinyTuya handles local devices; the optional Sharing SDK and Developer connection handle cloud access. Production serves the built interface and proxies the API through nginx in one container.
 
 Device local keys and Tuya credentials are handled by the server. The browser stores its service access key and UI preferences. Keep `.env`, databases, Tuya session files, and device exports out of Git; back them up privately. The included HTTP service is intended for a trusted LAN. Use a VPN or an HTTPS reverse proxy for remote access.
 

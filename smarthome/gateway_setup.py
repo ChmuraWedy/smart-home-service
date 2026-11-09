@@ -8,12 +8,13 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field, ValidationError, field_validator
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
 from .cloud_api import Provider, cloud_bridge
 from .cloud_scope import scope_for
+from .db import lock_writes
 from .device_aliases import aliases_for_devices
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
 from .models import Device
@@ -416,7 +417,7 @@ def find_gateway(
 
 
 def save_gateway(body, session, bridge_for, controller, probe_lock, store):
-    """Only this explicit confirmation path may change the SQLite inventory."""
+    """Only this explicit confirmation path may change the device inventory."""
     if not probe_lock.acquire(blocking=False):
         raise HTTPException(409, "Проверка другого устройства ещё выполняется. Дождитесь её завершения.")
     try:
@@ -436,7 +437,7 @@ def save_gateway(body, session, bridge_for, controller, probe_lock, store):
                 if entry.expires <= store.clock():
                     raise HTTPException(404, "Результат поиска истёк. Найдите шлюз снова.")
                 session.rollback()
-                session.execute(text("BEGIN IMMEDIATE"))
+                lock_writes(session)
                 check_finding(bridge, entry, session)
                 if entry.expires <= store.clock():
                     raise HTTPException(404, "Результат поиска истёк. Найдите шлюз снова.")

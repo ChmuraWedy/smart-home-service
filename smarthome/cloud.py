@@ -20,7 +20,7 @@ MISSING_LIGHT_REFRESH_INTERVAL = 60
 
 
 class CloudBridge:
-    def __init__(self, settings, login_factory=None, manager_factory=None, mq_factory=None):
+    def __init__(self, settings, login_factory=None, manager_factory=None, mq_factory=None, *, engine=None):
         self.settings = settings
         self.path = Path(settings.cloud_session_path or (settings.database_path + ".cloud.json"))
         self.login_factory = login_factory
@@ -33,7 +33,7 @@ class CloudBridge:
         self.next_inventory_refresh = 0.0
         self.next_light_refresh = {}
         self.next_room_lookup = {}
-        self.state = SharingState(self, mq_factory)
+        self.state = SharingState(self, mq_factory, engine=engine)
         if settings.cloud_enabled and self.path.exists():
             if self.path.is_symlink():
                 raise ValueError("Cloud session file must not be a symlink")

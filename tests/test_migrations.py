@@ -79,7 +79,9 @@ def test_newer_schema_is_rejected_without_modification():
 def test_upgrades_a_version_one_database_without_losing_layouts():
     engine = db.make_engine(":memory:")
     with engine.begin() as connection:
-        connection.exec_driver_sql("CREATE TABLE rooms (id INTEGER PRIMARY KEY)")
+        for name in ("buildings", "device_types", "devices"):
+            db.Base.metadata.tables[name].create(connection)
+        connection.exec_driver_sql("CREATE TABLE rooms (id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
         connection.exec_driver_sql(
             "CREATE TABLE combined_devices (id INTEGER PRIMARY KEY, show_all_power BOOLEAN NOT NULL)"
         )

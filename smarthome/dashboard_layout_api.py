@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import Account, authenticate, get_session, require_account
+from .db import lock_writes, upsert
 from .models import AccountDashboardLayout, DashboardLayout, HouseholdMember, Room
 from .service import commit
 
@@ -63,7 +63,7 @@ class RoomNavigationLayout(BaseModel):
 
 
 def write_layout(session: Session, browser_id: str, view: str, changes: dict):
-    statement = insert(DashboardLayout).values(browser_id=browser_id, view=view, **changes)
+    statement = upsert(session.get_bind(), DashboardLayout).values(browser_id=browser_id, view=view, **changes)
     session.execute(statement.on_conflict_do_update(
         index_elements=[DashboardLayout.browser_id, DashboardLayout.view],
         set_=changes,
@@ -82,13 +82,13 @@ def layout_slots(layout: DashboardLayout | AccountDashboardLayout | None):
 def lock_member_layout(session: Session, account: Account):
     if account.role == "member":
         # Serialize the membership recheck with revocation before writing any layout.
-        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        lock_writes(session)
         if session.get(HouseholdMember, account.id) is None:
             raise HTTPException(401, "Missing or invalid X-API-Key")
 
 
 def write_account_layout(session: Session, account: Account, view: str, changes: dict):
-    statement = insert(AccountDashboardLayout).values(account_id=account.id, view=view, **changes)
+    statement = upsert(session.get_bind(), AccountDashboardLayout).values(account_id=account.id, view=view, **changes)
     session.execute(statement.on_conflict_do_update(
         index_elements=[AccountDashboardLayout.account_id, AccountDashboardLayout.view],
         set_=changes,

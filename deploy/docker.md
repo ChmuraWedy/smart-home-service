@@ -78,7 +78,27 @@ The `smart-home-service_smart-home-data` volume contains the database, reports, 
 
 Ordinary updates preserve the volume. For a manual import into a new volume, use UID/GID `1000:1000`, directories with mode 0700, and files with mode 0600. Both containers run as unprivileged users. Keep HTTP access within a trusted LAN or use a VPN or HTTPS reverse proxy.
 
-The backend applies pending SQLite migrations at startup. It records the schema version in `PRAGMA user_version` and rolls back the upgrade if a migration fails. Take a database backup before deploying a schema change. Developers append upgrades to `smarthome/migrations.py` in version order.
+The backend applies pending database migrations at startup. SQLite stores the version in `PRAGMA user_version`. PostgreSQL stores it in `smart_home_schema_version`. A failed upgrade rolls back. Take a database backup before deploying a schema change. Developers append upgrades to `smarthome/migrations.py` in version order.
+
+## Move an existing SQLite database to PostgreSQL
+
+1. Provision a dedicated UTF-8 PostgreSQL database with an empty schema. Give the app database role permission to create and update objects in that schema. Make the database reachable from the backend. Use a private connection or configure PostgreSQL TLS.
+2. Stop every backend writing to the SQLite database. Keep the existing volume and back up the SQLite database, service key, and Tuya session files. Keep the existing database path and back up `/app/data/smarthome.db.account-key-vault` if it exists so the service can still decrypt existing device keys. Keep the PostgreSQL URL in your protected `.env` as `SMART_HOME_DATABASE_URL`.
+3. Build the backend and run the one-time transfer with the same Compose files used for your deployment. The Dell LAN stack uses both Compose files.
+
+   ```sh
+   docker compose -f compose.yaml -f compose.lan.yaml build backend
+   docker compose -f compose.yaml -f compose.lan.yaml stop backend
+   docker compose -f compose.yaml -f compose.lan.yaml run --rm --no-deps \
+     --entrypoint smart-home-migrate-postgres backend --sqlite /app/data/smarthome.db
+   ```
+
+   For a Python installation, install `smart-home-service[postgres]`, export the PostgreSQL URL, and run `smart-home-migrate-postgres --sqlite /path/to/smarthome.db`.
+4. Review the row counts and start the backend with the same URL. Verify authenticated inventory, room layouts, and device controls. Keep the current service key and the Tuya session files in their existing locations.
+
+The transfer reads a consistent SQLite snapshot, upgrades that copy, and commits the PostgreSQL schema and data together. The source file stays intact. The command requires an empty target, so run it before starting the API with a new PostgreSQL URL. To return to SQLite before accepting writes in PostgreSQL, stop the backend, remove `SMART_HOME_DATABASE_URL`, and start with the original volume. After PostgreSQL accepts writes, returning to SQLite also requires reconciling those changes.
+
+To run the PostgreSQL integration tests locally, install `.[dev,postgres]` and set `SMART_HOME_TEST_POSTGRES_URL` to a test database. The tests create and remove a separate schema for each case.
 
 ## Build on another computer
 

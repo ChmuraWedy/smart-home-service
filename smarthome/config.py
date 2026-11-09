@@ -68,6 +68,10 @@ class Settings:
     )
     frontend_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_FRONTEND_URL", ""))
 
+    database_url: str = field(
+        default_factory=lambda: os.getenv("SMART_HOME_DATABASE_URL", ""), repr=False
+    )
+
     def __post_init__(self):
         if self.setup_code and len(self.setup_code) < 32:
             raise ValueError("SMART_HOME_SETUP_CODE must have at least 32 characters")

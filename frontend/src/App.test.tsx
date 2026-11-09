@@ -373,7 +373,7 @@ describe('cloud UI journeys', () => {
     await user.click(screen.getByRole('button', { name: 'Далее' }));
     expect(screen.queryByRole('button', { name: 'Меню' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Smart Life / QR' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Smart Life / Android' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Подключить аккаунт SmartLife' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Access ID / Secret' }));
     await user.click(screen.getByRole('button', { name: 'Проверить и подключить' }));
@@ -386,6 +386,36 @@ describe('cloud UI journeys', () => {
     await user.click(screen.getByRole('button', { name: 'Открыть панель' }));
     expect(window.location.pathname).toBe('/');
     expect(screen.getByRole('button', { name: 'Меню' })).toBeInTheDocument();
+  });
+
+  it('shows the Smart Life account method and explains disabled cloud mode in setup', async () => {
+    stored();
+    window.history.replaceState(null, '', '/setup?step=tuya');
+    fakeApi({ enabled: false, connected: false });
+    render(<App />);
+    const user = userEvent.setup();
+    await screen.findByText('API подключён');
+    await user.click(screen.getByRole('button', { name: 'Подключить аккаунт SmartLife' }));
+    expect(window.location.search).toBe('?step=tuya&provider=android');
+    expect(screen.getByRole('heading', { name: 'Smart Life через Android' })).toBeInTheDocument();
+    expect(screen.getByText('Облачный режим выключен на сервере.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Пароль Smart Life')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Android password sign-in in the setup wizard when opening HTTPS', async () => {
+    vi.stubGlobal('isSecureContext', false);
+    vi.stubEnv('VITE_DASHBOARD_HTTPS_ORIGIN', 'https://homeassistant.dom:8443');
+    try {
+      stored(window.location.origin);
+      window.history.replaceState(null, '', '/setup?step=tuya&provider=android');
+      fakeApi({ connected: false, redroid_available: true });
+      render(<App />);
+      const link = await screen.findByRole('link', { name: 'Открыть защищённый вход в Smart Life' });
+      expect(link).toHaveAttribute('href', 'https://homeassistant.dom:8443/setup?step=tuya&provider=android');
+      expect(screen.queryByLabelText('Пароль Smart Life')).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('creates a first key only after the user enters the one-time code', async () => {

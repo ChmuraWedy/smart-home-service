@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from pydantic import Field, field_validator
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import (
@@ -18,6 +17,7 @@ from .api_dependencies import (
     require_account,
     require_owner,
 )
+from .db import lock_writes, upsert
 from .models import AccountDashboardLayout, HouseholdDeviceKey, HouseholdMember, HouseholdOwner
 from .schemas import Schema
 from .service import commit
@@ -103,7 +103,7 @@ def account_key_scope(account_id: str, account: Account) -> str | None:
 
 
 def lock_access(session: Session, account: Account):
-    session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    lock_writes(session)
     if account.key_id and session.get(HouseholdDeviceKey, account.key_id) is None:
         raise HTTPException(401, "Missing or invalid X-API-Key")
 
@@ -187,7 +187,7 @@ def name_owner(
     if session.scalar(select(HouseholdMember.id).where(HouseholdMember.login == login.casefold())):
         raise HTTPException(409, "This login is already in use")
     changes = {"name": body.name, "login": login}
-    statement = insert(HouseholdOwner).values(id=OWNER_ID, **changes)
+    statement = upsert(session.get_bind(), HouseholdOwner).values(id=OWNER_ID, **changes)
     session.execute(statement.on_conflict_do_update(index_elements=[HouseholdOwner.id], set_=changes))
     commit(session)
     private(response)

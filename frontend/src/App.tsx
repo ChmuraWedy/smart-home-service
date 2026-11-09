@@ -537,9 +537,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     <section className="card setup" aria-label={t(MSG.TUYA_CONNECTION)}>
       <div className="method-tabs" role="group" aria-label={t(MSG.CONNECTION_METHOD)}>
         <button aria-pressed={provider === 'sharing'} disabled={locked} onClick={() => chooseProvider('sharing')}>Smart Life / QR</button>
-        {redroidAvailable && (
+        {(view === 'setup' || redroidAvailable) && (
         <button type="button" aria-pressed={provider === 'android'} disabled={locked} onClick={() => chooseProvider('android')}>
-          Smart Life / Android
+          {view === 'setup' ? t(MSG.CONNECT_SMARTLIFE_ACCOUNT) : 'Smart Life / Android'}
         </button>
         )}
         <button aria-pressed={provider === 'developer'} disabled={locked} onClick={() => chooseProvider('developer')}>Access ID / Secret</button>
@@ -550,6 +550,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
         <RedroidConnection
           available={redroidAvailable}
           protectedConnection={protectedConnection}
+          inSetup={view === 'setup'}
           connected={accountConnected}
           ready={ready}
           busy={locked}

@@ -10,7 +10,8 @@ API requests use `X-API-Key` when `SMART_HOME_API_TOKEN` is configured. Camera m
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `SMART_HOME_DB` | `./data/smarthome.db` | SQLite database |
+| `SMART_HOME_DB` | `./data/smarthome.db` | SQLite database path |
+| `SMART_HOME_DATABASE_URL` | Unset | Optional PostgreSQL connection URL. See [migration instructions](../deploy/docker.md#move-an-existing-sqlite-database-to-postgresql). |
 | `SMART_HOME_API_TOKEN` | empty | Service access key |
 | `SMART_HOME_TUYA_TIMEOUT` | `3` | Socket timeout, seconds |
 | `SMART_HOME_LOCK_TIMEOUT` | `5` | Device/gateway lock timeout, seconds |

@@ -21,7 +21,7 @@ def load_json(path):
 def main():
     parser = argparse.ArgumentParser(description="Import TinyTuya JSON into the local inventory")
     parser.add_argument(
-        "--db", help="SQLite path; defaults to SMART_HOME_DB or ./data/smarthome.db"
+        "--db", help="Override the configured database with an explicit SQLite path"
     )
     parser.add_argument("--devices", required=True, help="devices.json or snapshot.json")
     parser.add_argument(
@@ -48,7 +48,8 @@ def main():
             device_type_id=args.device_type_id,
             dry_run=args.dry_run,
         )
-        engine = make_engine(args.db or Settings().database_path)
+        settings = Settings()
+        engine = make_engine(args.db or settings.database_path, "" if args.db else settings.database_url)
         init_db(engine)
         with Session(engine, expire_on_commit=False) as session:
             result = import_tinytuya(session, request)
