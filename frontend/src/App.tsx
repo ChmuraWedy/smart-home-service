@@ -347,7 +347,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     const expiresAt = Date.now() + login.expires_in * 1000;
     const image = await api.qrImage(login);
     if (currentConnection.current !== connection) return;
-    setQR({ session: login.session_id, imageUrl: URL.createObjectURL(image), expiresAt, scanSubmitted: login.scan_submitted });
+    setQR({
+      session: login.session_id, imageUrl: URL.createObjectURL(image), expiresAt, scanSubmitted: login.scan_submitted,
+    });
   }, true);
 
   const confirmQR = () => run(async () => {
@@ -529,6 +531,20 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   )}
                   <button aria-pressed={provider === 'developer'} disabled={locked} onClick={() => chooseProvider('developer')}>Access ID / Secret</button>
                 </div>
+                {provider === 'android' && (
+                  <div className="provider-panel">
+                    <h2>{t(MSG.SMART_LIFE_THROUGH_ANDROID)}</h2>
+                    <RedroidConnection
+                      available={redroidAvailable}
+                      protectedConnection={protectedConnection}
+                      ready={ready}
+                      busy={locked}
+                      approval={qr ? { remaining, imageUrl: qr.imageUrl, scanSubmitted: qr.scanSubmitted ?? false } : null}
+                      onConnect={connectRedroid}
+                      onConfirm={confirmQR}
+                    />
+                  </div>
+                )}
                 {provider === 'sharing' ? (
                   <div className="provider-panel">
                     <p className="eyebrow">{t(MSG.SIGN_IN_WITH_THE_APP)}</p>
@@ -557,20 +573,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   </div>
 )}
                   </div>
- ) : provider === 'android' ? (
-  <div className="provider-panel">
-    <h2>{t(MSG.SMART_LIFE_THROUGH_ANDROID)}</h2>
-    <RedroidConnection
-      available={redroidAvailable}
-      protectedConnection={protectedConnection}
-      ready={ready}
-      busy={locked}
-      approval={qr ? { remaining, imageUrl: qr.imageUrl, scanSubmitted: qr.scanSubmitted ?? false } : null}
-      onConnect={connectRedroid}
-      onConfirm={confirmQR}
-    />
-  </div>
- ) : (
+) : provider === 'developer' && (
   <div className="provider-panel">
     <p className="eyebrow">{t(MSG.SIGN_IN_WITH_A_CLOUD_PROJECT)}</p>
     <h2>Tuya Developer</h2>
