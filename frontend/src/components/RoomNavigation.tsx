@@ -208,7 +208,7 @@ export default function RoomNavigation({
   const editButton = canEdit && (
     <button
       type="button"
-      className="secondary room-picker-action"
+      className="secondary room-navigation-edit"
       aria-label={editLabel}
       aria-haspopup={readFailed ? undefined : 'dialog'}
       title={editLabel}
@@ -271,7 +271,7 @@ export default function RoomNavigation({
               <span className="room-choice" key={choice.id}>{choice.label}</span>
             ))}
             <span className="room-choice">{moreLabel}</span>
-            {canEdit && <span className="room-picker-action" />}
+            {canEdit && <span className="room-navigation-edit" />}
           </div>
         </div>
       </nav>

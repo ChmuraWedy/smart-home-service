@@ -1400,6 +1400,10 @@ button.room-navigation-trigger {
 .room-name-translations > summary { @apply tw:cursor-pointer tw:font-semibold; }
 .room-picker-heading { @apply tw:flex tw:shrink-0 tw:items-center tw:justify-between tw:gap-3 tw:px-2 tw:pb-2; }
 .room-picker-heading h2 { @apply tw:m-0 tw:text-xl; }
+.room-navigation-edit { @apply tw:grid tw:size-9 tw:shrink-0 tw:place-items-center; }
+button.secondary.room-navigation-edit { @apply tw:border-transparent tw:bg-transparent tw:p-0 tw:text-(--muted); }
+button.secondary.room-navigation-edit:hover:enabled { @apply tw:text-(--accent); }
+.room-navigation-edit .ui-icon { @apply tw:size-4; }
 .room-picker-actions { @apply tw:flex tw:shrink-0 tw:gap-2; }
 .room-picker-action { @apply tw:grid tw:size-12 tw:shrink-0 tw:place-items-center tw:p-0; }
 .room-picker-action .ui-icon { @apply tw:size-6; }
@@ -1448,6 +1452,7 @@ button.room-navigation-trigger {
   }
   .room-picker-list .room-choice { @apply tw:min-h-[60px] tw:text-lg; }
   .room-picker-action { @apply tw:size-14; }
+  .room-navigation-edit { @apply tw:size-11; }
   .room-navigation-editor-row[data-manage] { @apply tw:grid-cols-[minmax(0,1fr)_auto_auto]; }
   .room-navigation-editor-row[data-manage] > span { @apply tw:col-span-2; }
   .room-navigation-editor-row[data-manage] .room-navigation-order { @apply tw:col-span-2; }

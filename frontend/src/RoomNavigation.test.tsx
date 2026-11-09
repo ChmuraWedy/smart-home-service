@@ -115,7 +115,7 @@ it('moves the editor into More rooms when there is insufficient width for every 
   let width = 800;
   const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measure(this: HTMLElement) {
     if (this.classList.contains('room-navigation-row')) return new DOMRect(0, 0, width, 56);
-    if (this.classList.contains('room-picker-action')) return new DOMRect(0, 0, 48, 48);
+    if (this.classList.contains('room-navigation-edit')) return new DOMRect(0, 0, 36, 36);
     return new DOMRect(0, 0, 90, 56);
   });
   try {
@@ -125,6 +125,7 @@ it('moves the editor into More rooms when there is insufficient width for every 
     const navigation = within(screen.getByRole('navigation', { name: 'Rooms' }));
     await vi.waitFor(() => expect(navigation.getByRole('button', { name: 'Edit rooms' })).toBeEnabled());
     const edit = navigation.getByRole('button', { name: 'Edit rooms' });
+    expect(edit).toHaveTextContent(/^$/);
     expect(edit.previousElementSibling).toContainElement(navigation.getByRole('button', { name: 'No room' }));
     await user.click(edit);
     const editor = await screen.findByRole('dialog', { name: 'Edit rooms' });
