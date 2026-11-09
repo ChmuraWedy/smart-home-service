@@ -1833,6 +1833,13 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-sheet-range input { @apply tw:col-span-full tw:m-0 tw:h-11 tw:w-full tw:cursor-pointer; accent-color:var(--toggle-on); }
 .dashboard-sheet-range-value { color:var(--muted); }
+.dashboard-sheet .capability-number > .capability-row:has(> .reading-meta > .read-only) {
+  grid-template-columns:minmax(0,1fr) auto auto;
+}
+.dashboard-sheet .capability-number .reading-meta:has(> .read-only) {
+  display:flex;
+  grid-column:3;
+}
 .dashboard-sheet-temperature-labels { @apply tw:col-span-full tw:flex tw:justify-between tw:text-xs tw:font-normal tw:text-(--muted); }
 .dashboard-sheet-range input[data-temperature]::-webkit-slider-runnable-track {
   height:8px; border-radius:99px; background:linear-gradient(to right,#ffbf56,#fff4d9,#b8daff);
