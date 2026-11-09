@@ -67,6 +67,7 @@ export default function AiChatButton({
       <button
         type="button"
         className="secondary header-icon"
+        data-tour="chat"
         ref={trigger}
         aria-label={title}
         aria-haspopup="dialog"

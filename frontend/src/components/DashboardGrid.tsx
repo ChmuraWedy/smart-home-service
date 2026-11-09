@@ -328,6 +328,7 @@ export default function DashboardGrid<T>({
                   type="button"
                   className="secondary dashboard-layout-icon"
                   aria-label={editLabel}
+                  data-tour="room-layout"
                   title={editLabel}
                   disabled={saving || (!editing && ((!current?.error && !items.length && !roomAction) || Boolean((api.account || browserId) && !current)))}
                   onClick={toggleEditing}

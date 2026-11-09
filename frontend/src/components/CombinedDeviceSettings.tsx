@@ -114,7 +114,7 @@ export function CombinedDeviceList({
           <h1>{t(MSG.COMBINED_DEVICES)}</h1>
           <p className="help">{t(MSG.COMBINED_DEVICES_HELP)}</p>
         </div>
-        <button type="button" disabled={!canCreate} onClick={onCreate}>{t(MSG.CREATE_COMBINED_DEVICE)}</button>
+        <button type="button" data-tour="create-combination" disabled={!canCreate} onClick={onCreate}>{t(MSG.CREATE_COMBINED_DEVICE)}</button>
       </div>
       {combinations.length ? (
         <ul className="group-members">
@@ -293,7 +293,13 @@ export function CombinedDeviceSettings({
     <>
       <h1>{t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)}</h1>
       <p className="help">{t(MSG.COMBINED_DEVICES_HELP)}</p>
-      <form className="combined-device-form" aria-label={t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)} aria-busy={busy} onSubmit={(event) => save(event)}>
+      <form
+        className="combined-device-form"
+        data-tour-combination-phase={existing ? undefined : step}
+        aria-label={t(existing ? MSG.EDIT_COMBINATION : MSG.CREATE_COMBINED_DEVICE)}
+        aria-busy={busy}
+        onSubmit={(event) => save(event)}
+      >
         <ol className="combined-creation-steps">
           {steps.map(([key, label]) => (
             <li key={key} ref={step === key ? activeStep : undefined} tabIndex={-1} aria-current={step === key ? 'step' : undefined}>

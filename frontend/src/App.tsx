@@ -35,13 +35,15 @@ import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 import RoomEditor from './components/RoomEditor';
+import AppTutorial from './components/AppTutorial';
+import DashboardTour from './components/DashboardTour';
 import SmartLifeRoomsPage from './components/SmartLifeRoomsPage';
 import { Icon, IconGlyph } from './components/ui/icon';
 import { Switch } from './components/ui/switch';
 import {
   appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath, combinationPattern, combinationQuickPattern,
   dashboardHref, dashboardLayoutPath, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomLayoutPattern, roomPattern,
-  dashboardSearchHref,
+  dashboardSearchHref, withQuery,
 } from './navigation';
 import type { DashboardPanel } from './navigation';
 import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
@@ -110,6 +112,7 @@ export function createAppRouter() {
       screenRoute(combinationEditPreviewPattern, 'combined-devices'),
       screenRoute(dashboardToolsPath, 'control'),
       screenRoute(appPaths.settings, 'settings'),
+      screenRoute(appPaths.tutorial, 'tutorial'),
       ...(!demo ? [
         screenRoute(appPaths.setup, 'setup'),
         screenRoute(appPaths.rooms, 'rooms'),
@@ -137,7 +140,8 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const hasInvitation = Boolean(invitation);
   const query = new URLSearchParams(location.search);
   const requestedView = (matched?.handle as View | undefined) ?? 'control';
-  const needsAccess = !connection.token && !['settings', 'connections', 'setup'].includes(requestedView);
+  const needsAccess = !connection.token && !['settings', 'connections', 'setup', 'tutorial'].includes(requestedView);
+  const [tourOpen, setTourOpen] = useState(() => query.get('tour') === '1' && Boolean(connection.token));
   const initialSetup = needsAccess && location.pathname === '/' && !location.search && !location.hash;
   const panelParam = query.get('panel');
   const dashboardPanel: DashboardPanel = matched?.id === dashboardToolsPath || panelParam === 'tools' ? 'tools' : panelParam === 'search' ? 'search' : null;
@@ -227,6 +231,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     setEditingCode(false);
     setEditingDeveloper(false);
     setLocalConnectionLocked(false);
+    setTourOpen(false);
     setSessionRevision((revision) => revision + 1);
     busyRef.current = false;
     setBusy(false);
@@ -447,10 +452,30 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     try { localStorage.setItem(NETWORK_MONITORING_KEY, enabled ? '1' : '0'); } catch { /* In-memory preference still applies. */ }
   }, []);
 
+  const tourRoom = dashboardRoom(location.pathname, query);
+  const startTour = useCallback(() => {
+    setMenuOpen(false);
+    setTourOpen(true);
+    const params = new URLSearchParams({ tour: '1' });
+    navigate(dashboardHref(tourRoom, params, null));
+  }, [navigate, tourRoom]);
+
+  const closeTour = useCallback(() => {
+    setTourOpen(false);
+    const params = new URLSearchParams(location.search);
+    if (!params.has('tour')) return;
+    params.delete('tour');
+    navigate(withQuery(location.pathname, params) + location.hash, { replace: true, state: location.state });
+  }, [location.hash, location.pathname, location.search, location.state, navigate]);
+
   const goTo = useCallback((next: View) => {
+    if (next === 'tutorial' && connection.token) {
+      startTour();
+      return;
+    }
     setMenuOpen(false); setNotice({ text: '' });
     if (location.pathname !== appPaths[next] || location.search || location.hash) navigate(appPaths[next]);
-  }, [location.hash, location.pathname, location.search, navigate]);
+  }, [connection.token, location.hash, location.pathname, location.search, navigate, startTour]);
   function changeDashboardPanel(next: DashboardPanel) {
     if (next !== 'search' && query.has('q')) { query.delete('q'); query.delete('page'); }
     navigate(dashboardHref(dashboardRoom(location.pathname, query), query, next));
@@ -700,6 +725,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     ] as const] : []),
     [
       ['settings', MSG.SETTINGS],
+      ['tutorial', MSG.APP_TUTORIAL],
       ...(!demo && identity ? [['users', member ? MSG.MY_DEVICE_KEYS : MSG.USERS] as const] : []),
     ],
   ] as const;
@@ -727,6 +753,13 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
           </button>
         )}
       </section>
+    ),
+    tutorial: (
+      <AppTutorial
+        onStart={connection.token ? startTour : undefined}
+        canOpenDashboard={Boolean(connection.token)}
+        canOpenLocalConnections={Boolean(connection.token) && !demo && !member}
+      />
     ),
     users: householdAccess,
     network: networkMonitoring ? <NetworkPage api={api} ready={setupHasAccess} onAuthError={invalidateConnection} /> : (
@@ -772,6 +805,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                     <button
                       type="button"
                       key={key}
+                      data-tour={key === 'combined-devices' ? 'combined-menu' : undefined}
                       className="secondary"
                       aria-current={view === key ? 'page' : undefined}
                       disabled={locked}
@@ -865,6 +899,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
           </div>
         )}
       </header>
+      {tourOpen && connection.token && <DashboardTour onClose={closeTour} onMenuChange={setMenuOpen} canCombine={!demo && !member} />}
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
         <Outlet context={{ accessView, pages }} />
