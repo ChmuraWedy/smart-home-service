@@ -36,7 +36,7 @@ export default function useLightCardControls({
   } = controls;
   const library = useLightPresets(api, deviceId, scene, onAuthError);
   const summary = lightCardSummary(controls, currentReading);
-  const hasQuickSettings = white.length > 0 || Boolean(color?.writable || scene);
+  const hasQuickSettings = white.length > 0 || Boolean(color || scene);
   const hasPresetMenu = Boolean(summary || scene);
   useEffect(() => {
     onLightFeatures?.(hasQuickSettings, hasPresetMenu);
@@ -50,7 +50,7 @@ export default function useLightCardControls({
         tuyaApi={tuyaApi}
         mode={mode}
         white={white}
-        color={color?.writable ? color : undefined}
+        color={color}
         scene={scene}
         scope={scope}
         reading={reading}

@@ -448,7 +448,7 @@ describe('main controls on device cards', () => {
     await waitFor(() => expect(power).toBeEnabled());
     expect(calls).toEqual([{path:'http://api.test/api/v1/devices/7/commands/capabilities',body:{values:{switch:true}}}]);
   });
-  it('shows local bulb brightness as a percentage and keeps settings out of the dashboard footer', async () => {
+  it.each([false, true])('shows local bulb levels and keeps settings out of the dashboard footer, embedded=%s', async (embeddedQuick) => {
     const local: LocalDevice = {
       id: 7, device_id: 'physical', name: 'Лампа', transport: 'wifi', parent_id: null, cid: null,
       aliases: [], building_id: null, room_id: null, enabled: true,
@@ -491,11 +491,14 @@ describe('main controls on device cards', () => {
         paused={false}
         onAuthError={vi.fn()}
         onBusy={vi.fn()}
-        sheet={{ open: true, close: vi.fn(), trigger: { current: null } }}
+        embeddedQuick={embeddedQuick}
+        sheet={embeddedQuick ? undefined : { open: true, close: vi.fn(), trigger: { current: null } }}
       />,
     );
 
-    const sheet = within(await screen.findByRole('dialog', { name: local.name }));
+    const sheet = within(embeddedQuick
+      ? screen.getByRole('group', { name: /Лампа/ })
+      : await screen.findByRole('dialog', { name: local.name }));
     const brightness = sheet.getByRole('slider', { name: 'Яркость' });
     await waitFor(() => expect(brightness).toBeEnabled());
     expect(brightness).toHaveAttribute('min', '1');
@@ -504,6 +507,9 @@ describe('main controls on device cards', () => {
     expect(sheet.getByText('46.9 %')).toBeInTheDocument();
     expect(document.querySelector('.card-sensor-values')).toBeNull();
     expect(sheet.queryByRole('slider', { name: 'Цветовая температура' })).toBeNull();
+    const temperature = within(sheet.getByRole('region', { name: 'Цветовая температура' }));
+    expect(temperature.getByText('0', { exact: true })).toBeInTheDocument();
+    expect(temperature.getByText('Только чтение')).toBeInTheDocument();
     expect(sheet.getByRole('button', { name: 'Сцена' })).toBeDisabled();
     fireEvent.change(brightness, { target: { value: '52.5' } });
     fireEvent.pointerUp(brightness);

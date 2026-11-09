@@ -54,7 +54,8 @@ type QuickSheet = DashboardSheetState & {
 type EmbeddedControls = {
   embeddedQuick?: boolean;
   powerSide?: PowerSide;
-  inlineMemberName?: ReactNode;
+  inlineMemberName?: string;
+  renderQuickTarget?: (content: ReactNode) => ReactNode;
   onPower?: (power: MemberPower) => void;
   channelChildren?: ReadonlyMap<string, ReactNode>;
   supplyPower?: false | null;
@@ -141,7 +142,7 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
 
 function StandardCardControls({
   api, tuyaApi, name, deviceId, pendingScope, paused, sheet, specs, reading, now, local, online, busy,
-  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, supplyPower,
+  readOK, sending, refresh, toggle, notice, category, onAuthError, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, renderQuickTarget, supplyPower,
 }: EmbeddedControls & {
   api: HomeApi; tuyaApi?: HomeApi; name: string; deviceId: string; pendingScope: string; paused: boolean; sheet?: QuickSheet; specs: ControlSpec[];
   reading: (spec: ControlSpec) => Reading | undefined; now: number; local: boolean; online: boolean; busy: boolean; readOK: boolean; sending: boolean;
@@ -180,15 +181,17 @@ function StandardCardControls({
   });
   const { summary } = lighting;
   const inlineName = inlineMemberName && powerLayout === 'single' && !channelChildren?.size;
-  const renderSummary = inlineName ? (power: boolean | null) => {
+  const renderSummary = inlineName || summary ? (power: boolean | null) => {
+    const readings = summary?.(power);
     const powerLabel = power ? MSG.ON : MSG.OFF;
-    return (
+    const content = inlineName ? (
       <span className="combined-member-inline">
         <span className="combined-member-inline-name">{inlineMemberName}</span>
-        {summary ? summary(power) : <span className="combined-member-inline-state">{t(power === null ? MSG.NO_DATA : powerLabel)}</span>}
+        {readings ?? <span className="combined-member-inline-state">{t(power === null ? MSG.NO_DATA : powerLabel)}</span>}
       </span>
-    );
-  } : summary;
+    ) : readings;
+    return renderQuickTarget?.(content) ?? content;
+  } : undefined;
   const socket = category === 'cz' || specs.some(({ key }) => /^(?:add_ele|cur_(?:power|current|voltage))$/.test(key));
   const sensors = specs.filter((spec) => !lighting.isLightLevel(spec) && sensorReading(spec, socket));
   const unplaced = unplacedChannelChildren(channelChildren, powers);
@@ -280,7 +283,7 @@ function StandardCardControls({
 
 function CloudCardControls({
   api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
-  channelChildren, powerSide, inlineMemberName, supplyPower, previewOnly,
+  channelChildren, powerSide, inlineMemberName, renderQuickTarget, supplyPower, previewOnly,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
   const dispatch = useAppDispatch();
@@ -356,13 +359,14 @@ function CloudCardControls({
         channelChildren={channelChildren}
         powerSide={powerSide}
         inlineMemberName={inlineMemberName}
+        renderQuickTarget={renderQuickTarget}
         supplyPower={supplyPower}
       />
     );
 }
 
 function LocalCardControls({
-  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, supplyPower,
+  api, device, displayName, now, visible, paused, sheet, onAuthError, onBusy, embeddedQuick, onPower, channelChildren, powerSide, inlineMemberName, renderQuickTarget, supplyPower,
 }: CardProps & { visible: boolean }) {
   const item = device.local!;
   const dispatch = useAppDispatch();
@@ -401,6 +405,7 @@ function LocalCardControls({
       channelChildren={channelChildren}
       powerSide={powerSide}
       inlineMemberName={inlineMemberName}
+      renderQuickTarget={renderQuickTarget}
       supplyPower={supplyPower}
       {...commands}
     />

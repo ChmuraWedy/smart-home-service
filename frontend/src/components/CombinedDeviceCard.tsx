@@ -56,7 +56,7 @@ const outcomeLabels: Record<PowerFailure, keyof typeof MSG> = {
 };
 
 function MemberControls({
-  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth, supplyPower, onOpen,
+  api, entry, now, paused, preview, quick, onPower, onAuthError, commandKey, sourceLabel, channelChildren, powerSide, depth, supplyPower, onOpen, hideName,
 }: {
   api: HomeApi;
   entry: ResolvedMember;
@@ -65,6 +65,7 @@ function MemberControls({
   preview: boolean;
   depth: number;
   quick?: boolean;
+  hideName?: boolean;
   commandKey: string;
   sourceLabel?: string;
   channelChildren?: ReadonlyMap<string, ReactNode>;
@@ -83,7 +84,7 @@ function MemberControls({
     dispatch(setCommandPending({ deviceId: commandKey, pending }));
   }, [commandKey, dispatch]);
   const recordPower = useCallback((power: MemberPower) => onPower(id, power), [id, onPower]);
-  const memberName = onOpen ? (
+  const renderQuickTarget = onOpen ? (content: ReactNode) => (
     <button
       className="combined-member-quick-button"
       type="button"
@@ -91,9 +92,9 @@ function MemberControls({
       disabled={paused}
       onClick={(event) => onOpen(event.currentTarget)}
     >
-      {displayName}
+      {content}
     </button>
-  ) : displayName;
+  ) : undefined;
   return (
     <section
       className="combined-member"
@@ -101,10 +102,12 @@ function MemberControls({
       data-unavailable={!device || online === false || supplyPower !== undefined || undefined}
       style={depth ? { '--combined-depth': depth } as CSSProperties : undefined}
     >
-      <header className="combined-member-header">
-        <h3 className="combined-member-name">{memberName}</h3>
-        {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
-      </header>
+      {(!hideName || sourceLabel) && (
+        <header className="combined-member-header">
+          {!hideName && <h3 className="combined-member-name">{renderQuickTarget?.(displayName) ?? displayName}</h3>}
+          {sourceLabel && <p className="combined-member-source">{sourceLabel}</p>}
+        </header>
+      )}
       {device ? (
         <CardControls
           api={api}
@@ -120,7 +123,8 @@ function MemberControls({
           onAuthError={onAuthError}
           channelChildren={channelChildren}
           powerSide={powerSide}
-          inlineMemberName={sourceLabel && !quick ? memberName : undefined}
+          inlineMemberName={sourceLabel && !quick ? displayName : undefined}
+          renderQuickTarget={renderQuickTarget}
           supplyPower={supplyPower}
         />
       ) : (
@@ -252,6 +256,7 @@ export default function CombinedDeviceCard({
         preview={preview}
         depth={depth}
         quick={quick}
+        hideName={quick && entry === quickMember}
         commandKey={memberKey(member.device_id, quick)}
         sourceLabel={sourceLabel || undefined}
         powerSide={!quick && source ? 'start' : undefined}

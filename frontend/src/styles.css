@@ -1938,6 +1938,7 @@ button.combined-member-quick-button {
   overflow:hidden;
   text-overflow:ellipsis;
 }
+.dashboard-power-state-summary > button.combined-member-quick-button { display:flex; }
 button.combined-member-quick-button:hover:not(:disabled) { text-decoration:underline; }
 button.combined-member-quick-button:focus-visible { outline-offset:-2px; }
 .combined-member-inline-state { @apply tw:self-center tw:px-3; }

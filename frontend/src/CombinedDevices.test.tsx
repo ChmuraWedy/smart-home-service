@@ -605,7 +605,13 @@ describe('combined devices', () => {
     });
   });
 
-  it('opens a single wired member from its name while its individual card is hidden', async () => {
+  it.each([
+    [0, bulbs[0].name],
+    [0, 'Brightness'],
+    [0, 'Color'],
+    [1, 'Brightness'],
+    [1, 'Color temperature'],
+  ])('opens combined member %s from %s without sending a command', async (index, label) => {
     const combined: CombinedDevice = {
       id: 1, name: 'Workroom lamps', room_id: room.id, aliases: [], show_all_power: true, show_member_cards: false,
       members: [
@@ -621,18 +627,20 @@ describe('combined devices', () => {
     const user = userEvent.setup();
     openApp('/rooms/3');
     const card = within(await screen.findByRole('listitem', { name: combined.name }));
-    const member = within(card.getByRole('region', { name: bulbs[0].name }));
-    const inline = await waitFor(() => {
-      const label = member.getByRole('switch').closest('.capability-row')?.querySelector<HTMLElement>('.combined-member-inline');
-      expect(label).not.toBeNull();
-      return label!;
+    const bulb = bulbs[index];
+    const target = await waitFor(() => {
+      const region = card.getByRole('region', { name: bulb.name });
+      if (index === 0) expect(region.closest('[data-relay-channel="switch_1"]')).not.toBeNull();
+      const content = within(region).getByRole('switch').closest('.capability-row')?.querySelector<HTMLElement>('.dashboard-power-state-summary');
+      expect(content).not.toBeNull();
+      return within(content!).getByText(label, { exact: true });
     });
-    await user.click(within(inline).getByRole('button', { name: bulbs[0].name }));
-    const sheet = within(await screen.findByRole('dialog', { name: bulbs[0].name }));
+    await user.click(target);
+    const sheet = within(await screen.findByRole('dialog', { name: bulb.name }));
     expect(window.location.pathname).toBe('/combined-devices/1/quick');
-    expect(new URLSearchParams(window.location.search).get('member')).toBe(bulbs[0].id);
+    expect(new URLSearchParams(window.location.search).get('member')).toBe(bulb.id);
     expect(await sheet.findByRole('slider', { name: 'Brightness' })).toBeInTheDocument();
-    expect(sheet.queryByRole('region', { name: bulbs[1].name })).toBeNull();
+    expect(sheet.queryByRole('region', { name: bulbs[1 - index].name })).toBeNull();
     expect(sheet.queryByRole('region', { name: relay.name })).toBeNull();
     await user.click(sheet.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(window.location.pathname).toBe('/rooms/3'));
