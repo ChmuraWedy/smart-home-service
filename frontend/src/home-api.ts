@@ -259,6 +259,15 @@ export class HomeApi extends CloudApi {
 
   device(id: number, signal?: AbortSignal) { return this.request<LocalDevice>(`/devices/${id}`, 'GET', undefined, signal); }
 
+  localTimerSuggestion(id: number, name: string, signal: AbortSignal) {
+    return this.request<{ dp: string; minimum: number; maximum: number; step: number } | null>(
+      `/commissioning/devices/${id}/mappings/${encodeURIComponent(name)}/suggestion`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
+
   editLocalMapping(id: number, name: string, expected: Capability, mapping: Capability) {
     return this.request<LocalDevice>(`/commissioning/devices/${id}/mappings/${encodeURIComponent(name)}`, 'PATCH', { expected, mapping });
   }

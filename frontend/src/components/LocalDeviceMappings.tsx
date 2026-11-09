@@ -83,16 +83,25 @@ export default function LocalDeviceMappings({
   const lookup = useRef<AbortController | null>(null);
   useEffect(() => () => lookup.current?.abort(), []);
 
-  async function beginEdit(key: string, mapping: Capability) {
-    setError('');
-    if (!mapping.dp || !needsSuggestion(key, mapping) || sharingDevice?.id !== device.device_id) {
-      setEdit({ code: key, mapping });
-      return;
-    }
+  async function lookupSmartLife(key: string, mapping: Capability, signal: AbortSignal) {
+    if (sharingDevice?.id !== device.device_id) return undefined;
     const cached = sharingDevice.controls?.definitions;
     const suggested = cached && matchingSuggestion(cached, device.device_id, key, mapping);
-    if (suggested) {
-      setEdit({ code: key, mapping, suggestion: suggested });
+    if (suggested) return suggested;
+    try {
+      const definitions = await api.deviceFunctions(device.device_id, 'sharing', signal);
+      return matchingSuggestion(definitions, device.device_id, key, mapping);
+    } catch (failure) {
+      if (!signal.aborted && failure instanceof ApiError && failure.status === 401) throw failure;
+      return undefined;
+    }
+  }
+
+  async function beginEdit(key: string, mapping: Capability) {
+    setError('');
+    const timer = timerCode.test(key);
+    if (!mapping.dp || !needsSuggestion(key, mapping) || (!timer && sharingDevice?.id !== device.device_id)) {
+      setEdit({ code: key, mapping });
       return;
     }
 
@@ -103,8 +112,15 @@ export default function LocalDeviceMappings({
     setOperation('lookup');
     let suggestion: MappingSuggestion | undefined;
     try {
-      const definitions = await api.deviceFunctions(device.device_id, 'sharing', controller.signal);
-      suggestion = matchingSuggestion(definitions, device.device_id, key, mapping);
+      // An imported timer definition is available even when the local server has no Smart Life session.
+      const saved = timer ? await api.localTimerSuggestion(device.id, key, controller.signal).catch((failure: unknown) => {
+        if (failure instanceof ApiError && failure.status === 401) throw failure;
+        return null;
+      }) : null;
+      if (saved && saved.dp === mapping.dp) {
+        suggestion = timerRange({ min: saved.minimum, max: saved.maximum, step: saved.step }, mapping);
+      }
+      suggestion ??= await lookupSmartLife(key, mapping, controller.signal);
     } catch (failure) {
       if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
     } finally {

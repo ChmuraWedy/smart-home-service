@@ -444,6 +444,31 @@ def test_manual_mapping_edit_validates_timer_and_rejects_stale_edits(client, fac
     assert factory.commands[-1] == (item["device_id"], "set_dps", {"7": 60})
 
 
+def test_imported_timer_suggestion_is_separate_from_mapping_and_bound_to_dp(client, factory):
+    item = existing_device(client, capabilities={
+        "countdown_1": {"dp": "9", "type": "integer", "writable": False, "unit": "s"},
+    })
+    mapping = item["capabilities"]["countdown_1"]
+    device_url = f'/api/v1/devices/{item["id"]}'
+    mapping_url = f'{API}/devices/{item["id"]}/mappings/countdown_1'
+    url = f"{mapping_url}/suggestion"
+    draft = {"dp": "9", "minimum": 0, "maximum": 86400, "step": 1}
+
+    assert client.get(url).json() is None
+    assert client.put(url, json={**draft, "dp": "7"}).status_code == 409
+    assert client.put(url, json={**draft, "step": 0}).status_code == 422
+    assert client.put(url, json={**draft, "minimum": 86401}).status_code == 422
+    assert client.put(url, json=draft).status_code == 204
+    assert client.put(url, json=draft).status_code == 204
+    assert client.get(url).json() == draft
+    assert client.get(device_url).json()["capabilities"]["countdown_1"] == mapping
+
+    changed = {**mapping, "dp": "10"}
+    assert client.patch(mapping_url, json={"expected": mapping, "mapping": changed}).status_code == 200
+    assert client.get(url).json() is None
+    assert factory.commands == []
+
+
 @pytest.mark.parametrize("confirmation", [False, 1, "true", None])
 def test_existing_function_save_requires_actual_confirmation(
     client, observer, factory, confirmation

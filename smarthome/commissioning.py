@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,8 +22,9 @@ from .cloud_api import Provider, cloud_bridge, safe_spec
 from .cloud_scope import scope_for
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
 from .local_lighting import color_capability
-from .models import Device
+from .models import Device, LocalTimerSuggestion
 from .schemas import (
+    DP,
     Capability,
     CapName,
     DeviceCreate,
@@ -97,6 +98,19 @@ class RegisterObservation(Schema):
 class MappingEdit(Schema):
     expected: Capability
     mapping: Capability
+
+
+class TimerSuggestion(Schema):
+    dp: DP
+    minimum: int = Field(ge=0, le=2**53 - 1, strict=True)
+    maximum: int = Field(ge=0, le=2**53 - 1, strict=True)
+    step: int = Field(gt=0, le=2**53 - 1, strict=True)
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.minimum > self.maximum:
+            raise ValueError("Minimum must not exceed maximum.")
+        return self
 
 
 @dataclass(repr=False)
@@ -580,6 +594,44 @@ def merge_detected_capabilities(session, item, detected):
             merged[name] = definition
             occupied[dp] = {name}
     return merged
+
+
+def local_timer_dp(session, device_id, name):
+    item = get_or_404(session, Device, device_id)
+    mapping = effective_capabilities(session, item).get(name)
+    if (
+        not COUNTDOWN.fullmatch(name)
+        or not mapping
+        or mapping["type"] != "integer"
+        or mapping.get("unit") not in (None, "s")
+        or mapping.get("scale", 1) != 1
+        or mapping.get("offset", 0) != 0
+        or mapping.get("read_dp") not in (None, mapping["dp"])
+        or mapping.get("value_map")
+    ):
+        raise HTTPException(404, "Local whole-second timer mapping not found")
+    return mapping["dp"]
+
+
+@router.get("/devices/{device_id}/mappings/{name}/suggestion", response_model=TimerSuggestion | None)
+def read_timer_suggestion(device_id: PositiveID, name: CapName, session: Session = Depends(get_session)):
+    dp = local_timer_dp(session, device_id, name)
+    suggestion = session.get(LocalTimerSuggestion, (device_id, name, dp))
+    if suggestion is None:
+        return None
+    return TimerSuggestion(dp=dp, minimum=suggestion.minimum, maximum=suggestion.maximum, step=suggestion.step)
+
+
+@router.put("/devices/{device_id}/mappings/{name}/suggestion", status_code=204)
+def store_timer_suggestion(
+    device_id: PositiveID, name: CapName, body: TimerSuggestion, session: Session = Depends(get_session),
+):
+    """Import verified Smart Life bounds as a draft, separate from the active mapping."""
+    session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    if local_timer_dp(session, device_id, name) != body.dp:
+        raise HTTPException(409, "The suggested DP does not match the local timer mapping.")
+    session.merge(LocalTimerSuggestion(device_id=device_id, code=name, **body.model_dump()))
+    commit(session)
 
 
 @router.patch("/devices/{device_id}/mappings/{name}", response_model=DeviceRead)

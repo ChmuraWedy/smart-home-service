@@ -433,7 +433,7 @@ describe('local device and group controls', () => {
     const mappings = within(summary.closest('details')!);
     const edit = mappings.getByRole('button', { name: 'Изменить сопоставление: Таймер канала 1' });
     await user.click(edit);
-    const form = within(mappings.getByRole('form', { name: 'Таймер канала 1' }));
+    const form = within(await mappings.findByRole('form', { name: 'Таймер канала 1' }));
     expect(form.getByLabelText('DP')).toHaveValue('7');
     await user.click(form.getByRole('checkbox', { name: 'Разрешить команды' }));
     await user.type(form.getByLabelText('Минимальное значение'), '0');
@@ -448,7 +448,7 @@ describe('local device and group controls', () => {
     expect(setup).toHaveBeenCalledOnce();
   });
 
-  it.each(['matching', 'different-dp', 'offline'] as const)(
+  it.each(['matching', 'different-dp', 'offline', 'saved-offline'] as const)(
     'suggests missing switch timer bounds only for matching Smart Life metadata (%s)',
     async (metadata) => {
       const timer: Capability = { dp: '7', type: 'integer', readable: true, writable: false, unit: 's', minimum: 10 };
@@ -459,6 +459,9 @@ describe('local device and group controls', () => {
       const saves: unknown[] = [];
       vi.mocked(fetch).mockImplementation(async (input, init) => {
         const url = new URL(String(input));
+        if (url.pathname.endsWith('/suggestion')) {
+          return json(metadata === 'saved-offline' ? { dp: '7', minimum: 0, maximum: 86400, step: 1 } : null);
+        }
         if (url.pathname.endsWith('/functions')) {
           expect(url.searchParams.get('provider')).toBe('sharing');
           if (metadata === 'offline') return json({ detail: 'Complete QR login first' }, 409);
@@ -484,7 +487,7 @@ describe('local device and group controls', () => {
         <LocalControl
           api={new HomeApi(connection)}
           device={device}
-          cloudDevice={cloud}
+          cloudDevice={metadata === 'saved-offline' ? undefined : cloud}
           routes={['sharing', 'local']}
           onClose={vi.fn()}
           onAuthError={vi.fn()}
@@ -498,11 +501,12 @@ describe('local device and group controls', () => {
       const maximum = form.getByLabelText('Максимальное значение');
       const step = form.getByLabelText('Шаг');
       expect(minimum).toHaveValue(10);
-      expect(maximum).toHaveValue(metadata === 'matching' ? 86400 : null);
-      expect(step).toHaveValue(metadata === 'matching' ? 1 : null);
+      const suggested = metadata === 'matching' || metadata === 'saved-offline';
+      expect(maximum).toHaveValue(suggested ? 86400 : null);
+      expect(step).toHaveValue(suggested ? 1 : null);
       expect(form.getByRole('checkbox', { name: 'Разрешить команды' })).not.toBeChecked();
       expect(saves).toEqual([]);
-      if (metadata !== 'matching') return;
+      if (!suggested) return;
 
       await user.clear(maximum);
       await user.type(maximum, '3600');
