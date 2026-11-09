@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { ensureDashboardBrowserId } from './dashboard-layout';
@@ -41,7 +41,8 @@ it.each([false, true])('saves room order and visibility for both navigation surf
     return screen.findByRole('dialog', { name: 'Rooms' });
   };
   const editInPicker = (picker: HTMLElement) => within(picker).getByRole('button', { name: 'Edit rooms' });
-  expect(screen.queryByRole('button', { name: 'Edit rooms' })).not.toBeInTheDocument();
+  const navigation = screen.getByRole('navigation', { name: 'Rooms' });
+  expect(within(navigation).getByRole('button', { name: 'Edit rooms' })).toBeInTheDocument();
   const firstPicker = await openPicker();
   const edit = editInPicker(firstPicker);
   expect(edit.nextElementSibling).toBe(within(firstPicker).getByRole('button', { name: 'Close' }));
@@ -105,4 +106,37 @@ it('appends new rooms and retains the draft when saving fails', async () => {
   await user.click(within(editor).getByRole('button', { name: 'Save' }));
   expect(await within(editor).findByRole('alert')).toHaveTextContent('Your edits are still here');
   expect(hide).toHaveAttribute('aria-pressed', 'false');
+});
+
+it('moves the editor into More rooms when there is insufficient width for every room and the pencil', async () => {
+  setLocale('en', false);
+  ensureDashboardBrowserId();
+  vi.mocked(fetch).mockImplementation(async () => Response.json({ rooms: [] }));
+  let width = 800;
+  const bounds = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measure(this: HTMLElement) {
+    if (this.classList.contains('room-navigation-row')) return new DOMRect(0, 0, width, 56);
+    if (this.classList.contains('room-picker-action')) return new DOMRect(0, 0, 48, 48);
+    return new DOMRect(0, 0, 90, 56);
+  });
+  try {
+    const user = userEvent.setup();
+    const select = vi.fn();
+    render(<RoomNavigation api={api} allRooms={rooms} rooms={rooms} selected="" onSelect={select} />);
+    const navigation = within(screen.getByRole('navigation', { name: 'Rooms' }));
+    await vi.waitFor(() => expect(navigation.getByRole('button', { name: 'Edit rooms' })).toBeEnabled());
+    const edit = navigation.getByRole('button', { name: 'Edit rooms' });
+    expect(edit.previousElementSibling).toContainElement(navigation.getByRole('button', { name: 'No room' }));
+    await user.click(edit);
+    const editor = await screen.findByRole('dialog', { name: 'Edit rooms' });
+    await user.click(within(editor).getByRole('button', { name: 'Cancel' }));
+
+    width = 470;
+    fireEvent(window, new Event('resize'));
+    expect(navigation.queryByRole('button', { name: 'Edit rooms' })).toBeNull();
+    await user.click(navigation.getByRole('button', { name: 'More rooms' }));
+    const picker = await screen.findByRole('dialog', { name: 'Rooms' });
+    expect(within(picker).getByRole('button', { name: 'Edit rooms' })).toBeEnabled();
+  } finally {
+    bounds.mockRestore();
+  }
 });

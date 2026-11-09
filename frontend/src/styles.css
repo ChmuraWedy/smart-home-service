@@ -1371,6 +1371,8 @@ button.room-navigation-trigger {
   @apply tw:fixed tw:inset-x-0 tw:bottom-0 tw:z-20 tw:border-t tw:border-(--border) tw:bg-(--surface) tw:px-4 tw:pt-1.5;
   padding-bottom:max(6px,env(safe-area-inset-bottom));
 }
+.room-navigation-row { @apply tw:flex tw:items-center tw:gap-2; }
+.room-navigation-row > .room-navigation-shortcuts { @apply tw:flex-1; }
 .room-navigation-shortcuts { @apply tw:flex tw:min-w-0 tw:justify-center tw:gap-2; }
 .room-navigation-measure { @apply tw:invisible tw:pointer-events-none tw:absolute tw:inset-x-0 tw:top-0 tw:h-0 tw:overflow-hidden; }
 .room-navigation-measure .room-navigation-shortcuts { @apply tw:w-max; }

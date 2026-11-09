@@ -28,7 +28,7 @@ const roomIcons = [
   [/\bbalcony\b/i, 'room-balcony'],
 ] as const;
 
-function useVisibleRooms(labels: string) {
+function useVisibleRooms(labels: string, canEdit: boolean) {
   const bar = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(Infinity);
@@ -43,16 +43,17 @@ function useVisibleRooms(labels: string) {
       if (!available) return;
       const gap = Number.parseFloat(getComputedStyle(container).columnGap) || 0;
       const widths = Array.from(measure.children, (item) => item.getBoundingClientRect().width);
+      const editWidth = canEdit ? (widths.pop() ?? 0) + gap : 0;
       const moreWidth = widths.pop() ?? 0;
       const fullWidth = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, widths.length - 1) * gap;
-      if (fullWidth <= available) {
+      if (fullWidth + editWidth <= available) {
         setVisibleCount(widths.length);
         return;
       }
 
       let used = moreWidth;
       let count = 0;
-      for (const width of widths) {
+      for (const width of widths.slice(0, -1)) {
         used += width + gap;
         if (used > available) break;
         count += 1;
@@ -69,7 +70,7 @@ function useVisibleRooms(labels: string) {
     observer.observe(container);
     observer.observe(measure);
     return () => observer.disconnect();
-  }, [labels]);
+  }, [labels, canEdit]);
 
   return { bar, ruler, visibleCount };
 }
@@ -155,7 +156,9 @@ export default function RoomNavigation({
   const none: RoomChoice = { id: 'none', label: t(MSG.NO_ROOM), icon: 'room-none' };
   const moreLabel = t(MSG.MORE_ROOMS);
   const options = [all, ...visibleRooms.map((item) => roomChoice(item, roomLabel(item))), none];
-  const { bar, ruler, visibleCount } = useVisibleRooms(JSON.stringify([...options.map(({ label }) => label), moreLabel]));
+  const canEdit = Boolean(management || allRooms?.length);
+  const labels = JSON.stringify([...options.map(({ label }) => label), moreLabel]);
+  const { bar, ruler, visibleCount } = useVisibleRooms(labels, canEdit);
   const quick = options.slice(0, visibleCount);
   const overflow = quick.length < options.length;
   const selectedRoom = allRooms?.find(({ id }) => String(id) === selected);
@@ -202,6 +205,19 @@ export default function RoomNavigation({
   }
 
   const editorManagement = management && { ...management, onDeleted: roomDeleted };
+  const editButton = canEdit && (
+    <button
+      type="button"
+      className="secondary room-picker-action"
+      aria-label={editLabel}
+      aria-haspopup={readFailed ? undefined : 'dialog'}
+      title={editLabel}
+      disabled={!currentRead}
+      onClick={openEditor}
+    >
+      <Icon name={readFailed ? 'refresh-list' : 'edit'} />
+    </button>
+  );
 
   return (
     <>
@@ -230,21 +246,24 @@ export default function RoomNavigation({
         />
       )}
       <nav className="room-navigation-bar" aria-label={t(MSG.ROOMS)}>
-        <div className="room-navigation-shortcuts" ref={bar}>
-          {quick.map((choice) => <RoomButton key={choice.id} choice={choice} active={choice.id === selected} onSelect={onSelect} />)}
-          {overflow && (
-            <button
-              type="button"
-              className="secondary room-choice"
-              data-active={moreActive || undefined}
-              aria-haspopup="dialog"
-              aria-expanded={open}
-              onClick={openPicker}
-            >
-              <Icon name="more" />
-              <span>{moreLabel}</span>
-            </button>
-          )}
+        <div className="room-navigation-row" ref={bar}>
+          <div className="room-navigation-shortcuts">
+            {quick.map((choice) => <RoomButton key={choice.id} choice={choice} active={choice.id === selected} onSelect={onSelect} />)}
+            {overflow && (
+              <button
+                type="button"
+                className="secondary room-choice"
+                data-active={moreActive || undefined}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                onClick={openPicker}
+              >
+                <Icon name="more" />
+                <span>{moreLabel}</span>
+              </button>
+            )}
+          </div>
+          {!overflow && editButton}
         </div>
         <div className="room-navigation-measure" aria-hidden="true">
           <div className="room-navigation-shortcuts" ref={ruler}>
@@ -252,6 +271,7 @@ export default function RoomNavigation({
               <span className="room-choice" key={choice.id}>{choice.label}</span>
             ))}
             <span className="room-choice">{moreLabel}</span>
+            {canEdit && <span className="room-picker-action" />}
           </div>
         </div>
       </nav>
@@ -261,19 +281,7 @@ export default function RoomNavigation({
           <header className="room-picker-heading">
             <DialogTitle as="h2">{t(MSG.ROOMS)}</DialogTitle>
             <div className="room-picker-actions">
-              {(management || Boolean(allRooms?.length)) && (
-                <button
-                  type="button"
-                  className="secondary room-picker-action"
-                  aria-label={editLabel}
-                  aria-haspopup={readFailed ? undefined : 'dialog'}
-                  title={editLabel}
-                  disabled={!currentRead}
-                  onClick={openEditor}
-                >
-                  <Icon name={readFailed ? 'refresh-list' : 'edit'} />
-                </button>
-              )}
+              {editButton}
               <button
                 type="button"
                 className="secondary room-picker-action"
