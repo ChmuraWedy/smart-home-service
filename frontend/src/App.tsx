@@ -607,7 +607,8 @@ function AppContent() {
         {view !== 'setup' && (
           <div className="app-menu" ref={menuRef} onKeyDown={(event) => { if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus(); } }}>
             <button
-              className="secondary app-menu-button"
+              type="button"
+              className="app-menu-button"
               ref={menuButton}
               aria-label={t(MSG.MENU)}
               aria-expanded={menuOpen}
@@ -615,7 +616,7 @@ function AppContent() {
               disabled={locked}
               onClick={() => setMenuOpen((value) => !value)}
             >
-              <IconGlyph name="menu" />
+              <Icon name="home-power" />
             </button>
             {menuOpen && (
             <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>
@@ -667,9 +668,11 @@ function AppContent() {
           </div>
         )}
         <div className="brand">
-          <span className="brand-icon">
-            <Icon name="home-power" />
-          </span>
+          {view === 'setup' && (
+            <span className="brand-icon">
+              <Icon name="home-power" />
+            </span>
+          )}
           <div>
             <strong>Smart Home</strong>
             <span className="brand-tagline">{t(MSG.YOUR_HOME_UNDER_CONTROL)}</span>

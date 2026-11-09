@@ -116,7 +116,6 @@ const glyphs = {
   close: '×',
   fullscreen: '⛶',
   info: 'i',
-  menu: '☰',
   more: '…',
   'more-centered': '···',
   play: '▷',

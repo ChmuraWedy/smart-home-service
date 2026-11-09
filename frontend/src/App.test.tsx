@@ -416,6 +416,8 @@ it('opens LAN observations from the menu without a connected Tuya account', asyn
   expect(await screen.findByRole('option', { name: /192.168.40.0/ })).toBeInTheDocument();
   expect(backend.calls.map(call => call.path)).toEqual(['/api/v1/cloud/status', '/api/v1/network/interfaces']);
   const menu = screen.getByRole('button', { name: 'Меню' });
+  expect(menu.querySelector('[data-icon="home-power"]')).toBeInTheDocument();
+  expect(document.querySelectorAll('[data-icon="home-power"]')).toHaveLength(1);
   fireEvent.click(menu); expect(screen.getByRole('navigation', { name: 'Раздел приложения' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Мониторинг сети' })).toHaveAttribute('aria-current', 'page');
   fireEvent.keyDown(menu, { key: 'Escape' }); expect(screen.queryByRole('navigation')).toBeNull();

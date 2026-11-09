@@ -377,7 +377,7 @@ input[type=hidden] {
   align-items:center;
 }
 
-.brand-icon {
+.brand-icon, .app-menu-button {
   display:grid;
   place-items:center;
   width:44px;
@@ -386,9 +386,10 @@ input[type=hidden] {
   background:var(--success-bg);
   color:var(--success);
   border-radius:12px;
+  padding:0;
 }
 
-.brand-icon > .ui-icon {
+:is(.brand-icon, .app-menu-button) > .ui-icon {
   width:28px;
   height:28px;
   stroke-linecap:round;
@@ -1271,7 +1272,7 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
 .camera-stream-info > .help { flex-basis:100%; margin:0; font-size:11px; }
 
 .app-menu { position:relative; flex-shrink:0; }
-.app-menu-button { width:44px; height:44px; padding:0; font-size:24px; }
+.app-menu-button:hover:enabled, .app-menu-button[aria-expanded="true"] { background:var(--hover); }
 .app-menu-panel { position:absolute; top:calc(100% + 10px); left:0; z-index:100; display:grid; gap:6px; min-width:220px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 12px 36px var(--shadow); }
 .app-menu-panel button { text-align:left; }
 .app-menu-panel button[aria-current=page] { color:var(--success); border-color:var(--success-border); background:var(--success-bg); }
@@ -1360,7 +1361,6 @@ button.header-icon:hover:enabled { background:var(--hover); }
 .dashboard-header-search { @apply tw:flex tw:min-w-0 tw:items-center tw:gap-1; }
 .dashboard-header-search > input { @apply tw:m-0 tw:min-w-0; width:clamp(7rem, 38vw, 18rem); }
 .dashboard-view .dashboard-search-button { @apply tw:grid tw:size-11 tw:shrink-0 tw:place-items-center tw:p-0; }
-.dashboard-view .app-menu-button,
 .dashboard-view .dashboard-search-button { @apply tw:border-transparent tw:bg-transparent; }
 .dashboard-view .control-center { @apply tw:border-0 tw:bg-transparent tw:p-0; }
 .dashboard-view .control-center:has(.dashboard-layout-toolbar[data-editing]) { @apply tw:overflow-visible; }
