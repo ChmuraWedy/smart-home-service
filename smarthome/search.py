@@ -1,21 +1,21 @@
 import unicodedata
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 
 
 def fold_name(value: str) -> str:
-    """Unicode-aware search, including Cyrillic; no SQLite ASCII-only LIKE/NOCASE."""
+    """Use the same Unicode normalization for stored names and search inputs."""
     return unicodedata.normalize("NFC", value).strip().casefold()
 
 
 def name_filters(query, model, *, name=None, q=None):
-    folded_column = func.unicode_casefold(model.name)
+    folded_column = model.folded_name
     if name is not None:
         query = query.where(folded_column == fold_name(name))
     if q is not None:
-        # instr treats %, _ and quotes literally and all input remains bound parameters.
-        query = query.where(func.instr(folded_column, fold_name(q)) > 0)
+        # Escape LIKE wildcards so search terms match literally.
+        query = query.where(folded_column.contains(fold_name(q), autoescape=True))
     return query
 
 
@@ -25,7 +25,7 @@ def alias_filters(query, model, alias):
     alias_model, owner_field = ALIAS_MODELS[model]
     owners = select(getattr(alias_model, owner_field)).where(alias_model.alias == fold_name(alias))
     return query.where(
-        or_(func.unicode_casefold(model.name) == fold_name(alias), model.id.in_(owners))
+        or_(model.folded_name == fold_name(alias), model.id.in_(owners))
     )
 
 

@@ -2,13 +2,18 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
+    Column,
     DateTime,
     ForeignKey,
+    Integer,
     LargeBinary,
     String,
+    Table,
     Text,
     UniqueConstraint,
+    event,
     false,
     true,
 )
@@ -20,7 +25,31 @@ def utcnow():
 
 
 class Base(DeclarativeBase):
-    pass
+    type_annotation_map = {int: BigInteger().with_variant(Integer(), "sqlite")}
+
+
+class SearchableName:
+    folded_name: Mapped[str] = mapped_column(Text, server_default="")
+
+
+@event.listens_for(SearchableName, "before_insert", propagate=True)
+@event.listens_for(SearchableName, "before_update", propagate=True)
+def fold_searchable_name(mapper, connection, target):
+    from .search import fold_name
+
+    target.folded_name = fold_name(target.name)
+
+
+cloud_status_reports = Table(
+    "cloud_status_reports",
+    Base.metadata,
+    Column("scope", Text, primary_key=True),
+    Column("device_id", Text, primary_key=True),
+    Column("code", Text, primary_key=True),
+    Column("value", Text, nullable=False),
+    Column("observed_at", Text),
+    Column("received_at", Text, nullable=False),
+)
 
 
 class DashboardLayout(Base):
@@ -142,7 +171,7 @@ class CloudRoomOverride(Base):
     room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id", ondelete="SET NULL"))
 
 
-class Building(AliasOwner, Base):
+class Building(AliasOwner, SearchableName, Base):
     __tablename__ = "buildings"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
@@ -156,7 +185,7 @@ class Building(AliasOwner, Base):
     )
 
 
-class Room(AliasOwner, Base):
+class Room(AliasOwner, SearchableName, Base):
     __tablename__ = "rooms"
     __table_args__ = (UniqueConstraint("building_id", "name"),)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -199,7 +228,7 @@ class RoomAppearance(Base):
     background: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
 
 
-class DeviceType(Base):
+class DeviceType(SearchableName, Base):
     __tablename__ = "device_types"
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(String(80), unique=True)
@@ -208,7 +237,7 @@ class DeviceType(Base):
     capabilities: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
-class Device(AliasOwner, Base):
+class Device(AliasOwner, SearchableName, Base):
     __tablename__ = "devices"
     __table_args__ = (UniqueConstraint("parent_id", "cid"),)
     id: Mapped[int] = mapped_column(primary_key=True)

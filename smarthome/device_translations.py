@@ -5,10 +5,10 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import Field
 from sqlalchemy import delete, select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
+from .db import lock_writes, upsert
 from .models import Device, DeviceTranslation
 from .schemas import DisplayText, EntityRef, Identifier, Locale, Schema
 
@@ -93,7 +93,7 @@ def save_values(session, scope, identifier, kind, original, values, *, promote=F
     match = {
         "scope": scope, "device_id": identifier, "kind": kind, "original": original,
     }
-    statement = insert(DeviceTranslation).values(**match, values=values)
+    statement = upsert(session.get_bind(), DeviceTranslation).values(**match, values=values)
     keys = list(match)
     if promote:
         statement = statement.on_conflict_do_nothing(index_elements=keys)
@@ -129,7 +129,7 @@ def save_edit(session, scope, identifier, body, *, previous_cloud_key=None):
 def save_local_translations(item_id: EntityRef, body: TranslationWrite, response: Response, session: Session = Depends(get_session)):
     from .service import commit, get_by_ref
 
-    session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+    lock_writes(session)
     device = get_by_ref(session, Device, item_id)
     valid = body.original == device.name if body.kind == "name" else any(
         entry.alias == body.original for entry in device.alias_entries
@@ -156,7 +156,7 @@ def save_cloud_translations(
     with bridge.lock:
         cloud = bridge.device(device_id)
         scope = scope_for(bridge, provider)
-        session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        lock_writes(session)
         device = session.scalar(select(Device).where(Device.device_id == device_id))
         if body.kind == "name":
             shared = device is not None and body.original == device.name

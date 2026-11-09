@@ -65,6 +65,10 @@ class Settings:
     )
     frontend_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_FRONTEND_URL", ""))
 
+    database_url: str = field(
+        default_factory=lambda: os.getenv("SMART_HOME_DATABASE_URL", ""), repr=False
+    )
+
     def __post_init__(self):
         if not 1 <= self.redroid_port <= 65535:
             raise ValueError("SMART_HOME_REDROID_PORT must be a valid port")

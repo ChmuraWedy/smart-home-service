@@ -77,7 +77,7 @@ def missing_light_reading(device):
 
 
 class SharingState:
-    def __init__(self, bridge, mq_factory=None):
+    def __init__(self, bridge, mq_factory=None, *, engine=None):
         self.bridge = bridge
         self.mq_factory = mq_factory
         self.metadata = set()
@@ -86,7 +86,7 @@ class SharingState:
         self.online = {}
         self.http_readings = {}
         self.mq = None
-        self.store = SharingReports(bridge)
+        self.store = SharingReports(bridge, engine)
         self.history_engine = None
 
     def history(self, device_id, reports):

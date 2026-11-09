@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, 
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,7 @@ from .config import Settings
 from .control import run_command
 from .dashboard_layout_api import remove_room_from_navigation
 from .dashboard_layout_api import router as dashboard_layout_router
-from .db import init_db, make_engine
+from .db import init_db, make_engine, merge_json_object
 from .importer import import_tinytuya
 from .models import (
     Building,
@@ -221,8 +221,9 @@ def edit_room(item_id: EntityRef, body: RoomPatch, request: Request, session: Se
             assert_empty(session, Device, Device.room_id == item.id)
     update_fields(item, body, session, exclude={"name_translations"})
     if body.name_translations:
-        edits = [part for locale, value in body.name_translations.items() for part in (f"$.{locale}", value)]
-        item.name_translation_overrides = func.json_set(Room.name_translation_overrides, *edits)
+        item.name_translation_overrides = merge_json_object(
+            session.get_bind(), Room.name_translation_overrides, body.name_translations
+        )
     commit(session)
     translate_room_names(session, request.app.state.settings.label_translator_url, [item.id])
     return item
@@ -635,7 +636,7 @@ def create_app(settings: Settings | None = None, controller=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        engine = make_engine(settings.database_path)
+        engine = make_engine(settings.database_path, settings.database_url)
         init_db(engine)
         app.state.engine = engine
         from .commissioning import Observations
@@ -652,7 +653,7 @@ def create_app(settings: Settings | None = None, controller=None):
         app.state.topology = TopologySync()
         from .cloud import CloudBridge
 
-        app.state.cloud = CloudBridge(settings)
+        app.state.cloud = CloudBridge(settings, engine=engine)
         from .developer_cloud import DeveloperBridge
 
         app.state.developer_cloud = DeveloperBridge(settings)
@@ -684,7 +685,7 @@ def create_app(settings: Settings | None = None, controller=None):
         title="Smart Home Local API",
         version=__version__,
         lifespan=lifespan,
-        description="SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
+        description="Device inventory with direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
     )
     app.state.settings = settings
     if settings.cors_origins:

@@ -12,10 +12,10 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import Field, JsonValue, SecretStr, field_validator
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
+from .db import upsert
 from .importer import import_tinytuya
 from .models import CloudChannelLabel, CloudRoomOverride, Room
 from .schemas import Identifier, ImportRequest, PositiveID, Schema
@@ -478,7 +478,7 @@ def assign_cloud_device_room(
         bridge.device(device_id)
         room = get_or_404(session, Room, body.room_id) if body.room_id is not None else None
         building_id = room.building_id if room else None
-        statement = insert(CloudRoomOverride).values(scope=scope, device_id=device_id, room_id=body.room_id)
+        statement = upsert(session.get_bind(), CloudRoomOverride).values(scope=scope, device_id=device_id, room_id=body.room_id)
         session.execute(statement.on_conflict_do_update(
             index_elements=[CloudRoomOverride.scope, CloudRoomOverride.device_id],
             set_={"room_id": statement.excluded.room_id},

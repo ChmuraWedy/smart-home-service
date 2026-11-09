@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import select
-from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from .api_dependencies import authenticate, get_session
+from .db import upsert
 from .models import DashboardLayout, Room
 from .service import commit
 
@@ -59,7 +59,7 @@ class RoomNavigationLayout(BaseModel):
 
 
 def write_layout(session: Session, browser_id: str, view: str, changes: dict):
-    statement = insert(DashboardLayout).values(browser_id=browser_id, view=view, **changes)
+    statement = upsert(session.get_bind(), DashboardLayout).values(browser_id=browser_id, view=view, **changes)
     session.execute(statement.on_conflict_do_update(
         index_elements=[DashboardLayout.browser_id, DashboardLayout.view],
         set_=changes,

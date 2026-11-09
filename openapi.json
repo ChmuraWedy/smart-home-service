@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Smart Home Local API",
-    "description": "SQLite inventory + direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
+    "description": "Device inventory with direct Wi-Fi and parent/cid Zigbee control. local_key is write-only.",
     "version": "0.8.3"
   },
   "paths": {
