@@ -82,6 +82,7 @@ type Props = {
   busy: boolean;
   hasAccess: boolean;
   connected: boolean;
+  ownerProfileRequired: boolean;
   api: HomeApi;
   access: ReactNode;
   tuya: ReactNode;
@@ -93,7 +94,7 @@ type Props = {
 
 export default function FirstRunWizard(props: Props) {
   const {
-    step, busy, hasAccess, connected, api, access, tuya, devices, initialize, go, finish,
+    step, busy, hasAccess, connected, ownerProfileRequired, api, access, tuya, devices, initialize, go, finish,
   } = props;
   const index = steps.findIndex(([id]) => id === step);
   const back = steps[index - 1]?.[0];
@@ -124,7 +125,7 @@ export default function FirstRunWizard(props: Props) {
         )}
         {step === 'access' && (
           <>
-            <p className="muted">{t(MSG.SETUP_USE_SERVER_KEY)}</p>
+            {!ownerProfileRequired && <p className="muted">{t(MSG.SETUP_USE_SERVER_KEY)}</p>}
             {access}
             <InitializeKey api={api} busy={busy} hasAccess={hasAccess} initialize={initialize} />
           </>
@@ -144,7 +145,7 @@ export default function FirstRunWizard(props: Props) {
             <button type="button" onClick={() => go('access')}>{t(MSG.SETUP_GET_STARTED)}</button>
           )}
           {step === 'access' && (
-            <button type="button" disabled={!hasAccess || busy} onClick={() => go('tuya')}>{t(MSG.NEXT)}</button>
+            <button type="button" disabled={!hasAccess || ownerProfileRequired || busy} onClick={() => go('tuya')}>{t(MSG.NEXT)}</button>
           )}
           {step === 'tuya' && (
             <>

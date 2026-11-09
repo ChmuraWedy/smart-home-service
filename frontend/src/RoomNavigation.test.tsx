@@ -23,7 +23,7 @@ it.each([false, true])('saves room order and visibility for both navigation surf
   setLocale('en', false);
   const browserId = ensureDashboardBrowserId();
   const connection = member
-    ? new HomeApi({ baseUrl: 'http://rooms.test', token: 'member-key' }, { id: 'alex', name: 'Alex', role: 'member' })
+    ? new HomeApi({ baseUrl: 'http://rooms.test', token: 'member-key' }, { id: 'alex', name: 'Alex', login: 'alex', role: 'member' })
     : api;
   let stored: RoomNavigationLayout = { rooms: [] };
   const requests: string[] = [];

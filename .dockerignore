@@ -29,3 +29,7 @@ frontend/dist/
 frontend/coverage/
 frontend/.env*
 smarthome/**/__pycache__/
+
+# Private wrapping key and files used to create it atomically.
+*.account-key-vault
+.account-key-vault-*

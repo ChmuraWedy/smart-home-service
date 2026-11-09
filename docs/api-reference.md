@@ -29,20 +29,25 @@ Swagger at `/docs` and the generated `/openapi.json` describe request bodies, li
 
 ## Household access
 
-The existing service key is the owner credential. To add someone, open **Menu → Settings → Household access**, enter their name, and copy the access key shown once. Share it privately. They enter it in **Menu → Connections → Connection settings** with the same API address. **Sign out** clears the credential and the dashboard state from that browser.
+The existing service key is the root credential. On first sign-in, enter the owner's name and login. In **Menu → Users**, root can create users, set their login, and issue and revoke a separate key for each device. A user can open **My device keys** to manage their own keys. Keys stay masked until explicitly revealed.
 
-Members share the home's devices. They can view ordinary readings, use permitted power and lighting controls, and save their own card positions, hidden cards, and room navigation across browsers. Only the owner can change inventory and integrations, manage access, access cameras and Classic Chat, and use advanced device commands or network tools. Revoking a key also deletes the member's saved dashboard layouts.
+Reveal a device key to copy its sign-in link. The login and key travel in the URL fragment, which the browser removes from the address after reading it. The recipient confirms sign-in before the app saves the connection. Each link grants the permissions of its key, so share it privately. Existing owner links using the original `root` login continue to work. Revoking a device key preserves the user's other keys and private dashboard.
 
-| Method and path | Access |
+| Endpoint | Access |
 | --- | --- |
-| `GET /api/v1/accounts` | Owner. Lists member IDs and names. |
-| `POST /api/v1/accounts` | Owner. Accepts `{"name":"Alex"}` and returns the new member and their one-time `access_key`. |
-| `DELETE /api/v1/accounts/{member_id}` | Owner. Revokes the key and deletes that member's layouts. |
-| `GET /api/v1/cloud/status` | Owner and members. The `account` field identifies the current session. |
-| `GET, PUT /api/v1/dashboard-layouts/me` | Owner and members. Reads or saves the caller's layout for the requested building, room, column count and page. |
-| `GET, PUT /api/v1/dashboard-layouts/me/room-navigation` | Reads or saves the caller's room order and visibility. The member dashboard uses this account-level route. |
+| `GET, POST /api/v1/accounts` | Root. Lists users or creates a user with a login and initial device key. |
+| `PUT /api/v1/accounts/owner` | Root. Saves the owner's display name and login. |
+| `POST /api/v1/accounts/login` | Verifies a login against the key supplied in the request header. |
+| `GET, POST /api/v1/accounts/{account_id}/keys` | Root or the account holder. Lists masked key metadata or issues a new key. The root account ID is `owner`. |
+| `GET, DELETE /api/v1/accounts/{account_id}/keys/{key_id}` | Root or the account holder. Reveals or revokes one device key. |
+| `DELETE /api/v1/accounts/{member_id}` | Root. Revokes every key for that user and deletes their dashboard preferences. |
+| `GET /api/v1/cloud/status` | The `account` field identifies the session. |
+| `GET, PUT /api/v1/dashboard-layouts/me` | Reads or saves the current account's card positions and hidden cards. |
+| `GET, PUT /api/v1/dashboard-layouts/me/room-navigation` | Reads or saves the current account's room order and visibility. |
 
-For existing owner dashboards, an optional `browser_id` on the account layout read loads the old browser layout until the first account-level save for that view. The old browser layout endpoints remain available with the owner key. Household access requires a configured owner key.
+Members can use permitted device controls and read ordinary device state. Root manages cameras, Classic Chat, shared settings, integrations, and network tools. Existing keys remain valid after the database upgrade. Earlier hash-only keys cannot be displayed. Store the private vault file beside the database when backing up encrypted key retrieval, for example `smarthome.db.account-key-vault`.
+
+For existing root dashboards, an optional `browser_id` on the account layout read loads the old browser layout until the first account-level save for that view. The old browser layout endpoints remain available with the root key.
 
 ## Data model
 
