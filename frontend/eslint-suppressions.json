@@ -665,22 +665,7 @@
     }
   },
   "src/components/ConnectionSettings.tsx": {
-    "@stylistic/max-len": {
-      "count": 1
-    },
     "import/prefer-default-export": {
-      "count": 1
-    },
-    "jsx-a11y/label-has-associated-control": {
-      "count": 2
-    },
-    "jsx-a11y/no-autofocus": {
-      "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 4
-    },
-    "no-void": {
       "count": 1
     }
   },

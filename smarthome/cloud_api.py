@@ -1,6 +1,7 @@
 import base64
 import binascii
 import json
+from dataclasses import asdict
 from http.client import HTTPConnection
 from http.client import HTTPException as HTTPClientError
 from ipaddress import ip_address, ip_network
@@ -295,7 +296,7 @@ def cloud_status(
             "scene_edit_supported": False,
             "developer": request.app.state.developer_cloud.status(),
             **({"redroid_available": True} if account and account.role == "owner" and request.app.state.settings.redroid_token_file else {}),
-            **({"account": {"id": account.id, "name": account.name, "role": account.role}} if account else {}),
+            **({"account": asdict(account)} if account else {}),
         }
 
 

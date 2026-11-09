@@ -1,7 +1,7 @@
 import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
 import type {
-  HouseholdMember, IssuedMember, JsonValue, Provider,
+  AccountIdentity, HouseholdDeviceKey, HouseholdMember, IssuedMember, JsonValue, Provider,
 } from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { DeviceTranslations, TranslatedText } from './device-translations';
@@ -144,8 +144,28 @@ export class HomeApi extends CloudApi {
     return this.request<HouseholdMember[]>('/accounts', 'GET', undefined, signal);
   }
 
-  createHouseholdMember(name: string) {
-    return this.request<IssuedMember>('/accounts', 'POST', { name });
+  createHouseholdMember(name: string, login: string, deviceName: string) {
+    return this.request<IssuedMember>('/accounts', 'POST', { name, login, device_name: deviceName });
+  }
+
+  nameHouseholdOwner(name: string, login: string) {
+    return this.request<AccountIdentity>('/accounts/owner', 'PUT', { name, login });
+  }
+
+  householdDeviceKeys(id: string, signal?: AbortSignal) {
+    return this.request<HouseholdDeviceKey[]>(`/accounts/${encodeURIComponent(id)}/keys`, 'GET', undefined, signal);
+  }
+
+  createHouseholdDeviceKey(id: string, name: string) {
+    return this.request<HouseholdDeviceKey>(`/accounts/${encodeURIComponent(id)}/keys`, 'POST', { name });
+  }
+
+  householdDeviceKey(id: string, key: string) {
+    return this.request<{ 'access_key': string }>(`/accounts/${encodeURIComponent(id)}/keys/${encodeURIComponent(key)}`);
+  }
+
+  revokeHouseholdDeviceKey(id: string, key: string) {
+    return this.deleteResource(`/accounts/${encodeURIComponent(id)}/keys/${encodeURIComponent(key)}`);
   }
 
   revokeHouseholdMember(id: string) {

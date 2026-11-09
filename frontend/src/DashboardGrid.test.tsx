@@ -176,7 +176,7 @@ describe('dashboard layout', () => {
 
   it('uses the signed-in account layout across browsers and never sends a legacy browser ID for members', async () => {
     const viewPath = '/api/v1/dashboard-layouts/me';
-    const member = { id: 'alex', name: 'Alex', role: 'member' as const };
+    const member = { id: 'alex', name: 'Alex', login: 'alex', role: 'member' as const };
     const connection = { baseUrl: 'http://dashboard.test', token: 'member-key' };
     let slots: LayoutSlots = [];
     ensureDashboardBrowserId();

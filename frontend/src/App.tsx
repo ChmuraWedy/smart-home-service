@@ -15,7 +15,7 @@ import type {
   CloudStatus, Connection, DeveloperCredentials, Provider, RedroidCredentials,
 } from './api';
 import {
-  clearConnection, loadConnection, saveConnection, STORAGE_KEY,
+  clearConnection, DEFAULT_API_BASE, loadConnection, saveConnection, STORAGE_KEY,
 } from './connection';
 import appIcon from './assets/home-power.svg?no-inline';
 import AiChatButton from './components/AiChat';
@@ -24,6 +24,7 @@ import { ConnectionSettings } from './components/ConnectionSettings';
 import FirstRunWizard, { setupStep } from './components/FirstRunWizard';
 import type { SetupStep } from './components/FirstRunWizard';
 import HouseholdAccess from './components/HouseholdAccess';
+import { readHouseholdSignIn } from './household-login';
 import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -112,6 +113,7 @@ export function createAppRouter() {
       ...(!demo ? [
         screenRoute(appPaths.setup, 'setup'),
         screenRoute(appPaths.rooms, 'rooms'),
+        screenRoute(appPaths.users, 'users'),
         screenRoute(appPaths.connections, 'connections'),
         screenRoute(appPaths.network, 'network'),
         screenRoute(appPaths['local-connections'], 'local-connections'),
@@ -129,6 +131,10 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const matched = useMatches().at(-1);
+  const [invitation, setInvitation] = useState(() => (
+    !demo && location.pathname === appPaths.connections ? readHouseholdSignIn(location.hash) : undefined
+  ));
+  const hasInvitation = Boolean(invitation);
   const query = new URLSearchParams(location.search);
   const requestedView = (matched?.handle as View | undefined) ?? 'control';
   const needsAccess = !connection.token && !['settings', 'connections', 'setup'].includes(requestedView);
@@ -146,8 +152,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const [status, setStatus] = useState<CloudStatus | null>(null);
   const [sessionRevision, setSessionRevision] = useState(0);
   const currentConnection = useRef(connection);
-  const member = status?.account?.role === 'member';
-  const owner = status?.account?.role === 'owner';
+  const identity = status?.account;
+  const member = identity?.role === 'member';
+  const ownerProfileRequired = identity?.needs_name === true;
   const ownerPageBlocked = member && ownerPage(requestedView);
   let accessView: View | null = null;
   if (needsAccess) accessView = initialSetup ? 'setup' : 'connections';
@@ -178,7 +185,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const accountConnected = provider === 'developer' ? developer.connected : Boolean(status?.connected);
   const setupConnected = ready && Boolean(status?.connected || developer.connected);
   const setupHasAccess = Boolean(status && connection.token);
-  const step = setupStep(query.get('step'), setupHasAccess, setupConnected);
+  const step = setupStep(query.get('step'), setupHasAccess && !ownerProfileRequired, setupConnected && !ownerProfileRequired);
 
   const blocker = useBlocker(({ historyAction }) => {
     if (historyAction !== 'POP') return false;
@@ -189,7 +196,13 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
 
   useEffect(() => {
     const legacy = location.pathname === '/' ? legacyHref(location.hash) : null;
-    if (initialSetup) {
+    const sharedSignIn = !demo && location.pathname === appPaths.connections ? readHouseholdSignIn(location.hash) : undefined;
+    if (sharedSignIn) {
+      setInvitation(sharedSignIn);
+      navigate(location.pathname + location.search, { replace: true, state: location.state });
+    } else if (ownerProfileRequired && !hasInvitation && requestedView !== 'setup' && requestedView !== 'users') {
+      navigate(appPaths.users, { replace: true });
+    } else if (initialSetup) {
       navigate(appPaths.setup, { replace: true });
     } else if (needsAccess) {
       const returnTo = legacy ?? (matched?.id === '*' ? '/' : location.pathname + location.search);
@@ -199,7 +212,11 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     } else if (legacy || matched?.id === '*') {
       navigate(legacy ?? appPaths.control, { replace: true });
     }
-  }, [location, matched?.id, needsAccess, initialSetup, navigate, ownerPageBlocked]);
+  }, [location, matched?.id, needsAccess, initialSetup, navigate, ownerPageBlocked, ownerProfileRequired, requestedView, hasInvitation]);
+
+  useEffect(() => {
+    if (location.pathname !== appPaths.connections) setInvitation(undefined);
+  }, [location.pathname]);
 
   const installSession = useCallback((next: Connection, nextStatus: CloudStatus | null) => {
     currentConnection.current = next;
@@ -284,27 +301,35 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     }
   }, [connection, controlLocked, invalidateConnection]);
 
-  const acceptAccess = useCallback(async (next: Connection) => {
-    const nextStatus = await new CloudApi(next).status();
+  const acceptAccess = useCallback(async (next: Connection, login = '') => {
+    const client = new CloudApi(next);
+    if (login) await client.verifyHouseholdLogin(login);
+    const nextStatus = await client.status();
     if (currentConnection.current !== connection) return;
     saveConnection(next);
     installSession(next, nextStatus);
+    setInvitation(undefined);
     setNotice({ text: t(MSG.CONNECTION_SAVED_NOTICE) });
-    if (nextStatus.account?.role === 'member') {
+    if (invitation || nextStatus.account?.role === 'member') {
       const returnTo = location.state?.returnTo;
       navigate(returnTo ?? appPaths.control, { replace: true });
     } else if (location.state?.returnTo && view !== 'setup') {
       navigate(location.state.returnTo, { replace: true });
     }
-  }, [connection, installSession, location.state, navigate, view]);
+  }, [connection, installSession, invitation, location.state, navigate, view]);
 
-  const saveAccess = (address: string, candidate: string) => run(async () => {
-    const baseUrl = normalizeApiBase(address);
+  const saveAccess = (address: string, candidate: string, login: string) => run(async () => {
+    const baseUrl = normalizeApiBase(invitation ? DEFAULT_API_BASE : address);
     // A saved key is only valid for the API address where it was entered.
     const token = candidate.trim() || (baseUrl === connection.baseUrl ? connection.token : '');
     if (!token) throw new Error(t(MSG.ENTER_THE_ACCESS_KEY_FOR_THIS_API));
-    await acceptAccess({ baseUrl, token });
+    await acceptAccess({ baseUrl, token }, login.trim());
   });
+
+  const nameOwner = async (name: string, login: string) => {
+    const updated = await api.nameHouseholdOwner(name, login);
+    if (currentConnection.current === connection) setStatus((current) => (current ? { ...current, account: updated } : null));
+  };
 
   const initializeAccess = useCallback(async (code: string) => {
     let generated = '';
@@ -451,16 +476,16 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
 
   let connectionTitle = t(MSG.ACCOUNT_SIGN_IN);
   let connectionHint = t(MSG.ACCOUNT_SIGN_IN_HELP);
-  if (member) {
+  if (member && !invitation) {
     connectionTitle = t(MSG.SERVICE_ACCESS);
     connectionHint = '';
-  } else if (status) {
+  } else if (status && !invitation) {
     connectionTitle = t(ready && accountConnected ? MSG.TUYA_CONNECTED : MSG.CONNECT_TUYA);
     connectionHint = t(ready && accountConnected ? MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES : MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES);
   }
 
-  const accountName = owner ? t(MSG.HOUSEHOLD_OWNER) : status?.account?.name;
-  const sessionControls = !demo && status && connection.token && (
+  const accountName = identity?.name;
+  const sessionControls = !demo && status && connection.token && !invitation && (
     <div className="actions">
       {accountName && <span>{t(MSG.SIGNED_IN_AS, [accountName])}</span>}
       <button type="button" className="secondary compact" disabled={locked} onClick={signOut}>
@@ -599,14 +624,26 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       onConnections={openConnectionSetup}
     />
   );
+  const householdAccess = identity && (
+    <HouseholdAccess
+      key={sessionRevision}
+      api={api}
+      account={identity}
+      onAuthError={invalidateConnection}
+      onNameOwner={nameOwner}
+    />
+  );
   const setupWizard = (
     <FirstRunWizard
       step={step}
       busy={locked}
       hasAccess={setupHasAccess}
       connected={setupConnected}
+      ownerProfileRequired={ownerProfileRequired}
       api={api}
-      access={<ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} inline />}
+      access={ownerProfileRequired ? householdAccess : (
+        <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} inline />
+      )}
       tuya={tuyaConnection}
       devices={localConnections}
       initialize={initializeAccess}
@@ -635,13 +672,13 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
         <h1>{connectionTitle}</h1>
         {connectionHint && <p className="muted">{connectionHint}</p>}
       </div>
-      {status && !member && (
+      {status && !member && !invitation && (
         <div className="workspace connections-workspace">
           {tuyaConnection}
         </div>
       )}
-      <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
-      {!member && (
+      <ConnectionSettings connection={connection} busy={locked} invitation={invitation} onSave={saveAccess} />
+      {!member && !invitation && (
         <button type="button" className="secondary compact" disabled={locked} onClick={() => goTo('setup')}>
           {t(MSG.SETUP_OPEN_WIZARD)}
         </button>
@@ -661,7 +698,10 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
         ['smart-life-rooms', MSG.ROOMS_FROM_SMART_LIFE],
       ] as const : []),
     ] as const] : []),
-    [['settings', MSG.SETTINGS]],
+    [
+      ['settings', MSG.SETTINGS],
+      ...(!demo && identity ? [['users', member ? MSG.MY_DEVICE_KEYS : MSG.USERS] as const] : []),
+    ],
   ] as const;
   const pages: Record<View, ReactNode> = {
     connections,
@@ -681,8 +721,14 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
           </section>
         )}
         {sessionControls}
+        {identity && (
+          <button type="button" className="secondary compact" onClick={() => goTo('users')}>
+            {t(member ? MSG.MY_DEVICE_KEYS : MSG.USERS)}
+          </button>
+        )}
       </section>
     ),
+    users: householdAccess,
     network: networkMonitoring ? <NetworkPage api={api} ready={setupHasAccess} onAuthError={invalidateConnection} /> : (
       <section className="card settings-page">
         <h1>{t(MSG.NETWORK_MONITORING)}</h1>
@@ -822,7 +868,6 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
         <Outlet context={{ accessView, pages }} />
-        {owner && view === 'settings' && <HouseholdAccess key={sessionRevision} api={api} onAuthError={invalidateConnection} />}
         <div className={`notice ${notice.error ? 'error' : ''}`} role={notice.error ? 'alert' : 'status'} aria-live="polite">
           {busy ? (
             <>

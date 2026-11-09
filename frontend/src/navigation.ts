@@ -7,6 +7,7 @@ export const appPaths = {
   settings: '/settings',
   setup: '/setup',
   rooms: '/settings/rooms',
+  users: '/settings/users',
   connections: '/settings/connections',
   network: '/network',
   'local-connections': '/local-connections',
