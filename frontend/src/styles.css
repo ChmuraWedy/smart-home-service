@@ -911,7 +911,7 @@ input[type=hidden] {
 .ui-icon:is(.parameter-icon, .device-type-icon) { stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
 .dashboard-action-icon { @apply tw:hidden; width:20px; height:20px; }
 .alias-icon > .ui-icon { width:14px; height:14px; }
-.tile-icon-action > .ui-icon, .channel-timer-toggle > .ui-icon { width:18px; height:18px; }
+.tile-icon-action > .ui-icon { width:18px; height:18px; }
 .dashboard-search-button > .ui-icon { width:22px; height:22px; }
 @media (max-width: 760px) {
   .control-center { @apply tw:p-3; }
@@ -1115,6 +1115,14 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
 .capability-heading h3 label { font:inherit; color:inherit; margin:0; cursor:pointer; }
 .control-header-buttons .control-refresh { width:44px; height:44px; padding:0; font-size:24px; }
 .light-schedules { margin-top:20px; }
+.switch-timers > h4 { margin:12px 0 0; }
+.switch-timers > .capability-grid { margin-top:8px; }
+.inching-settings { display:grid; gap:8px; }
+.inching-setting { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; }
+.inching-setting > label { margin:0; }
+.inching-toggle { display:flex; align-items:center; gap:8px; }
+.inching-setting input { width:8ch; margin:0 0 0 8px; }
+.inching-settings > button { justify-self:start; }
 .light-schedules > h3 { font-size:14px; }
 @media(max-width:520px) {
   .control-header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; }
@@ -1136,18 +1144,10 @@ button[data-slot="switch"]:hover:enabled { @apply tw:border-0 tw:rounded-full tw
 .card-quick-controls .capability-boolean > .capability-row { grid-template-columns:auto auto; justify-content:start; }
 .card-sensor-caption { font-size:12px; color:var(--muted); }
 .card-sensor-value { flex-wrap:wrap; font-size:15px; }
-.channel-timer-toggle { display:inline-grid; place-items:center; padding:0; width:28px; height:28px; min-width:28px; border:0; background:transparent; color:var(--muted); }
-.channel-timer-toggle[aria-expanded=true] { color:var(--success); background:var(--surface-soft); }
-.channel-timer-panel { margin:8px 0; padding:8px 0 8px 12px; border-left:2px solid var(--border); }
-.channel-timer-panel[hidden] { display:none; }
-.card-quick-controls .channel-timer-panel .capability-row { display:flex; flex-wrap:wrap; gap:8px; }
-.card-quick-controls .channel-timer-panel .capability-form { flex:1 1 100%; flex-wrap:wrap; }
-.card-quick-controls .channel-timer-panel .range-input-row { flex:1 1 120px; }
-.card-quick-controls .channel-timer-panel .help { margin:4px 0; }
 .connection-balloon { position:absolute; z-index:5; right:0; top:calc(100% - 8px); width:min(480px,calc(100vw - 80px)); max-height:60dvh; overflow:auto; padding:22px; margin:0; border:1px solid var(--border-strong); border-radius:14px; background:var(--overlay-surface); color:var(--text); box-shadow:0 16px 60px var(--shadow-heavy); }
 .connection-balloon .connection-description { margin:0; }
 .balloon-close { float:right; margin:-12px -12px 4px 8px; width:36px; height:36px; padding:0; font-size:24px; }
-@media(pointer:coarse) { .channel-timer-toggle { min-width:36px; width:36px; height:44px; } .balloon-close { width:44px; height:44px; } }
+@media(pointer:coarse) { .balloon-close { width:44px; height:44px; } }
 .capability-boolean .capability-heading,.capability-boolean .capability-label { display:contents; }
 .capability-boolean .capability-label-line { grid-column:1; grid-row:1; }
 .capability-boolean > .capability-row > .power-actions { grid-column:2; grid-row:1; }

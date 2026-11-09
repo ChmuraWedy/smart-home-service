@@ -101,9 +101,8 @@ describe('cloud device control', () => {
     const aliases = await within(screen.getByRole('region', { name: 'Канал 1' })).findByRole('group', { name: 'Алиасы' });
     expect(within(aliases).getByText('Настольный свет', { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Настольный свет' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Таймер канала 1' })).toBeNull();
-    await user.click(screen.getByRole('button',{name:'Таймер канала 1'}));
-    expect(screen.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
+    const timers = within(screen.getByRole('region', { name: 'Таймеры' }));
+    expect(timers.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
     expect(writes).toEqual([{ method: 'PUT', body: { labels: { switch_1: 'Настольный свет' } } }]);
     view.unmount(); renderWithStore(<CloudControl {...props} />);
     const channel = await screen.findByRole('region', { name: 'Канал 1' });
@@ -409,6 +408,34 @@ describe('cloud device control', () => {
 });
 
 describe('local device and group controls', () => {
+  it('decodes local Inching, and sends the reported slot and edited duration only on Apply', async () => {
+    const device = { ...light, capabilities: {
+      switch_1: boolean,
+      switch_inching: { dp: '44', type: 'string', readable: true, writable: true } as const,
+    } };
+    const { states, writes } = localServer({ lamp: device });
+    states[device.id].values.switch_inching.value = 'AAAC';
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+
+    const timers = within(await screen.findByRole('region', { name: 'Таймеры' }));
+    const inching = within(timers.getByRole('region', { name: 'Автовыключение' }));
+    const enabled = inching.getByRole('switch', { name: 'Канал 1' });
+    const duration = inching.getByRole('spinbutton', { name: 'Задержка выключения (секунды)' });
+    expect(enabled).not.toBeChecked();
+    expect(duration).toHaveValue(2);
+    fireEvent.change(duration, { target: { value: '65536' } });
+    expect(inching.getByRole('button', { name: 'Применить' })).toBeDisabled();
+    fireEvent.change(duration, { target: { value: '60' } });
+    const user = userEvent.setup();
+    await user.click(enabled);
+    expect(writes).toEqual([]);
+    await user.click(inching.getByRole('button', { name: 'Применить' }));
+    await waitFor(() => expect(writes).toEqual([{
+      path: '/api/v1/devices/1/commands/capabilities',
+      body: { values: { switch_inching: 'AQA8' } },
+    }]));
+  });
+
   it('lists and edits the saved timer mapping in full local settings', async () => {
     const timer: Capability = { dp: '7', type: 'integer', readable: true, writable: false, unit: 's' };
     const device = { ...light, capabilities: { switch: boolean, countdown_1: timer } };

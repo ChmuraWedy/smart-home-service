@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { MSG, t } from "../i18n";
-import type { CloudDevice } from '../api';
+import type { CloudDevice, JsonValue } from '../api';
 import type { DeviceRoute } from '../devices';
 import { displayReading, isStale, localCommandValue, localReading, localSpec, validateControlValue } from '../controls';
+import type { ControlSpec } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
 import { readLocalDevice } from '../local-device-cache';
@@ -14,6 +15,7 @@ import { useLocalDeviceState } from '../use-local-device-state';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import DeviceInformation from './DeviceInformation';
 import LocalDeviceMappings from './LocalDeviceMappings';
+import { InchingControl, SwitchTimers, switchTimerControls } from './SwitchTimers';
 import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import DeviceTranslationEditor from './DeviceTranslationEditor';
@@ -76,6 +78,29 @@ export function LocalControl({
     onMappingsSaved?.(updated);
   }, [onMappingsSaved]);
 
+  const { countdowns, inching, channels } = switchTimerControls(specs);
+  const regularSpecs = specs.filter((spec) => !isBattery(spec.key) && spec !== inching && !countdowns.includes(spec));
+  const controlsDisabled = session.busy || !session.readOK || !state?.enabled;
+  const sendValue = (spec: ControlSpec, value: JsonValue) => session.execute(async () => {
+    const result = await api.setCapability(item.id, spec.key, localCommandValue(spec, value));
+    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
+    return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
+  });
+  const field = (spec: ControlSpec) => (
+    <CapabilityField
+      key={spec.key}
+      spec={spec}
+      pendingScope={pendingScope}
+      stage={item.capabilities[spec.key].type === 'boolean' ? undefined : drafts.stage}
+      immediatePower
+      reading={localReading(spec, state?.values[spec.key])}
+      now={now}
+      local
+      disabled={controlsDisabled}
+      onSend={(value) => sendValue(spec, value)}
+    />
+  );
+
   return (
     <ControlDialog onRefresh={session.refresh}
       information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />}
@@ -86,26 +111,25 @@ export function LocalControl({
       {roomEditor}
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
       {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
-      <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>
-        {session.data && state && specs.filter(({ key }) => !isBattery(key)).map((spec) => (
-          <CapabilityField
-            key={spec.key}
-            spec={spec}
-            pendingScope={pendingScope}
-            stage={item.capabilities[spec.key].type === 'boolean' ? undefined : drafts.stage}
-            immediatePower
-            reading={localReading(spec, state.values[spec.key])}
-            now={now}
-            local
-            disabled={session.busy || !session.readOK || !state.enabled}
-            onSend={(value) => session.execute(async () => {
-              const result = await api.setCapability(item.id, spec.key, localCommandValue(spec, value));
-              if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
-              return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
-            })}
-          />
-        ))}
+      <div className={`capability-grid${specs.every((spec) => !spec.writable) ? ' sensor-grid' : ''}`}>
+        {session.data && state && regularSpecs.map(field)}
       </div>
+      {session.data && state && (
+        <SwitchTimers
+          countdowns={countdowns}
+          renderCountdown={field}
+          inching={inching && (
+          <InchingControl
+            spec={inching}
+            channels={channels}
+            reading={state.values[inching.key]}
+            pendingScope={pendingScope}
+            disabled={controlsDisabled || !state.available}
+            onSend={(value) => sendValue(inching, value)}
+          />
+          )}
+        />
+      )}
       {session.data && !Object.keys(item.capabilities).length && (
       <div className="saved-summary">
         {item.is_gateway ? <p>{t(MSG.THE_GATEWAY_IS_CONFIGURED_FOR_LOCAL_CHILD_DEVICE)}</p> : (

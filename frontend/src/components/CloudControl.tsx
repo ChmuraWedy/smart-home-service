@@ -22,7 +22,8 @@ import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 import { hasLightEffectWizard } from './LightEffectWizard';
 import { hasScheduleWizard } from './ScheduleWizard';
-import { ChannelControl, channelTimer } from './ChannelControl';
+import { ChannelControl } from './ChannelControl';
+import { InchingControl, SwitchTimers, switchTimerControls } from './SwitchTimers';
 import type { ReactNode } from 'react';
 import { CameraLive } from './CameraLive';
 import { CameraSettings } from './CameraSettings';
@@ -93,7 +94,8 @@ export function CloudControl({
   const privacyReading = data?.snapshot.status.basic_private;
   const privacyState = usePendingPrivacyState(pendingScope, !session.readOK || !data ? null : typeof privacyReading === 'boolean' ? privacyReading : privacySpec ? null : undefined);
   const privacyBlock = cameraPrivacyBlock(privacyState);
-  const regularSpecs = camera ? [] : specs;
+  const { countdowns, inching, channels } = switchTimerControls(camera ? [] : specs);
+  const regularSpecs = camera ? [] : specs.filter((spec) => spec !== inching && !countdowns.includes(spec));
   const settings = regularSpecs.filter(spec => /^(relay_status(?:_[1-9][0-9]*)?|switch_backlight|switch_inching)$/.test(spec.key));
   const basic = regularSpecs.filter(spec => !spec.advanced && !hasLightEffectWizard(spec) && !settings.includes(spec) && !isBattery(spec.key)), schedules = regularSpecs.filter(hasScheduleWizard), effects = regularSpecs.filter(hasLightEffectWizard), advanced = regularSpecs.filter(spec => spec.advanced && !settings.includes(spec) && !hasScheduleWizard(spec) && !hasLightEffectWizard(spec));
   const ensureStorage = (spec:ControlSpec) => {if (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready)) throw new Error(storage.label+t(MSG.COMMAND_UNAVAILABLE));};
@@ -139,8 +141,11 @@ export function CloudControl({
       />
     );
   };
-  const pairedTimers = new Set(basic.flatMap(spec => { const timer = channelTimer(spec,basic); return timer ? [timer.key] : []; }));
-  const basicField = (spec:ControlSpec) => <ChannelControl key={spec.key} spec={spec} timer={channelTimer(spec,basic)} renderField={field} />;
+  const basicField = (spec: ControlSpec) => <ChannelControl key={spec.key} spec={spec} renderField={field} />;
+  const inchingReading = inching && data ? {
+    ...cloudReading(inching, data.snapshot.status[inching.key], data.snapshot.status_observations?.[inching.key]),
+    liveRequestAt,
+  } : undefined;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
@@ -185,7 +190,21 @@ export function CloudControl({
       {data && !data.snapshot.online && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
       {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
       {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
-      {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.filter(spec => !pairedTimers.has(spec.key)).map(basicField)}</div>}
+      {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.map(basicField)}</div>}
+      <SwitchTimers
+        countdowns={countdowns}
+        renderCountdown={(spec) => field(spec)}
+        inching={inching && (
+        <InchingControl
+          spec={inching}
+          channels={channels}
+          reading={inchingReading}
+          pendingScope={pendingScope}
+          disabled={session.busy || editingBusy || !session.readOK || !data?.snapshot.online}
+          onSend={(value) => sendValue(inching, value)}
+        />
+        )}
+      />
       {settings.length > 0 && (
       <details className="cloud-properties additional-settings">
         <summary>{t(MSG.ADDITIONAL_SETTINGS)}</summary>

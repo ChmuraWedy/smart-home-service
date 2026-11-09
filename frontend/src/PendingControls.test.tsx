@@ -56,7 +56,8 @@ it('puts switch configuration in collapsed additional settings and shows relativ
   expect(details).not.toHaveAttribute('open');
   expect(within(details).getByRole('heading',{name:'Состояние после подачи питания'})).toBeInTheDocument();
   expect(within(details).getByRole('heading',{name:'Подсветка выключателя'})).toBeInTheDocument();
-  expect(within(details).getByRole('heading',{name:'Автовыключение (импульсный режим)'})).toBeInTheDocument();
+  const timers = within(screen.getByRole('region', { name: 'Таймеры' }));
+  expect(timers.getByRole('heading', { name: 'Автовыключение' })).toBeInTheDocument();
   const before=vi.mocked(fetch).mock.calls.length;
   await userEvent.setup().click(screen.getByRole('button',{name:'Обновить статус'}));
   await waitFor(()=>expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(before));
