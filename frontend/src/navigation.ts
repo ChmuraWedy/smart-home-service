@@ -10,6 +10,7 @@ export const appPaths = {
   connections: '/settings/connections',
   network: '/network',
   'local-connections': '/local-connections',
+  'smart-life-rooms': '/settings/smart-life-rooms',
 } as const;
 
 export const dashboardToolsPath = '/settings/dashboard';

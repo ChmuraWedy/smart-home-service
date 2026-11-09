@@ -1177,5 +1177,10 @@
   "SETUP_UNAVAILABLE": "First-time key setup is unavailable.",
   "SETUP_INVALID_CODE": "Invalid setup code.",
   "SETUP_USE_SERVER_KEY": "Use the service access key configured on this server.",
-  "SETUP_REQUIRED": "Complete first-time key setup before using the service."
+  "SETUP_REQUIRED": "Complete first-time key setup before using the service.",
+  "DASHBOARD_NAVIGATION": "Dashboard",
+  "ADVANCED_SETTINGS": "Advanced",
+  "NETWORK_MONITORING": "Network Monitoring",
+  "NETWORK_MONITORING_DISABLED": "Enable Network Monitoring in Advanced settings to inspect local network traffic.",
+  "SMART_LIFE_NO_LOADED_ROOMS": "No rooms have been loaded from Smart Life yet."
 }

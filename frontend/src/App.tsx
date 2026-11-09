@@ -4,7 +4,7 @@ import {
 import type { ReactNode } from 'react';
 import { Provider as StoreProvider } from 'react-redux';
 import {
-  createBrowserRouter, createHashRouter, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext,
+  createBrowserRouter, createHashRouter, Link, Outlet, useBlocker, useLocation, useMatches, useNavigate, useOutletContext,
 } from 'react-router';
 import type { RouteObject } from 'react-router';
 import {
@@ -30,7 +30,9 @@ import { HomeApi } from './home-api';
 import { NetworkPage } from './components/NetworkPage';
 import { LocalConnectionsPage } from './components/LocalConnectionsPage';
 import RoomEditor from './components/RoomEditor';
+import SmartLifeRoomsPage from './components/SmartLifeRoomsPage';
 import { Icon, IconGlyph } from './components/ui/icon';
+import { Switch } from './components/ui/switch';
 import {
   appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath, combinationPattern, combinationQuickPattern,
   dashboardHref, dashboardLayoutPath, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomLayoutPattern, roomPattern,
@@ -47,6 +49,11 @@ type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
 const demo = import.meta.env.MODE === 'demo';
 const CARD_SIZE_STORAGE_KEY = 'smart-home.ui.card-size.v1';
+const NETWORK_MONITORING_KEY = 'smart-home.ui.network-monitoring.v1';
+
+function savedNetworkMonitoring() {
+  try { return localStorage.getItem(NETWORK_MONITORING_KEY) === '1'; } catch { return false; }
+}
 
 function savedCardSize(): CardSize {
   try { return localStorage.getItem(CARD_SIZE_STORAGE_KEY) === 'small' ? 'small' : 'large'; } catch { return 'large'; }
@@ -99,6 +106,7 @@ export function createAppRouter() {
         screenRoute(appPaths.connections, 'connections'),
         screenRoute(appPaths.network, 'network'),
         screenRoute(appPaths['local-connections'], 'local-connections'),
+        screenRoute(appPaths['smart-life-rooms'], 'smart-life-rooms'),
       ] : []),
       screenRoute('*', 'control'),
     ],
@@ -123,6 +131,7 @@ function AppContent() {
   const dashboardPanel: DashboardPanel = matched?.id === dashboardToolsPath || panelParam === 'tools' ? 'tools' : panelParam === 'search' ? 'search' : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [cardSize, setCardSize] = useState(savedCardSize);
+  const [networkMonitoring, setNetworkMonitoring] = useState(savedNetworkMonitoring);
   const menuRef = useRef<HTMLDivElement>(null); const
     menuButton = useRef<HTMLButtonElement>(null);
   const [localConnectionLocked, setLocalConnectionLocked] = useState(false);
@@ -342,6 +351,11 @@ function AppContent() {
     try { localStorage.setItem(CARD_SIZE_STORAGE_KEY, next); } catch { /* The current view still updates. */ }
   }
 
+  const changeNetworkMonitoring = useCallback((enabled: boolean) => {
+    setNetworkMonitoring(enabled);
+    try { localStorage.setItem(NETWORK_MONITORING_KEY, enabled ? '1' : '0'); } catch { /* In-memory preference still applies. */ }
+  }, []);
+
   const goTo = useCallback((next: View) => {
     setMenuOpen(false); setNotice({ text: '' });
     if (location.pathname !== appPaths[next] || location.search || location.hash) navigate(appPaths[next]);
@@ -538,17 +552,46 @@ function AppContent() {
 
     </>
   );
+  const navigationGroups = [
+    [
+      ['control', MSG.DASHBOARD_NAVIGATION],
+      ...(!demo ? [['combined-devices', MSG.COMBINED_DEVICES] as const] : []),
+    ],
+    ...(!demo ? [[
+      ['connections', MSG.CONNECTIONS],
+      ['local-connections', MSG.LOCAL_CONNECTIONS],
+      ['smart-life-rooms', MSG.ROOMS_FROM_SMART_LIFE],
+    ] as const] : []),
+    [['settings', MSG.SETTINGS]],
+  ] as const;
   const pages: Record<View, ReactNode> = {
     connections,
     setup: setupWizard,
     settings: (
-      <section className="card">
+      <section className="card settings-page">
         <h1>{t(MSG.SETTINGS)}</h1>
-        <div className="app-menu-appearance">{appearance}</div>
+        <div className="app-menu-appearance settings-appearance">{appearance}</div>
+        {!demo && (
+          <section className="settings-advanced" aria-labelledby="advanced-settings-heading">
+            <h2 id="advanced-settings-heading">{t(MSG.ADVANCED_SETTINGS)}</h2>
+            <div className="settings-feature">
+              <span>{t(MSG.NETWORK_MONITORING)}</span>
+              <Switch aria-label={t(MSG.NETWORK_MONITORING)} checked={networkMonitoring} onChange={changeNetworkMonitoring} />
+            </div>
+            {networkMonitoring && <Link to={appPaths.network}>{t(MSG.NETWORK_AND_PACKETS)}</Link>}
+          </section>
+        )}
       </section>
     ),
-    network: <NetworkPage api={api} ready={setupHasAccess} onAuthError={invalidateConnection} />,
+    network: networkMonitoring ? <NetworkPage api={api} ready={setupHasAccess} onAuthError={invalidateConnection} /> : (
+      <section className="card settings-page">
+        <h1>{t(MSG.NETWORK_MONITORING)}</h1>
+        <p>{t(MSG.NETWORK_MONITORING_DISABLED)}</p>
+        <Link to={appPaths.settings}>{t(MSG.SETTINGS)}</Link>
+      </section>
+    ),
     'local-connections': localConnections,
+    'smart-life-rooms': <SmartLifeRoomsPage api={api} ready={Boolean(ready && status?.connected)} onAuthError={invalidateConnection} />,
     control: controlCenter,
     rooms: <RoomEditor api={api} ready={setupHasAccess} onAuthError={invalidateConnection} />,
     'combined-devices': controlCenter,
@@ -576,25 +619,36 @@ function AppContent() {
             </button>
             {menuOpen && (
             <nav id="app-sections" className="app-menu-panel" aria-label={t(MSG.APP_NAVIGATION)}>
-              {([
-                ['control', t(MSG.CONTROL)],
-                ['combined-devices', t(MSG.COMBINED_DEVICES)],
-                ['network', t(MSG.NETWORK_AND_PACKETS)],
-                ['local-connections', t(MSG.LOCAL_CONNECTIONS)],
-                ['settings', t(MSG.SETTINGS)],
-                ['connections', t(MSG.CONNECTIONS)],
-              ] as const).filter(([key]) => !demo || key === 'control' || key === 'settings').map(([key, label]) => (
-                <button
-                  type="button"
-                  key={key}
-                  className="secondary"
-                  aria-current={view === key ? 'page' : undefined}
-                  disabled={locked}
-                  onClick={() => goTo(key)}
-                >
-                  {label}
-                </button>
+              {navigationGroups.map((group) => (
+                <div className="app-menu-group" key={group[0][0]}>
+                  {group.map(([key, label]) => (
+                    <button
+                      type="button"
+                      key={key}
+                      className="secondary"
+                      aria-current={view === key ? 'page' : undefined}
+                      disabled={locked}
+                      onClick={() => goTo(key)}
+                    >
+                      {t(label)}
+                    </button>
+                  ))}
+                </div>
               ))}
+              {!demo && networkMonitoring && (
+                <div className="app-menu-group">
+                  <span className="app-menu-group-heading">{t(MSG.ADVANCED_SETTINGS)}</span>
+                  <button
+                    type="button"
+                    className="secondary"
+                    aria-current={view === 'network' ? 'page' : undefined}
+                    disabled={locked}
+                    onClick={() => goTo('network')}
+                  >
+                    {t(MSG.NETWORK_MONITORING)}
+                  </button>
+                </div>
+              )}
               {view === 'control' && status && (
               <button
                 className="secondary dashboard-tools-menu"

@@ -692,10 +692,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 6
+      "count": 5
     },
     "@stylistic/max-len": {
-      "count": 11
+      "count": 9
     },
     "arrow-parens": {
       "count": 34
@@ -716,7 +716,7 @@
       "count": 1
     },
     "indent": {
-      "count": 5
+      "count": 3
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
@@ -737,7 +737,7 @@
       "count": 1
     },
     "no-void": {
-      "count": 9
+      "count": 8
     },
     "object-curly-newline": {
       "count": 30
@@ -761,7 +761,7 @@
       "count": 2
     },
     "react/button-has-type": {
-      "count": 5
+      "count": 3
     },
     "react/jsx-max-props-per-line": {
       "count": 1
@@ -1753,23 +1753,6 @@
       "count": 1
     },
     "jsx-a11y/label-has-associated-control": {
-      "count": 1
-    }
-  },
-  "src/components/TopologySummary.tsx": {
-    "import/prefer-default-export": {
-      "count": 1
-    },
-    "indent": {
-      "count": 1
-    },
-    "object-curly-newline": {
-      "count": 2
-    },
-    "prefer-template": {
-      "count": 1
-    },
-    "react/button-has-type": {
       "count": 1
     }
   },

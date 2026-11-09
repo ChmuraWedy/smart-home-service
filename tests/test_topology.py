@@ -65,6 +65,10 @@ def test_sync_creates_idempotent_hierarchy_without_registering_cloud_devices(top
     assert client.get(API + "/topology").json()["placements"] == [] and api.calls == []
     result = sync(client)
     assert len(result["homes"]) == 2 and len(result["placements"]) == 3
+    assert {(room["home_id"], room["room_id"], room["name"]) for room in result["rooms"]} == {
+        ("101", "1", "Кухня"),
+        ("101", "2", "Кухня"),
+    }
     assert result["empty_rooms_available"] is False
     assert len(api.calls) == 6  # Homes + two home inventories + three room reads, no specs/status.
     rooms = client.get("/api/v1/rooms").json()

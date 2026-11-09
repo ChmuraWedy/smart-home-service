@@ -68,7 +68,16 @@ it('opens local connections from the hamburger and restores its direct URL', asy
   expect(screen.getByRole('button', { name: 'Найти устройства' })).toBeDisabled();
   expect(screen.queryByRole('combobox', { name: 'Устройство' })).toBeNull();
   expect(backend.calls.some(call => call.path.endsWith('/find') || call.path.endsWith('/save'))).toBe(false);
-  await go(userEvent.setup(), 'Сеть и пакеты'); expect(window.location.pathname).toBe('/network');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Меню' }));
+  expect(screen.queryByRole('button', { name: 'Мониторинг сети' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Параметры' }));
+  const monitor = screen.getByRole('switch', { name: 'Мониторинг сети' });
+  expect(monitor).not.toBeChecked();
+  await user.click(monitor);
+  expect(monitor).toBeChecked();
+  await go(user, 'Мониторинг сети');
+  expect(window.location.pathname).toBe('/network');
   await go(userEvent.setup(), 'Локальные подключения'); expect(window.location.pathname).toBe('/local-connections');
   expect(screen.getByRole('heading', { name: 'Локальные подключения' })).toBeInTheDocument();
 });
@@ -79,6 +88,24 @@ async function restored(connections = true) {
   if (connections) await go(userEvent.setup(), 'Подключения');
   return backend;
 }
+
+it('opens the dedicated Smart Life rooms page from the menu', async () => {
+  stored(); fakeApi(); render(<App />);
+  await screen.findByText('API подключён');
+  await go(userEvent.setup(), 'Комнаты из Smart Life');
+  expect(window.location.pathname).toBe('/settings/smart-life-rooms');
+  expect(screen.getByRole('heading', { name: 'Комнаты из Smart Life' })).toBeInTheDocument();
+});
+
+it('keeps the network page inactive until Network Monitoring is enabled', async () => {
+  stored();
+  window.history.replaceState(null, '', '/network');
+  const backend = fakeApi();
+  render(<App />);
+  await screen.findByText('API подключён');
+  expect(screen.getByRole('heading', { name: 'Мониторинг сети' })).toBeInTheDocument();
+  expect(backend.calls.some(call => call.path.startsWith('/api/v1/network/'))).toBe(false);
+});
 
 it('uses the Android Docker session from the LAN dashboard without entering a password', async () => {
   vi.stubGlobal('isSecureContext', false);
@@ -133,7 +160,7 @@ describe('cloud UI journeys', () => {
     const backend = await restored(false); const user = userEvent.setup();
     expect(await screen.findByRole('heading', { name: 'Лампа кухни' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Меню' }));
-    expect(screen.getByRole('button', { name: 'Управление' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Панель управления' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByText('Локальное управление')).toBeNull();
     expect(screen.queryByText(/Облачные устройства доступны на вкладке/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Получить QR-код' })).toBeNull();
@@ -246,7 +273,7 @@ describe('cloud UI journeys', () => {
     expect(screen.queryByAltText('QR-код для входа в Tuya')).not.toBeInTheDocument();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:qr-test');
     expect(screen.getByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
-    await go(user, 'Управление');
+    await go(user, 'Панель управления');
     expect(await screen.findByRole('heading', { name: 'Лампа кухни' })).toBeInTheDocument();
   });
 
@@ -279,7 +306,7 @@ describe('cloud UI journeys', () => {
     expect(backend.calls.find(call => call.method === 'PUT')?.body).toEqual({ access_id: 'project-id', access_secret: 'private-secret', region: 'us-e', sample_device_id: null });
     await user.click(screen.getByRole('button', { name: 'Проверить и подключить' }));
     await screen.findByText('Tuya Developer подключён. Найдено устройств: 2.');
-    await go(user, 'Управление');
+    await go(user, 'Панель управления');
     await screen.findByText('Лампа кухни');
     expect(vi.mocked(fetch).mock.calls.some(call => String(call[0]).endsWith('provider=developer'))).toBe(true);
     await go(user, 'Подключения');
@@ -380,7 +407,8 @@ describe('cloud UI journeys', () => {
 
 
 it('opens LAN observations from the menu without a connected Tuya account', async () => {
-  stored(); window.history.replaceState(null, '', '/#network');
+  stored(); localStorage.setItem('smart-home.ui.network-monitoring.v1', '1');
+  window.history.replaceState(null, '', '/#network');
   const backend = fakeApi({ enabled: false, connected: false, developer: { configured: false, connected: false, region: 'eu' } });
   render(<App />); await screen.findByText('API подключён');
   expect(screen.getByRole('heading', { name: 'Сеть и пакеты' })).toBeInTheDocument();
@@ -389,7 +417,7 @@ it('opens LAN observations from the menu without a connected Tuya account', asyn
   expect(backend.calls.map(call => call.path)).toEqual(['/api/v1/cloud/status', '/api/v1/network/interfaces']);
   const menu = screen.getByRole('button', { name: 'Меню' });
   fireEvent.click(menu); expect(screen.getByRole('navigation', { name: 'Раздел приложения' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Сеть и пакеты' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('button', { name: 'Мониторинг сети' })).toHaveAttribute('aria-current', 'page');
   fireEvent.keyDown(menu, { key: 'Escape' }); expect(screen.queryByRole('navigation')).toBeNull();
   expect(menu).toHaveFocus();
   fireEvent.click(menu); fireEvent.pointerDown(document.body); expect(screen.queryByRole('navigation')).toBeNull();

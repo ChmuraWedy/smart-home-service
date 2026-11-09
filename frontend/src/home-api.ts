@@ -47,7 +47,11 @@ export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 
 export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
 export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
 export type TopologyJob = { status: 'idle' | 'running' | 'done' | 'failed'; processed: number; total: number; message: string | null };
-export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: boolean; placements: Placement[]; job: TopologyJob };
+export type Topology = {
+  synced_at: string | null; warnings: number; empty_rooms_available: boolean; placements: Placement[]; job: TopologyJob;
+  homes?: { 'home_id': string; 'name': string }[];
+  rooms?: { 'home_id': string; 'room_id': string; 'name': string }[];
+};
 export type DeviceDraft = {
   name: string; device_id: string; transport: 'wifi' | 'zigbee'; is_gateway: boolean;
   ip: string | null; version: string | null; parent_id: number | null; cid: string | null;

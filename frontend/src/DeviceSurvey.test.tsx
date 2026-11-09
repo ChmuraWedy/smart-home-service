@@ -2,8 +2,6 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DeviceSurvey } from './components/DeviceSurvey';
-import { ControlCenter } from './components/ControlCenter';
-import { renderWithStore } from './test/render-with-store';
 import { HomeApi } from './home-api';
 import type { CloudDevice } from './api';
 import type { DeviceDraft, Inventory, ObservationSession, LocalDevice } from './home-api';
@@ -174,21 +172,6 @@ describe('device survey before registration', () => {
     expect(screen.queryByRole('button', { name: 'Сохранить локальное подключение' })).toBeNull();
   });
 
-  it('lists real gateway candidates from the chosen cloud provider without choosing a parent', async () => {
-    const calls = server({ devices: [sensor, gateway, { ...gateway, id: 'other', name: 'Лампа', category: 'dj' }] }), user = userEvent.setup();
-    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
-    const card = await screen.findByRole('listitem', { name: sensor.name });
-    await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
-    const select = screen.getByLabelText('Шлюз');
-    expect(select).toHaveValue('');
-    expect(within(select).getByRole('option', { name: gateway.name + ' · требуется локальная настройка' })).toBeInTheDocument();
-    expect(within(select).queryByRole('option', { name: /Лампа/ })).toBeNull();
-    await user.selectOptions(select, 'cloud:' + gateway.id);
-    expect(screen.getByRole('button', { name: 'Начать опрос' })).toBeDisabled();
-    expect(screen.getByText(/Smart Life не передал эту связь/)).toBeInTheDocument();
-    expect(calls.every(call => call.method === 'GET')).toBe(true);
-  });
-
   it('returns from gateway setup with the sensor draft intact and uses the saved numeric parent', async () => {
     vi.useFakeTimers(); const calls = server(), user = timedUser();
     const { onClose } = setup({ device: sensor, cloudDevices: [gateway], gatewayPlacements: [{ device_id: gateway.id, building_id: 1, room_id: 2 }] });
@@ -232,20 +215,6 @@ describe('device survey before registration', () => {
     expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
     expect(screen.getByLabelText(/Локальный ключ/)).toBeInTheDocument();
     expect(calls).toHaveLength(0);
-  });
-
-  it('opens the survey from a cloud card before registering anything', async () => {
-    const calls = server(), user = userEvent.setup();
-    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
-    const card = await screen.findByRole('listitem', { name: cloudDevice.name });
-    await user.click(within(card).getByRole('button', { name: 'Настроить локальное подключение' }));
-    expect(screen.getByRole('heading', { name: 'Настроить локальное подключение' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Tuya device ID')).toHaveValue(cloudDevice.id);
-    expect(screen.getByLabelText('Название')).toHaveValue(cloudDevice.name);
-    expect(screen.getByLabelText('Источник показаний')).toHaveValue('local');
-    expect(screen.queryByLabelText('Локальный ключ')).toBeNull();
-    expect(calls.every(call => call.method === 'GET')).toBe(true);
-    expect(screen.getByRole('button', { name: 'Начать опрос' })).toBeDisabled();
   });
 
   it('records owner actions and saves directly from observation only after clicking Save', async () => {

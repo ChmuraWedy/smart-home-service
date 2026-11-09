@@ -139,7 +139,7 @@ describe('device deep navigation', () => {
     await go('Параметры');
     expect(currentPath()).toBe('/settings');
     expect(screen.getByLabelText('Размер карточек')).toBeInTheDocument();
-    await go('Управление');
+    await go('Панель управления');
     await go('Настройки панели');
     expect(currentPath()).toBe('/settings/dashboard');
     expect(screen.getByRole('button', { name: 'Обновить список' })).toBeInTheDocument();
@@ -208,7 +208,7 @@ describe('device deep navigation', () => {
     });
     access('/local-connections');
     render(<App />);
-    await go('Управление');
+    await go('Панель управления');
     const first = await screen.findByRole('listitem', { name: 'Устройство 0' });
     const second = await screen.findByRole('listitem', { name: 'Устройство 1' });
     const firstSwitch = await within(first).findByRole('switch');

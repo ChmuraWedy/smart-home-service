@@ -1177,5 +1177,10 @@
   "SETUP_UNAVAILABLE": "Pierwsza konfiguracja klucza jest niedostępna.",
   "SETUP_INVALID_CODE": "Nieprawidłowy kod konfiguracji.",
   "SETUP_USE_SERVER_KEY": "Użyj klucza dostępu ustawionego na tym serwerze.",
-  "SETUP_REQUIRED": "Dokończ pierwszą konfigurację klucza, aby korzystać z usługi."
+  "SETUP_REQUIRED": "Dokończ pierwszą konfigurację klucza, aby korzystać z usługi.",
+  "DASHBOARD_NAVIGATION": "Panel główny",
+  "ADVANCED_SETTINGS": "Zaawansowane",
+  "NETWORK_MONITORING": "Monitorowanie sieci",
+  "NETWORK_MONITORING_DISABLED": "Włącz monitorowanie sieci w ustawieniach zaawansowanych, aby sprawdzać ruch w sieci lokalnej.",
+  "SMART_LIFE_NO_LOADED_ROOMS": "Nie wczytano jeszcze pokoi ze Smart Life."
 }
