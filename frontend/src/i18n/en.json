@@ -1,4 +1,7 @@
 {
+  "AI_CHAT_TITLE": "AI chat",
+  "AI_CHAT_UNAVAILABLE": "AI chat is unavailable on this server.",
+  "AI_CHAT_LOADING": "Loading chat…",
   "WARM": "Warm",
   "COOL": "Cool",
   "TURN_OFF_PRIVACY": "Turn off privacy",

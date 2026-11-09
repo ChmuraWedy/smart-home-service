@@ -1,4 +1,7 @@
 {
+  "AI_CHAT_TITLE": "Czat AI",
+  "AI_CHAT_UNAVAILABLE": "Czat AI jest niedostępny na tym serwerze.",
+  "AI_CHAT_LOADING": "Wczytywanie czatu…",
   "WARM": "Ciepłe",
   "COOL": "Chłodne",
   "TURN_OFF_PRIVACY": "Wyłącz prywatność",

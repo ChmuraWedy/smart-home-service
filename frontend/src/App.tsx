@@ -7,6 +7,7 @@ import type { RouteObject } from 'react-router';
 import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider, RedroidCredentials } from './api';
 import { loadConnection, saveConnection } from './connection';
+import AiChatButton from './components/AiChat';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
@@ -387,6 +388,9 @@ function AppContent() {
         <span className={'api-presence ' + (status ? 'online' : '')}>
           <i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}
         </span>
+        {!demo && view === 'control' && status && connection.token && (
+          <AiChatButton api={api} disabled={locked} onAuthError={invalidateConnection} />
+        )}
         {view === 'control' && status && (
           <div className="dashboard-header-search">
             {searchOpen && (

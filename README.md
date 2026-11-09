@@ -131,6 +131,16 @@ Devices and Tuya sessions are stored in the persistent Docker volume. See the [d
 
 Cloud and local connections can coexist. A failed command is not automatically retried through another connection.
 
+### Optional AI chat
+
+Open **AI chat** in the connected dashboard header to use Home Voice Classic Chat.
+Set `SMART_HOME_AI_CHAT_EMBED_URL` to the HTTPS `/embed` page of a separate Home
+Voice instance configured for this backend. Set a Smart Home service key and
+run a single backend worker so chat tickets and sessions reach the same process.
+The dashboard issues a one-time ticket and Classic Chat receives a temporary
+credential scoped to chat operations. Microphone input requires a trusted HTTPS
+dashboard and Home Voice endpoint, plus browser permission.
+
 ## Development
 
 The backend requires Python 3.10+. The frontend requires Node.js `^22.22.2` or `>=24.15.0` and pnpm `11.19.0`, as declared in [frontend/package.json](frontend/package.json).

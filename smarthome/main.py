@@ -698,6 +698,11 @@ def create_app(settings: Settings | None = None, controller=None):
         )
     app.state.controller = controller or TuyaController(settings)
     app.include_router(router)
+    from .assistant_api import router as assistant_router
+    from .assistant_sessions import AssistantSessions
+
+    app.state.assistant_sessions = AssistantSessions()
+    app.include_router(assistant_router)
     from .display_api import router as display_router
 
     app.include_router(display_router)

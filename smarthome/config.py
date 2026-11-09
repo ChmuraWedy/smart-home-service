@@ -53,6 +53,9 @@ class Settings:
     label_translator_url: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_LABEL_TRANSLATOR_URL", "").strip()
     )
+    ai_chat_embed_url: str = field(
+        default_factory=lambda: os.getenv("SMART_HOME_AI_CHAT_EMBED_URL", "").strip()
+    )
     cors_origins: tuple[str, ...] = field(
         default_factory=lambda: tuple(
             value.strip()
@@ -79,6 +82,10 @@ class Settings:
                 or endpoint.path not in {"", "/"}
             ):
                 raise ValueError("Label translator must use a loopback HTTP URL")
+        if self.ai_chat_embed_url:
+            self._http_url(self.ai_chat_embed_url)
+            if urlsplit(self.ai_chat_embed_url).scheme != "https":
+                raise ValueError("AI chat embedding requires an HTTPS URL")
         for origin in self.cors_origins:
             self._http_url(origin, origin_only=True)
         if self.frontend_url:

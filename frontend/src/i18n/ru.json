@@ -1,4 +1,7 @@
 {
+  "AI_CHAT_TITLE": "Чат с ИИ",
+  "AI_CHAT_UNAVAILABLE": "Чат с ИИ недоступен на этом сервере.",
+  "AI_CHAT_LOADING": "Загружаем чат…",
   "WARM": "Тёплый",
   "COOL": "Холодный",
   "TURN_OFF_PRIVACY": "Выключить приватность",
