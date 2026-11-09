@@ -7,11 +7,14 @@ import { Icon } from './ui/icon';
 
 type ChatAccess = { api: HomeApi; onAuthError: () => void };
 
-function trustedFrameUrl(value: string | null): string | null {
-  if (!value) return null;
+function trustedFrameUrl(value: string | null, ticket: string | null): string | null {
+  if (!value || !ticket || !/^[A-Za-z0-9_-]{43}$/.test(ticket)) return null;
   try {
     const url = new URL(value);
-    if (url.protocol === 'https:' && url.origin !== window.location.origin && !url.username && !url.password) {
+    const safe = url.protocol === 'https:' && url.origin !== window.location.origin
+      && !url.username && !url.password && !url.search && !url.hash;
+    if (safe) {
+      url.hash = new URLSearchParams({ ticket }).toString();
       return url.href;
     }
   } catch { /* Treat invalid frame URLs as unavailable. */ }
@@ -23,8 +26,8 @@ function ChatFrame({ api, onAuthError }: ChatAccess) {
 
   useEffect(() => {
     const controller = new AbortController();
-    api.assistantEmbed(controller.signal).then(({ url }) => {
-      if (!controller.signal.aborted) setSrc(trustedFrameUrl(url));
+    api.assistantEmbed(controller.signal).then(({ url, ticket }) => {
+      if (!controller.signal.aborted) setSrc(trustedFrameUrl(url, ticket));
     }).catch((error: unknown) => {
       if (controller.signal.aborted) return;
       if (error instanceof ApiError && error.status === 401) onAuthError();
@@ -38,20 +41,14 @@ function ChatFrame({ api, onAuthError }: ChatAccess) {
   }
 
   return (
-    <>
-      <iframe
-        className="ai-chat-frame"
-        src={src}
-        title={t(MSG.AI_CHAT_TITLE)}
-        allow="microphone"
-        sandbox="allow-scripts allow-same-origin allow-forms"
-        referrerPolicy="no-referrer"
-      />
-      <div className="ai-chat-frame-help">
-        <p className="help">{t(MSG.AI_CHAT_SIGN_IN)}</p>
-        <a href={src} target="_blank" rel="noopener noreferrer">{t(MSG.AI_CHAT_OPEN_SEPARATELY)}</a>
-      </div>
-    </>
+    <iframe
+      className="ai-chat-frame"
+      src={src}
+      title={t(MSG.AI_CHAT_TITLE)}
+      allow="microphone"
+      sandbox="allow-scripts allow-same-origin allow-forms"
+      referrerPolicy="no-referrer"
+    />
   );
 }
 

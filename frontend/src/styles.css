@@ -1801,9 +1801,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 @media (min-width:601px) { .ai-chat-sheet:has(.ai-chat-frame) { max-width:760px; } }
 .ai-chat-frame { flex:1; width:100%; min-height:0; border:1px solid var(--border); border-radius:10px; }
-.ai-chat-frame-help { margin-top:8px; }
-.ai-chat-frame-help p { margin:0; }
-.ai-chat-frame-help a { display:inline-flex; align-items:center; min-height:44px; white-space:normal; }
 .dashboard-sheet-power .capability-boolean > .capability-row { @apply tw:grid-cols-[64px_1fr] tw:justify-normal; }
 .dashboard-sheet-power .capability-heading { @apply tw:hidden; }
 .dashboard-sheet-power .capability-boolean > .capability-row > .power-actions { @apply tw:col-start-1 tw:row-start-1; }

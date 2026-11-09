@@ -7,7 +7,8 @@ import { App } from './test/App';
 
 const EMBED_PATH = '/api/v1/assistant/embed';
 const BASE = 'http://api.test:8765';
-const FRAME = 'https://voice.test:8011/';
+const FRAME = 'https://voice.test:8012/embed';
+const TICKET = 't'.repeat(43);
 const TOKEN = 'test-service-key';
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 
@@ -37,18 +38,15 @@ function embedRequests() {
 }
 
 it('opens Classic Chat in a titled iframe and restores focus when dismissed', async () => {
-  const { button, dialog } = await openChat(() => json({ url: FRAME }));
+  const { button, dialog } = await openChat(() => json({ url: FRAME, ticket: TICKET }));
   const chat = within(dialog);
   const iframe = await chat.findByTitle('AI chat');
-  expect(iframe).toHaveAttribute('src', FRAME);
+  expect(iframe).toHaveAttribute('src', `${FRAME}#ticket=${TICKET}`);
   expect(iframe).toHaveAttribute('allow', 'microphone');
   expect(iframe).toHaveAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
   expect(iframe).toHaveAttribute('referrerpolicy', 'no-referrer');
-  const link = chat.getByRole('link', { name: 'Open Classic Chat' });
-  expect(link).toHaveAttribute('href', FRAME);
-  expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   expect(embedRequests()[0].headers).toEqual({ 'X-API-Key': TOKEN });
-  expect(embedRequests()[0].method).toBe('GET');
+  expect(embedRequests()[0].method).toBe('POST');
 
   fireEvent(dialog, new Event('cancel', { cancelable: true }));
   expect(screen.queryByRole('dialog')).toBeNull();
@@ -59,7 +57,7 @@ it('opens Classic Chat in a titled iframe and restores focus when dismissed', as
 it.each([null, 'http://voice.test/', 'javascript:alert(1)', 'https://user:password@voice.test/'])(
   'shows the unavailable message for an unset or unsafe frame URL (%s)',
   async (url) => {
-    const { dialog } = await openChat(() => json({ url }));
+    const { dialog } = await openChat(() => json({ url, ticket: TICKET }));
     await within(dialog).findByText('AI chat is unavailable on this server.');
     expect(dialog.querySelector('iframe')).toBeNull();
   },
