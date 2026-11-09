@@ -42,7 +42,7 @@ import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 import { rotateCloudAccountScope } from './cloud-account-scope';
 
 type Notice = { text: string; error?: boolean };
-type QR = { session: string; imageUrl: string; expiresAt: number; scanSubmitted?: boolean };
+type QR = { session: string; imageUrl?: string; expiresAt: number; approvalReady?: boolean };
 type ConnectionMethod = Provider | 'android';
 type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
@@ -255,7 +255,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     };
     update();
     const timer = setInterval(update, 1000);
-    return () => { clearInterval(timer); URL.revokeObjectURL(qr.imageUrl); };
+    return () => { clearInterval(timer); if (qr.imageUrl) URL.revokeObjectURL(qr.imageUrl); };
   }, [qr]);
 
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
@@ -350,16 +350,20 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     const login = await api.beginRedroidQR();
     if (currentConnection.current !== connection) return;
     const expiresAt = Date.now() + login.expires_in * 1000;
-    const image = await api.qrImage(login);
+    const image = login.android_approval_ready ? null : await api.qrImage(login);
     if (currentConnection.current !== connection) return;
     setQR({
-      session: login.session_id, imageUrl: URL.createObjectURL(image), expiresAt, scanSubmitted: login.scan_submitted,
+      session: login.session_id,
+      imageUrl: image ? URL.createObjectURL(image) : undefined,
+      expiresAt,
+      approvalReady: login.android_approval_ready,
     });
   }, true);
 
   const confirmQR = () => run(async () => {
     if (!qr) return;
-    await api.confirmQR(qr.session);
+    if (qr.approvalReady) await api.confirmRedroidQR(qr.session);
+    else await api.confirmQR(qr.session);
     if (currentConnection.current !== connection) return;
     rotateCloudAccountScope(api, 'sharing');
     const nextStatus = await api.status();
@@ -569,7 +573,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                       protectedConnection={protectedConnection}
                       ready={ready}
                       busy={locked}
-                      approval={qr ? { remaining, imageUrl: qr.imageUrl, scanSubmitted: qr.scanSubmitted ?? false } : null}
+                      approval={qr ? { remaining, imageUrl: qr.imageUrl, readyOnAndroid: qr.approvalReady ?? false } : null}
                       onConnect={connectRedroid}
                       onConfirm={confirmQR}
                     />
@@ -595,7 +599,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   </>
           )}
                     <button className="full-width" disabled={busy || !ready || !status?.has_saved_user_code || showCodeForm} onClick={beginQR}>{t(MSG.GET_QR_CODE)}</button>
-                    {qr && (
+                    {qr?.imageUrl && (
                   <div className="qr-panel">
                     <img src={qr.imageUrl} alt={t(MSG.QR_CODE_FOR_TUYA_SIGN_IN)} />
                     <p className="help">{t(MSG.SCAN_THE_CODE_IN_THE_APP) + " "}{remaining}{" " + t(MSG.SEC)}</p>

@@ -162,7 +162,7 @@ class CloudBridge:
                 "saved_user_code_requires_login": self.saved_code_requires_login,
             }
 
-    def begin_login(self, user_code=None):
+    def begin_login(self, user_code=None, *, redroid=False):
         self.require_enabled()
         with self.lock:
             if user_code is None:
@@ -195,6 +195,7 @@ class CloudBridge:
                 "user_code": user_code,
                 "qr": qr,
                 "login": login,
+                "redroid": redroid,
                 "expires": now + 120,
             }
             return {
@@ -214,27 +215,26 @@ class CloudBridge:
         return item
 
     def qr_svg(self, id):
-        return self._render_qr(id, png=False)
-
-    def qr_png(self, id):
-        return self._render_qr(id, png=True)
-
-    def _render_qr(self, id, *, png):
         self.require_enabled()
         with self.lock:
             item = self._pending(id)
             try:
                 import qrcode
-                if png:
-                    from qrcode.image.pil import PilImage as image_factory
-                else:
-                    from qrcode.image.svg import SvgPathImage as image_factory
+                from qrcode.image.svg import SvgPathImage
             except ImportError:
                 raise HTTPException(503, "Install the cloud extra for QR rendering") from None
-            qr = qrcode.make("tuyaSmart--qrLogin?token=" + item["qr"], image_factory=image_factory)
+            qr = qrcode.make("tuyaSmart--qrLogin?token=" + item["qr"], image_factory=SvgPathImage)
             output = io.BytesIO()
             qr.save(output)
             return output.getvalue()
+
+    def redroid_qr_token(self, id):
+        self.require_enabled()
+        with self.lock:
+            item = self._pending(id)
+            if not item["redroid"]:
+                raise HTTPException(404, "Android login session not found")
+            return item["qr"]
 
     def confirm(self, id):
         self.require_enabled()

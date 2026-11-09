@@ -7,7 +7,7 @@ type Props = {
   protectedConnection: boolean;
   ready: boolean;
   busy: boolean;
-  approval: { remaining: number; imageUrl: string; scanSubmitted: boolean } | null;
+  approval: { remaining: number; imageUrl?: string; readyOnAndroid: boolean } | null;
   onConnect: (credentials?: RedroidCredentials) => Promise<void>;
   onConfirm: () => Promise<void>;
 };
@@ -85,14 +85,14 @@ export default function RedroidConnection({
   }
   if (!ready) return <p className="help">{t(MSG.CLOUD_MODE_IS_DISABLED_ON_THE_SERVER)}</p>;
   if (approval) {
-    const { remaining, imageUrl, scanSubmitted } = approval;
+    const { remaining, imageUrl, readyOnAndroid } = approval;
     return (
       <div className="qr-panel">
-        {scanSubmitted && <p className="help">{t(MSG.APPROVE_DASHBOARD_ACCESS_ON_ANDROID, [remaining])}</p>}
-        <img src={imageUrl} alt={t(MSG.QR_CODE_FOR_TUYA_SIGN_IN)} />
-        <p className="help">{t(MSG.SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE, [remaining])}</p>
+        {readyOnAndroid && <p className="help">{t(MSG.APPROVE_DASHBOARD_ACCESS_ON_ANDROID, [remaining])}</p>}
+        {imageUrl && <img src={imageUrl} alt={t(MSG.QR_CODE_FOR_TUYA_SIGN_IN)} />}
+        {imageUrl && <p className="help">{t(MSG.SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE, [remaining])}</p>}
         <button type="button" className="full-width" disabled={busy || remaining === 0} onClick={onConfirm}>
-          {t(MSG.I_CONFIRMED_SIGN_IN_IN_THE_APP)}
+          {t(readyOnAndroid ? MSG.APPROVE_IN_ANDROID_AND_CONNECT : MSG.I_CONFIRMED_SIGN_IN_IN_THE_APP)}
         </button>
       </div>
     );

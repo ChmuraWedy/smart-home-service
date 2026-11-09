@@ -204,7 +204,11 @@ export class CloudApi {
   }
 
   beginRedroidQR() {
-    return this.json<QRLogin & { 'scan_submitted': boolean }>('/login/redroid/qr', 'POST');
+    return this.json<QRLogin & { 'android_approval_ready': boolean }>('/login/redroid/qr', 'POST');
+  }
+
+  confirmRedroidQR(session: string) {
+    return this.json<{ 'connected': boolean }>(`/login/redroid/${encodeURIComponent(session)}/confirm`, 'POST');
   }
 
   confirmQR(session: string) { return this.json<{ connected: boolean }>('/login/' + encodeURIComponent(session) + '/confirm', 'POST'); }

@@ -1216,9 +1216,10 @@
   "SMART_LIFE_ANDROID_NOT_CONFIGURED": "The Smart Life Android controller is not configured.",
   "OPEN_CONNECTIONS_THROUGH_A_LOCALHOST_TUNNEL": "Open Connections over HTTPS or run this SSH command, then open the local page to enter your password.",
   "OPEN_LOCAL_CONNECTIONS": "Open local Connections",
-  "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Approve dashboard access in Smart Life on Android, then confirm here. {0} seconds left.",
+  "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Smart Life is ready to approve dashboard access. {0} seconds left.",
   "SMART_LIFE_ANDROID_LOGIN_HELP": "Use the country name shown in Smart Life. The dashboard sends your password to Android for sign-in and discards it after the request.",
   "USE_EXISTING_ANDROID_SESSION": "Use existing Android session",
   "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Finish verification in Smart Life on Android, then choose Use existing Android session.",
-  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "If Android shows no approval prompt, scan this QR in Smart Life on another device signed into the same account. {0} seconds left."
+  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "If Android shows no approval prompt, scan this QR in Smart Life on another device signed into the same account. {0} seconds left.",
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Approve in Android and connect"
 }

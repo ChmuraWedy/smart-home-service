@@ -38,7 +38,7 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
     }
     if (path.endsWith('/login/qr')) return json({ session_id: 'qr-session', qr_url: '/api/v1/cloud/login/qr-session/qr.svg', expires_in: 120 });
     if (path.endsWith('/login/redroid/credentials')) return json({ screen: 'home' });
-    if (path.endsWith('/login/redroid/qr')) return json({ session_id: 'android-session', qr_url: '/api/v1/cloud/login/android-session/qr.svg', expires_in: 90, scan_submitted: true });
+    if (path.endsWith('/login/redroid/qr')) return json({ session_id: 'android-session', qr_url: '/api/v1/cloud/login/android-session/qr.svg', expires_in: 90, android_approval_ready: true });
     if (path.endsWith('/qr.svg')) return new Response('<svg/>', { headers: { 'Content-Type': 'image/svg+xml' } });
     if (path.endsWith('/confirm')) {
       status.connected = true; status.saved_user_code_requires_login = false;
@@ -99,13 +99,13 @@ it('sends credentials once and waits for Smart Life approval before connecting t
   await user.type(screen.getByLabelText('Электронная почта или телефон Smart Life'), 'demo@example.invalid');
   await user.type(screen.getByLabelText('Пароль Smart Life'), 'temporary-password');
   await user.click(screen.getByRole('button', { name: 'Подключиться через Android' }));
-  await screen.findByText(/Разрешите доступ панели управления/);
+  await screen.findByText(/Smart Life готов подтвердить доступ/);
   const posts = () => backend.calls.filter(call => call.method === 'POST');
   expect(posts().map(call => call.path)).toEqual(['/api/v1/cloud/login/redroid/credentials', '/api/v1/cloud/login/redroid/qr']);
   expect(posts()[0].body).toEqual({ region: 'Poland', account: 'demo@example.invalid', password: 'temporary-password' });
   expect(localStorage.getItem(STORAGE_KEY)).not.toContain('temporary-password');
-  await user.click(screen.getByRole('button', { name: /Подтвердил.*в приложении/i }));
-  expect(posts().at(-1)?.path).toBe('/api/v1/cloud/login/android-session/confirm');
+  await user.click(screen.getByRole('button', { name: 'Подтвердить в Android и подключиться' }));
+  expect(posts().at(-1)?.path).toBe('/api/v1/cloud/login/redroid/android-session/confirm');
   expect(await screen.findByRole('heading', { name: 'Tuya подключена' })).toBeInTheDocument();
 });
 

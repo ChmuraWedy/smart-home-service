@@ -1,6 +1,5 @@
 import json
 import sqlite3
-from base64 import b64decode
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -369,7 +368,7 @@ def test_redroid_connect_uses_protected_owner_route_and_existing_qr_confirmation
     assert client.get(API + "/status").json()["redroid_available"] is True
 
     calls = []
-    fail_scan = False
+    fail_open = False
 
     def controller(config, method, path, body=None, content_type="application/json"):
         assert config == (18765, controller_token)
@@ -379,11 +378,12 @@ def test_redroid_connect_uses_protected_owner_route_and_existing_qr_confirmation
             return {"screen": "home"}
         if path == "/v1/account/user-code":
             return {"user_code": "private-android-user-code"}
-        assert path == "/v1/scan/qr?expect_smart_life=true" and content_type == "text/plain"
-        assert b64decode(body).startswith(b"\x89PNG\r\n\x1a\n")
-        if fail_scan:
-            raise HTTPException(409, "Smart Life closed while scanning")
-        return {"status": "submitted"}
+        assert path == "/v1/account/authorize-qr" and content_type == "application/json"
+        payload = json.loads(body)
+        assert payload["token"] == "qr-secret"
+        if fail_open:
+            raise HTTPException(409, "Smart Life could not open authorization")
+        return {"status": "approved" if payload.get("approve") is True else "ready"}
 
     monkeypatch.setattr(cloud_api, "redroid_request", controller)
     path = API + "/login/redroid/credentials"
@@ -394,14 +394,17 @@ def test_redroid_connect_uses_protected_owner_route_and_existing_qr_confirmation
     assert response.json() == {"screen": "home"}
     response = client.post("https://testserver" + API + "/login/redroid/qr")
     assert response.status_code == 201
-    assert response.json()["scan_submitted"] is True
+    assert response.json()["android_approval_ready"] is True
     assert "private-android-user-code" not in response.text
     assert "qr-secret" not in response.text
     assert client.get(API + "/status").json()["connected"] is False
-    assert calls == [("POST", "/v1/login/credentials"), ("GET", "/v1/account/user-code"), ("POST", "/v1/scan/qr?expect_smart_life=true")]
-    fail_scan = True
+    assert calls == [("POST", "/v1/login/credentials"), ("GET", "/v1/account/user-code"), ("POST", "/v1/account/authorize-qr")]
+    confirmed = client.post("https://testserver" + API + "/login/redroid/" + response.json()["session_id"] + "/confirm")
+    assert confirmed.json()["connected"] is True
+    assert calls[-1] == ("POST", "/v1/account/authorize-qr")
+    fail_open = True
     fallback = client.post("https://testserver" + API + "/login/redroid/qr")
-    assert fallback.status_code == 201 and fallback.json()["scan_submitted"] is False
+    assert fallback.status_code == 201 and fallback.json()["android_approval_ready"] is False
     assert b"<svg" in client.get(fallback.json()["qr_url"]).content
     confirmed = client.post(API + "/login/" + fallback.json()["session_id"] + "/confirm")
     assert confirmed.json()["connected"] is True
