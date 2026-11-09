@@ -1,10 +1,32 @@
-import { useId, useState } from 'react';
+import {
+  useEffect, useId, useRef, useState,
+} from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api';
-import { labelFor } from '../controls';
+import type { CloudDevice, CloudFunctions } from '../api';
+import { labelFor, limitsOf } from '../controls';
 import type { Capability, HomeApi, LocalDevice } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
 import { Icon } from './ui/icon';
+
+type TimerRange = { minimum: number; maximum: number; step: number };
+const timerCode = /^countdown(?:_[1-9][0-9]*)?$/;
+
+function matchingTimerRange(definitions: CloudFunctions, deviceId: string, code: string, mapping: Capability): TimerRange | undefined {
+  if (definitions.device_id !== deviceId || !Array.isArray(definitions.functions)) return undefined;
+  const point = Number(mapping.dp);
+  const matches = definitions.functions.filter((entry) => entry.dp_id === point || entry.dp_ids?.includes(point));
+  const [spec] = matches;
+  if (matches.length !== 1 || spec.code !== code || spec.type !== 'Integer') return undefined;
+  if ((spec.dp_id !== undefined && spec.dp_id !== point) || spec.dp_ids?.some((id) => id !== point)) return undefined;
+  const {
+    min, max, step, scale = 0, unit = '',
+  } = limitsOf(spec.values);
+  if (scale !== 0 || (unit !== '' && unit !== 's') || typeof min !== 'number' || typeof max !== 'number' || typeof step !== 'number') return undefined;
+  if (![min, max, step].every(Number.isSafeInteger) || min < 0 || min > max || step <= 0) return undefined;
+  if ((mapping.minimum ?? min) > (mapping.maximum ?? max)) return undefined;
+  return { minimum: min, maximum: max, step };
+}
 
 function numberField(data: FormData, name: string) {
   const value = String(data.get(name) ?? '').trim();
@@ -12,23 +34,58 @@ function numberField(data: FormData, name: string) {
 }
 
 export default function LocalDeviceMappings({
-  api, device, disabled, onSetup, onSaved, onAuthError,
+  api, device, sharingDevice, disabled, onSetup, onSaved, onAuthError,
 }: {
   api: HomeApi;
   device: LocalDevice;
+  sharingDevice?: CloudDevice;
   disabled: boolean;
   onSetup?: () => void;
   onSaved: (device: LocalDevice) => void;
   onAuthError: () => void;
 }) {
-  const [edit, setEdit] = useState<{ code: string; mapping: Capability }>();
-  const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState<{ code: string; mapping: Capability; suggestion?: TimerRange }>();
+  const [operation, setOperation] = useState<'lookup' | 'save'>();
+  const busy = operation !== undefined;
   const [error, setError] = useState('');
   const formId = useId();
+  const lookup = useRef<AbortController | null>(null);
+  useEffect(() => () => lookup.current?.abort(), []);
 
-  function beginEdit(key: string, mapping: Capability) {
+  async function beginEdit(key: string, mapping: Capability) {
     setError('');
-    setEdit({ code: key, mapping });
+    const { dp } = mapping;
+    const needsRange = mapping.minimum == null || mapping.maximum == null || mapping.step == null;
+    if (!dp || mapping.type !== 'integer' || !timerCode.test(key) || !needsRange || sharingDevice?.id !== device.device_id) {
+      setEdit({ code: key, mapping });
+      return;
+    }
+    const cached = sharingDevice.controls?.definitions;
+    const suggested = cached && matchingTimerRange(cached, device.device_id, key, mapping);
+    if (suggested) {
+      setEdit({ code: key, mapping, suggestion: suggested });
+      return;
+    }
+
+    const controller = new AbortController();
+    lookup.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 3000);
+    setEdit(undefined);
+    setOperation('lookup');
+    let suggestion: TimerRange | undefined;
+    try {
+      const definitions = await api.deviceFunctions(device.device_id, 'sharing', controller.signal);
+      suggestion = matchingTimerRange(definitions, device.device_id, key, mapping);
+    } catch (failure) {
+      if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
+    } finally {
+      window.clearTimeout(timeout);
+      if (lookup.current === controller) {
+        lookup.current = null;
+        setOperation(undefined);
+        setEdit({ code: key, mapping, suggestion });
+      }
+    }
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -42,7 +99,7 @@ export default function LocalDeviceMappings({
       next.maximum = numberField(form, 'maximum');
       next.step = numberField(form, 'step');
     }
-    setBusy(true);
+    setOperation('save');
     setError('');
     try {
       const updated = await api.editLocalMapping(device.id, code, mapping, next);
@@ -52,7 +109,7 @@ export default function LocalDeviceMappings({
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
       else setError(failure instanceof Error ? failure.message : t(MSG.COULD_NOT_LOAD_DEVICES));
     } finally {
-      setBusy(false);
+      setOperation(undefined);
     }
   }
 
@@ -86,8 +143,10 @@ export default function LocalDeviceMappings({
           </li>
         ))}
       </ul>
+      {operation === 'lookup' && <p role="status">{t(MSG.LOADING)}</p>}
       {edit && (
         <form key={edit.code} aria-label={labelFor(edit.code)} onSubmit={save}>
+          {edit.suggestion && <p className="help">{t(MSG.TIMER_RANGE_SUGGESTED_BY_SMART_LIFE)}</p>}
           <fieldset disabled={disabled || busy} className="survey-form-grid">
             <legend>{labelFor(edit.code)}</legend>
             <label htmlFor={`${formId}-dp`}>
@@ -114,7 +173,7 @@ export default function LocalDeviceMappings({
                     name="minimum"
                     type="number"
                     step="any"
-                    defaultValue={edit.mapping.minimum ?? undefined}
+                    defaultValue={edit.mapping.minimum ?? edit.suggestion?.minimum}
                   />
                 </label>
                 <label htmlFor={`${formId}-maximum`}>
@@ -124,7 +183,7 @@ export default function LocalDeviceMappings({
                     name="maximum"
                     type="number"
                     step="any"
-                    defaultValue={edit.mapping.maximum ?? undefined}
+                    defaultValue={edit.mapping.maximum ?? edit.suggestion?.maximum}
                   />
                 </label>
                 <label htmlFor={`${formId}-step`}>
@@ -134,7 +193,7 @@ export default function LocalDeviceMappings({
                     name="step"
                     type="number"
                     step="any"
-                    defaultValue={edit.mapping.step ?? undefined}
+                    defaultValue={edit.mapping.step ?? edit.suggestion?.step}
                   />
                 </label>
               </>

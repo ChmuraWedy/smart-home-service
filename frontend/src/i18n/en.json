@@ -275,6 +275,7 @@
   "TIMER_MAPPING_REQUIRES_WHOLE_SECONDS": "A writable timer requires a valid whole-second range.",
   "GATEWAY_HAS_NO_LOCAL_FUNCTIONS": "This gateway has no local functions to configure.",
   "TIMER_DEFINITIONS_CHANGED": "Timer definitions changed. Scan for the device again.",
+  "TIMER_RANGE_SUGGESTED_BY_SMART_LIFE": "Smart Life suggested the missing values. You can edit them before saving.",
   "TECHNICAL_DATA_FOR_DEVICE_MAPPINGS": "Technical data for device mappings",
   "PARAMETER_CODES_AND_KNOWN_DP_NUMBERS_FOR_DEVICE": "Parameter codes and known DP numbers for device mappings. A cloud command does not require a DP number; a missing number is not an error. These details do not confirm physical execution of a command.",
   "CONNECTION_SETTINGS": "Connection settings",

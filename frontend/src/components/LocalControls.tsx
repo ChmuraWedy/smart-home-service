@@ -142,6 +142,7 @@ export function LocalControl({
         <LocalDeviceMappings
           api={api}
           device={item}
+          sharingDevice={routes?.includes('sharing') ? cloudDevice : undefined}
           disabled={session.busy || aliasBusy}
           onSetup={onSetup}
           onSaved={applySavedMappings}
