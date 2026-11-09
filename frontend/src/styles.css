@@ -1946,8 +1946,9 @@ button.combined-member-quick-button {
   text-overflow:ellipsis;
 }
 .dashboard-power-state-summary > button.combined-member-quick-button { display:flex; }
-button.combined-member-quick-button:hover:not(:disabled) { text-decoration:underline; }
-button.combined-member-quick-button:focus-visible { outline-offset:-2px; }
+button.combined-member-quick-button:hover:enabled,
+button.combined-member-quick-button:active:enabled { background:var(--hover); text-decoration:underline; }
+button.combined-member-quick-button:focus-visible { outline-color:var(--toggle-on); outline-offset:-2px; }
 .combined-member-inline-state { @apply tw:self-center tw:px-3; }
 .dashboard-view {
   @variant narrow-dashboard-controls {

@@ -14,6 +14,7 @@ export type ControlSpec = {
   schema?: JsonSchema; maximumBytes?: number; aliases?: string[];
 };
 
+const TUYA_LIGHT_PERCENTAGE_CODES = new Set(['bright_value', 'bright_value_v2', 'temp_value', 'temp_value_v2']);
 const MOTION_KEYS = new Set(['motion', 'pir', 'pir_state']);
 
 const LABELS: Record<string, string> = localizeMessages({
@@ -119,7 +120,7 @@ export function localSpec(key: string, cap: Capability, reported?: JsonValue): C
     case 'integer': case 'number': {
       const { minimum, maximum } = cap;
       const step = cap.step ?? (cap.type === 'integer' ? 1 : undefined);
-      if (!base.unit && /^bright_value(?:_v2)?$/.test(key) && finite(minimum) && finite(maximum)
+      if (!base.unit && TUYA_LIGHT_PERCENTAGE_CODES.has(key) && finite(minimum) && finite(maximum)
         && minimum >= 0 && minimum < maximum) {
         const factor = 100 / maximum;
         return {
@@ -177,7 +178,7 @@ export function cloudSpec(fn: CloudFunction, writable: boolean): ControlSpec {
     const validScale = Number.isInteger(scale) && (scale as number) >= 0 && (scale as number) <= 9;
     let factor = validScale ? 10 ** -(scale as number) : 1;
     let displayUnit = unit;
-    if (validScale && scale === 0 && finite(limits.max) && limits.max > 0 && ['bright_value', 'bright_value_v2', 'temp_value', 'temp_value_v2'].includes(fn.code)) {
+    if (validScale && scale === 0 && finite(limits.max) && limits.max > 0 && TUYA_LIGHT_PERCENTAGE_CODES.has(fn.code)) {
       factor = 100 / limits.max; displayUnit = '%';
     }
     const validBounds = Number.isInteger(limits.min) && Number.isInteger(limits.max) &&
