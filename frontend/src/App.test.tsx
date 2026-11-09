@@ -76,16 +76,29 @@ async function restored(connections = true) {
   return backend;
 }
 
-it('offers the SSH tunnel instead of a password field on the LAN HTTP page', async () => {
+it('uses the Android Docker session from the LAN dashboard without entering a password', async () => {
   vi.stubGlobal('isSecureContext', false);
-  stored(window.location.origin);
-  window.history.replaceState(null, '', '/settings/connections');
-  const backend = fakeApi({ redroid_available: true });
-  render(<App />);
-  await userEvent.click(await screen.findByRole('button', { name: 'Smart Life / Android' }));
-  expect(screen.getByText(/ssh -N -L/)).toBeInTheDocument();
-  expect(screen.queryByLabelText('Пароль Smart Life')).toBeNull();
-  expect(backend.calls.every(call => call.method === 'GET')).toBe(true);
+  vi.stubEnv('VITE_DASHBOARD_HTTPS_ORIGIN', 'https://homeassistant.dom:8443');
+  try {
+    stored(window.location.origin);
+    window.history.replaceState(null, '', '/settings/connections?provider=android');
+    const backend = fakeApi({ redroid_available: true });
+    render(<App />);
+    const user = userEvent.setup();
+    const connect = await screen.findByRole('button', { name: 'Использовать текущий сеанс Android' });
+    expect(screen.getByText('Smart Life подключён.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Открыть защищённый вход в Smart Life' }))
+      .toHaveAttribute('href', 'https://homeassistant.dom:8443/settings/connections?provider=android');
+    expect(screen.queryByLabelText('Пароль Smart Life')).toBeNull();
+    await user.click(connect);
+    await user.click(await screen.findByRole('button', { name: 'Подтвердить в Android и подключиться' }));
+    expect(backend.calls.filter(call => call.method === 'POST').map(call => call.path)).toEqual([
+      '/api/v1/cloud/login/redroid/qr', '/api/v1/cloud/login/redroid/android-session/confirm',
+    ]);
+    expect(window.location.pathname + window.location.search).toBe('/settings/connections?provider=android');
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 it('sends credentials once and waits for Smart Life approval before connecting the dashboard', async () => {

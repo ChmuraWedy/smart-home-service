@@ -337,7 +337,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   }, true);
 
   const connectRedroid = (credentials?: RedroidCredentials) => run(async () => {
-    if (!protectedConnection || !redroidAvailable) return;
+    if (!redroidAvailable || (credentials && !protectedConnection)) return;
     setQR(null);
     if (credentials) {
       const result = await api.loginRedroid(credentials);
@@ -571,6 +571,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                     <RedroidConnection
                       available={redroidAvailable}
                       protectedConnection={protectedConnection}
+                      connected={accountConnected}
                       ready={ready}
                       busy={locked}
                       approval={qr ? { remaining, imageUrl: qr.imageUrl, readyOnAndroid: qr.approvalReady ?? false } : null}

@@ -389,21 +389,22 @@ def test_redroid_connect_uses_protected_owner_route_and_existing_qr_confirmation
     path = API + "/login/redroid/credentials"
     credentials = {"region": " Poland ", "account": "demo@example.invalid", "password": "secret password"}
     assert client.post(path, headers={"Host": "127.0.0.1"}, json=credentials).status_code == 403
+    assert client.post(API + "/login/redroid/qr", headers={"X-API-Key": ""}).status_code == 401
     assert not calls
     response = client.post("https://testserver" + path, json=credentials)
     assert response.json() == {"screen": "home"}
-    response = client.post("https://testserver" + API + "/login/redroid/qr")
+    response = client.post(API + "/login/redroid/qr")
     assert response.status_code == 201
     assert response.json()["android_approval_ready"] is True
     assert "private-android-user-code" not in response.text
     assert "qr-secret" not in response.text
     assert client.get(API + "/status").json()["connected"] is False
     assert calls == [("POST", "/v1/login/credentials"), ("GET", "/v1/account/user-code"), ("POST", "/v1/account/authorize-qr")]
-    confirmed = client.post("https://testserver" + API + "/login/redroid/" + response.json()["session_id"] + "/confirm")
+    confirmed = client.post(API + "/login/redroid/" + response.json()["session_id"] + "/confirm")
     assert confirmed.json()["connected"] is True
     assert calls[-1] == ("POST", "/v1/account/authorize-qr")
     fail_open = True
-    fallback = client.post("https://testserver" + API + "/login/redroid/qr")
+    fallback = client.post(API + "/login/redroid/qr")
     assert fallback.status_code == 201 and fallback.json()["android_approval_ready"] is False
     assert b"<svg" in client.get(fallback.json()["qr_url"]).content
     confirmed = client.post(API + "/login/" + fallback.json()["session_id"] + "/confirm")

@@ -104,13 +104,6 @@ class RedroidCredentials(Schema):
 
 
 def require_redroid(request: Request, _owner: Account = Depends(require_owner)):
-    loopback = {"127.0.0.1", "::1"}
-    local_request = (
-        request.client is not None and request.client.host in loopback
-        and request.url.hostname in loopback | {"localhost"}
-    )
-    if request.url.scheme != "https" and not local_request:
-        raise HTTPException(403, "Open Connections over HTTPS or through a localhost SSH tunnel.")
     settings = request.app.state.settings
     if not settings.redroid_token_file:
         raise HTTPException(503, "The Smart Life Android controller is not configured.")
@@ -122,6 +115,17 @@ def require_redroid(request: Request, _owner: Account = Depends(require_owner)):
         raise HTTPException(503, "The Smart Life Android controller token is unavailable.") from None
     request.app.state.cloud.require_enabled()
     return settings.redroid_port, token
+
+
+def require_redroid_credentials(request: Request, controller=Depends(require_redroid)):
+    loopback = {"127.0.0.1", "::1"}
+    local_request = (
+        request.client is not None and request.client.host in loopback
+        and request.url.hostname in loopback | {"localhost"}
+    )
+    if request.url.scheme != "https" and not local_request:
+        raise HTTPException(403, "Open Connections over HTTPS to enter Smart Life credentials.")
+    return controller
 
 
 def redroid_request(controller, method, path, body=None, content_type="application/json"):
@@ -340,7 +344,7 @@ def begin_login(body: QRLogin, request: Request):
 
 
 @router.post("/login/redroid/credentials")
-def redroid_login(body: RedroidCredentials, controller=Depends(require_redroid)):
+def redroid_login(body: RedroidCredentials, controller=Depends(require_redroid_credentials)):
     region = body.region.strip()
     account = body.account.get_secret_value().strip()
     if not region or not account:

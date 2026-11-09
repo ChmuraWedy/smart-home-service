@@ -5,12 +5,24 @@ import type { RedroidCredentials } from '../api';
 type Props = {
   available: boolean;
   protectedConnection: boolean;
+  connected: boolean;
   ready: boolean;
   busy: boolean;
   approval: { remaining: number; imageUrl?: string; readyOnAndroid: boolean } | null;
   onConnect: (credentials?: RedroidCredentials) => Promise<void>;
   onConfirm: () => Promise<void>;
 };
+
+function secureSignInUrl() {
+  const origin = import.meta.env.VITE_DASHBOARD_HTTPS_ORIGIN;
+  if (!origin) return undefined;
+  try {
+    const url = new URL('/settings/connections?provider=android', origin);
+    return url.protocol === 'https:' ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function LoginForm({ busy, onConnect }: Pick<Props, 'busy' | 'onConnect'>) {
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -69,20 +81,9 @@ function LoginForm({ busy, onConnect }: Pick<Props, 'busy' | 'onConnect'>) {
 }
 
 export default function RedroidConnection({
-  available, protectedConnection, ready, busy, approval, onConnect, onConfirm,
+  available, protectedConnection, connected, ready, busy, approval, onConnect, onConfirm,
 }: Props) {
   if (!available) return <p className="help">{t(MSG.SMART_LIFE_ANDROID_NOT_CONFIGURED)}</p>;
-  if (!protectedConnection) {
-    return (
-      <>
-        <p className="help">{t(MSG.OPEN_CONNECTIONS_THROUGH_A_LOCALHOST_TUNNEL)}</p>
-        <p>
-          <code>ssh -N -L 127.0.0.1:18082:127.0.0.1:8082 dell5070</code>
-        </p>
-        <a href="http://127.0.0.1:18082/settings/connections?provider=android">{t(MSG.OPEN_LOCAL_CONNECTIONS)}</a>
-      </>
-    );
-  }
   if (!ready) return <p className="help">{t(MSG.CLOUD_MODE_IS_DISABLED_ON_THE_SERVER)}</p>;
   if (approval) {
     const { remaining, imageUrl, readyOnAndroid } = approval;
@@ -97,13 +98,23 @@ export default function RedroidConnection({
       </div>
     );
   }
+  const httpsUrl = protectedConnection ? undefined : secureSignInUrl();
   return (
     <>
-      <p className="muted">{t(MSG.SMART_LIFE_ANDROID_LOGIN_HELP)}</p>
-      <LoginForm busy={busy} onConnect={onConnect} />
+      {connected && <p className="saved-summary">{t(MSG.SMART_LIFE_CONNECTED)}</p>}
+      {protectedConnection && (
+        <>
+          <p className="muted">{t(MSG.SMART_LIFE_ANDROID_LOGIN_HELP)}</p>
+          <LoginForm busy={busy} onConnect={onConnect} />
+        </>
+      )}
       <button className="secondary full-width" type="button" disabled={busy} onClick={() => onConnect()}>
         {t(MSG.USE_EXISTING_ANDROID_SESSION)}
       </button>
+      {!protectedConnection && !connected && (
+        <p className="help">{t(MSG.SMART_LIFE_SIGN_IN_REQUIRES_HTTPS)}</p>
+      )}
+      {httpsUrl && <a href={httpsUrl}>{t(MSG.OPEN_SECURE_SMART_LIFE_SIGN_IN)}</a>}
     </>
   );
 }
