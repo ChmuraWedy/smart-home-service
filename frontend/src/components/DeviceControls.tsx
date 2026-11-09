@@ -131,8 +131,24 @@ function lockBodyScroll() {
   return () => { if (--bodyScrollLocks === 0) document.body.style.overflow = savedBodyOverflow; };
 }
 
-export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = t(MSG.CLOSE), titleContent, connectionContent, statusContent, information, onRefresh, className = '' }: {
-  title: string; subtitle?: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; connectionContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; onRefresh?: () => Promise<void>; className?: string;
+export function latestReadingTime(readings?: Record<string, Reading>): number {
+  return Object.values(readings ?? {}).reduce((latest, reading) => {
+    const timestamp = Date.parse(reading.observed_at || reading.received_at || '');
+    return reading.known && Number.isFinite(timestamp) ? Math.max(latest, timestamp) : latest;
+  }, 0);
+}
+
+function DeviceReadingAge({ at, now }: { at: number; now: number }) {
+  const elapsed = Math.max(0, Math.floor((now - at) / 1000));
+  return (
+    <span className="device-reading-age" title={new Date(at).toLocaleString(dateLocale())}>
+      {t(MSG.DEVICE_LAST_READ, [elapsed])}
+    </span>
+  );
+}
+
+export function ControlDialog({ title, subtitle, busy, onClose, children, closeLabel = t(MSG.CLOSE), titleContent, connectionContent, statusContent, information, onRefresh, readingAge, className = '' }: {
+  title: string; subtitle?: string; busy: boolean; onClose: () => void; children: ReactNode; closeLabel?: string; titleContent?: ReactNode; connectionContent?: ReactNode; statusContent?: ReactNode; information?: ReactNode; onRefresh?: () => Promise<void>; className?: string; readingAge?: { at: number; now: number };
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [infoOpen,setInfoOpen] = useState(false);
@@ -203,6 +219,7 @@ export function ControlDialog({ title, subtitle, busy, onClose, children, closeL
               <Icon name={closeLabel === t(MSG.CLOSE) ? 'close' : 'back'} />
             </button>
           </div>
+          {readingAge && <DeviceReadingAge at={readingAge.at} now={readingAge.now} />}
           {statusContent}
           {information && infoOpen && (
           <section
@@ -432,7 +449,6 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
   const metadata = (
     <div className="reading-meta">
       {spec.readable && !reading?.known && <span>{t(MSG.NO_READING)}</span>}
-      {reading?.known && (reading.observed_at || reading.received_at) && <span title={new Date(reading.observed_at || reading.received_at!).toLocaleString(dateLocale())}>{Math.max(0, Math.floor((now - Date.parse(reading.observed_at || reading.received_at!)) / 1000))}{` ${t(MSG.S_AGO)}`}</span>}
       {!spec.writable ? <span className="read-only">{t(MSG.READ_ONLY)}</span> : !spec.readable
       && <span className="read-only">{t(MSG.COMMAND)}</span>}
     </div>

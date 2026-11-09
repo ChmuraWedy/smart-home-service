@@ -992,7 +992,7 @@
       "count": 13
     },
     "@stylistic/max-len": {
-      "count": 16
+      "count": 15
     },
     "arrow-parens": {
       "count": 24
@@ -1037,7 +1037,7 @@
       "count": 5
     },
     "no-restricted-syntax": {
-      "count": 17
+      "count": 15
     },
     "no-shadow": {
       "count": 10
@@ -1568,7 +1568,7 @@
       "count": 1
     },
     "comma-spacing": {
-      "count": 6
+      "count": 4
     },
     "curly": {
       "count": 1
@@ -1854,7 +1854,7 @@
   },
   "src/controls.ts": {
     "@stylistic/max-len": {
-      "count": 9
+      "count": 8
     },
     "arrow-parens": {
       "count": 7
@@ -1878,13 +1878,13 @@
       "count": 3
     },
     "no-confusing-arrow": {
-      "count": 2
+      "count": 1
     },
     "no-mixed-operators": {
       "count": 10
     },
     "no-nested-ternary": {
-      "count": 14
+      "count": 12
     },
     "no-restricted-syntax": {
       "count": 4

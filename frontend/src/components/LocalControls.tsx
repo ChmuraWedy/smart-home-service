@@ -12,7 +12,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { cacheDeviceMetadata, localMetadataKey, nextDeviceMetadataRevision } from '../device-metadata';
 import { localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
-import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession, latestReadingTime } from './DeviceControls';
 import DeviceInformation from './DeviceInformation';
 import LocalDeviceMappings from './LocalDeviceMappings';
 import { InchingControl, SwitchTimers, switchTimerControls } from './SwitchTimers';
@@ -71,7 +71,11 @@ export function LocalControl({
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
     return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
   }), !session.busy && !aliasBusy && session.readOK && !!state?.enabled);
-  const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
+  const specs = Object.entries(item.capabilities).map(([key, cap]) => {
+    const reading = state?.values[key];
+    return localSpec(key, cap, reading?.known ? reading.value : undefined);
+  });
+  const lastReadAt = latestReadingTime(state?.values);
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const applySavedMappings = useCallback((updated: LocalDevice) => {
     setSavedMappings(updated);
@@ -103,6 +107,7 @@ export function LocalControl({
 
   return (
     <ControlDialog onRefresh={session.refresh}
+      readingAge={lastReadAt ? { at: lastReadAt, now } : undefined}
       information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />}
       statusContent={<BatteryBadge reading={state ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel}
       titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={originalName} translations={translations} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
@@ -166,6 +171,7 @@ export function LocalControl({
         <LocalDeviceMappings
           api={api}
           device={item}
+          readings={state?.values}
           sharingDevice={routes?.includes('sharing') ? cloudDevice : undefined}
           disabled={session.busy || aliasBusy}
           onSetup={onSetup}

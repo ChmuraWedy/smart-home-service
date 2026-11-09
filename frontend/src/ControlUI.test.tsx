@@ -408,6 +408,34 @@ describe('cloud device control', () => {
 });
 
 describe('local device and group controls', () => {
+  it('uses the reported LAN vocabulary for switch dropdowns before mapping edits', async () => {
+    const mapping: Capability = { dp: '38', type: 'string', readable: true, writable: true, enum: null };
+    const device = { ...light, capabilities: {
+      switch_1: boolean,
+      relay_status: mapping,
+      switch_type: { ...mapping, dp: '47' },
+    } };
+    const { states, writes } = localServer({ lamp: device });
+    states[device.id].values.relay_status.value = 'memory';
+    states[device.id].values.switch_type.value = 'sync';
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const relay = within(await screen.findByRole('region', { name: 'Состояние после подачи питания' }));
+    expect(within(relay.getByRole('combobox')).getByRole('option', { name: 'Восстановить предыдущее состояние' })).toHaveProperty('selected', true);
+    const mode = within(screen.getByRole('region', { name: 'Тип внешнего выключателя' }));
+    expect(within(mode.getByRole('combobox')).getByRole('option', { name: 'Клавиша · по положению выключателя' })).toHaveProperty('selected', true);
+    expect(screen.getAllByText(/Обновлено \d+ с назад/)).toHaveLength(1);
+    const user = userEvent.setup();
+    await user.selectOptions(relay.getByRole('combobox'), '0');
+    await waitFor(() => expect(writes).toEqual([{
+      path: '/api/v1/devices/1/commands/capabilities',
+      body: { values: { relay_status: 'off' } },
+    }]));
+    await user.click(screen.getByText('Локальные сопоставления и команды'));
+    await user.click(screen.getByRole('button', { name: 'Изменить сопоставление: Тип внешнего выключателя' }));
+    const form = within(await screen.findByRole('form', { name: 'Тип внешнего выключателя' }));
+    expect(form.getByRole('textbox', { name: /Допустимые варианты/ })).toHaveValue('flip\nsync\nbutton');
+  });
+
   it('decodes local Inching, and sends the reported slot and edited duration only on Apply', async () => {
     const device = { ...light, capabilities: {
       switch_1: boolean,

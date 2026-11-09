@@ -151,6 +151,7 @@ export function CloudControl({
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
   return (
     <ControlDialog onRefresh={session.refresh}
+      readingAge={data && Number.isFinite(reportedAt) ? { at: reportedAt, now } : undefined}
       closeLabel={closeLabel}
       information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
       statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={name} busy={session.busy || editingBusy} onClose={onClose}
