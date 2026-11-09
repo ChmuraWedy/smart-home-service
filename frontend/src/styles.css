@@ -1962,7 +1962,10 @@ button.combined-member-quick-button:focus-visible { outline-color:var(--toggle-o
 .combined-power-footer .capability-heading { @apply tw:m-0 tw:text-sm tw:font-semibold; }
 .combined-device-options { @apply tw:flex tw:list-none tw:flex-col tw:gap-2 tw:p-0; }
 .combined-device-options button { @apply tw:w-full tw:text-start; }
-.combined-device-management { @apply tw:mx-auto tw:w-full tw:max-w-[760px]; }
+.combined-device-management {
+  @apply tw:mx-auto tw:w-full tw:max-w-[760px];
+  padding:clamp(1rem, 3vw, 1.5rem);
+}
 .combined-device-management .card-heading { @apply tw:flex-wrap; }
 .combined-device-management .group-members h2 { @apply tw:m-0 tw:text-base tw:wrap-anywhere; }
 .combined-device-form { @apply tw:grid tw:gap-3; }
