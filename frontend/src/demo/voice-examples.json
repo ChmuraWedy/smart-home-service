@@ -1,0 +1,20 @@
+[
+  {
+    "transcript": "How warm is the bedroom?",
+    "device": "Bedroom climate",
+    "reading": "temperature",
+    "unit": " °C"
+  },
+  {
+    "transcript": "Turn on the bedside lamp.",
+    "device": "Bedside lamp",
+    "reading": "switch",
+    "value": true
+  },
+  {
+    "transcript": "Turn off the kitchen counter lights.",
+    "device": "Counter lights",
+    "reading": "switch",
+    "value": false
+  }
+]

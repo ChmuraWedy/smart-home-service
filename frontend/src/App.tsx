@@ -8,6 +8,7 @@ import { ApiError, CloudApi, normalizeApiBase } from './api';
 import type { CloudStatus, Connection, DeveloperCredentials, Provider, RedroidCredentials } from './api';
 import { loadConnection, saveConnection } from './connection';
 import AiChatButton from './components/AiChat';
+import VoiceDemo from './demo/VoiceDemo';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
@@ -421,6 +422,7 @@ function AppContent() {
       </header>
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
+        {demo && view === 'control' && <VoiceDemo api={api} disabled={locked || !status} />}
         <input id="access-token" type="hidden" value={connection.token} readOnly />
         <Outlet
           context={{ needsAccess, pages: { connections: <>
