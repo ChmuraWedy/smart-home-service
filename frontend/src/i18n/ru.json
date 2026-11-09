@@ -207,6 +207,7 @@
   "ADDITIONAL_CAMERA_SETTINGS": "Дополнительные параметры камеры",
   "MAIN_CONTROLS_PREFIX": "Основные параметры: ",
   "SHOW_STATE": "Показать состояние",
+  "DEVICE_CONFIRMED_REQUESTED_SETTING": "Устройство сообщило запрошенное значение.",
   "COMMAND_ACCEPTED_NOTICE": "Команда принята.",
   "STALE_SUFFIX": " · Устарело",
   "STALE": "Устарело",

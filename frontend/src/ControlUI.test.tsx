@@ -436,6 +436,44 @@ describe('local device and group controls', () => {
     expect(form.getByRole('textbox', { name: /Допустимые варианты/ })).toHaveValue('flip\nsync\nbutton');
   });
 
+  it.each(['delayed', 'unchanged', 'cached-match'] as const)(
+    'checks an unacknowledged Inching write without repeating the command (%s)',
+    async (outcome) => {
+      const device = { ...light, capabilities: {
+        switch_1: boolean,
+        switch_inching: { dp: '44', type: 'string', readable: true, writable: true } as const,
+      } };
+      const { states, writes } = localServer({ lamp: device, postError: true });
+      const reading = states[device.id].values.switch_inching;
+      reading.value = 'AAAC';
+      const initialStamp = Date.parse(reading.observed_at!);
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      let refreshed = 0;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/state') && url.searchParams.get('refresh') === 'true') {
+          refreshed += 1;
+          if (outcome !== 'cached-match') reading.observed_at = new Date(initialStamp + refreshed * 1000).toISOString();
+          if ((outcome === 'delayed' && refreshed === 2) || outcome === 'cached-match') reading.value = 'AAEs';
+        }
+        return original(input, init);
+      });
+      const user = userEvent.setup();
+      renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+      const inching = within(await screen.findByRole('region', { name: 'Автовыключение' }));
+      fireEvent.change(inching.getByRole('spinbutton'), { target: { value: '300' } });
+      await user.click(inching.getByRole('button', { name: 'Применить' }));
+
+      const message = outcome === 'delayed' ? /Устройство сообщило запрошенное значение/ : /Transport timeout/;
+      expect(await screen.findByText(message, {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(refreshed).toBe(2);
+      expect(writes).toEqual([{
+        path: '/api/v1/devices/1/commands/capabilities',
+        body: { values: { switch_inching: 'AAEs' } },
+      }]);
+    },
+  );
+
   it('decodes local Inching, and sends the reported slot and edited duration only on Apply', async () => {
     const device = { ...light, capabilities: {
       switch_1: boolean,
@@ -753,7 +791,7 @@ describe('local device and group controls', () => {
     await waitFor(() => expect(power).toBeEnabled());
     fireEvent.click(power);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('результат команды неизвестен');
+    expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent('результат команды неизвестен');
     expect(server.writes).toHaveLength(1);
   });
 });

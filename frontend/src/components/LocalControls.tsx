@@ -7,7 +7,7 @@ import { displayReading, isStale, localCommandValue, localReading, localSpec, va
 import type { ControlSpec } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
-import { readLocalDevice } from '../local-device-cache';
+import { readLocalDevice, sendLocalCapabilities } from '../local-device-cache';
 import { useAppDispatch, useAppSelector } from '../store';
 import { cacheDeviceMetadata, localMetadataKey, nextDeviceMetadataRevision } from '../device-metadata';
 import { localPendingScope } from '../pending-device-values';
@@ -65,11 +65,13 @@ export function LocalControl({
   const translations = identity?.translations?.value ?? item.translations;
   const name = localize(originalName, translationFor(translations, 'name', originalName));
   const pendingScope = localPendingScope(api, item.id);
-  const drafts = useAutomaticControls(changes => session.execute(async () => {
+  const sendLocal = async (values: Record<string, JsonValue>) => {
+    const confirmed = await dispatch(sendLocalCapabilities(api, item.id, values));
+    return { confirmed, text: t(confirmed ? MSG.DEVICE_CONFIRMED_REQUESTED_SETTING : MSG.COMMAND_ACCEPTED_NOTICE) };
+  };
+  const drafts = useAutomaticControls(changes => session.execute(() => {
     for (const change of changes) validateControlValue(change.spec, change.value!);
-    const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(({ spec, value }) => [spec.key, localCommandValue(spec, value!)])));
-    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
-    return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
+    return sendLocal(Object.fromEntries(changes.map(({ spec, value }) => [spec.key, localCommandValue(spec, value!)])));
   }), !session.busy && !aliasBusy && session.readOK && !!state?.enabled);
   const specs = Object.entries(item.capabilities).map(([key, cap]) => {
     const reading = state?.values[key];
@@ -85,11 +87,7 @@ export function LocalControl({
   const { countdowns, inching, channels } = switchTimerControls(specs);
   const regularSpecs = specs.filter((spec) => !isBattery(spec.key) && spec !== inching && !countdowns.includes(spec));
   const controlsDisabled = session.busy || !session.readOK || !state?.enabled;
-  const sendValue = (spec: ControlSpec, value: JsonValue) => session.execute(async () => {
-    const result = await api.setCapability(item.id, spec.key, localCommandValue(spec, value));
-    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
-    return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
-  });
+  const sendValue = (spec: ControlSpec, value: JsonValue) => session.execute(() => sendLocal({ [spec.key]: localCommandValue(spec, value) }));
   const field = (spec: ControlSpec) => (
     <CapabilityField
       key={spec.key}

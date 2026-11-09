@@ -207,6 +207,7 @@
   "ADDITIONAL_CAMERA_SETTINGS": "Additional camera settings",
   "MAIN_CONTROLS_PREFIX": "Main controls: ",
   "SHOW_STATE": "Show status",
+  "DEVICE_CONFIRMED_REQUESTED_SETTING": "The device now reports the requested setting.",
   "COMMAND_ACCEPTED_NOTICE": "Command accepted.",
   "STALE_SUFFIX": " · Stale",
   "STALE": "Stale",

@@ -207,6 +207,7 @@
   "ADDITIONAL_CAMERA_SETTINGS": "Dodatkowe ustawienia kamery",
   "MAIN_CONTROLS_PREFIX": "Główne funkcje: ",
   "SHOW_STATE": "Pokaż stan",
+  "DEVICE_CONFIRMED_REQUESTED_SETTING": "Urządzenie zgłosiło żądane ustawienie.",
   "COMMAND_ACCEPTED_NOTICE": "Polecenie przyjęte.",
   "STALE_SUFFIX": " · Nieaktualne",
   "STALE": "Nieaktualne",

@@ -20,7 +20,7 @@ import type { PowerButtonVariant } from './PowerButton';
 import { Icon, IconGlyph } from './ui/icon';
 
 export type ControlNotice = { text: string; error?: boolean };
-export type Receipt = ControlNotice;
+export type Receipt = ControlNotice & { confirmed?: boolean };
 const errorText = (error: unknown) => error instanceof Error ? error.message : t(MSG.COULD_NOT_COMPLETE_THE_REQUEST);
 
 export function useClock() {
@@ -100,6 +100,10 @@ export function useControlSession<T>(
     try {
       const receipt = await send();
       if (!isCurrent(version)) return true; // The command was acknowledged even if its view closed.
+      if (receipt.confirmed) {
+        setNotice(receipt);
+        return true;
+      }
       if (poll) {
         setNotice({...receipt, text: receipt.text + t(MSG.WAITING_FOR_A_DEVICE_REPORT)});
         return true;

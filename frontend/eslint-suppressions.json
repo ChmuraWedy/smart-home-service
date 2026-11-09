@@ -505,7 +505,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 31
+      "count": 30
     },
     "consistent-return": {
       "count": 1
@@ -523,7 +523,7 @@
       "count": 2
     },
     "key-spacing": {
-      "count": 8
+      "count": 7
     },
     "no-confusing-arrow": {
       "count": 2
@@ -544,7 +544,7 @@
       "count": 6
     },
     "object-curly-spacing": {
-      "count": 8
+      "count": 6
     },
     "object-property-newline": {
       "count": 10
@@ -1576,9 +1576,6 @@
     "indent": {
       "count": 7
     },
-    "key-spacing": {
-      "count": 1
-    },
     "no-await-in-loop": {
       "count": 1
     },
@@ -1595,7 +1592,7 @@
       "count": 8
     },
     "object-curly-spacing": {
-      "count": 4
+      "count": 2
     },
     "one-var": {
       "count": 3
