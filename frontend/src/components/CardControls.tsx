@@ -3,10 +3,9 @@ import {
   Fragment, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import type { CloudDevice, JsonValue, Provider } from '../api';
 import {
-  cloudBatchCommands, cloudReading, cloudSpecs, displayReading, hsvToHex, isStale, limitsOf,
+  cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale,
   localCommandValue, localReading, localSpec, validateControlValue, withChannelLabels,
 } from '../controls';
 import type { ControlSpec } from '../controls';
@@ -29,21 +28,15 @@ import { CameraCardControls } from './CameraCardControls';
 import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
 import { IconGlyph } from './ui/icon';
-import QuickLightSettings from './QuickLightSettings';
-import LightPresetMenu from './LightPresetMenu';
-import lightControls from '../light-controls';
-import { useLightPresets } from '../use-light-presets';
-import { readSimpleScene } from '../light-scenes';
-import { LightCardReading, LightSceneReadings, temperatureTint } from './LightCardReadings';
+import useLightCardControls from './LightCardControls';
+import { powerDisplayOverride, usePowerCardControls } from './PowerCardControls';
+import type { MemberPower } from './PowerCardControls';
 
 const CARD_CACHE_INTERVAL = 4000;
 const SOCKET_METER_CODES = /^(?:add_ele|cur_(?:current|power|voltage)|electric(?:ity)?_coe|power_coe|voltage_coe|current|power|voltage|energy|electricity|fault)(?:_[1-9][0-9]*)?$/;
 const DASHBOARD_SETTING_CODE = /^(?:(?:countdown|relay_status|switch_backlight)(?:_[1-9][0-9]*)?|switch_inching|do_not_disturb|remote_switch|work_mode|scene_data(?:_v2)?)$/;
 const ELECTRICAL_UNIT = /^(?:mA|A|mV|V|mW|W|kW|Wh|kWh)$/i;
 
-function powerControl(spec: ControlSpec) {
-  return spec.writable && spec.kind === 'boolean' && /^(switch|switch_led|switch_[1-9][0-9]*)$/.test(spec.key);
-}
 function sensorReading(spec: ControlSpec, socket: boolean) {
   return spec.readable && !spec.writable && !spec.advanced && !/^switch_mode/.test(spec.key) && !isBattery(spec.key)
     && !DASHBOARD_SETTING_CODE.test(spec.key)
@@ -57,8 +50,6 @@ type QuickSheet = DashboardSheetState & {
   presetSlot?: HTMLDivElement | null;
   onLightFeatures?: (hasQuickSettings: boolean, hasPresets: boolean) => void;
 };
-
-export type MemberPower = 'on' | 'off' | 'mixed' | 'unknown';
 
 type EmbeddedControls = {
   embeddedQuick?: boolean;
@@ -157,74 +148,37 @@ function StandardCardControls({
   refresh: () => Promise<void>; toggle: (spec: ControlSpec, value: JsonValue) => Promise<boolean>; notice: ControlNotice;
   category?: string; onAuthError: () => void;
 }) {
-  const powers = specs.filter(powerControl);
-  const powerLayout = !powers.length ? undefined : powers.length === 1 && !powers[0].aliases?.length ? 'single' : 'channels';
-  const {
-    brightness, temperature, color, white, mode: modeSpec, scene,
-  } = lightControls(specs, powerLayout === 'single');
-  const library = useLightPresets(api, deviceId, scene, onAuthError);
-  const hasQuickSettings = white.length > 0 || Boolean(color?.writable || scene);
   const currentReading = (spec: ControlSpec | undefined) => {
     const value = spec && reading(spec);
     if (!online && value?.known) return value;
     return isStale(value, now, local) ? undefined : value;
   };
-  const knownPowers = online ? powers.map((spec) => currentReading(spec)) : [];
-  let reportedPower: MemberPower = 'unknown';
-  if (knownPowers.length && knownPowers.every((value) => value?.known && typeof value.value === 'boolean')) {
-    if (knownPowers.every((value) => value?.value === true)) reportedPower = 'on';
-    else if (knownPowers.every((value) => value?.value === false)) reportedPower = 'off';
-    else reportedPower = 'mixed';
-  }
-  if (supplyPower !== undefined) reportedPower = supplyPower === false ? 'off' : 'unknown';
-  useEffect(() => { onPower?.(reportedPower); }, [onPower, reportedPower]);
-  const mode = currentReading(modeSpec)?.value;
-  const colorMode = Boolean(color) && (mode === 'colour' || mode === 'color');
-  const hasSummary = Boolean(brightness || temperature || colorMode || (mode === 'scene' && scene));
-  const onLightFeatures = sheet?.onLightFeatures;
-  const hasPresetMenu = hasSummary || Boolean(scene);
-  useEffect(() => { onLightFeatures?.(hasQuickSettings, hasPresetMenu); }, [hasQuickSettings, hasPresetMenu, onLightFeatures]);
-  const whiteMode = mode === 'white' || mode === undefined;
-  const { h, s, v } = limitsOf(colorMode ? currentReading(color)?.value : undefined);
-  const hsv = typeof h === 'number' && h >= 0 && h <= 360 && typeof s === 'number' && s >= 0 && s <= 1000 &&
-    typeof v === 'number' && v >= 0 && v <= 1000 ? { h, s, v } : undefined;
-  const brightnessReading = whiteMode ? currentReading(brightness) : undefined;
-  const temperatureReading = whiteMode ? currentReading(temperature) : undefined;
-  const sceneUnit = mode === 'scene' && scene ? readSimpleScene(currentReading(scene)?.value, scene)?.scene_units[0] : undefined;
-  const brightnessText = hsv ? `${hsv.v / 10} %` : brightness && brightnessReading && displayReading(brightness, brightnessReading);
-  const colorText = hsv && hsvToHex(hsv).toUpperCase();
-
-  function renderLightReadings(power: boolean | null) {
-    if (power && sceneUnit) return <LightSceneReadings unit={sceneUnit} />;
-    if (power !== null && !brightnessText && !temperatureReading && !colorText) {
-      return (
-        <>
-          <LightCardReading code="power" label={t(MSG.POWER)} value={t(power ? MSG.ON : MSG.OFF)} />
-          {power && <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} />}
-        </>
-      );
-    }
-    const brightnessValue = power === false ? t(MSG.OFF) : brightnessText || undefined;
-    return (
-      <>
-        <LightCardReading code="brightness" label={t(MSG.BRIGHTNESS)} off={power === false} value={power === null ? undefined : brightnessValue} />
-        {colorMode
-          ? <LightCardReading code="color" label={t(MSG.COLOR)} value={power ? colorText : undefined} tint={power ? colorText : undefined} />
-          : whiteMode && temperature && (
-            <LightCardReading
-              code="color_temperature"
-              label={temperature.label}
-              value={power && temperatureReading ? displayReading(temperature, temperatureReading) : undefined}
-              tint={power ? temperatureTint(temperatureReading?.value, temperature.minimum, temperature.maximum) : undefined}
-            />
-          )}
-      </>
-    );
-  }
-
-  const summary = hasSummary ? (power: boolean | null) => (
-    <span className="dashboard-light-readings">{renderLightReadings(power)}</span>
-  ) : undefined;
+  const { powers, layout: powerLayout } = usePowerCardControls({
+    specs,
+    read: currentReading,
+    online,
+    supply: supplyPower,
+    onPower,
+  });
+  const disabled = paused || busy || !readOK || sending || !online || supplyPower !== undefined;
+  const lighting = useLightCardControls({
+    api,
+    tuyaApi,
+    deviceId,
+    specs,
+    singlePower: powerLayout === 'single',
+    currentReading,
+    reading,
+    now,
+    local,
+    disabled,
+    send: toggle,
+    scope: pendingScope,
+    onAuthError,
+    presetSlot: sheet?.presetSlot,
+    onLightFeatures: sheet?.onLightFeatures,
+  });
+  const { summary } = lighting;
   const inlineName = inlineMemberName && powerLayout === 'single' && !channelChildren?.size;
   const renderSummary = inlineName ? (power: boolean | null) => {
     const powerLabel = power ? MSG.ON : MSG.OFF;
@@ -236,14 +190,11 @@ function StandardCardControls({
     );
   } : summary;
   const socket = category === 'cz' || specs.some(({ key }) => /^(?:add_ele|cur_(?:power|current|voltage))$/.test(key));
-  const sensors = specs.filter((spec) => spec !== brightness && spec !== temperature && sensorReading(spec, socket));
-  const disabled = paused || busy || !readOK || sending || !online || supplyPower !== undefined;
+  const sensors = specs.filter((spec) => !lighting.isLightLevel(spec) && sensorReading(spec, socket));
   const unplaced = unplacedChannelChildren(channelChildren, powers);
   if (!busy && readOK && !powers.length && !sensors.length && !notice.error) return unplaced ?? null;
   const field = (spec: ControlSpec, headingActions?: ReactNode, showSummary = true) => {
     const reported = reading(spec);
-    const lastPower = reported?.known && typeof reported.value === 'boolean' ? reported.value : null;
-    const displayPower = supplyPower === undefined && !online ? lastPower : supplyPower;
     return (
       <CapabilityField
         pendingScope={pendingScope}
@@ -260,7 +211,7 @@ function StandardCardControls({
           ? <DeviceIcon category={category} codes={specs.map((item) => item.key)} />
           : <ParameterIcon code={spec.key} />}
         powerSummary={showSummary ? renderSummary : undefined}
-        displayPower={displayPower}
+        displayPower={powerDisplayOverride(reported, online, supplyPower)}
         disabled={disabled}
         onSend={(value) => toggle(spec, value)}
         aliasEditor={spec.aliases?.length ? (
@@ -287,40 +238,16 @@ function StandardCardControls({
     })}
   </div>
 );
-  const quickEditor = hasQuickSettings && (embeddedQuick || (sheet?.open && !paused)) && (
+  const quickEditor = lighting.hasQuickSettings && (embeddedQuick || (sheet?.open && !paused)) && (
     <>
-      <QuickLightSettings
-        power={field(powers[0], undefined, false)}
-        library={library}
-        tuyaApi={tuyaApi}
-        mode={modeSpec}
-        white={white}
-        color={color?.writable ? color : undefined}
-        scene={scene}
-        scope={pendingScope}
-        reading={reading}
-        now={now}
-        local={local}
-        disabled={disabled}
-        send={toggle}
-      />
+      {lighting.renderQuick(field(powers[0], undefined, false))}
       {notice.error && <ControlFeedback busy={false} notice={notice} />}
     </>
   );
   if (embeddedQuick && quickEditor) return quickEditor;
   return (
     <>
-      {sheet?.presetSlot && createPortal(
-        <LightPresetMenu
-          presets={library.presets}
-          scope={pendingScope}
-          capability={scene?.key}
-          reading={scene && reading(scene)}
-          disabled={paused || disabled || !online}
-          send={(value) => (scene ? toggle(scene, value) : Promise.resolve(false))}
-        />,
-        sheet.presetSlot,
-      )}
+      {lighting.presetMenu}
       <div className="card-primary-controls tw:flex tw:flex-wrap tw:items-center tw:justify-end tw:gap-1" data-power-layout={powerLayout}>
         {powers.map((spec) => (channelChildren?.has(spec.key) ? (
           <RelayChannel key={spec.key} spec={spec} renderField={field}>

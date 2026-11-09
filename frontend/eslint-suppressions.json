@@ -528,9 +528,6 @@
     "no-confusing-arrow": {
       "count": 2
     },
-    "no-nested-ternary": {
-      "count": 1
-    },
     "no-restricted-globals": {
       "count": 1
     },
@@ -554,9 +551,6 @@
     },
     "one-var-declaration-per-line": {
       "count": 2
-    },
-    "operator-linebreak": {
-      "count": 1
     },
     "prefer-template": {
       "count": 2

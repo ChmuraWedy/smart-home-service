@@ -19,7 +19,7 @@ import {
   selectCommandPending, setCommandPending, useAppDispatch, useAppSelector,
 } from '../store';
 import { CardControls } from './CardControls';
-import type { MemberPower } from './CardControls';
+import type { MemberPower } from './PowerCardControls';
 import ControlRow from './ControlRow';
 import type { PowerSide } from './ControlRow';
 import DashboardCardFooter from './DashboardCardFooter';

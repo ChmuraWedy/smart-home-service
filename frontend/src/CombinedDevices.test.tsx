@@ -405,6 +405,7 @@ describe('combined devices', () => {
       },
       device: { id: device.device_id, name: device.name, local: device, cloud: {} },
     }));
+    const flatMembers = members.map((entry) => ({ ...entry, member: { ...entry.member, power_source: undefined } }));
     const at = Date.now();
     let lampObservedAt = at - 1_000;
     vi.mocked(fetch).mockImplementation(async (input, options) => {
@@ -431,11 +432,21 @@ describe('combined devices', () => {
             now={now}
             onAuthError={vi.fn()}
           />
+          <CombinedDeviceCard
+            api={api}
+            combined={{ id: 2, name: 'Flat devices' }}
+            members={flatMembers}
+            room={room.name}
+            now={now}
+            onAuthError={vi.fn()}
+          />
         </MemoryRouter>
       </Provider>
     );
     const view = render(card(at));
-    const lamp = screen.getByRole('region', { name: localLamp.name });
+    const wiredCard = within(screen.getByRole('listitem', { name: 'Wired devices' }));
+    const flatCard = within(screen.getByRole('listitem', { name: 'Flat devices' }));
+    const lamp = wiredCard.getByRole('region', { name: localLamp.name });
     const power = await within(lamp).findByRole('switch', { name: 'Power' });
     await waitFor(() => expect(lamp).toHaveAttribute('data-unavailable'));
     expect(power).toBeDisabled();
@@ -445,6 +456,9 @@ describe('combined devices', () => {
     await act(async () => { await store.dispatch(readLocalDevice(api, localLamp.id, false, undefined, true)); });
     await waitFor(() => expect(power).toBeEnabled());
     expect(power).toBeChecked();
+    const flatPower = within(flatCard.getByRole('region', { name: localLamp.name })).getByRole('switch', { name: 'Power' });
+    expect(flatPower).toBeEnabled();
+    expect(flatPower).toBeChecked();
     expect(lamp).not.toHaveAttribute('data-unavailable');
 
     view.rerender(card(lampObservedAt + 16_000));
@@ -622,7 +636,7 @@ describe('combined devices', () => {
     expect(sheet.queryByRole('region', { name: relay.name })).toBeNull();
     await user.click(sheet.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(window.location.pathname).toBe('/rooms/3'));
-    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(writes).toHaveLength(0);
   });
 
