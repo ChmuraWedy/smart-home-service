@@ -6,6 +6,11 @@
     "unit": " °C"
   },
   {
+    "transcript": "Is the bedside lamp on?",
+    "device": "Bedside lamp",
+    "reading": "switch"
+  },
+  {
     "transcript": "Turn on the bedside lamp.",
     "device": "Bedside lamp",
     "reading": "switch",

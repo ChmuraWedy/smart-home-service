@@ -1,0 +1,65 @@
+.demo-voice {
+  color-scheme: dark;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #343c4a;
+  border-radius: 10px;
+  background: #15171c;
+  color: #eef2f8;
+  font: 16px system-ui, sans-serif;
+}
+.demo-voice-header { padding: 16px 20px; background: #191d25; border-bottom: 1px solid #343c4a; }
+.demo-voice-header h3 { margin: 0; font-size: 1.2rem; font-weight: 650; }
+.demo-voice-header p { margin: 3px 0 0; font-size: .82rem; color: #a8b1c0; }
+.demo-voice-conversation { overflow-y: auto; padding: 18px 20px; }
+.demo-voice-turn { display: grid; gap: 8px; margin-bottom: 18px; }
+.demo-voice-utterance {
+  justify-self: end;
+  max-width: 90%;
+  margin: 0;
+  padding: 10px 13px;
+  background: #242935;
+  border-radius: 15px 15px 5px 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.demo-voice-answer { padding: 12px 14px; border: 1px solid #3a4352; border-radius: 14px; background: #1e222a; }
+.demo-voice-answer > div { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+.demo-voice-answer h4 { margin: 0; font-size: .95rem; }
+.demo-voice-answer span { font-size: .76rem; color: #b4c8e5; }
+.demo-voice-answer p { margin: 6px 0 0; line-height: 1.45; color: #dee5ef; }
+.demo-voice-footer {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 12px 20px max(10px, env(safe-area-inset-bottom));
+  background: #191d25;
+  border-top: 1px solid #343c4a;
+  text-align: center;
+}
+.demo-voice button.demo-voice-mic {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  padding: 0;
+  border: 1px solid #e6efff;
+  border-radius: 50%;
+  color: #101927;
+  background: radial-gradient(circle at 36% 22%, #fff 8%, #dcf4ff 36%, #9bb9f2 72%, #a9a2ed);
+  box-shadow: 0 0 54px #8bacf654;
+}
+.demo-voice-footer > p { margin: 0; font-size: .9rem; font-weight: 600; }
+.demo-voice details { width: min(100%, 410px); }
+.demo-voice summary { width: fit-content; min-height: 44px; padding: 10px 6px; margin: auto; cursor: pointer; color: #b1b8c7; font-size: .85rem; }
+.demo-voice form { display: flex; gap: 8px; padding-bottom: 4px; }
+.demo-voice form :is(input, button) { background: #242935; color: inherit; border: 1px solid #3a4352; border-radius: 10px; min-height: 44px; font: inherit; }
+.demo-voice form input { flex: 1; min-width: 0; padding: 8px 12px; }
+.demo-voice form button { flex: 0 0 44px; padding: 0; font-size: 1.15rem; }
+@media (max-width: 480px), (max-height: 640px) {
+  .demo-voice button.demo-voice-mic { width: 96px; height: 96px; }
+  .demo-voice-conversation { padding: 14px; }
+}

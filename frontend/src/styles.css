@@ -1789,11 +1789,11 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-sheet-heading { @apply tw:mb-3 tw:flex tw:items-center tw:justify-between tw:gap-3; }
 .dashboard-sheet-heading h2 { @apply tw:m-0 tw:text-xl; }
 .dashboard-sheet-heading > button { @apply tw:grid tw:size-11 tw:shrink-0 tw:place-items-center tw:border-0 tw:bg-transparent tw:p-0 tw:text-2xl; }
-.ai-chat-sheet[open]:has(.ai-chat-frame) {
+.ai-chat-sheet[open]:has(.ai-chat-frame, .demo-voice) {
   display:flex; flex-direction:column; overflow:hidden;
   height:min(760px, calc(100dvh - 24px));
 }
-@media (min-width:601px) { .ai-chat-sheet:has(.ai-chat-frame) { max-width:760px; } }
+@media (min-width:601px) { .ai-chat-sheet:has(.ai-chat-frame, .demo-voice) { max-width:760px; } }
 .ai-chat-frame { flex:1; width:100%; min-height:0; border:1px solid var(--border); border-radius:10px; }
 .dashboard-sheet-power .capability-boolean > .capability-row { @apply tw:grid-cols-[64px_1fr] tw:justify-normal; }
 .dashboard-sheet-power .capability-heading { @apply tw:hidden; }
@@ -1966,7 +1966,3 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-member-option { @apply tw:flex tw:min-h-11 tw:items-center tw:gap-2 tw:wrap-anywhere; }
 .combined-member-option input[type="checkbox"] { @apply tw:size-4 tw:shrink-0; }
 .combined-delete p { @apply tw:w-full; }
-
-.demo-voice { margin-block: 12px; }
-.demo-voice p { margin-block: 10px; }
-.demo-voice-examples { display: flex; flex-wrap: wrap; gap: 8px; }
