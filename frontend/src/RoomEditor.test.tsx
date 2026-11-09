@@ -90,6 +90,32 @@ function openApp(path: string) {
   return render(<App />);
 }
 
+it('opens room search in the header and shows the empty result below the room toolbar', async () => {
+  fixture([building], [kitchen, bedroom], [{
+    id: 1, device_id: 'kitchen-lamp', name: 'Kitchen lamp', aliases: [],
+    room_id: kitchen.id, building_id: building.id, transport: 'wifi', parent_id: null,
+    cid: null, enabled: true, capabilities: {},
+  }]);
+  openApp('/rooms/2?building=1&page=2');
+  const user = userEvent.setup();
+  const header = within(screen.getByRole('banner'));
+  const toggle = await header.findByRole('button', { name: 'Search' });
+  expect(screen.queryByRole('searchbox')).toBeNull();
+  await user.click(toggle);
+  const search = header.getByRole('searchbox', { name: 'Search by name, alias, or ID' });
+  expect(search).toHaveFocus();
+  const empty = await screen.findByRole('heading', { name: 'Nothing found' });
+  const roomToolbar = screen.getByText('Bedroom', { selector: '.room-navigation-heading' }).closest('.dashboard-layout-toolbar');
+  expect((roomToolbar?.compareDocumentPosition(empty) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  await user.type(search, 'lamp');
+  expect(window.location.pathname).toBe('/rooms/2');
+  expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({ building: '1', q: 'lamp', panel: 'search' });
+  await user.click(toggle);
+  expect(screen.queryByRole('searchbox')).toBeNull();
+  expect(window.location.search).toBe('?building=1');
+});
+
 it('creates a first building and room, renames it, and preserves it after a blocked deletion', async () => {
   const { changes, enableDelete } = fixture([], []);
   const user = userEvent.setup();

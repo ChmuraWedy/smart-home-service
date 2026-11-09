@@ -803,6 +803,7 @@ describe('combined devices', () => {
       body: { aliases: ['Святло Łódź'] },
     }]);
     await user.click(dialog.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Search' }));
     const search = screen.getByRole('searchbox');
     fireEvent.change(search, { target: { value: 'ŁÓDŹ' } });
     expect(await screen.findByRole('listitem', { name: 'Kitchen lights' })).toBeInTheDocument();

@@ -34,6 +34,7 @@ import { Icon, IconGlyph } from './components/ui/icon';
 import {
   appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath, combinationPattern, combinationQuickPattern,
   dashboardHref, dashboardLayoutPath, dashboardRoom, dashboardToolsPath, devicePattern, groupPattern, legacyHref, quickPattern, roomLayoutPattern, roomPattern,
+  dashboardSearchHref,
 } from './navigation';
 import type { DashboardPanel } from './navigation';
 import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
@@ -139,6 +140,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   let view = requestedView;
   if (needsAccess) view = 'connections';
   else if (member && ownerPage(requestedView)) view = 'control';
+  const searchOpen = view === 'control' && Boolean(status) && dashboardPanel === 'search';
+  const dashboardSearchInput = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (searchOpen) dashboardSearchInput.current?.focus(); }, [searchOpen]);
   const method = query.get('provider');
   const provider: ConnectionMethod = method === 'developer' || method === 'android' ? method : 'sharing';
   const redroidAvailable = Boolean(status?.redroid_available);
@@ -385,6 +389,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     void navigate(dashboardHref(dashboardRoom(location.pathname, query), query, next));
     setMenuOpen(false);
   }
+  function updateDashboardSearch(value: string) {
+    navigate(dashboardSearchHref(location.pathname, location.search, 'search', value), { replace: true });
+  }
   useEffect(() => { setMenuOpen(false); }, [location.key]);
   useEffect(() => { setQR(null); }, [view, provider]);
   useEffect(() => {
@@ -502,13 +509,32 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
           <i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}
         </span>
         {view === 'control' && status && (
-        <button className="secondary dashboard-search-button" type="button" aria-label={t(MSG.SEARCH)} aria-expanded={dashboardPanel === 'search'} aria-controls="dashboard-search" disabled={locked} onClick={() => {
-        changeDashboardPanel(dashboardPanel === 'search' ? null : 'search');
-      }}
-        >
-          <Icon name="search" />
-        </button>
-)}
+          <div className="dashboard-header-search">
+            {searchOpen && (
+              <input
+                ref={dashboardSearchInput}
+                id="dashboard-search"
+                type="search"
+                aria-label={t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}
+                placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)}
+                value={query.get('q') ?? ''}
+                disabled={locked}
+                onChange={(event) => updateDashboardSearch(event.currentTarget.value)}
+              />
+            )}
+            <button
+              className="secondary dashboard-search-button"
+              type="button"
+              aria-label={t(MSG.SEARCH)}
+              aria-expanded={searchOpen}
+              aria-controls={searchOpen ? 'dashboard-search' : undefined}
+              disabled={locked}
+              onClick={() => changeDashboardPanel(searchOpen ? null : 'search')}
+            >
+              <Icon name="search" />
+            </button>
+          </div>
+        )}
       </header>
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}

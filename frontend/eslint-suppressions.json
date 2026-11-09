@@ -1,10 +1,10 @@
 {
   "src/App.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 9
+      "count": 8
     },
     "@stylistic/max-len": {
-      "count": 5
+      "count": 4
     },
     "arrow-parens": {
       "count": 4
@@ -19,7 +19,7 @@
       "count": 1
     },
     "indent": {
-      "count": 26
+      "count": 23
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 1
@@ -58,13 +58,13 @@
       "count": 2
     },
     "react/jsx-first-prop-new-line": {
-      "count": 5
+      "count": 4
     },
     "react/jsx-indent": {
       "count": 4
     },
     "react/jsx-max-props-per-line": {
-      "count": 5
+      "count": 4
     },
     "react/jsx-no-useless-fragment": {
       "count": 1
@@ -693,10 +693,10 @@
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 6
+      "count": 5
     },
     "@stylistic/max-len": {
-      "count": 12
+      "count": 10
     },
     "arrow-parens": {
       "count": 34
@@ -717,7 +717,7 @@
       "count": 1
     },
     "indent": {
-      "count": 6
+      "count": 5
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
@@ -726,7 +726,7 @@
       "count": 4
     },
     "no-nested-ternary": {
-      "count": 6
+      "count": 5
     },
     "no-restricted-globals": {
       "count": 2
@@ -762,7 +762,7 @@
       "count": 2
     },
     "react/button-has-type": {
-      "count": 6
+      "count": 5
     },
     "react/jsx-max-props-per-line": {
       "count": 1
