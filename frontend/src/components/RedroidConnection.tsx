@@ -2,11 +2,13 @@ import { useMemo } from 'react';
 import type { FormEvent } from 'react';
 import { MSG, t, useLocale } from '../i18n';
 import type { RedroidCredentials } from '../api';
+import { appPaths } from '../navigation';
 import smartLifeRegions from '../smart-life-regions.json';
 
 type Props = {
   available: boolean;
   protectedConnection: boolean;
+  inSetup: boolean;
   connected: boolean;
   ready: boolean;
   busy: boolean;
@@ -15,11 +17,13 @@ type Props = {
   onConfirm: () => Promise<void>;
 };
 
-function secureSignInUrl() {
+function secureSignInUrl(inSetup: boolean) {
   const origin = import.meta.env.VITE_DASHBOARD_HTTPS_ORIGIN;
   if (!origin) return undefined;
   try {
-    const url = new URL('/settings/connections?provider=android', origin);
+    const url = new URL(inSetup ? appPaths.setup : appPaths.connections, origin);
+    if (inSetup) url.searchParams.set('step', 'tuya');
+    url.searchParams.set('provider', 'android');
     return url.protocol === 'https:' ? url.href : undefined;
   } catch {
     return undefined;
@@ -97,10 +101,10 @@ function LoginForm({ busy, onConnect }: Pick<Props, 'busy' | 'onConnect'>) {
 }
 
 export default function RedroidConnection({
-  available, protectedConnection, connected, ready, busy, approval, onConnect, onConfirm,
+  available, protectedConnection, inSetup, connected, ready, busy, approval, onConnect, onConfirm,
 }: Props) {
-  if (!available) return <p className="help">{t(MSG.SMART_LIFE_ANDROID_NOT_CONFIGURED)}</p>;
   if (!ready) return <p className="help">{t(MSG.CLOUD_MODE_IS_DISABLED_ON_THE_SERVER)}</p>;
+  if (!available) return <p className="help">{t(MSG.SMART_LIFE_ANDROID_NOT_CONFIGURED)}</p>;
   if (approval) {
     const { remaining, imageUrl, readyOnAndroid } = approval;
     return (
@@ -114,7 +118,7 @@ export default function RedroidConnection({
       </div>
     );
   }
-  const httpsUrl = protectedConnection ? undefined : secureSignInUrl();
+  const httpsUrl = protectedConnection ? undefined : secureSignInUrl(inSetup);
   return (
     <>
       {connected && <p className="saved-summary">{t(MSG.SMART_LIFE_CONNECTED)}</p>}
