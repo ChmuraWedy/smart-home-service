@@ -1159,5 +1159,17 @@
   "ACCOUNT_SIGN_IN": "Увайсці ў Smart Home",
   "ACCOUNT_SIGN_IN_HELP": "Увядзіце ключ доступу, які выдаў уладальнік дома.",
   "HOUSEHOLD_OWNER_REQUIRED": "Для гэтага дзеяння патрэбны ўліковы запіс уладальніка",
-  "HOUSEHOLD_OWNER": "Уладальнік"
+  "HOUSEHOLD_OWNER": "Уладальнік",
+  "USER_LOGIN": "Лагін",
+  "MY_DEVICE_KEYS": "Ключы маіх прылад",
+  "ADD_USER": "Дадаць карыстальніка",
+  "KEY_DEVICE_NAME": "Назва прылады",
+  "DEVICE_KEYS_FOR": "Ключы прылад карыстальніка {0}",
+  "EXISTING_DEVICE_KEY": "Існуючы ключ прылады",
+  "REVOKE_DEVICE_KEY": "Адклікаць ключ для {0}",
+  "REVOKE_DEVICE_KEY_CONFIRM": "Адклікаць ключ для {0}?",
+  "SIGN_IN_LINK": "Спасылка для ўваходу",
+  "SHARE_DEVICE_KEY_PRIVATELY": "Перадавайце спасылку ці ключ прыватна. Любы, хто іх мае, можа ўвайсці.",
+  "SET_OWNER_NAME": "Наладзьце ўладальніка",
+  "OWNER_NAME": "Імя ўладальніка"
 }

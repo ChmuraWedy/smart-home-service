@@ -1159,5 +1159,17 @@
   "ACCOUNT_SIGN_IN": "Sign in to Smart Home",
   "ACCOUNT_SIGN_IN_HELP": "Enter the access key provided by the household owner.",
   "HOUSEHOLD_OWNER_REQUIRED": "This action requires the owner account",
-  "HOUSEHOLD_OWNER": "Owner"
+  "HOUSEHOLD_OWNER": "Owner",
+  "USER_LOGIN": "Login",
+  "MY_DEVICE_KEYS": "My device keys",
+  "ADD_USER": "Add user",
+  "KEY_DEVICE_NAME": "Device name",
+  "DEVICE_KEYS_FOR": "Device keys for {0}",
+  "EXISTING_DEVICE_KEY": "Existing device key",
+  "REVOKE_DEVICE_KEY": "Revoke key for {0}",
+  "REVOKE_DEVICE_KEY_CONFIRM": "Revoke the key for {0}?",
+  "SIGN_IN_LINK": "Sign-in link",
+  "SHARE_DEVICE_KEY_PRIVATELY": "Share this link or key privately. Anyone who has it can sign in.",
+  "SET_OWNER_NAME": "Set up the owner",
+  "OWNER_NAME": "Owner name"
 }

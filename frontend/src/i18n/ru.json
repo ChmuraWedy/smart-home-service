@@ -1159,5 +1159,17 @@
   "ACCOUNT_SIGN_IN": "Войти в Smart Home",
   "ACCOUNT_SIGN_IN_HELP": "Введите ключ доступа, который выдал владелец дома.",
   "HOUSEHOLD_OWNER_REQUIRED": "Для этого действия нужна учётная запись владельца",
-  "HOUSEHOLD_OWNER": "Владелец"
+  "HOUSEHOLD_OWNER": "Владелец",
+  "USER_LOGIN": "Логин",
+  "MY_DEVICE_KEYS": "Ключи моих устройств",
+  "ADD_USER": "Добавить пользователя",
+  "KEY_DEVICE_NAME": "Название устройства",
+  "DEVICE_KEYS_FOR": "Ключи устройств пользователя {0}",
+  "EXISTING_DEVICE_KEY": "Существующий ключ устройства",
+  "REVOKE_DEVICE_KEY": "Отозвать ключ для {0}",
+  "REVOKE_DEVICE_KEY_CONFIRM": "Отозвать ключ для {0}?",
+  "SIGN_IN_LINK": "Ссылка для входа",
+  "SHARE_DEVICE_KEY_PRIVATELY": "Передавайте ссылку или ключ приватно. Любой, у кого они есть, может войти.",
+  "SET_OWNER_NAME": "Настройка владельца",
+  "OWNER_NAME": "Имя владельца"
 }

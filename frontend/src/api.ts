@@ -10,9 +10,12 @@ export type DeveloperStatus = {
   region?: Region;
   device_count?: number;
 };
-export type HouseholdMember = { id: string; 'name': string; 'key_available'?: boolean };
-export type AccountIdentity = HouseholdMember & { role: 'owner' | 'member' };
-export type IssuedMember = HouseholdMember & { 'access_key': string };
+export type HouseholdMember = { id: string; 'name': string; login: string };
+export type AccountIdentity = HouseholdMember & {
+  role: 'owner' | 'member'; 'key_id'?: string | null; 'needs_name'?: boolean;
+};
+export type HouseholdDeviceKey = { id: string; 'name': string; 'key_available': boolean };
+export type IssuedMember = HouseholdMember & { 'key_id': string };
 export type CloudStatus = {
   account?: AccountIdentity;
   enabled: boolean;
@@ -147,6 +150,10 @@ export class CloudApi {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
     }
+  }
+
+  verifyHouseholdLogin(login: string) {
+    return this.request<AccountIdentity>('/accounts/login', 'POST', { login });
   }
 
   protected async request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {

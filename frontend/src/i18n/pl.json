@@ -1159,5 +1159,17 @@
   "ACCOUNT_SIGN_IN": "Zaloguj się do Smart Home",
   "ACCOUNT_SIGN_IN_HELP": "Wpisz klucz dostępu otrzymany od właściciela domu.",
   "HOUSEHOLD_OWNER_REQUIRED": "Ta operacja wymaga konta właściciela",
-  "HOUSEHOLD_OWNER": "Właściciel"
+  "HOUSEHOLD_OWNER": "Właściciel",
+  "USER_LOGIN": "Login",
+  "MY_DEVICE_KEYS": "Klucze moich urządzeń",
+  "ADD_USER": "Dodaj użytkownika",
+  "KEY_DEVICE_NAME": "Nazwa urządzenia",
+  "DEVICE_KEYS_FOR": "Klucze urządzeń użytkownika {0}",
+  "EXISTING_DEVICE_KEY": "Istniejący klucz urządzenia",
+  "REVOKE_DEVICE_KEY": "Unieważnij klucz dla {0}",
+  "REVOKE_DEVICE_KEY_CONFIRM": "Unieważnić klucz dla {0}?",
+  "SIGN_IN_LINK": "Link do logowania",
+  "SHARE_DEVICE_KEY_PRIVATELY": "Udostępnij link lub klucz prywatnie. Każdy, kto go ma, może się zalogować.",
+  "SET_OWNER_NAME": "Skonfiguruj właściciela",
+  "OWNER_NAME": "Nazwa właściciela"
 }

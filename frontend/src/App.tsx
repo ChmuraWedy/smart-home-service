@@ -15,10 +15,11 @@ import type {
   CloudStatus, Connection, DeveloperCredentials, Provider,
 } from './api';
 import {
-  clearConnection, loadConnection, saveConnection, STORAGE_KEY,
+  clearConnection, DEFAULT_API_BASE, loadConnection, saveConnection, STORAGE_KEY,
 } from './connection';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import HouseholdAccess from './components/HouseholdAccess';
+import { readHouseholdSignIn } from './household-login';
 import { LanguageSelector } from './components/LanguageSelector';
 import DeviceTextModeSelector from './components/DeviceTextModeSelector';
 import { ThemeSelector } from './components/ThemeSelector';
@@ -67,7 +68,7 @@ function screenRoute(path: string, view: View, id = path): RouteObject {
 }
 
 function ownerPage(view: View) {
-  return view === 'network' || view === 'local-connections' || view === 'rooms' || view === 'combined-devices' || view === 'users';
+  return view === 'network' || view === 'local-connections' || view === 'rooms' || view === 'combined-devices';
 }
 
 function AppScreen() {
@@ -112,6 +113,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const matched = useMatches().at(-1)!;
+  const [invitation, setInvitation] = useState(() => (
+    !demo && location.pathname === appPaths.connections ? readHouseholdSignIn(location.hash) : undefined
+  ));
   const query = new URLSearchParams(location.search);
   const requestedView = matched.handle as View;
   const needsAccess = !connection.token && requestedView !== 'settings' && requestedView !== 'connections';
@@ -128,7 +132,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const [sessionRevision, setSessionRevision] = useState(0);
   const currentConnection = useRef(connection);
   const member = status?.account?.role === 'member';
-  const owner = status?.account?.role === 'owner';
+  const identity = status?.account;
   const showIntegration = Boolean(status && !member);
   let view = requestedView;
   if (needsAccess) view = 'connections';
@@ -160,7 +164,13 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
 
   useEffect(() => {
     const legacy = location.pathname === '/' ? legacyHref(location.hash) : null;
-    if (needsAccess) {
+    const sharedSignIn = location.pathname === appPaths.connections ? readHouseholdSignIn(location.hash) : undefined;
+    if (sharedSignIn) {
+      setInvitation(sharedSignIn);
+      navigate(location.pathname + location.search, { replace: true, state: location.state });
+    } else if (identity?.needs_name && requestedView !== 'users') {
+      navigate(appPaths.users, { replace: true });
+    } else if (needsAccess) {
       const returnTo = legacy ?? (matched.id === '*' ? '/' : location.pathname + location.search);
       void navigate(appPaths.connections, { replace: true, state: returnTo === '/' ? null : { returnTo } });
     } else if (member && ownerPage(requestedView)) {
@@ -168,7 +178,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     } else if (legacy || matched.id === '*') {
       void navigate(legacy ?? appPaths.control, { replace: true });
     }
-  }, [location, matched.id, member, needsAccess, navigate, requestedView]);
+  }, [identity?.needs_name, location, matched.id, member, needsAccess, navigate, requestedView]);
 
   const installSession = useCallback((next: Connection, nextStatus: CloudStatus | null) => {
     currentConnection.current = next;
@@ -253,21 +263,29 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     }
   }
 
-  const saveAccess = (address: string, candidate: string) => run(async () => {
-    const baseUrl = normalizeApiBase(address);
+  const saveAccess = (address: string, candidate: string, login: string) => run(async () => {
+    const baseUrl = normalizeApiBase(invitation ? DEFAULT_API_BASE : address);
     // Changing the API host requires a newly entered key. A saved key is reused
     // only for its original API, never sent to another host by an address edit.
     const token = candidate.trim() || (baseUrl === connection.baseUrl ? connection.token : '');
     if (!token) throw new Error(t(MSG.ENTER_THE_ACCESS_KEY_FOR_THIS_API));
     const next = { baseUrl, token };
-    const nextStatus = await new CloudApi(next).status();
+    const client = new CloudApi(next);
+    if (login.trim()) await client.verifyHouseholdLogin(login.trim());
+    const nextStatus = await client.status();
     if (currentConnection.current !== connection) return;
     saveConnection(next);
     installSession(next, nextStatus);
+    setInvitation(undefined);
     setNotice({ text: t(MSG.CONNECTION_SAVED_NOTICE) });
     if (location.state?.returnTo) void navigate(location.state.returnTo, { replace: true });
-    else if (nextStatus.account?.role === 'member') navigate(appPaths.control, { replace: true });
+    else if (invitation || nextStatus.account?.role === 'member') navigate(appPaths.control, { replace: true });
   });
+
+  const nameOwner = async (name: string) => {
+    const updated = await api.nameHouseholdOwner(name);
+    if (currentConnection.current === connection) setStatus((current) => (current ? { ...current, account: updated } : null));
+  };
 
   const saveCode = (code: string) => run(async () => {
     if (!code.trim()) throw new Error(t(MSG.ENTER_YOUR_USER_CODE));
@@ -357,15 +375,15 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
 
   let connectionTitle = t(MSG.ACCOUNT_SIGN_IN);
   let connectionHint = t(MSG.ACCOUNT_SIGN_IN_HELP);
-  if (member) {
+  if (member && !invitation) {
     connectionTitle = t(MSG.SERVICE_ACCESS);
     connectionHint = '';
-  } else if (showIntegration) {
+  } else if (showIntegration && !invitation) {
     connectionTitle = t(ready && accountConnected ? MSG.TUYA_CONNECTED : MSG.CONNECT_TUYA);
     connectionHint = t(ready && accountConnected ? MSG.YOUR_SAVED_CONNECTION_IS_READY_TO_CONTROL_DEVICES : MSG.CONNECT_YOUR_ACCOUNT_TO_ACCESS_YOUR_DEVICES);
   }
 
-  const accountName = owner ? t(MSG.HOUSEHOLD_OWNER) : status?.account?.name;
+  const accountName = identity?.name;
   const sessionControls = !demo && status && connection.token && (
     <div className="actions">
       {accountName && <span>{t(MSG.SIGNED_IN_AS, [accountName])}</span>}
@@ -420,9 +438,11 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
               ['network', t(MSG.NETWORK_AND_PACKETS)],
               ['local-connections', t(MSG.LOCAL_CONNECTIONS)],
               ['settings', t(MSG.SETTINGS)],
-              ['users', t(MSG.USERS)],
+              ['users', t(member ? MSG.MY_DEVICE_KEYS : MSG.USERS)],
               ['connections', t(MSG.CONNECTIONS)],
-            ] as const).filter(([key]) => (!demo || key === 'control' || key === 'settings') && (!member || !ownerPage(key)) && (key !== 'users' || owner)).map(([key, label]) => (
+            ] as const).filter(([key]) => (
+              (!demo || key === 'control' || key === 'settings') && (!member || !ownerPage(key)) && (key !== 'users' || Boolean(identity))
+            )).map(([key, label]) => (
               <button type="button" key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>
                 {label}
               </button>
@@ -472,7 +492,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
               <h1>{connectionTitle}</h1>
               {connectionHint && <p className="muted">{connectionHint}</p>}
             </div>
-            {showIntegration && (
+            {showIntegration && !invitation && (
             <div className="workspace connections-workspace">
               <section className="card setup" aria-label={t(MSG.TUYA_CONNECTION)}>
                 <div className="method-tabs" role="group" aria-label={t(MSG.CONNECTION_METHOD)}>
@@ -536,16 +556,24 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
               </section>
             </div>
             )}
-            <ConnectionSettings connection={connection} busy={locked} onSave={saveAccess} />
+            <ConnectionSettings connection={connection} busy={locked} invitation={invitation} onSave={saveAccess} />
             {sessionControls}
           </>,
         settings: <section className="card">
           <h1>{t(MSG.SETTINGS)}</h1>
           <div className="app-menu-appearance">{appearance}</div>
           {sessionControls}
-          {owner && <button type="button" className="secondary compact" onClick={() => goTo('users')}>{t(MSG.USERS)}</button>}
+          {identity && <button type="button" className="secondary compact" onClick={() => goTo('users')}>{t(member ? MSG.MY_DEVICE_KEYS : MSG.USERS)}</button>}
         </section>,
-          users: owner ? <HouseholdAccess key={sessionRevision} api={api} onAuthError={invalidateConnection} /> : null,
+          users: identity ? (
+            <HouseholdAccess
+              key={sessionRevision}
+              api={api}
+              account={identity}
+              onAuthError={invalidateConnection}
+              onNameOwner={nameOwner}
+            />
+          ) : null,
         network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
         'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
         control: controlCenter,

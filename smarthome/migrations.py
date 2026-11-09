@@ -2,7 +2,14 @@ from collections.abc import Callable
 
 from sqlalchemy.engine import Connection
 
-from .models import AccountDashboardLayout, CloudRoomOverride, HouseholdMember, RoomAppearance
+from .models import (
+    AccountDashboardLayout,
+    CloudRoomOverride,
+    HouseholdDeviceKey,
+    HouseholdMember,
+    HouseholdOwner,
+    RoomAppearance,
+)
 
 
 def add_combined_power_visibility(connection: Connection) -> None:
@@ -70,6 +77,21 @@ def add_recoverable_member_keys(connection: Connection) -> None:
         connection.exec_driver_sql("ALTER TABLE household_members ADD COLUMN sealed_key BLOB")
 
 
+def add_device_access_keys(connection: Connection) -> None:
+    columns = {column[1] for column in connection.exec_driver_sql("PRAGMA table_info(household_members)")}
+    if "login" not in columns:
+        connection.exec_driver_sql("ALTER TABLE household_members ADD COLUMN login VARCHAR(40)")
+        connection.exec_driver_sql("CREATE UNIQUE INDEX household_members_login ON household_members (login)")
+    connection.exec_driver_sql("UPDATE household_members SET login = 'user-' || id WHERE login IS NULL")
+    HouseholdOwner.__table__.create(connection, checkfirst=True)
+    HouseholdDeviceKey.__table__.create(connection, checkfirst=True)
+    connection.exec_driver_sql("""
+        INSERT OR IGNORE INTO household_device_keys (id, member_id, name, key_digest, sealed_key)
+        SELECT id, id, '', key_digest, sealed_key FROM household_members
+    """)
+    connection.exec_driver_sql("UPDATE household_members SET sealed_key = NULL WHERE sealed_key IS NOT NULL")
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
@@ -82,4 +104,5 @@ MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_generated_room_names,
     add_household_accounts,
     add_recoverable_member_keys,
+    add_device_access_keys,
 )

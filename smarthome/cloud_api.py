@@ -2,6 +2,7 @@ import base64
 import binascii
 import json
 from ipaddress import ip_address, ip_network
+from dataclasses import asdict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -231,7 +232,7 @@ def cloud_status(
             "transport": "internet",
             "scene_edit_supported": False,
             "developer": request.app.state.developer_cloud.status(),
-            **({"account": {"id": account.id, "name": account.name, "role": account.role}} if account else {}),
+            **({"account": asdict(account)} if account else {}),
         }
 
 

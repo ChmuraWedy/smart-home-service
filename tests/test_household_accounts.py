@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from smarthome.config import Settings
 from smarthome.main import create_app
-from smarthome.models import AccountDashboardLayout, HouseholdMember
+from smarthome.models import AccountDashboardLayout, HouseholdDeviceKey, HouseholdMember
 from smarthome.tuya import TuyaController
 
 from .conftest import KEY
@@ -45,14 +45,15 @@ def test_credentials_are_individual_and_cannot_manage_accounts(secured_app):
         assert alex["id"] != sam["id"] and alex["access_key"] != sam["access_key"]
         listed = client.get(API + "/accounts", headers=OWNER)
         assert listed.json() == [
-            {"id": alex["id"], "name": "Alex", "key_available": True},
-            {"id": sam["id"], "name": "Sam", "key_available": True},
+            {"id": alex["id"], "name": "Alex", "login": alex["login"], "key_available": True},
+            {"id": sam["id"], "name": "Sam", "login": sam["login"], "key_available": True},
         ]
         assert listed.headers["Cache-Control"] == "no-store"
         with Session(secured_app.state.engine) as session:
             member = session.get(HouseholdMember, alex["id"])
             assert member.key_digest == hashlib.sha256(alex["access_key"].encode()).hexdigest()
-            assert alex["access_key"].encode() not in member.sealed_key
+            key_row = session.get(HouseholdDeviceKey, alex["key_id"])
+            assert alex["access_key"].encode() not in key_row.sealed_key
         path = API + "/accounts/" + alex["id"] + "/key"
         assert client.get(path, headers=headers).status_code == 403
         assert client.get(path).status_code == 401
@@ -60,7 +61,10 @@ def test_credentials_are_individual_and_cannot_manage_accounts(secured_app):
         assert key.json() == {"access_key": alex["access_key"]}
         assert key.headers["Cache-Control"] == "no-store"
         status = client.get(API + "/cloud/status", headers=headers).json()
-        assert status["account"] == {"id": alex["id"], "name": "Alex", "role": "member"}
+        assert status["account"] == {
+            "id": alex["id"], "name": "Alex", "role": "member", "login": alex["login"],
+            "key_id": alex["key_id"], "needs_name": False,
+        }
         assert client.get(API + "/cloud/status", headers=OWNER).json()["account"]["role"] == "owner"
         for method, path in [("GET", "/accounts"), ("POST", "/accounts"), ("DELETE", "/accounts/" + sam["id"])]:
             assert client.request(method, API + path, headers=headers).status_code == 403
@@ -72,11 +76,15 @@ def test_existing_hashed_keys_keep_working_without_becoming_recoverable(secured_
     with TestClient(secured_app) as client:
         with Session(secured_app.state.engine) as session:
             session.add(HouseholdMember(
-                id=member_id, name="Existing member", key_digest=hashlib.sha256(token.encode()).hexdigest(),
+                id=member_id, name="Existing member", login="legacy", key_digest=hashlib.sha256(token.encode()).hexdigest(),
+            ))
+            session.flush()
+            session.add(HouseholdDeviceKey(
+                id=member_id, member_id=member_id, name="", key_digest=hashlib.sha256(token.encode()).hexdigest(),
             ))
             session.commit()
         listed = client.get(API + "/accounts", headers=OWNER)
-        assert listed.json() == [{"id": member_id, "name": "Existing member", "key_available": False}]
+        assert listed.json() == [{"id": member_id, "name": "Existing member", "login": "legacy", "key_available": False}]
         assert client.get(API + "/accounts/" + member_id + "/key", headers=OWNER).status_code == 404
         assert client.get(API + "/cloud/status", headers={"X-API-Key": token}).status_code == 200
         new_member, _ = create_member(client, "New member")
@@ -84,6 +92,57 @@ def test_existing_hashed_keys_keep_working_without_becoming_recoverable(secured_
     with TestClient(secured_app) as client:
         result = client.get(API + "/accounts/" + new_member["id"] + "/key", headers=OWNER)
         assert result.json() == {"access_key": new_member["access_key"]}
+
+
+def test_root_and_members_manage_device_keys_without_sharing_other_users(secured_app):
+    with TestClient(secured_app) as client:
+        status = client.get(API + "/cloud/status", headers=OWNER).json()["account"]
+        assert status["needs_name"] and status["login"] == "root"
+        result = client.put(API + "/accounts/owner", headers=OWNER, json={"name": "  Dmitry  "})
+        assert result.json()["name"] == "Dmitry" and not result.json()["needs_name"]
+        alex = client.post(API + "/accounts", headers=OWNER, json={
+            "name": "Alex", "login": "alex", "device_name": "Laptop",
+        }).json()
+        assert client.post(API + "/accounts", headers=OWNER, json={"name": "Another", "login": "alex"}).status_code == 409
+        assert client.post(API + "/accounts", headers=OWNER, json={"name": "Another", "login": "root"}).status_code == 409
+        sam, sam_key = create_member(client, "Sam")
+        laptop = {"X-API-Key": alex["access_key"]}
+        login_path = API + "/accounts/login"
+        assert client.post(login_path, headers=laptop, json={"login": "sam"}).status_code == 401
+        assert client.post(login_path, headers=laptop, json={"login": " Alex "}).json()["id"] == alex["id"]
+        assert client.put(API + "/accounts/owner", headers=laptop, json={"name": "Alex"}).status_code == 403
+        keys_path = API + "/accounts/" + alex["id"] + "/keys"
+        assert client.get(keys_path, headers=sam_key).status_code == 403
+        for headers in (OWNER, laptop):
+            listing = client.get(keys_path, headers=headers)
+            assert listing.json() == [{"id": alex["key_id"], "name": "Laptop", "key_available": True}]
+            assert alex["access_key"] not in listing.text
+        phone = client.post(keys_path, headers=laptop, json={"name": "Phone"})
+        assert phone.status_code == 201 and "access_key" not in phone.json()
+        phone_path = keys_path + "/" + phone.json()["id"]
+        token = client.get(phone_path, headers=laptop).json()["access_key"]
+        assert token != alex["access_key"]
+        phone_key = {"X-API-Key": token}
+        assert client.get(phone_path, headers=OWNER).json() == {"access_key": token}
+        assert client.get(phone_path, headers=sam_key).status_code == 403
+        assert client.get(API + "/accounts/" + sam["id"] + "/keys/" + phone.json()["id"], headers=OWNER).status_code == 404
+        layout = {"slots": ["device-lamp"]}
+        assert client.put(PRIVATE, params=VIEW, headers=laptop, json=layout).status_code == 200
+        assert client.get(PRIVATE, params=VIEW, headers=phone_key).json() == layout
+        assert client.delete(phone_path, headers=laptop).status_code == 204
+        assert client.get(PRIVATE, params=VIEW, headers=phone_key).status_code == 401
+        assert client.get(PRIVATE, params=VIEW, headers=laptop).json() == layout
+
+        root_keys = API + "/accounts/owner/keys"
+        root_device = client.post(root_keys, headers=OWNER, json={"name": "Owner phone"}).json()
+        root_path = root_keys + "/" + root_device["id"]
+        assert client.get(root_path, headers=laptop).status_code == 403
+        device = {"X-API-Key": client.get(root_path, headers=OWNER).json()["access_key"]}
+        root = client.post(login_path, headers=device, json={"login": "root"}).json()
+        assert root["name"] == "Dmitry" and root["role"] == "owner"
+        assert client.delete(root_path, headers=device).status_code == 204
+        assert client.get(API + "/accounts", headers=device).status_code == 401
+        assert client.get(API + "/accounts", headers=OWNER).status_code == 200
 
 
 def test_layout_is_private_across_browsers_and_revocation_removes_it(secured_app):

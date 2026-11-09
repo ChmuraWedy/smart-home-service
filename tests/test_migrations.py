@@ -158,3 +158,26 @@ def test_upgrades_existing_home_to_household_accounts_without_losing_layouts():
         assert connection.exec_driver_sql("SELECT COUNT(*) FROM account_dashboard_layouts").scalar_one() == 0
         assert connection.exec_driver_sql("SELECT hidden_devices FROM dashboard_layouts").scalar_one() == '["device-light"]'
     engine.dispose()
+
+
+def test_migrates_existing_user_keys_to_device_keys_without_changing_their_digest():
+    engine = db.make_engine(":memory:")
+    db.init_db(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version = 10")
+        connection.exec_driver_sql("DROP TABLE household_device_keys")
+        connection.exec_driver_sql("DROP TABLE household_owner")
+        connection.exec_driver_sql(
+            "INSERT INTO household_members (id, name, key_digest, sealed_key) VALUES (?, ?, ?, ?)",
+            ("a" * 32, "Existing user", "d" * 64, b"existing-encrypted-key"),
+        )
+    db.init_db(engine)
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        member = connection.exec_driver_sql("SELECT login, sealed_key FROM household_members").one()
+        assert member == ("user-" + "a" * 32, None)
+        key = connection.exec_driver_sql(
+            "SELECT id, member_id, key_digest, sealed_key FROM household_device_keys"
+        ).one()
+        assert key == ("a" * 32, "a" * 32, "d" * 64, b"existing-encrypted-key")
+    engine.dispose()
