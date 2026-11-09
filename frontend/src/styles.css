@@ -2001,6 +2001,7 @@ button.combined-member-quick-button:focus-visible { outline-color:var(--toggle-o
   min-height:100vh;
   min-height:100dvh;
 }
+.app-shell[data-setup-view] .brand-icon .app-icon { width:34px; height:34px; }
 .app-shell[data-setup-view] > footer {
   margin-block-start:auto;
   border-top:1px solid var(--border);
