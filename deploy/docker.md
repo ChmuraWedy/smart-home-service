@@ -42,6 +42,16 @@ On the Dell, use both files for independent updates too. Host networking lets th
 
 Bridge networking sees container interfaces. See [Docker host networking](https://docs.docker.com/engine/network/drivers/host/) and [Compose merge rules](https://docs.docker.com/reference/compose-file/merge/#reset-value).
 
+## Smart Life through ReDroid
+
+Run the ReDroid controller API on the Linux host and set `SMART_HOME_REDROID_TOKEN_FILE` in the dashboard's `.env` to the controller token file. Set `SMART_HOME_REDROID_PORT` if the API uses a port other than 18765.
+
+```sh
+docker compose -f compose.yaml -f compose.lan.yaml -f compose.redroid.yaml up -d --build --wait
+```
+
+In Connections, choose **Smart Life / Android**, then **Use existing Android session**. The backend talks to the controller on the host's loopback interface. If you serve the dashboard over HTTPS, set `VITE_DASHBOARD_HTTPS_ORIGIN` to its HTTPS origin before building so HTTP clients can open the password form on the secure page.
+
 ## Automatic device label translations
 
 The optional Linux service generates display translations after saving device names and aliases. It preserves saved translations and falls back to the original when the model skips a label or the service is unavailable. Short labels can produce incorrect translations, particularly in Belarusian. Device settings let you correct the translations.

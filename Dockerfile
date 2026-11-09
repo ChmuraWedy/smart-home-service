@@ -7,6 +7,7 @@ RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 # Resolve the API on the browser's current host, including LAN addresses.
 ENV VITE_API_BASE_URL=same-origin
+ARG VITE_DASHBOARD_HTTPS_ORIGIN
 RUN pnpm build
 
 FROM debian:bookworm-slim AS frontend

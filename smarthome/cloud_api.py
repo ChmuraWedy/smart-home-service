@@ -1,7 +1,12 @@
 import base64
 import binascii
 import json
+from http.client import HTTPConnection
+from http.client import HTTPException as HTTPClientError
 from ipaddress import ip_address, ip_network
+from math import ceil
+from pathlib import Path
+from time import monotonic, sleep
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -83,6 +88,64 @@ def battery_reading(device):
 
 class QRLogin(Schema):
     user_code: SecretStr | None = Field(default=None, min_length=1, max_length=128, repr=False)
+
+
+class RedroidCredentials(Schema):
+    region: str = Field(min_length=1, max_length=120)
+    account: SecretStr = Field(min_length=1, max_length=254, repr=False)
+    password: SecretStr = Field(min_length=1, max_length=256, repr=False)
+
+
+def require_redroid(request: Request):
+    request.app.state.cloud.require_enabled()
+    settings = request.app.state.settings
+    if not settings.redroid_token_file:
+        raise HTTPException(503, "The Smart Life Android controller is not configured.")
+    try:
+        token = Path(settings.redroid_token_file).read_text(encoding="ascii").strip()
+        if len(token) < 32 or not all("!" <= c <= "~" for c in token):
+            raise ValueError("Invalid token")
+    except (OSError, ValueError):
+        raise HTTPException(503, "The Smart Life Android controller token is unavailable.") from None
+    return settings.redroid_port, token
+
+
+def require_redroid_credentials(request: Request, controller=Depends(require_redroid)):
+    loopback = {"127.0.0.1", "::1"}
+    local_request = (
+        request.client is not None and request.client.host in loopback
+        and request.url.hostname in loopback | {"localhost"}
+    )
+    if request.url.scheme != "https" and not local_request:
+        raise HTTPException(403, "Open Connections over HTTPS to enter Smart Life credentials.")
+    return controller
+
+
+def redroid_request(controller, method, path, body=None, content_type="application/json"):
+    port, token = controller
+    connection = HTTPConnection("127.0.0.1", port, timeout=85)
+    try:
+        connection.request(method, path, body, {"Authorization": f"Bearer {token}", "Content-Type": content_type})
+        response = connection.getresponse()
+        status = response.status
+        result = json.loads(response.read(8192))
+    except TimeoutError:
+        raise HTTPException(504, "Smart Life on Android did not respond in time.") from None
+    except (OSError, HTTPClientError, ValueError):
+        raise HTTPException(502, "The Smart Life Android controller could not be reached.") from None
+    finally:
+        connection.close()
+    if status == 409:
+        detail = result.get("detail") if isinstance(result, dict) else None
+        if detail in (
+            "Smart Life already has a session on Android. Use that session or sign out in the app first.",
+            "Finish signing in to Smart Life on Android first.",
+        ):
+            raise HTTPException(409, detail)
+        raise HTTPException(409, "Check the Smart Life screen on Android and try again.")
+    if status != 200 or not isinstance(result, dict):
+        raise HTTPException(502, "The Smart Life Android operation failed.")
+    return result
 
 
 class SavedUserCode(Schema):
@@ -223,6 +286,7 @@ def cloud_status(request: Request, response: Response):
             "transport": "internet",
             "scene_edit_supported": False,
             "developer": request.app.state.developer_cloud.status(),
+            **({"redroid_available": True} if request.app.state.settings.api_token and request.app.state.settings.redroid_token_file else {}),
         }
 
 
@@ -267,6 +331,65 @@ def save_user_code(body: SavedUserCode, request: Request, response: Response):
 def begin_login(body: QRLogin, request: Request):
     user_code = body.user_code.get_secret_value() if body.user_code is not None else None
     return request.app.state.cloud.begin_login(user_code)
+
+
+@router.post("/login/redroid/credentials")
+def redroid_login(body: RedroidCredentials, controller=Depends(require_redroid_credentials)):
+    region = body.region.strip()
+    account = body.account.get_secret_value().strip()
+    if not region or not account:
+        raise HTTPException(422, "Enter the Smart Life region and account.")
+    result = redroid_request(controller, "POST", "/v1/login/credentials", json.dumps({
+        "region": region, "account": account, "password": body.password.get_secret_value(),
+    }).encode())
+    if result.get("screen") not in ("home", "verification"):
+        raise HTTPException(409, "Finish signing in to Smart Life on Android first.")
+    return {"screen": result["screen"]}
+
+
+@router.post("/login/redroid/qr", status_code=201)
+def redroid_qr(request: Request, controller=Depends(require_redroid)):
+    account = redroid_request(controller, "GET", "/v1/account/user-code")
+    code = account.get("user_code")
+    if not isinstance(code, str) or not code.strip() or len(code) > 128:
+        raise HTTPException(502, "Smart Life on Android did not provide a User Code.")
+    bridge = request.app.state.cloud
+    started = monotonic()
+    login = bridge.begin_login(code, redroid=True)
+    session = login["session_id"]
+    try:
+        token = bridge.redroid_qr_token(session)
+        try:
+            opened = redroid_request(controller, "POST", "/v1/account/authorize-qr", json.dumps({"token": token}).encode())
+            approval_ready = opened.get("status") == "ready"
+        except HTTPException:
+            approval_ready = False
+        remaining = login["expires_in"] - ceil(monotonic() - started)
+        if remaining <= 0:
+            raise HTTPException(409, "The QR code expired on Android. Start a new connection.")
+    except Exception:
+        with bridge.lock:
+            bridge.pending.pop(session, None)
+        raise
+    return {**login, "expires_in": remaining, "android_approval_ready": approval_ready}
+
+
+@router.post("/login/redroid/{session_id}/confirm")
+def redroid_confirm(session_id: str, request: Request, controller=Depends(require_redroid)):
+    bridge = request.app.state.cloud
+    token = bridge.redroid_qr_token(session_id)
+    approved = redroid_request(controller, "POST", "/v1/account/authorize-qr", json.dumps({
+        "token": token, "approve": True,
+    }).encode())
+    if approved.get("status") != "approved":
+        raise HTTPException(409, "Smart Life on Android did not complete approval.")
+    try:
+        return bridge.confirm(session_id)
+    except HTTPException as error:
+        if error.status_code != 409:
+            raise
+        sleep(2)
+        return bridge.confirm(session_id)
 
 
 @router.get("/login/{session_id}/qr.svg")

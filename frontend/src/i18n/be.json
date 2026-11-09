@@ -1141,5 +1141,20 @@
   "ROOM_BACKGROUND_UPLOAD_LIMIT": "Памер фонавага відарыса перавышае 1 МіБ",
   "ROOM_CARD_OPACITY": "Непразрыстасць фону картак",
   "ROOM_OPACITY_HINT": "Пры меншым значэнні фон пакоя лепш бачны.",
-  "ROOM_VIEW_DASHBOARD": "Адкрыць панэль пакоя"
+  "ROOM_VIEW_DASHBOARD": "Адкрыць панэль пакоя",
+  "SMART_LIFE_COUNTRY_OR_REGION": "Краіна або рэгіён Smart Life",
+  "SMART_LIFE_EMAIL_OR_PHONE": "Электронная пошта або тэлефон Smart Life",
+  "SMART_LIFE_PASSWORD": "Пароль Smart Life",
+  "CONNECT_THROUGH_ANDROID": "Падключыцца праз Android",
+  "SMART_LIFE_THROUGH_ANDROID": "Smart Life праз Android",
+  "SMART_LIFE_ANDROID_NOT_CONFIGURED": "Кантролер Smart Life для Android не наладжаны.",
+  "SMART_LIFE_SIGN_IN_REQUIRES_HTTPS": "Для ўводу пароля Smart Life патрабуецца HTTPS.",
+  "OPEN_SECURE_SMART_LIFE_SIGN_IN": "Адкрыць бяспечны ўваход у Smart Life",
+  "SMART_LIFE_CONNECTED": "Smart Life падключаны.",
+  "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Smart Life гатовы пацвердзіць доступ панэлі кіравання. Засталося секунд: {0}.",
+  "SMART_LIFE_ANDROID_LOGIN_HELP": "Увядзіце назву краіны, як у Smart Life. Панэль кіравання перадасць пароль у Android для ўваходу і выдаліць яго пасля запыту.",
+  "USE_EXISTING_ANDROID_SESSION": "Выкарыстаць бягучы сеанс Android",
+  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Завяршыце праверку ў Smart Life на Android, потым выберыце «Выкарыстаць бягучы сеанс Android».",
+  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Калі Android не паказаў запыт, адсканіруйце QR-код у Smart Life на іншай прыладзе з тым жа акаўнтам. Засталося секунд: {0}.",
+  "APPROVE_IN_ANDROID_AND_CONNECT": "Пацвердзіць у Android і падключыцца"
 }

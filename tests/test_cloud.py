@@ -4,11 +4,12 @@ from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from smarthome import auto_label_translations
+from smarthome import auto_label_translations, cloud_api
 from smarthome.cloud import CloudBridge
 from smarthome.config import Settings
 from smarthome.db import init_db, make_engine
@@ -317,6 +318,58 @@ def test_qr_flow_uses_local_renderer_and_never_returns_tokens(cloud_client):
     assert status.json()["connected"] is True
     assert status.json()["has_saved_user_code"] is True
     assert "user-code-private" not in status.text
+
+
+def test_redroid_uses_authenticated_http_session_and_protects_password_entry(cloud_client, tmp_path, monkeypatch):
+    client = cloud_client
+    token_file = tmp_path / "redroid-token"
+    controller_token = "controller-token-" * 3
+    token_file.write_text(controller_token)
+    client.app.state.settings = replace(client.app.state.settings, redroid_token_file=str(token_file))
+    assert client.get(API + "/status").json()["redroid_available"] is True
+
+    calls = []
+    fail_open = False
+
+    def controller(config, method, path, body=None, content_type="application/json"):
+        assert config == (18765, controller_token)
+        calls.append((method, path))
+        if path == "/v1/login/credentials":
+            assert json.loads(body) == {"account": "demo@example.invalid", "region": "Poland", "password": "secret password"}
+            return {"screen": "home"}
+        if path == "/v1/account/user-code":
+            return {"user_code": "private-android-user-code"}
+        assert path == "/v1/account/authorize-qr" and content_type == "application/json"
+        payload = json.loads(body)
+        assert payload["token"] == "qr-secret"
+        if fail_open:
+            raise HTTPException(409, "Smart Life could not open authorization")
+        return {"status": "approved" if payload.get("approve") is True else "ready"}
+
+    monkeypatch.setattr(cloud_api, "redroid_request", controller)
+    path = API + "/login/redroid/credentials"
+    credentials = {"region": " Poland ", "account": "demo@example.invalid", "password": "secret password"}
+    assert client.post(path, headers={"Host": "127.0.0.1"}, json=credentials).status_code == 403
+    assert client.post(API + "/login/redroid/qr", headers={"X-API-Key": ""}).status_code == 401
+    assert not calls
+    response = client.post("https://testserver" + path, json=credentials)
+    assert response.json() == {"screen": "home"}
+    response = client.post(API + "/login/redroid/qr")
+    assert response.status_code == 201
+    assert response.json()["android_approval_ready"] is True
+    assert "private-android-user-code" not in response.text
+    assert "qr-secret" not in response.text
+    assert client.get(API + "/status").json()["connected"] is False
+    assert calls == [("POST", "/v1/login/credentials"), ("GET", "/v1/account/user-code"), ("POST", "/v1/account/authorize-qr")]
+    confirmed = client.post(API + "/login/redroid/" + response.json()["session_id"] + "/confirm")
+    assert confirmed.json()["connected"] is True
+    assert calls[-1] == ("POST", "/v1/account/authorize-qr")
+    fail_open = True
+    fallback = client.post(API + "/login/redroid/qr")
+    assert fallback.status_code == 201 and fallback.json()["android_approval_ready"] is False
+    assert b"<svg" in client.get(fallback.json()["qr_url"]).content
+    confirmed = client.post(API + "/login/" + fallback.json()["session_id"] + "/confirm")
+    assert confirmed.json()["connected"] is True
 
 
 @pytest.mark.parametrize("body", [{}, {"user_code": None}])
