@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { HomeApi } from '../home-api';
 import examples from './voice-examples.json';
 
-export default function VoiceDemo({ api, disabled }: { api: HomeApi; disabled: boolean }) {
+export default function VoiceDemo({ api }: { api: HomeApi }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [reply, setReply] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,8 +36,7 @@ export default function VoiceDemo({ api, disabled }: { api: HomeApi; disabled: b
   }
 
   return (
-    <details className="card demo-voice">
-      <summary>Voice control demo</summary>
+    <div className="demo-voice">
       <p>These transcripts are scripted and run without a live voice agent or microphone. Replies use the current data from the simulated dashboard.</p>
       <div className="demo-voice-examples">
         {examples.map(({ transcript }, index) => (
@@ -45,7 +44,7 @@ export default function VoiceDemo({ api, disabled }: { api: HomeApi; disabled: b
             key={transcript}
             type="button"
             className="secondary compact"
-            disabled={busy || disabled}
+            disabled={busy}
             onClick={() => replay(index)}
           >
             {transcript}
@@ -59,6 +58,6 @@ export default function VoiceDemo({ api, disabled }: { api: HomeApi; disabled: b
         </p>
       )}
       <div role="status">{busy ? 'Replaying example…' : reply}</div>
-    </details>
+    </div>
   );
 }

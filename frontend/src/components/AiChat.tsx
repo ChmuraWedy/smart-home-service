@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { ApiError } from '../api';
 import type { HomeApi } from '../home-api';
 import { MSG, t, useLocale } from '../i18n';
@@ -52,7 +53,9 @@ function ChatFrame({ api, onAuthError }: ChatAccess) {
   );
 }
 
-export default function AiChatButton({ api, disabled, onAuthError }: ChatAccess & { disabled: boolean }) {
+export default function AiChatButton({
+  api, disabled, onAuthError, children,
+}: ChatAccess & { disabled: boolean; children?: ReactNode }) {
   useLocale();
   const [openFor, setOpenFor] = useState<HomeApi | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -76,7 +79,7 @@ export default function AiChatButton({ api, disabled, onAuthError }: ChatAccess 
       </button>
       {open && (
         <DashboardSheet title={title} onClose={() => setOpenFor(null)} returnFocus={trigger} className="ai-chat-sheet">
-          <ChatFrame api={api} onAuthError={onAuthError} />
+          {children ?? <ChatFrame api={api} onAuthError={onAuthError} />}
         </DashboardSheet>
       )}
     </>

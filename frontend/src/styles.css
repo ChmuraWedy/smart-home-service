@@ -1968,6 +1968,5 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .combined-delete p { @apply tw:w-full; }
 
 .demo-voice { margin-block: 12px; }
-.demo-voice summary { cursor: pointer; font-weight: 650; }
 .demo-voice p { margin-block: 10px; }
 .demo-voice-examples { display: flex; flex-wrap: wrap; gap: 8px; }

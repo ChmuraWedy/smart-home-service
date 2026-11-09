@@ -389,8 +389,10 @@ function AppContent() {
         <span className={'api-presence ' + (status ? 'online' : '')}>
           <i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}
         </span>
-        {!demo && view === 'control' && status && connection.token && (
-          <AiChatButton api={api} disabled={locked} onAuthError={invalidateConnection} />
+        {view === 'control' && status && connection.token && (
+          <AiChatButton api={api} disabled={locked} onAuthError={invalidateConnection}>
+            {demo ? <VoiceDemo api={api} /> : null}
+          </AiChatButton>
         )}
         {view === 'control' && status && (
           <div className="dashboard-header-search">
@@ -422,7 +424,6 @@ function AppContent() {
       </header>
       <main>
         {demo && <p className="eyebrow">Interactive demo · Simulated apartment · Reload to reset</p>}
-        {demo && view === 'control' && <VoiceDemo api={api} disabled={locked || !status} />}
         <input id="access-token" type="hidden" value={connection.token} readOnly />
         <Outlet
           context={{ needsAccess, pages: { connections: <>
