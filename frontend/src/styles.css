@@ -1789,6 +1789,15 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-sheet-heading { @apply tw:mb-3 tw:flex tw:items-center tw:justify-between tw:gap-3; }
 .dashboard-sheet-heading h2 { @apply tw:m-0 tw:text-xl; }
 .dashboard-sheet-heading > button { @apply tw:grid tw:size-11 tw:shrink-0 tw:place-items-center tw:border-0 tw:bg-transparent tw:p-0 tw:text-2xl; }
+.ai-chat-sheet[open]:has(.ai-chat-frame) {
+  display:flex; flex-direction:column; overflow:hidden;
+  height:min(760px, calc(100dvh - 24px));
+}
+@media (min-width:601px) { .ai-chat-sheet:has(.ai-chat-frame) { max-width:760px; } }
+.ai-chat-frame { flex:1; width:100%; min-height:0; border:1px solid var(--border); border-radius:10px; }
+.ai-chat-frame-help { margin-top:8px; }
+.ai-chat-frame-help p { margin:0; }
+.ai-chat-frame-help a { display:inline-flex; align-items:center; min-height:44px; white-space:normal; }
 .dashboard-sheet-power .capability-boolean > .capability-row { @apply tw:grid-cols-[64px_1fr] tw:justify-normal; }
 .dashboard-sheet-power .capability-heading { @apply tw:hidden; }
 .dashboard-sheet-power .capability-boolean > .capability-row > .power-actions { @apply tw:col-start-1 tw:row-start-1; }

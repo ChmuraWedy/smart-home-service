@@ -1,0 +1,87 @@
+import { useEffect, useRef, useState } from 'react';
+import { ApiError } from '../api';
+import type { HomeApi } from '../home-api';
+import { MSG, t, useLocale } from '../i18n';
+import { DashboardSheet } from './DashboardSheet';
+import { Icon } from './ui/icon';
+
+type ChatAccess = { api: HomeApi; onAuthError: () => void };
+
+function trustedFrameUrl(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' && url.origin !== window.location.origin && !url.username && !url.password) {
+      return url.href;
+    }
+  } catch { /* Treat invalid frame URLs as unavailable. */ }
+  return null;
+}
+
+function ChatFrame({ api, onAuthError }: ChatAccess) {
+  const [src, setSrc] = useState<string | null>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api.assistantEmbed(controller.signal).then(({ url }) => {
+      if (!controller.signal.aborted) setSrc(trustedFrameUrl(url));
+    }).catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      if (error instanceof ApiError && error.status === 401) onAuthError();
+      else setSrc(null);
+    });
+    return () => controller.abort();
+  }, [api, onAuthError]);
+
+  if (!src) {
+    return <p role="status">{t(src === undefined ? MSG.AI_CHAT_LOADING : MSG.AI_CHAT_UNAVAILABLE)}</p>;
+  }
+
+  return (
+    <>
+      <iframe
+        className="ai-chat-frame"
+        src={src}
+        title={t(MSG.AI_CHAT_TITLE)}
+        allow="microphone"
+        sandbox="allow-scripts allow-same-origin allow-forms"
+        referrerPolicy="no-referrer"
+      />
+      <div className="ai-chat-frame-help">
+        <p className="help">{t(MSG.AI_CHAT_SIGN_IN)}</p>
+        <a href={src} target="_blank" rel="noopener noreferrer">{t(MSG.AI_CHAT_OPEN_SEPARATELY)}</a>
+      </div>
+    </>
+  );
+}
+
+export default function AiChatButton({ api, disabled, onAuthError }: ChatAccess & { disabled: boolean }) {
+  useLocale();
+  const [openFor, setOpenFor] = useState<HomeApi | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const open = openFor === api;
+  const title = t(MSG.AI_CHAT_TITLE);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="secondary header-icon"
+        ref={trigger}
+        aria-label={title}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title={title}
+        disabled={disabled}
+        onClick={() => setOpenFor(api)}
+      >
+        <Icon name="chat" />
+      </button>
+      {open && (
+        <DashboardSheet title={title} onClose={() => setOpenFor(null)} returnFocus={trigger} className="ai-chat-sheet">
+          <ChatFrame api={api} onAuthError={onAuthError} />
+        </DashboardSheet>
+      )}
+    </>
+  );
+}

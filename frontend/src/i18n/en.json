@@ -1,4 +1,9 @@
 {
+  "AI_CHAT_TITLE": "AI chat",
+  "AI_CHAT_UNAVAILABLE": "AI chat is unavailable on this server.",
+  "AI_CHAT_LOADING": "Loading chat…",
+  "AI_CHAT_SIGN_IN": "If chat fails to load, sign in in a new tab and reopen this panel.",
+  "AI_CHAT_OPEN_SEPARATELY": "Open Classic Chat",
   "WARM": "Warm",
   "COOL": "Cool",
   "TURN_OFF_PRIVACY": "Turn off privacy",
