@@ -49,6 +49,7 @@ describe('appearance preferences', () => {
   });
 
   it('accepts cross-tab changes and falls back to System when the preference is removed', () => {
+    window.history.replaceState(null, '', '/settings/connections');
     render(<App/>);
     fireEvent.click(screen.getByRole('button',{name:'Меню'}));
     act(()=>window.dispatchEvent(new StorageEvent('storage', {key:theme.THEME_STORAGE_KEY,newValue:'dark'})));
@@ -72,6 +73,7 @@ describe('appearance preferences', () => {
   });
 
   it('offers appearance preferences in the menu before connecting and preserves a live API/key draft', () => {
+    window.history.replaceState(null, '', '/settings/connections');
     render(<App/>);
     const address=screen.getByLabelText('Адрес API');
     const key=screen.getByLabelText('Ключ доступа к сервису');
@@ -101,6 +103,7 @@ describe('appearance preferences', () => {
   });
 
   it('changes card size immediately and restores the saved selection on remount', () => {
+    window.history.replaceState(null, '', '/settings/connections');
     const first = render(<App />);
     const openMenu = () => fireEvent.click(screen.getByRole('button', { name: 'Меню' }));
     openMenu();

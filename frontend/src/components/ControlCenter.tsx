@@ -18,7 +18,6 @@ import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
-import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
 import useRoomName from '../room-names';
 import { RoomLayoutSettings } from './RoomEditor';
@@ -50,7 +49,7 @@ import { useDeviceText } from '../device-translations';
 import type { DeviceTranslations } from '../device-translations';
 import { useRoomAppearance } from '../room-appearance';
 
-type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
+type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing: LocalDevice };
 type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice }
   | { kind: 'combined'; combined: CombinedDevice } | { kind: 'camera-video'; device: UnifiedDevice; provider: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; combinations?: CombinedDevice[]; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -76,8 +75,8 @@ function cardPresenceMessage({
   return online ? MSG.AVAILABLE_LOCALLY : MSG.STATUS_UNKNOWN;
 }
 
-function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd, placement }: {
-  api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
+function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, placement }: {
+  api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void;
   quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void; placement: GridCardPlacement;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
@@ -171,17 +170,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
               </button>
             )}
             <CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy || paused} onClick={openDetails} />
-            {!local && (
-            <button
-              className="secondary tile-icon-action device-setup-action"
-              aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)}
-              title={t(MSG.SET_UP_LOCAL_CONNECTION)}
-              disabled={!onAdd || quickBusy}
-              onClick={() => route !== 'local' && onAdd?.(route)}
-            >
-              <Icon name="wifi" />
-            </button>
-)}
+
           </>
 )}
         secondary={currentLightFeatures?.hasPresets && <div ref={setPresetSlot} />}
@@ -692,7 +681,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     }
 
     const { device } = entry;
-    const canAdd = inventory && !busy && (!sharingReady || topology.data || topology.error);
     return (
       <DeviceCard
         key={`device-${device.id}`}
@@ -706,7 +694,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         onOpen={(route) => choose({ ...entry, route })}
         onQuickOpen={(route) => openOverlay(overlayHref(devicePath(device.id, true), route))}
         onQuickClose={() => closeOverlay()}
-        onAdd={canAdd ? (provider) => choose({ kind: 'survey', device: device.cloud[provider], provider }) : undefined}
         placement={placement}
       />
     );
@@ -789,8 +776,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     }
 
     function closeSurvey() {
-      if (existing) reopenLocalDevice(existing);
-      else close();
+      reopenLocalDevice(existing);
     }
 
     function saveSurvey(saved: LocalDevice) {
@@ -869,10 +855,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           </h2>
         </div>
         <div className="survey-toolbar dashboard-actions">
-          <button className="secondary compact" disabled={!inventory || busy} aria-label={t(MSG.SET_UP_LOCAL_DEVICE)} title={t(MSG.SET_UP_LOCAL_DEVICE)} onClick={() => choose({ kind: 'survey' })}>
-            <Icon name="add" className="dashboard-action-icon" />
-            <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
-          </button>
           <button className="secondary compact" disabled={!ready || busy} aria-label={t(MSG.REFRESH_LIST)} title={t(MSG.REFRESH_LIST)} onClick={() => setRevision(value => value + 1)}>
             <Icon name="refresh-list" className="dashboard-action-icon" />
             <span>{t(MSG.REFRESH_LIST)}</span>
@@ -884,14 +866,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           {linkError && <p className="field-error" role="alert">{linkError}</p>}
           {!busy && current && combinedId && !combined && <p className="field-error" role="alert">{t(MSG.COMBINATION_UNAVAILABLE)}</p>}
           <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
-          {sharingReady && (
-          <TopologySummary
-            data={topology.data}
-            error={topology.error}
-            busy={topology.busy}
-            onSync={() => void topology.sync()}
-          />
-)}
           <div className="control-filters">
             <label>{t(MSG.BUILDING)}
               <select value={building} onChange={event => setBuilding(event.target.value)}>
@@ -935,12 +909,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
                   onSaved: updateRoom,
                   onDeleted: roomDeleted,
                   onAuthError,
-                  sync: sharingReady ? {
-                    run: topology.sync,
-                    busy: topology.busy,
-                    error: topology.error || topology.data?.job.message,
-                    emptyRoomsAvailable: Boolean(topology.data?.empty_rooms_available),
-                  } : undefined,
                 } : undefined}
               />
             )}

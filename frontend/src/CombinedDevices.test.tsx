@@ -435,7 +435,7 @@ describe('combined devices', () => {
       },
     });
     await user.click(screen.getByRole('button', { name: 'Menu' }));
-    await user.click(screen.getByRole('button', { name: 'Control' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
     const card = within(await screen.findByRole('listitem', { name: 'Devices in Kitchen' }));
     expect(card.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
     expect(card.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
@@ -491,7 +491,7 @@ describe('combined devices', () => {
     await user.click(managementEditor.getByRole('button', { name: 'Cancel' }));
     await screen.findByRole('heading', { name: 'Combined devices' });
     await user.click(screen.getByRole('button', { name: 'Menu' }));
-    await user.click(screen.getByRole('button', { name: 'Control' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
     const card = await screen.findByRole('listitem', { name: 'Kitchen Lights' });
     expect(writes).toEqual([{
       path: '/combined-devices', method: 'POST',
@@ -555,7 +555,7 @@ describe('combined devices', () => {
     await user.click(dissolve.getAllByRole('button', { name: 'Dissolve combination' })[1]);
     expect(await screen.findByText('There are no combined devices yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Menu' }));
-    await user.click(screen.getByRole('button', { name: 'Control' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
     expect(await screen.findByRole('listitem', { name: bulbs[0].name })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: 'Kitchen Lights' })).toBeNull();
     expect(writes[4]).toMatchObject({ path: '/combined-devices/1', method: 'DELETE' });

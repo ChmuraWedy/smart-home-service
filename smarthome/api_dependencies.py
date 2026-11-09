@@ -16,7 +16,10 @@ token_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def authenticate(request: Request, token: str | None = Depends(token_header)):
-    expected = request.app.state.settings.api_token
+    settings = request.app.state.settings
+    expected = settings.api_token
+    if not expected and settings.setup_code:
+        raise HTTPException(503, "Complete first-time key setup before using the service.")
     if not expected or hmac.compare_digest((token or "").encode(), expected.encode()):
         return
     if token and token.startswith(SESSION_PREFIX):

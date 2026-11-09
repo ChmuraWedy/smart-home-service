@@ -28,6 +28,7 @@ describe('Interface localization', () => {
   });
 
   it('switches live without clearing credentials or an unfinished connection form', () => {
+    window.history.replaceState(null, '', '/settings/connections');
     render(<App />);
     fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://another-api.test:8080'}});
     fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'unsaved-draft'}});
@@ -103,6 +104,7 @@ describe('Interface localization', () => {
   });
 
   it('updates another open tab from the saved language preference', () => {
+    window.history.replaceState(null, '', '/settings/connections');
     render(<App/>);
     act(()=>window.dispatchEvent(new StorageEvent('storage',{key:LANGUAGE_STORAGE_KEY,newValue:'en'})));
     expect(screen.getByRole('heading',{name:'Connect Tuya'})).toBeInTheDocument();
@@ -154,6 +156,7 @@ describe('Interface localization', () => {
       channel:'Канал 2', timer:'Таймер канала 2', privacy:'Рэжым прыватнасці', on:'Уключана', temperature:'Тэмпература',
       error:'Выбраная сетка больш недаступная. Абнавіце спіс сетак.', date:'be-BY'},
   ] as const)('supports $language preferences, dates, controls and service errors', async (language) => {
+    window.history.replaceState(null, '', '/settings/connections');
     render(<App/>);
     fireEvent.change(screen.getByLabelText('Адрес API'),{target:{value:'http://localization-api.test:8080'}});
     fireEvent.change(screen.getByLabelText('Ключ доступа к сервису'),{target:{value:'незахаваны-Łąka'}});

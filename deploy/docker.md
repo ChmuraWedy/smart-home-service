@@ -17,7 +17,9 @@ Set a generated `SMART_HOME_API_TOKEN`. Set `SMART_HOME_CLOUD_ENABLED=1` to enab
 docker compose up -d --build --wait
 ```
 
-Open `http://<server-address>:8080` and save the API address and service key in connection settings. Browser credentials are stored per origin. The bridge configuration publishes only the frontend port. To change it, set `SMART_HOME_PORT` in `.env` and recreate the frontend.
+Open `http://<server-address>:8080`. The first-run wizard guides you through service access, Tuya sign-in, and optional local device import. Open **Connections → Open setup wizard** to revisit it. Browser credentials are stored per origin. The bridge configuration publishes only the frontend port. To change it, set `SMART_HOME_PORT` in `.env` and recreate the frontend.
+
+For a new installation, you can let the wizard generate its first service key. Leave `SMART_HOME_API_TOKEN` empty and set `SMART_HOME_SETUP_CODE` to a random secret of at least 32 characters, for example one generated with `openssl rand -hex 32`. Open the wizard through HTTPS or a local loopback connection. With TLS termination, route `/api/v1/setup` through a trusted proxy that supplies the HTTPS scheme to the backend. The bundled HTTP nginx listener forwards its own scheme. Enter the setup code on the service access step and keep the generated key somewhere private. It is also stored in the persistent data volume beside the database. Remove the setup code from `.env` after provisioning. Existing service keys take precedence.
 
 ## Work on one image
 
