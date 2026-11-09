@@ -19,9 +19,12 @@ const buttonNames = (container: HTMLElement) => within(container).getAllByRole('
   .filter((button) => button.classList.contains('room-choice'))
   .map((button) => button.textContent);
 
-it('saves room order and visibility using the card layout browser ID for both navigation surfaces', async () => {
+it.each([false, true])('saves room order and visibility for both navigation surfaces (member=%s)', async (member) => {
   setLocale('en', false);
   const browserId = ensureDashboardBrowserId();
+  const connection = member
+    ? new HomeApi({ baseUrl: 'http://rooms.test', token: 'member-key' }, { id: 'alex', name: 'Alex', login: 'alex', role: 'member' })
+    : api;
   let stored: RoomNavigationLayout = { rooms: [] };
   const requests: string[] = [];
   vi.mocked(fetch).mockImplementation(async (input, init) => {
@@ -31,7 +34,7 @@ it('saves room order and visibility using the card layout browser ID for both na
   });
   const user = userEvent.setup();
   const select = vi.fn();
-  const nav = <RoomNavigation api={api} allRooms={rooms} rooms={rooms} selected="1" onSelect={select} />;
+  const nav = <RoomNavigation api={connection} allRooms={rooms} rooms={rooms} selected="1" onSelect={select} />;
   const first = render(nav);
   const openPicker = async () => {
     await user.click(screen.getByRole('button', { name: 'Change room, current room is Kitchen' }));
@@ -52,6 +55,7 @@ it('saves room order and visibility using the card layout browser ID for both na
   await user.click(within(editor).getByRole('button', { name: 'Save' }));
   expect(stored.rooms).toEqual([{ id: 1, hidden: true }, { id: 3, hidden: false }, { id: 2, hidden: false }]);
   first.unmount();
+  if (member) localStorage.clear();
 
   render(nav);
   const desktop = screen.getByRole('navigation', { name: 'Rooms' });
@@ -75,7 +79,7 @@ it('saves room order and visibility using the card layout browser ID for both na
   await user.click(within(confirm).getByRole('button', { name: 'Show Kitchen in room navigation' }));
   await user.click(within(confirm).getByRole('button', { name: 'Save' }));
   expect(buttonNames(await screen.findByRole('dialog', { name: 'Rooms' }))).toEqual(['All rooms', 'Kitchen', 'Hallway', 'Study', 'No room']);
-  expect(new Set(requests)).toEqual(new Set([`/api/v1/dashboard-layouts/${browserId}/room-navigation`]));
+  expect(new Set(requests)).toEqual(new Set([`/api/v1/dashboard-layouts/${member ? 'me' : browserId}/room-navigation`]));
 });
 
 it('appends new rooms and retains the draft when saving fails', async () => {

@@ -1,13 +1,17 @@
 from collections.abc import Callable
 
-from sqlalchemy import inspect, select, update
+from sqlalchemy import LargeBinary, inspect, select, update
 from sqlalchemy.engine import Connection
 
 from .models import (
+    AccountDashboardLayout,
     Building,
     CloudRoomOverride,
     Device,
     DeviceType,
+    HouseholdDeviceKey,
+    HouseholdMember,
+    HouseholdOwner,
     Room,
     RoomAppearance,
     cloud_status_reports,
@@ -87,6 +91,45 @@ def add_folded_names(connection: Connection) -> None:
             connection.execute(update(table).where(table.c.id == id).values(values))
 
 
+def add_household_accounts(connection: Connection) -> None:
+    HouseholdMember.__table__.create(connection, checkfirst=True)
+    AccountDashboardLayout.__table__.create(connection, checkfirst=True)
+    columns = column_names(connection, "account_dashboard_layouts")
+    if "hidden_devices" not in columns:
+        connection.exec_driver_sql(
+            "ALTER TABLE account_dashboard_layouts ADD COLUMN hidden_devices JSON NOT NULL DEFAULT '[]'"
+        )
+
+
+def add_recoverable_member_keys(connection: Connection) -> None:
+    columns = column_names(connection, "household_members")
+    if "sealed_key" not in columns:
+        binary = LargeBinary().compile(dialect=connection.dialect)
+        connection.exec_driver_sql(f"ALTER TABLE household_members ADD COLUMN sealed_key {binary}")
+
+
+def add_device_access_keys(connection: Connection) -> None:
+    columns = column_names(connection, "household_members")
+    if "login" not in columns:
+        connection.exec_driver_sql("ALTER TABLE household_members ADD COLUMN login VARCHAR(40)")
+        connection.exec_driver_sql("CREATE UNIQUE INDEX household_members_login ON household_members (login)")
+    connection.exec_driver_sql("UPDATE household_members SET login = 'user-' || id WHERE login IS NULL")
+    HouseholdOwner.__table__.create(connection, checkfirst=True)
+    HouseholdDeviceKey.__table__.create(connection, checkfirst=True)
+    connection.exec_driver_sql("""
+        INSERT INTO household_device_keys (id, member_id, name, key_digest, sealed_key)
+        SELECT id, id, '', key_digest, sealed_key FROM household_members WHERE TRUE
+        ON CONFLICT DO NOTHING
+    """)
+    connection.exec_driver_sql("UPDATE household_members SET sealed_key = NULL WHERE sealed_key IS NOT NULL")
+
+
+def add_owner_login(connection: Connection) -> None:
+    columns = column_names(connection, "household_owner")
+    if "login" not in columns:
+        connection.exec_driver_sql("ALTER TABLE household_owner ADD COLUMN login VARCHAR(40) NOT NULL DEFAULT 'root'")
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
@@ -97,6 +140,10 @@ MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     remove_manual_cloud_mappings,
     add_room_name_translations,
     add_generated_room_names,
+    add_household_accounts,
+    add_recoverable_member_keys,
+    add_device_access_keys,
+    add_owner_login,
     add_cloud_status_reports,
     add_folded_names,
 )

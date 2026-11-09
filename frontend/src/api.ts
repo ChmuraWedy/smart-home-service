@@ -10,8 +10,15 @@ export type DeveloperStatus = {
   region?: Region;
   device_count?: number;
 };
+export type HouseholdMember = { id: string; 'name': string; login: string };
+export type AccountIdentity = HouseholdMember & {
+  role: 'owner' | 'member'; 'key_id'?: string | null; 'needs_name'?: boolean;
+};
+export type HouseholdDeviceKey = { id: string; 'name': string; 'key_available': boolean };
+export type IssuedMember = HouseholdMember & { 'key_id': string };
 export type CloudStatus = {
   'redroid_available'?: boolean;
+  account?: AccountIdentity;
   enabled: boolean;
   connected: boolean;
   has_saved_user_code: boolean;
@@ -99,9 +106,11 @@ export function normalizeApiBase(input: string): string {
 
 export class CloudApi {
   readonly baseUrl: string;
-  constructor(private readonly connection: Connection) {
+  constructor(private readonly connection: Connection, readonly account?: AccountIdentity) {
     this.baseUrl = normalizeApiBase(connection.baseUrl);
   }
+
+  get isMember() { return this.account?.role === 'member'; }
 
   private url(path: string): string {
     if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {
@@ -143,6 +152,10 @@ export class CloudApi {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
     }
+  }
+
+  verifyHouseholdLogin(login: string) {
+    return this.request<AccountIdentity>('/accounts/login', 'POST', { login });
   }
 
   protected async request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {

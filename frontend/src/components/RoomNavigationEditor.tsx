@@ -19,9 +19,6 @@ export type RoomManagement = {
   onSaved: (room: Room) => void;
   onDeleted: (id: number) => void;
   onAuthError: () => void;
-  sync?: {
-    run: () => Promise<void>; busy: boolean; error?: string | null; emptyRoomsAvailable: boolean;
-  };
 };
 
 type EditAction = { kind: 'create' } | { kind: 'rename' | 'delete'; roomId: number };
@@ -59,8 +56,7 @@ export default function RoomNavigationEditor({
   const ordered = orderRooms(rooms, draft);
   const renamedRoom = action?.kind === 'rename' ? rooms.find(({ id }) => id === action.roomId) : undefined;
   const hidden = new Set(draft.filter((entry) => entry.hidden).map(({ id }) => id));
-  const syncing = management?.sync;
-  const locked = busy || saving || Boolean(syncing?.busy);
+  const locked = busy || saving;
 
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
@@ -130,7 +126,7 @@ export default function RoomNavigationEditor({
     setSaving(true);
     setFailed(false);
     try {
-      const browser = ensureDashboardBrowserId();
+      const browser = api.isMember ? '' : ensureDashboardBrowserId();
       const saved = await api.saveRoomNavigationLayout(browser, {
         rooms: ordered.map(({ id }) => ({ id, hidden: hidden.has(id) })),
       }, controller.signal);
@@ -232,11 +228,6 @@ export default function RoomNavigationEditor({
         </div>
         {action?.kind === 'delete' && error && <p className="field-error" role="alert">{error}</p>}
         {failed && <p className="field-error" role="alert">{t(MSG.DASHBOARD_LAYOUT_SAVE_FAILED)}</p>}
-        {syncing?.error && <p className="field-error" role="alert">{syncing.error}</p>}
-        {syncing?.busy && <p className="help" role="status">{t(MSG.SYNCHRONIZATION_RUNS_IN_THE_BACKGROUND)}</p>}
-        {syncing && !syncing.busy && !syncing.emptyRoomsAvailable && (
-          <p className="help room-navigation-editor-help">{t(MSG.SMART_LIFE_DOES_NOT_RETURN_EMPTY_ROOMS_IN)}</p>
-        )}
         <div className="room-navigation-catalog-actions">
           {management && action?.kind !== 'create' && (
             <button
@@ -248,17 +239,6 @@ export default function RoomNavigationEditor({
             >
               <Icon name="add" />
               {t(MSG.ROOM_NEW)}
-            </button>
-          )}
-          {syncing && (
-            <button
-              type="button"
-              className="secondary room-navigation-new-room"
-              disabled={locked || Boolean(action)}
-              onClick={syncing.run}
-            >
-              <Icon name="refresh-list" />
-              {t(MSG.ROOM_SYNC_SMART_LIFE)}
             </button>
           )}
         </div>

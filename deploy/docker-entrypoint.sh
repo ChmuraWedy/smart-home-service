@@ -2,8 +2,9 @@
 set -euo pipefail
 umask 077
 
-if [[ -z "${SMART_HOME_API_TOKEN:-}" ]]; then
-    echo 'Set SMART_HOME_API_TOKEN before exposing the service.' >&2
+if [[ -z "${SMART_HOME_API_TOKEN:-}" && -z "${SMART_HOME_SETUP_CODE:-}" &&
+      ! -s "${SMART_HOME_DB:-/app/data/smarthome.db}.access-key" ]]; then
+    echo 'Set SMART_HOME_API_TOKEN or opt into initial key setup with SMART_HOME_SETUP_CODE.' >&2
     exit 1
 fi
 

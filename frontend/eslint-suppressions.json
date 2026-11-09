@@ -1,28 +1,13 @@
 {
   "src/App.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 8
-    },
     "@stylistic/max-len": {
-      "count": 4
-    },
-    "arrow-parens": {
-      "count": 11
-    },
-    "brace-style": {
       "count": 2
     },
     "consistent-return": {
       "count": 3
     },
-    "import/order": {
-      "count": 1
-    },
     "import/prefer-default-export": {
       "count": 1
-    },
-    "indent": {
-      "count": 24
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 1
@@ -30,56 +15,17 @@
     "jsx-a11y/no-static-element-interactions": {
       "count": 1
     },
-    "no-confusing-arrow": {
-      "count": 3
-    },
     "no-nested-ternary": {
       "count": 1
     },
     "no-restricted-syntax": {
-      "count": 4
+      "count": 3
     },
     "no-use-before-define": {
       "count": 2
     },
-    "no-void": {
-      "count": 7
-    },
-    "object-curly-newline": {
-      "count": 15
-    },
-    "object-property-newline": {
-      "count": 2
-    },
-    "one-var": {
-      "count": 1
-    },
-    "one-var-declaration-per-line": {
-      "count": 1
-    },
-    "prefer-template": {
-      "count": 7
-    },
-    "quotes": {
-      "count": 11
-    },
     "react/button-has-type": {
-      "count": 7
-    },
-    "react/jsx-closing-bracket-location": {
-      "count": 1
-    },
-    "react/jsx-closing-tag-location": {
-      "count": 2
-    },
-    "react/jsx-first-prop-new-line": {
-      "count": 4
-    },
-    "react/jsx-indent": {
-      "count": 8
-    },
-    "react/jsx-max-props-per-line": {
-      "count": 4
+      "count": 6
     },
     "react/jsx-no-useless-fragment": {
       "count": 1
@@ -538,13 +484,10 @@
       "count": 2
     },
     "key-spacing": {
-      "count": 9
+      "count": 8
     },
     "no-confusing-arrow": {
       "count": 2
-    },
-    "no-nested-ternary": {
-      "count": 1
     },
     "no-restricted-globals": {
       "count": 1
@@ -556,10 +499,10 @@
       "count": 1
     },
     "object-curly-newline": {
-      "count": 8
+      "count": 6
     },
     "object-curly-spacing": {
-      "count": 10
+      "count": 8
     },
     "object-property-newline": {
       "count": 10
@@ -569,9 +512,6 @@
     },
     "one-var-declaration-per-line": {
       "count": 2
-    },
-    "operator-linebreak": {
-      "count": 1
     },
     "prefer-template": {
       "count": 2
@@ -725,58 +665,16 @@
     }
   },
   "src/components/ConnectionSettings.tsx": {
-    "@stylistic/jsx-max-props-per-line": {
-      "count": 3
-    },
-    "@stylistic/max-len": {
-      "count": 2
-    },
-    "arrow-parens": {
-      "count": 4
-    },
-    "brace-style": {
-      "count": 1
-    },
-    "import/order": {
-      "count": 1
-    },
     "import/prefer-default-export": {
       "count": 1
-    },
-    "indent": {
-      "count": 6
-    },
-    "jsx-a11y/label-has-associated-control": {
-      "count": 2
-    },
-    "jsx-a11y/no-autofocus": {
-      "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 4
-    },
-    "no-void": {
-      "count": 1
-    },
-    "prefer-template": {
-      "count": 1
-    },
-    "quotes": {
-      "count": 2
-    },
-    "react/jsx-first-prop-new-line": {
-      "count": 2
-    },
-    "react/jsx-max-props-per-line": {
-      "count": 2
     }
   },
   "src/components/ControlCenter.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 6
+      "count": 5
     },
     "@stylistic/max-len": {
-      "count": 11
+      "count": 9
     },
     "arrow-parens": {
       "count": 34
@@ -797,7 +695,7 @@
       "count": 1
     },
     "indent": {
-      "count": 5
+      "count": 3
     },
     "jsx-a11y/label-has-associated-control": {
       "count": 3
@@ -818,7 +716,7 @@
       "count": 1
     },
     "no-void": {
-      "count": 9
+      "count": 8
     },
     "object-curly-newline": {
       "count": 30
@@ -842,7 +740,7 @@
       "count": 2
     },
     "react/button-has-type": {
-      "count": 5
+      "count": 3
     },
     "react/jsx-max-props-per-line": {
       "count": 1
@@ -1086,14 +984,11 @@
     "consistent-return": {
       "count": 2
     },
-    "function-paren-newline": {
-      "count": 2
-    },
     "import/order": {
       "count": 1
     },
     "indent": {
-      "count": 19
+      "count": 18
     },
     "jsx-a11y/click-events-have-key-events": {
       "count": 1
@@ -1111,7 +1006,7 @@
       "count": 2
     },
     "no-nested-ternary": {
-      "count": 11
+      "count": 10
     },
     "no-plusplus": {
       "count": 5
@@ -1642,7 +1537,7 @@
       "count": 8
     },
     "arrow-parens": {
-      "count": 18
+      "count": 17
     },
     "brace-style": {
       "count": 1
@@ -1837,23 +1732,6 @@
       "count": 1
     }
   },
-  "src/components/TopologySummary.tsx": {
-    "import/prefer-default-export": {
-      "count": 1
-    },
-    "indent": {
-      "count": 1
-    },
-    "object-curly-newline": {
-      "count": 2
-    },
-    "prefer-template": {
-      "count": 1
-    },
-    "react/button-has-type": {
-      "count": 1
-    }
-  },
   "src/components/WizardDialog.tsx": {
     "@stylistic/max-len": {
       "count": 1
@@ -1979,7 +1857,7 @@
       "count": 2
     },
     "object-property-newline": {
-      "count": 78
+      "count": 74
     },
     "one-var": {
       "count": 6

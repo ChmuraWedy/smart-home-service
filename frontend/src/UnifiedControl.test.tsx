@@ -377,45 +377,6 @@ describe('unified device identity and management', () => {
     expect(screen.getByRole('listitem', { name: 'Только в аккаунте' })).toBeInTheDocument();
   });
 
-  it('resumes TRACER FOCUS 3 controls and local setup without sending device commands', async () => {
-    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!, user=userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async (input,init) => {
-      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'tracer-real',name:'TRACER FOCUS 3',sub:false}]);
-      return original(input,init);
-    });
-    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
-    const card=await screen.findByRole('listitem',{name:'TRACER FOCUS 3'});
-    expect(within(card).queryByText('Настройка отложена')).toBeNull();
-    expect(within(card).getByRole('group',{name:'Основные параметры: TRACER FOCUS 3'})).toBeInTheDocument();
-    await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
-    expect(screen.getByLabelText('Название')).toHaveValue('TRACER FOCUS 3');
-    expect(screen.getByLabelText('Tuya device ID')).toHaveValue('tracer-real');
-    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('wifi');
-    expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
-    expect(calls.every(call=>call.method==='GET')).toBe(true);
-  });
-
-  it('resumes WorkGtZb setup from its tile and treats cloud gateways as gateways even with sub=true', async () => {
-    const calls=server({noLocal:true}), original=vi.mocked(fetch).getMockImplementation()!, user=userEvent.setup();
-    vi.mocked(fetch).mockImplementation(async (input,init) => {
-      if (new URL(String(input)).pathname.endsWith('/cloud/devices')) return json([{...shared,id:'actual-gateway',name:'WorkGtZb',category:'wg2',sub:true}]);
-      return original(input,init);
-    });
-    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
-    const card=await screen.findByRole('listitem',{name:'WorkGtZb'});
-    expect(within(card).queryByText('Настройка отложена')).toBeNull();
-    await user.click(within(card).getByRole('button',{name:'Настроить локальное подключение'}));
-    expect(screen.getByLabelText('Название')).toHaveValue('WorkGtZb');
-    expect(screen.getByLabelText('Tuya device ID')).toHaveValue('actual-gateway');
-    expect(screen.getByLabelText('Подключение устройства')).toHaveValue('gateway');
-    expect(screen.getByLabelText('Подключение устройства')).toBeDisabled();
-    expect(within(screen.getByLabelText('Подключение устройства')).getAllByRole('option')).toHaveLength(1);
-    expect(screen.getByLabelText('IP в домашней сети')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Шлюз')).toBeNull();
-    expect(screen.getByRole('button',{name:'Начать опрос'})).toBeDisabled();
-    expect(calls.every(call=>call.method==='GET')).toBe(true);
-  });
-
   it('routes commands by the chosen provider or local numeric record, without an automatic fallback', async () => {
     const calls = server({ commandFailure: true }); const user = userEvent.setup();
     renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady developerReady onAuthError={vi.fn()} />);

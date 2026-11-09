@@ -137,13 +137,13 @@ export default function RoomNavigation({
 
   useEffect(() => {
     if (!ready) return undefined;
-    const browser = dashboardBrowserId();
-    if (!browser) {
+    const browser = api.isMember ? '' : dashboardBrowserId();
+    if (!api.isMember && !browser) {
       setRead({ api, layout: EMPTY_LAYOUT });
       return undefined;
     }
     const controller = new AbortController();
-    api.roomNavigationLayout(browser, controller.signal).then((saved) => {
+    api.roomNavigationLayout(browser ?? '', controller.signal).then((saved) => {
       if (!controller.signal.aborted) setRead({ api, layout: Array.isArray(saved?.rooms) ? saved : undefined });
     }).catch(() => {
       if (!controller.signal.aborted) setRead({ api });

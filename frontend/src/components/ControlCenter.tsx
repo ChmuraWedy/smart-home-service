@@ -18,7 +18,6 @@ import { useClock } from './DeviceControls';
 import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
-import { TopologySummary } from './TopologySummary';
 import RoomNavigation from './RoomNavigation';
 import useRoomName from '../room-names';
 import { RoomLayoutSettings } from './RoomEditor';
@@ -50,7 +49,7 @@ import { useDeviceText } from '../device-translations';
 import type { DeviceTranslations } from '../device-translations';
 import { useRoomAppearance } from '../room-appearance';
 
-type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing?: LocalDevice };
+type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing: LocalDevice };
 type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice }
   | { kind: 'combined'; combined: CombinedDevice } | { kind: 'camera-video'; device: UnifiedDevice; provider: Provider };
 type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; combinations?: CombinedDevice[]; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
@@ -76,8 +75,8 @@ function cardPresenceMessage({
   return online ? MSG.AVAILABLE_LOCALLY : MSG.STATUS_UNKNOWN;
 }
 
-function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, onAdd, placement }: {
-  api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void; onAdd?: (provider: Provider) => void;
+function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, onOpen, onQuickOpen, onQuickClose, placement }: {
+  api: HomeApi; device: UnifiedDevice; room: string; now: number; paused: boolean; onAuthError: () => void; onOpen: (route: DeviceRoute) => void;
   quickRoute?: DeviceRoute; onQuickOpen: (route: DeviceRoute) => void; onQuickClose: () => void; placement: GridCardPlacement;
 }) {
   const state = useLocalDeviceState(api, device.local?.id);
@@ -171,17 +170,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
               </button>
             )}
             <CardDetailsButton label={t(MSG.DETAILS)} disabled={quickBusy || paused} onClick={openDetails} />
-            {!local && (
-            <button
-              className="secondary tile-icon-action device-setup-action"
-              aria-label={t(MSG.SET_UP_LOCAL_CONNECTION)}
-              title={t(MSG.SET_UP_LOCAL_CONNECTION)}
-              disabled={!onAdd || quickBusy}
-              onClick={() => route !== 'local' && onAdd?.(route)}
-            >
-              <Icon name="wifi" />
-            </button>
-)}
+
           </>
 )}
         secondary={currentLightFeatures?.hasPresets && <div ref={setPresetSlot} />}
@@ -371,7 +360,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
       }
     };
-    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal)), readCombinations()];
+    const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal))];
+    if (!api.isMember) requests.push(readCombinations());
     if (sharingReady) requests.push(handle('Smart Life', () => api.devices('sharing', controller.signal), 'sharing'));
     if (developerReady) requests.push(handle('Tuya Developer', () => api.devices('developer', controller.signal), 'developer'));
     void Promise.all(requests).finally(() => { if (!controller.signal.aborted) setBusy(false); });
@@ -437,7 +427,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       return { ...previous, cloud: { ...previous.cloud, [provider]: items } };
     });
   }, [api, detailDevice, mask]);
-  const detailRoomEditor = detailDevice && inventory && (
+  const detailRoomEditor = !api.isMember && detailDevice && inventory && (
     <DeviceRoomEditor
       key={detailDevice.id}
       rooms={inventory.rooms}
@@ -554,6 +544,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (route) params.set('route', route); else params.delete('route');
     if (group) params.set('group', String(group.id)); else params.delete('group');
     if (combination) params.set('combined', String(combination.id)); else params.delete('combined');
+    params.delete('member');
     return withQuery(path, params);
   }
   const openOverlay = useCallback((href: string) => {
@@ -584,6 +575,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     if (parent) { void navigate(overlayHref('/groups/' + parent.id), { replace: true }); return; }
     if (combinedParent) { navigate(overlayHref(`/combined-devices/${combinedParent.id}`), { replace: true }); return; }
     if (page > 0) query.set('page', String(page + 1));
+    query.delete('member');
     void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
   }
   function close() {
@@ -640,6 +632,12 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       const locationRoom = inventory?.rooms.find((itemRoom) => itemRoom.id === item.room_id);
       const name = locationRoom ? roomLabel(locationRoom) : t(MSG.NO_ROOM);
       const quickOpen = combinedQuickOpen && item === combined;
+      const quickHref = overlayHref(`${href}/quick`);
+      const openMember = (deviceId: string) => {
+        const params = new URLSearchParams(quickHref.split('?')[1]);
+        params.set('member', deviceId);
+        openOverlay(withQuery(`${href}/quick`, params));
+      };
       return (
         <CombinedDeviceCard
           key={`combined-${item.id}`}
@@ -651,7 +649,9 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           placement={placement}
           paused={Boolean((detailsOpen && !quickOpen) || placement.inert)}
           quickOpen={quickOpen}
-          onQuickOpen={() => openOverlay(overlayHref(`${href}/quick`))}
+          quickMemberId={quickOpen ? query.get('member') ?? undefined : undefined}
+          onMemberQuickOpen={openMember}
+          onQuickOpen={() => openOverlay(quickHref)}
           onQuickClose={() => closeOverlay()}
           onDetails={() => openOverlay(overlayHref(href))}
           onAuthError={onAuthError}
@@ -692,7 +692,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     }
 
     const { device } = entry;
-    const canAdd = inventory && !busy && (!sharingReady || topology.data || topology.error);
     return (
       <DeviceCard
         key={`device-${device.id}`}
@@ -706,7 +705,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
         onOpen={(route) => choose({ ...entry, route })}
         onQuickOpen={(route) => openOverlay(overlayHref(devicePath(device.id, true), route))}
         onQuickClose={() => closeOverlay()}
-        onAdd={canAdd ? (provider) => choose({ kind: 'survey', device: device.cloud[provider], provider }) : undefined}
         placement={placement}
       />
     );
@@ -789,8 +787,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     }
 
     function closeSurvey() {
-      if (existing) reopenLocalDevice(existing);
-      else close();
+      reopenLocalDevice(existing);
     }
 
     function saveSurvey(saved: LocalDevice) {
@@ -815,7 +812,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     );
   }
   let roomAction: ReactNode;
-  if (import.meta.env.MODE !== 'demo') {
+  if (!api.isMember && import.meta.env.MODE !== 'demo') {
     if (activeRoom) {
       roomAction = (
         <RoomLayoutSettings
@@ -869,10 +866,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           </h2>
         </div>
         <div className="survey-toolbar dashboard-actions">
-          <button className="secondary compact" disabled={!inventory || busy} aria-label={t(MSG.SET_UP_LOCAL_DEVICE)} title={t(MSG.SET_UP_LOCAL_DEVICE)} onClick={() => choose({ kind: 'survey' })}>
-            <Icon name="add" className="dashboard-action-icon" />
-            <span>{t(MSG.SET_UP_LOCAL_DEVICE)}</span>
-          </button>
           <button className="secondary compact" disabled={!ready || busy} aria-label={t(MSG.REFRESH_LIST)} title={t(MSG.REFRESH_LIST)} onClick={() => setRevision(value => value + 1)}>
             <Icon name="refresh-list" className="dashboard-action-icon" />
             <span>{t(MSG.REFRESH_LIST)}</span>
@@ -884,14 +877,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           {linkError && <p className="field-error" role="alert">{linkError}</p>}
           {!busy && current && combinedId && !combined && <p className="field-error" role="alert">{t(MSG.COMBINATION_UNAVAILABLE)}</p>}
           <p className="help dashboard-intro">{t(MSG.MAIN_CONTROLS_ARE_AVAILABLE_HERE)}</p>
-          {sharingReady && (
-          <TopologySummary
-            data={topology.data}
-            error={topology.error}
-            busy={topology.busy}
-            onSync={() => void topology.sync()}
-          />
-)}
           <div className="control-filters">
             <label>{t(MSG.BUILDING)}
               <select value={building} onChange={event => setBuilding(event.target.value)}>
@@ -930,17 +915,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
                 rooms={filteredRooms}
                 selected={room}
                 onSelect={selectRoom}
-                management={inventory && import.meta.env.MODE !== 'demo' ? {
+                management={!api.isMember && inventory && import.meta.env.MODE !== 'demo' ? {
                   buildings: inventory.buildings,
                   onSaved: updateRoom,
                   onDeleted: roomDeleted,
                   onAuthError,
-                  sync: sharingReady ? {
-                    run: topology.sync,
-                    busy: topology.busy,
-                    error: topology.error || topology.data?.job.message,
-                    emptyRoomsAvailable: Boolean(topology.data?.empty_rooms_available),
-                  } : undefined,
                 } : undefined}
               />
             )}
@@ -980,7 +959,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
           cloudDevice={detailDevice.cloud.sharing ?? detailDevice.cloud.developer}
           routes={deviceRoutes(detailDevice)}
           onAuthError={onAuthError}
-          onSetup={inventory ? () => setupDetailDevice() : undefined}
+          onSetup={inventory && !api.isMember ? () => setupDetailDevice() : undefined}
           closeLabel={detailCloseLabel}
           onClose={close}
         />

@@ -5,10 +5,14 @@ export const appPaths = {
   control: '/',
   'combined-devices': '/combined-devices',
   settings: '/settings',
+  setup: '/setup',
+  tutorial: '/tutorial',
   rooms: '/settings/rooms',
+  users: '/settings/users',
   connections: '/settings/connections',
   network: '/network',
   'local-connections': '/local-connections',
+  'smart-life-rooms': '/settings/smart-life-rooms',
 } as const;
 
 export const dashboardToolsPath = '/settings/dashboard';

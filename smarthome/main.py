@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from . import __version__
-from .api_dependencies import authenticate, get_session
+from .api_dependencies import Account, authenticate, get_session
 from .auto_label_translations import (
     standard_room_names,
     translate_batches,
@@ -22,7 +22,14 @@ from .dashboard_layout_api import remove_room_from_navigation
 from .dashboard_layout_api import router as dashboard_layout_router
 from .db import init_db, make_engine, merge_json_object
 from .importer import import_tinytuya
+from .member_controls import (
+    is_camera,
+    member_local_device,
+    require_local_commands,
+    require_local_device,
+)
 from .models import (
+    AccountDashboardLayout,
     Building,
     CloudPlacement,
     DashboardLayout,
@@ -68,6 +75,7 @@ from .service import (
     create_device,
     device_read,
     device_state,
+    effective_capabilities,
     get_by_ref,
     get_or_404,
     patch_device,
@@ -235,7 +243,8 @@ def delete_room(item_id: EntityRef, session: Session = Depends(get_session)):
     assert_empty(session, Device, Device.room_id == item.id)
     remove_room_from_navigation(session, item.id)
     # The persisted layout view is building/room/columns/page.
-    session.execute(delete(DashboardLayout).where(DashboardLayout.view.like(f"%/{item.id}/%/%")))
+    for model in (DashboardLayout, AccountDashboardLayout):
+        session.execute(delete(model).where(model.view.like(f"%/{item.id}/%/%")))
     session.delete(item)
     commit(session)
     return Response(status_code=204)
@@ -330,6 +339,7 @@ def list_devices(
     unassigned: bool = False,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    account: Account | None = Depends(authenticate),
     session: Session = Depends(get_session),
 ):
     query = name_filters(select(Device), Device, name=name, q=q)
@@ -351,12 +361,20 @@ def list_devices(
 
     items = session.scalars(query.order_by(Device.id).offset(offset).limit(limit)).all()
     translations = translations_for(session, LOCAL_SCOPE, [str(item.id) for item in items])
-    return [device_read(session, item, translations.get(str(item.id), {})) for item in items]
+    rows = [device_read(session, item, translations.get(str(item.id), {})) for item in items]
+    if account and account.role == "member":
+        return [member_local_device(row) for row in rows if not is_camera(row.category, row.capabilities)]
+    return rows
 
 
 @router.get("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
-def read_device(item_id: EntityRef, session: Session = Depends(get_session)):
-    return device_read(session, get_by_ref(session, Device, item_id))
+def read_device(
+    item_id: EntityRef,
+    account: Account | None = Depends(authenticate),
+    session: Session = Depends(get_session),
+):
+    row = device_read(session, get_by_ref(session, Device, item_id))
+    return member_local_device(row) if account and account.role == "member" else row
 
 
 @router.patch("/devices/{item_id}", response_model=DeviceRead, tags=["Devices"])
@@ -399,9 +417,12 @@ def normalized_state(
     refresh: bool = False,
     watch: bool = False,
     max_age: int = Query(60, ge=1, le=86400),
+    account: Account | None = Depends(authenticate),
     session: Session = Depends(get_session),
 ):
     item = get_by_ref(session, Device, item_id)
+    if account and account.role == "member":
+        require_local_device(item.category, effective_capabilities(session, item))
     if refresh:
         run_command(request, session, item, "status")
     if watch:
@@ -416,11 +437,16 @@ def set_capabilities(
     item_id: EntityRef,
     body: CapabilitiesCommand,
     request: Request,
+    account: Account | None = Depends(authenticate),
     session: Session = Depends(get_session),
 ):
     item = get_by_ref(session, Device, item_id)
+    member = bool(account and account.role == "member")
+    if member:
+        require_local_commands(item.category, effective_capabilities(session, item), body.values)
     dps = capability_values_dps(session, item, body.values)
-    return run_command(request, session, item, "capabilities", dps)
+    result = run_command(request, session, item, "capabilities", dps)
+    return result.model_copy(update={"dps": {}}) if member else result
 
 
 @router.get("/devices/{item_id}/status", response_model=CommandRead, tags=["Control"])
@@ -632,13 +658,19 @@ for resource, model, schema in (
 
 
 def create_app(settings: Settings | None = None, controller=None):
-    settings = settings or Settings()
+    from .setup_api import load_managed_key
+    from .setup_api import router as setup_router
+
+    settings = load_managed_key(settings or Settings())
 
     @asynccontextmanager
     async def lifespan(app):
         engine = make_engine(settings.database_path, settings.database_url)
         init_db(engine)
         app.state.engine = engine
+        from .account_key_vault import AccountKeyVault
+
+        app.state.account_key_vault = AccountKeyVault(settings.database_path)
         from .commissioning import Observations
 
         app.state.observations = Observations()
@@ -699,6 +731,7 @@ def create_app(settings: Settings | None = None, controller=None):
         )
     app.state.controller = controller or TuyaController(settings)
     app.include_router(router)
+    app.include_router(setup_router)
     from .assistant_api import router as assistant_router
     from .assistant_sessions import AssistantSessions
 
@@ -713,6 +746,10 @@ def create_app(settings: Settings | None = None, controller=None):
     from .room_appearance import router as room_appearance_router
 
     app.include_router(room_appearance_router)
+
+    from .accounts import router as accounts_router
+
+    app.include_router(accounts_router)
     from .light_presets import router as light_presets_router
 
     app.include_router(light_presets_router)

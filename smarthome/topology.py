@@ -77,6 +77,10 @@ def cached(session, scope):
         "homes": [
             {"home_id": h.home_id, "building_id": h.building_id, "name": h.name} for h in homes
         ],
+        "rooms": [
+            {"home_id": r.home_id, "room_id": r.room_id, "name": r.name}
+            for r in rooms if (r.home_id, r.room_id) in room_ids
+        ],
         "placements": [
             {
                 "device_id": p.device_id,

@@ -4,13 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import type { AppRoomAssignment, CloudDevice, CloudFunctions, CloudSnapshot } from './api';
-import type { CombinedDevice, CombinedInput } from './home-api';
+import type { CombinedDevice, CombinedInput, LocalDevice } from './home-api';
 import { HomeApi } from './home-api';
 import { cloudDeviceKey, readCloudDevice } from './cloud-device-cache';
 import CombinedDeviceCard from './components/CombinedDeviceCard';
 import { STORAGE_KEY } from './connection';
 import { setDeviceTextMode } from './device-translations';
 import { setLocale } from './i18n';
+import { readLocalDevice } from './local-device-cache';
 import { createAppStore } from './store';
 import { App } from './test/App';
 
@@ -52,6 +53,12 @@ const relayDefinitions: CloudFunctions = {
     { code: 'switch_2', type: 'Boolean', values: {} },
     { code: 'switch_backlight', type: 'Boolean', values: {} },
   ],
+};
+
+const localLamp: LocalDevice = {
+  id: 7, device_id: bulbs[0].id, name: bulbs[0].name, aliases: [], building_id: room.building_id,
+  room_id: room.id, transport: 'wifi', parent_id: null, cid: null, enabled: true,
+  capabilities: { switch_led: { type: 'boolean', readable: true, writable: true } },
 };
 
 function backend(
@@ -313,6 +320,83 @@ describe('combined devices', () => {
     expect(refreshes).toHaveLength(1);
   });
 
+  it('uses fresh LAN readings for a wired lamp that responds with its relay off', async () => {
+    setLocale('en', false);
+    const api = new HomeApi({ baseUrl: 'http://combined.test', token: 'fixture' });
+    const store = createAppStore();
+    const source: LocalDevice = {
+      ...localLamp, id: 8, name: relay.name, device_id: relay.id,
+      capabilities: { switch_1: { type: 'boolean', readable: true, writable: true } },
+    };
+    const members = [source, localLamp].map((device) => ({
+      member: {
+        device_id: device.device_id,
+        route: 'local' as const,
+        power_source: device === localLamp ? { device_id: source.device_id, channel: 'switch_1' } : undefined,
+      },
+      device: { id: device.device_id, name: device.name, local: device, cloud: {} },
+    }));
+    const flatMembers = members.map((entry) => ({ ...entry, member: { ...entry.member, power_source: undefined } }));
+    const at = Date.now();
+    let lampObservedAt = at - 1_000;
+    vi.mocked(fetch).mockImplementation(async (input, options) => {
+      expect(options?.method).toBe('GET');
+      const id = Number(new URL(String(input)).pathname.match(/\/devices\/(\d+)\/state$/)?.[1]);
+      const isRelay = id === source.id;
+      return json({
+        device_id: id, enabled: true, available: true,
+        values: {
+          [isRelay ? 'switch_1' : 'switch_led']: {
+            value: !isRelay, known: true, stale: false, observed_at: new Date(isRelay ? at : lampObservedAt).toISOString(),
+          },
+        },
+      });
+    });
+    const card = (now: number) => (
+      <Provider store={store}>
+        <MemoryRouter>
+          <CombinedDeviceCard
+            api={api}
+            combined={{ id: 1, name: 'Wired devices' }}
+            members={members}
+            room={room.name}
+            now={now}
+            onAuthError={vi.fn()}
+          />
+          <CombinedDeviceCard
+            api={api}
+            combined={{ id: 2, name: 'Flat devices' }}
+            members={flatMembers}
+            room={room.name}
+            now={now}
+            onAuthError={vi.fn()}
+          />
+        </MemoryRouter>
+      </Provider>
+    );
+    const view = render(card(at));
+    const wiredCard = within(screen.getByRole('listitem', { name: 'Wired devices' }));
+    const flatCard = within(screen.getByRole('listitem', { name: 'Flat devices' }));
+    const lamp = wiredCard.getByRole('region', { name: localLamp.name });
+    const power = await within(lamp).findByRole('switch', { name: 'Power' });
+    await waitFor(() => expect(lamp).toHaveAttribute('data-unavailable'));
+    expect(power).toBeDisabled();
+    expect(power).not.toBeChecked();
+
+    lampObservedAt = Date.now() + 1;
+    await act(async () => { await store.dispatch(readLocalDevice(api, localLamp.id, false, undefined, true)); });
+    await waitFor(() => expect(power).toBeEnabled());
+    expect(power).toBeChecked();
+    const flatPower = within(flatCard.getByRole('region', { name: localLamp.name })).getByRole('switch', { name: 'Power' });
+    expect(flatPower).toBeEnabled();
+    expect(flatPower).toBeChecked();
+    expect(lamp).not.toHaveAttribute('data-unavailable');
+
+    view.rerender(card(lampObservedAt + 16_000));
+    expect(lamp).toHaveAttribute('data-unavailable');
+    expect(power).toBeDisabled();
+  });
+
   it.each([false, true])('keeps an online camera controllable when its offline socket last reported %s', async (lastPower) => {
     const camera = cameraWithPrivacy(false);
     renderWiredCard(relayWithReading(false, lastPower), camera);
@@ -435,7 +519,7 @@ describe('combined devices', () => {
       },
     });
     await user.click(screen.getByRole('button', { name: 'Menu' }));
-    await user.click(screen.getByRole('button', { name: 'Control' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
     const card = within(await screen.findByRole('listitem', { name: 'Devices in Kitchen' }));
     expect(card.getByText(`Powered by ${relay.name} · Channel 1`)).toBeInTheDocument();
     expect(card.getAllByText(`Powered by ${relay.name} · Channel 2`)).toHaveLength(2);
@@ -450,6 +534,49 @@ describe('combined devices', () => {
       path: `/cloud/devices/${relay.id}/commands`,
       body: { commands: [{ code: 'switch_2', value: false }] },
     });
+  });
+
+  it.each([
+    [0, bulbs[0].name],
+    [0, 'Brightness'],
+    [0, 'Color'],
+    [1, 'Brightness'],
+    [1, 'Color temperature'],
+  ])('opens combined member %s from %s without sending a command', async (index, label) => {
+    const combined: CombinedDevice = {
+      id: 1, name: 'Workroom lamps', room_id: room.id, aliases: [], show_all_power: true, show_member_cards: false,
+      members: [
+        { device_id: relay.id, route: 'sharing', accessible: true },
+        {
+          device_id: bulbs[0].id, route: 'sharing', accessible: true,
+          power_source: { device_id: relay.id, channel: 'switch_1' },
+        },
+        { device_id: bulbs[1].id, route: 'sharing', accessible: true },
+      ],
+    };
+    const { writes } = backend(combined, false, false, true);
+    const user = userEvent.setup();
+    openApp('/rooms/3');
+    const card = within(await screen.findByRole('listitem', { name: combined.name }));
+    const bulb = bulbs[index];
+    const target = await waitFor(() => {
+      const region = card.getByRole('region', { name: bulb.name });
+      if (index === 0) expect(region.closest('[data-relay-channel="switch_1"]')).not.toBeNull();
+      const content = within(region).getByRole('switch').closest('.capability-row')?.querySelector<HTMLElement>('.dashboard-power-state-summary');
+      expect(content).not.toBeNull();
+      return within(content!).getByText(label, { exact: true });
+    });
+    await user.click(target);
+    const sheet = within(await screen.findByRole('dialog', { name: bulb.name }));
+    expect(window.location.pathname).toBe('/combined-devices/1/quick');
+    expect(new URLSearchParams(window.location.search).get('member')).toBe(bulb.id);
+    expect(await sheet.findByRole('slider', { name: 'Brightness' })).toBeInTheDocument();
+    expect(sheet.queryByRole('region', { name: bulbs[1 - index].name })).toBeNull();
+    expect(sheet.queryByRole('region', { name: relay.name })).toBeNull();
+    await user.click(sheet.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/rooms/3'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(writes).toHaveLength(0);
   });
 
   it('saves three cloud bulbs, keeps quick settings independent, routes details, and edits and dissolves the combination', async () => {
@@ -491,7 +618,7 @@ describe('combined devices', () => {
     await user.click(managementEditor.getByRole('button', { name: 'Cancel' }));
     await screen.findByRole('heading', { name: 'Combined devices' });
     await user.click(screen.getByRole('button', { name: 'Menu' }));
-    await user.click(screen.getByRole('button', { name: 'Control' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
     const card = await screen.findByRole('listitem', { name: 'Kitchen Lights' });
     expect(writes).toEqual([{
       path: '/combined-devices', method: 'POST',
@@ -555,7 +682,7 @@ describe('combined devices', () => {
     await user.click(dissolve.getAllByRole('button', { name: 'Dissolve combination' })[1]);
     expect(await screen.findByText('There are no combined devices yet.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Menu' }));
-    await user.click(screen.getByRole('button', { name: 'Control' }));
+    await user.click(screen.getByRole('button', { name: 'Dashboard' }));
     expect(await screen.findByRole('listitem', { name: bulbs[0].name })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: 'Kitchen Lights' })).toBeNull();
     expect(writes[4]).toMatchObject({ path: '/combined-devices/1', method: 'DELETE' });

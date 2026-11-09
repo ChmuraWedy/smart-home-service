@@ -11,6 +11,9 @@ class Settings:
     api_token: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_API_TOKEN", ""), repr=False
     )
+    setup_code: str = field(
+        default_factory=lambda: os.getenv("SMART_HOME_SETUP_CODE", ""), repr=False
+    )
     tuya_timeout: float = field(
         default_factory=lambda: float(os.getenv("SMART_HOME_TUYA_TIMEOUT", "3"))
     )
@@ -70,6 +73,8 @@ class Settings:
     )
 
     def __post_init__(self):
+        if self.setup_code and len(self.setup_code) < 32:
+            raise ValueError("SMART_HOME_SETUP_CODE must have at least 32 characters")
         if not 1 <= self.redroid_port <= 65535:
             raise ValueError("SMART_HOME_REDROID_PORT must be a valid port")
         if self.display_poll_interval != 0 and not 10 <= self.display_poll_interval <= 3600:

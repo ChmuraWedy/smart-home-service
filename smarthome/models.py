@@ -60,6 +60,39 @@ class DashboardLayout(Base):
     hidden_devices: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
 
 
+class HouseholdMember(Base):
+    __tablename__ = "household_members"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    key_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    sealed_key: Mapped[bytes | None] = mapped_column(LargeBinary)
+    login: Mapped[str | None] = mapped_column(String(40), unique=True)
+
+
+class HouseholdDeviceKey(Base):
+    __tablename__ = "household_device_keys"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    member_id: Mapped[str | None] = mapped_column(ForeignKey("household_members.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    key_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    sealed_key: Mapped[bytes | None] = mapped_column(LargeBinary)
+
+
+class HouseholdOwner(Base):
+    __tablename__ = "household_owner"
+    id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    login: Mapped[str] = mapped_column(String(40), server_default="root")
+
+
+class AccountDashboardLayout(Base):
+    __tablename__ = "account_dashboard_layouts"
+    account_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    view: Mapped[str] = mapped_column(String(64), primary_key=True)
+    slots: Mapped[list[str | None]] = mapped_column(JSON)
+    hidden_devices: Mapped[list[str]] = mapped_column(JSON, server_default="[]")
+
+
 class LightPreset(Base):
     __tablename__ = "light_presets"
     __table_args__ = (UniqueConstraint("device_id", "name"),)

@@ -13,11 +13,11 @@ const items = ['device-a', 'group-1', 'device-b'].map((id, index) => ({
 const api = new HomeApi({ baseUrl: 'http://dashboard.test', token: 'fixture-key' });
 const view = { building: '', room: '3', page: 1 };
 
-function GridFixture({ room }: { room: string }) {
+function GridFixture({ room, connection }: { room: string; connection: HomeApi }) {
   const [editing, setEditing] = useState(false);
   return (
     <DashboardGrid
-      api={api}
+      api={connection}
       density="large"
       items={items}
       view={{ ...view, room }}
@@ -32,8 +32,8 @@ function GridFixture({ room }: { room: string }) {
   );
 }
 
-function mount(room = '3') {
-  return render(<GridFixture room={room} />);
+function mount(room = '3', connection = api) {
+  return render(<GridFixture room={room} connection={connection} />);
 }
 
 function click(name: string) {
@@ -172,6 +172,36 @@ describe('dashboard layout', () => {
     click('Save');
     await waitFor(() => expect(saved.slots[21]).toBe('device-a'));
     expect(saved.slots.slice(18, 22)).toEqual(['group-1', 'device-b', null, 'device-a']);
+  });
+
+  it('uses the signed-in account layout across browsers and never sends a legacy browser ID for members', async () => {
+    const viewPath = '/api/v1/dashboard-layouts/me';
+    const member = { id: 'alex', name: 'Alex', login: 'alex', role: 'member' as const };
+    const connection = { baseUrl: 'http://dashboard.test', token: 'member-key' };
+    let slots: LayoutSlots = [];
+    ensureDashboardBrowserId();
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe(viewPath);
+      expect(url.searchParams.has('browser_id')).toBe(false);
+      expect((init?.headers as Record<string, string>)['X-API-Key']).toBe(connection.token);
+      if (init?.method === 'PUT') slots = JSON.parse(String(init.body)).slots;
+      return Response.json({ slots });
+    });
+
+    const firstBrowser = mount('3', new HomeApi(connection, member));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
+    click('Edit layout');
+    click('Move Card 1 (Row 1, column 1)');
+    click('Move here (Row 7, column 2)');
+    click('Save');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit layout' })).toBeEnabled());
+    expect(slots[19]).toBe('device-a');
+
+    firstBrowser.unmount();
+    localStorage.clear();
+    mount('3', new HomeApi(connection, member));
+    await waitFor(() => cardAt('device-a', 7, 2));
   });
 
   it('keeps a previously saved card beyond the editor slots accessible', async () => {

@@ -147,9 +147,12 @@ export default function DashboardGrid<T>({
   }, [api, scope]);
 
   useEffect(() => {
-    if (!browserId || !viewKey) return undefined;
+    if (!viewKey || (!api.account && !browserId)) return undefined;
     const request = new AbortController();
-    api.dashboardLayout(browserId, viewKey, request.signal).then((layout) => {
+    const pending = api.account
+      ? api.accountDashboardLayout(viewKey, browserId, request.signal)
+      : api.dashboardLayout(browserId ?? '', viewKey, request.signal);
+    pending.then((layout) => {
       if (!request.signal.aborted) setSaved({ api, view: viewKey, layout });
     }).catch(() => {
       if (!request.signal.aborted) setSaved({ api, view: viewKey, error: true });
@@ -280,11 +283,15 @@ export default function DashboardGrid<T>({
     setSaving(true);
     setSaveError(false);
     try {
-      const id = ensureDashboardBrowserId();
       const changes: DashboardLayout = { slots };
       if (hidden.size || draft.hiddenDevices.length) changes.hidden_devices = draft.hiddenDevices;
-      const result = await api.saveDashboardLayout(id, viewKey, changes);
-      setBrowserId(id);
+      let result;
+      if (api.account) result = await api.saveAccountDashboardLayout(viewKey, changes);
+      else {
+        const id = ensureDashboardBrowserId();
+        result = await api.saveDashboardLayout(id, viewKey, changes);
+        setBrowserId(id);
+      }
       if (pendingSave.current !== request) return;
       setSaved({ api, view: viewKey, layout: result });
       setShowAll(false);
@@ -321,8 +328,9 @@ export default function DashboardGrid<T>({
                   type="button"
                   className="secondary dashboard-layout-icon"
                   aria-label={editLabel}
+                  data-tour="room-layout"
                   title={editLabel}
-                  disabled={saving || (!editing && ((!current?.error && !items.length && !roomAction) || Boolean(browserId && !current)))}
+                  disabled={saving || (!editing && ((!current?.error && !items.length && !roomAction) || Boolean((api.account || browserId) && !current)))}
                   onClick={toggleEditing}
                 >
                   <Icon name={editIcon} />

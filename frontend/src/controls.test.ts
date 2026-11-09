@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloudCommands, cloudReading, cloudSpec, cloudSpecs, displayReading, hexToHsv, hsvToHex, isStale, localSpec, motionState, optionLabel, validateControlValue } from './controls';
+import { cloudCommands, cloudReading, cloudSpec, cloudSpecs, displayReading, hexToHsv, hsvToHex, isStale, localCommandValue, localReading, localSpec, motionState, optionLabel, validateControlValue } from './controls';
 import type { CloudFunction, CloudFunctions } from './api';
 
 const fn = (code: string, type: string, values: unknown = {}): CloudFunction => ({ code, type, values: JSON.stringify(values) });
@@ -73,6 +73,17 @@ describe('metadata-driven controls', () => {
     expect(cloudCommands(spec, value, definitions([brightness, mode]))).toEqual([{ code: 'work_mode', value: 'white' }, { code, value: raw }]);
     expect(spec.unit).toBe('%');
   });
+  it('uses the same color-temperature percentage for a verified local range and Smart Life', () => {
+    const local = localSpec('temp_value_v2', {
+      type: 'integer', readable: true, writable: true, minimum: 0, maximum: 1000, step: 1,
+    });
+    const cloud = cloudSpec(fn('temp_value_v2', 'Integer', { min: 0, max: 1000, step: 1, scale: 0 }), true);
+    const localValue = localReading(local, { value: 16, known: true, stale: false });
+    expect(displayReading(local, localValue)).toBe(displayReading(cloud, cloudReading(cloud, 16)));
+    expect(localCommandValue(local, 1.6)).toBe(16);
+    expect(local).toMatchObject({ unit: '%', minimum: 0, maximum: 100, step: 0.1 });
+  });
+
   it('scales temperature and step and rejects invalid increments without a command', () => {
     const target = fn('temp_set', 'Integer', { min: 50, max: 350, step: 5, scale: 1, unit: '°C' });
     const spec = cloudSpec(target, true);

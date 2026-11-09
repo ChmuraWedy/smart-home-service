@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import type { FormEvent } from 'react';
-import { MSG, t } from '../i18n';
+import { MSG, t, useLocale } from '../i18n';
 import type { RedroidCredentials } from '../api';
+import smartLifeRegions from '../smart-life-regions.json';
 
 type Props = {
   available: boolean;
@@ -25,6 +27,18 @@ function secureSignInUrl() {
 }
 
 function LoginForm({ busy, onConnect }: Pick<Props, 'busy' | 'onConnect'>) {
+  const locale = useLocale();
+  const regions = useMemo(() => {
+    const display = locale !== 'en' && typeof Intl.DisplayNames === 'function'
+      ? new Intl.DisplayNames(locale, { type: 'region', fallback: 'none' })
+      : null;
+    // Smart Life 7.12.6 compares its English picker label exactly. Keep dialing variants distinct.
+    return Object.entries(smartLifeRegions).map(([name, code]) => {
+      const localized = code.length === 2 && !/\(\d/.test(name) ? display?.of(code) : undefined;
+      return { name, label: localized ?? name };
+    }).sort((first, second) => first.label.localeCompare(second.label, locale));
+  }, [locale]);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -41,14 +55,16 @@ function LoginForm({ busy, onConnect }: Pick<Props, 'busy' | 'onConnect'>) {
     <form method="post" onSubmit={submit}>
       <label htmlFor="redroid-region">
         {t(MSG.SMART_LIFE_COUNTRY_OR_REGION)}
-        <input
+        <select
           id="redroid-region"
           name="region"
-          autoComplete="off"
-          maxLength={120}
+          defaultValue=""
           required
           disabled={busy}
-        />
+        >
+          <option value="" disabled>{t(MSG.SMART_LIFE_SELECT_COUNTRY)}</option>
+          {regions.map(({ name, label }) => <option key={name} value={name}>{label}</option>)}
+        </select>
       </label>
       <label htmlFor="redroid-account">
         {t(MSG.SMART_LIFE_EMAIL_OR_PHONE)}
@@ -74,7 +90,7 @@ function LoginForm({ busy, onConnect }: Pick<Props, 'busy' | 'onConnect'>) {
         />
       </label>
       <div className="actions">
-        <button type="submit" disabled={busy}>{t(MSG.CONNECT_THROUGH_ANDROID)}</button>
+        <button type="submit" disabled={busy}>{t(MSG.CONNECT_SMARTLIFE_ACCOUNT)}</button>
       </div>
     </form>
   );

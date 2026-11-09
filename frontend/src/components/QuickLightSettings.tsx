@@ -45,6 +45,11 @@ export default function QuickLightSettings({
   const choices = (mode?.writable && mode.kind === 'enum' ? mode.choices ?? [] : [])
     .filter((value) => value === 'white' || value === 'colour' || value === 'color' || value === 'scene');
   const colorMode = active === 'colour' || active === 'color';
+  function hasModeContent(value: JsonValue) {
+    if (value === 'white') return white.length > 0;
+    if (value === 'scene') return Boolean(scene);
+    return Boolean(color);
+  }
   async function selectMode(value: JsonValue) {
     if (!mode || active === value) return;
     const accept = begin(value);
@@ -64,7 +69,7 @@ export default function QuickLightSettings({
                 title={optionLabel(value, mode?.key)}
                 aria-label={optionLabel(value, mode?.key)}
                 aria-pressed={active === value}
-                disabled={disabled}
+                disabled={disabled || !hasModeContent(value)}
                 onClick={() => selectMode(value)}
               >
                 {t(modeCaption(value))}
@@ -74,25 +79,32 @@ export default function QuickLightSettings({
         )}
       </div>
       {mode && active != null && !choices.some((value) => value === active) && <p className="help">{t(MSG.MODE)} · {optionLabel(active, mode.key)}</p>}
-      {active === 'white' && white.map((spec) => (
-        <CapabilityField
-          key={spec.key}
-          pendingScope={scope}
-          spec={spec}
-          reading={reading(spec)}
-          now={now}
-          local={local}
-          quickRange={/^(brightness|bright_value(?:_v2)?)$/.test(spec.key) ? 'brightness' : 'temperature'}
-          disabled={disabled}
-          onSend={(value) => send(spec, value)}
-        />
-      ))}
+      {choices.some((value) => value === active && !hasModeContent(value)) && (
+        <p className="help">{t(MSG.UNAVAILABLE)}</p>
+      )}
+      {active === 'white' && white.map((spec) => {
+        const adjustable = spec.writable && spec.minimum !== undefined && spec.maximum !== undefined && spec.minimum < spec.maximum;
+        const range = /^(brightness|bright_value(?:_v2)?)$/.test(spec.key) ? 'brightness' : 'temperature';
+        return (
+          <CapabilityField
+            key={spec.key}
+            pendingScope={scope}
+            spec={adjustable ? spec : { ...spec, writable: false }}
+            reading={reading(spec)}
+            now={now}
+            local={local}
+            quickRange={adjustable ? range : undefined}
+            disabled={disabled || !adjustable}
+            onSend={(value) => send(spec, value)}
+          />
+        );
+      })}
       {colorMode && color && (
         <QuickColorSettings
           scope={scope}
           capability={color.key}
           reading={reading(color)}
-          disabled={disabled}
+          disabled={disabled || !color.writable}
           send={(value) => send(color, value)}
         />
       )}

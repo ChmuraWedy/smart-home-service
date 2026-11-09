@@ -140,3 +140,61 @@ def test_adds_room_appearance_to_a_version_three_database_without_changing_rooms
         connection.exec_driver_sql("DELETE FROM rooms WHERE id = 1")
         assert connection.exec_driver_sql("SELECT room_id FROM room_appearances").fetchall() == []
     engine.dispose()
+
+
+def test_upgrades_existing_home_to_household_accounts_without_losing_layouts():
+    engine = db.make_engine(":memory:")
+    db.init_db(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version = 8")
+        connection.exec_driver_sql("DROP TABLE account_dashboard_layouts")
+        connection.exec_driver_sql("DROP TABLE household_members")
+        connection.exec_driver_sql(
+            "INSERT INTO dashboard_layouts (browser_id, view, slots, hidden_devices) VALUES (?, ?, ?, ?)",
+            ("b" * 32, "all/all/3/1", '["device-light"]', '["device-light"]'),
+        )
+    db.init_db(engine)
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM household_members").scalar_one() == 0
+        assert connection.exec_driver_sql("SELECT COUNT(*) FROM account_dashboard_layouts").scalar_one() == 0
+        assert connection.exec_driver_sql("SELECT hidden_devices FROM dashboard_layouts").scalar_one() == '["device-light"]'
+    engine.dispose()
+
+
+def test_migrates_existing_user_keys_to_device_keys_without_changing_their_digest():
+    engine = db.make_engine(":memory:")
+    db.init_db(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version = 10")
+        connection.exec_driver_sql("DROP TABLE household_device_keys")
+        connection.exec_driver_sql("DROP TABLE household_owner")
+        connection.exec_driver_sql(
+            "INSERT INTO household_members (id, name, key_digest, sealed_key) VALUES (?, ?, ?, ?)",
+            ("a" * 32, "Existing user", "d" * 64, b"existing-encrypted-key"),
+        )
+    db.init_db(engine)
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        member = connection.exec_driver_sql("SELECT login, sealed_key FROM household_members").one()
+        assert member == ("user-" + "a" * 32, None)
+        key = connection.exec_driver_sql(
+            "SELECT id, member_id, key_digest, sealed_key FROM household_device_keys"
+        ).one()
+        assert key == ("a" * 32, "a" * 32, "d" * 64, b"existing-encrypted-key")
+    engine.dispose()
+
+
+def test_existing_owner_profile_gets_legacy_login_during_upgrade():
+    engine = db.make_engine(":memory:")
+    db.init_db(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("PRAGMA user_version = 11")
+        connection.exec_driver_sql("DROP TABLE household_owner")
+        connection.exec_driver_sql("CREATE TABLE household_owner (id VARCHAR(16) PRIMARY KEY, name VARCHAR(80))")
+        connection.exec_driver_sql("INSERT INTO household_owner VALUES ('owner', 'Existing owner')")
+    db.init_db(engine)
+    assert schema_version(engine) == len(db.MIGRATIONS)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT name, login FROM household_owner").one() == ("Existing owner", "root")
+    engine.dispose()

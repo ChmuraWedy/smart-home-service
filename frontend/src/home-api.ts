@@ -1,6 +1,8 @@
 import { MSG, t } from "./i18n";
 import { CloudApi } from './api';
-import type { JsonValue, Provider } from './api';
+import type {
+  AccountIdentity, HouseholdDeviceKey, HouseholdMember, IssuedMember, JsonValue, Provider,
+} from './api';
 import type { SavedLightScene, ScenePresetInput, TuyaSceneReference } from './light-scenes';
 import type { DeviceTranslations, TranslatedText } from './device-translations';
 import type { Locale } from './i18n';
@@ -47,7 +49,11 @@ export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 
 export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
 export type Placement = { device_id: string; building_id: number | null; room_id: number | null };
 export type TopologyJob = { status: 'idle' | 'running' | 'done' | 'failed'; processed: number; total: number; message: string | null };
-export type Topology = { synced_at: string | null; warnings: number; empty_rooms_available: boolean; placements: Placement[]; job: TopologyJob };
+export type Topology = {
+  synced_at: string | null; warnings: number; empty_rooms_available: boolean; placements: Placement[]; job: TopologyJob;
+  homes?: { 'home_id': string; 'name': string }[];
+  rooms?: { 'home_id': string; 'room_id': string; 'name': string }[];
+};
 export type DeviceDraft = {
   name: string; device_id: string; transport: 'wifi' | 'zigbee'; is_gateway: boolean;
   ip: string | null; version: string | null; parent_id: number | null; cid: string | null;
@@ -78,6 +84,14 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
   key_source: 'device' | 'child'; interface_address: string };
 
 export class HomeApi extends CloudApi {
+  setupAvailability(signal: AbortSignal) {
+    return this.request<{ 'can_initialize': boolean }>('/setup', 'GET', undefined, signal);
+  }
+
+  initializeSetup(setupCode: string) {
+    return this.request<{ 'access_key': string }>('/setup', 'POST', { setup_code: setupCode });
+  }
+
   assistantEmbed(signal: AbortSignal) {
     return this.request<{ url: string | null; ticket: string | null }>('/assistant/embed', 'POST', undefined, signal);
   }
@@ -108,11 +122,54 @@ export class HomeApi extends CloudApi {
   }
 
   roomNavigationLayout(browser: string, signal: AbortSignal) {
-    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'GET', undefined, signal);
+    const scope = this.isMember ? 'me' : browser;
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${scope}/room-navigation`, 'GET', undefined, signal);
   }
 
   saveRoomNavigationLayout(browser: string, layout: RoomNavigationLayout, signal: AbortSignal) {
-    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${browser}/room-navigation`, 'PUT', layout, signal);
+    const scope = this.isMember ? 'me' : browser;
+    return this.request<RoomNavigationLayout>(`/dashboard-layouts/${scope}/room-navigation`, 'PUT', layout, signal);
+  }
+
+  accountDashboardLayout(view: string, legacyBrowser: string | null, signal: AbortSignal) {
+    const browser = this.account?.role === 'owner' && legacyBrowser ? `&browser_id=${legacyBrowser}` : '';
+    return this.request<DashboardLayout>(`/dashboard-layouts/me?${view}${browser}`, 'GET', undefined, signal);
+  }
+
+  saveAccountDashboardLayout(view: string, layout: DashboardLayout) {
+    return this.request<DashboardLayout>(`/dashboard-layouts/me?${view}`, 'PUT', layout);
+  }
+
+  householdMembers(signal: AbortSignal) {
+    return this.request<HouseholdMember[]>('/accounts', 'GET', undefined, signal);
+  }
+
+  createHouseholdMember(name: string, login: string, deviceName: string) {
+    return this.request<IssuedMember>('/accounts', 'POST', { name, login, device_name: deviceName });
+  }
+
+  nameHouseholdOwner(name: string, login: string) {
+    return this.request<AccountIdentity>('/accounts/owner', 'PUT', { name, login });
+  }
+
+  householdDeviceKeys(id: string, signal?: AbortSignal) {
+    return this.request<HouseholdDeviceKey[]>(`/accounts/${encodeURIComponent(id)}/keys`, 'GET', undefined, signal);
+  }
+
+  createHouseholdDeviceKey(id: string, name: string) {
+    return this.request<HouseholdDeviceKey>(`/accounts/${encodeURIComponent(id)}/keys`, 'POST', { name });
+  }
+
+  householdDeviceKey(id: string, key: string) {
+    return this.request<{ 'access_key': string }>(`/accounts/${encodeURIComponent(id)}/keys/${encodeURIComponent(key)}`);
+  }
+
+  revokeHouseholdDeviceKey(id: string, key: string) {
+    return this.deleteResource(`/accounts/${encodeURIComponent(id)}/keys/${encodeURIComponent(key)}`);
+  }
+
+  revokeHouseholdMember(id: string) {
+    return this.deleteResource(`/accounts/${encodeURIComponent(id)}`);
   }
 
   beginFunctionSetup(id: number, provider?: Provider, signal?: AbortSignal) {

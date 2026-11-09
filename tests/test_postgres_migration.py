@@ -227,3 +227,60 @@ def test_refuses_to_adopt_unversioned_inventory(postgres_url):
         assert inspect(engine).get_table_names() == ["buildings"]
     finally:
         engine.dispose()
+
+
+def test_migrates_household_keys_and_private_layouts(tmp_path, postgres_url):
+    sqlite_path = tmp_path / "household.db"
+    owner = {"X-API-Key": "test-owner-key"}
+    layout_path = "/api/v1/dashboard-layouts/me"
+    layout = {"slots": ["device-light"]}
+    with TestClient(create_app(Settings(database_path=str(sqlite_path), api_token=owner["X-API-Key"]))) as source:
+        issued = source.post("/api/v1/accounts", headers=owner, json={
+            "name": "Member", "login": "member", "device_name": "Phone",
+        })
+        assert issued.status_code == 201
+        member = issued.json()
+        member_key = {"X-API-Key": member["access_key"]}
+        assert source.put(layout_path, headers=member_key, params=LAYOUT_VIEW, json=layout).json() == layout
+
+    before = sqlite_path.read_bytes()
+    assert migrate_sqlite(sqlite_path, postgres_url)["household_device_keys"] == 1
+    settings = Settings(database_path=str(sqlite_path), database_url=postgres_url, api_token=owner["X-API-Key"])
+    with TestClient(create_app(settings)) as target:
+        assert target.get("/api/v1/accounts/me", headers=member_key).json()["login"] == "member"
+        reveal = target.get(f"/api/v1/accounts/{member['id']}/key", headers=owner)
+        assert reveal.json()["access_key"] == member["access_key"]
+        assert target.get(layout_path, headers=member_key, params=LAYOUT_VIEW).json() == layout
+        assert target.get(layout_path, headers=owner, params=LAYOUT_VIEW).json() == {"slots": []}
+        updated = {"slots": [None, "device-light"]}
+        assert target.put(layout_path, headers=member_key, params=LAYOUT_VIEW, json=updated).json() == updated
+        assert target.put("/api/v1/accounts/owner", headers=owner, json={"name": "Owner", "login": "home-owner"}).status_code == 200
+        assert target.delete(f"/api/v1/accounts/{member['id']}", headers=owner).status_code == 204
+        assert target.get("/api/v1/accounts/me", headers=member_key).status_code == 401
+    assert sqlite_path.read_bytes() == before
+
+
+def test_postgres_upgrades_legacy_member_access_keys(postgres_url):
+    engine = make_engine("", postgres_url)
+    try:
+        init_db(engine)
+        member_id = "a" * 32
+        digest = "d" * 64
+        with engine.begin() as connection:
+            connection.exec_driver_sql("DROP TABLE household_device_keys")
+            connection.exec_driver_sql("DROP TABLE household_owner")
+            connection.exec_driver_sql("ALTER TABLE household_members DROP COLUMN login, DROP COLUMN sealed_key")
+            connection.execute(text(
+                "INSERT INTO household_members (id, name, key_digest) VALUES (:id, 'Legacy member', :digest)"
+            ), {"id": member_id, "digest": digest})
+            connection.execute(SCHEMA_VERSION.update().values(version=9))
+
+        init_db(engine)
+        with engine.connect() as connection:
+            assert connection.scalar(select(SCHEMA_VERSION.c.version)) == len(MIGRATIONS)
+            assert connection.exec_driver_sql("SELECT login FROM household_members").scalar_one() == "user-" + member_id
+            assert connection.exec_driver_sql(
+                "SELECT id, member_id, key_digest FROM household_device_keys"
+            ).one() == (member_id, member_id, digest)
+    finally:
+        engine.dispose()
