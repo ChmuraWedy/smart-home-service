@@ -499,7 +499,7 @@ describe('main controls on device cards', () => {
     const sheet = within(embeddedQuick
       ? screen.getByRole('group', { name: /Лампа/ })
       : await screen.findByRole('dialog', { name: local.name }));
-    const brightness = sheet.getByRole('slider', { name: 'Яркость' });
+    const brightness = await sheet.findByRole('slider', { name: 'Яркость' });
     await waitFor(() => expect(brightness).toBeEnabled());
     expect(brightness).toHaveAttribute('min', '1');
     expect(brightness).toHaveAttribute('max', '100');
