@@ -11,6 +11,7 @@ export function CardDetailsButton({ label, disabled, onClick }: {
     <button
       type="button"
       className="secondary tile-icon-action"
+      data-tour="device-settings"
       aria-label={label}
       title={label}
       disabled={disabled}
