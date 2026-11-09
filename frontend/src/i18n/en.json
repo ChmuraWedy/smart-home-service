@@ -1045,6 +1045,8 @@
   "ROOM_NAVIGATION_VISIBILITY": "Show {0} in room navigation",
   "EDIT_DASHBOARD_LAYOUT": "Edit layout",
   "RETRY_DASHBOARD_LAYOUT": "Retry loading layout",
+  "SHOW_REMOTE_DEVICES": "Show remote devices",
+  "HIDE_REMOTE_DEVICES": "Hide remote devices",
   "DASHBOARD_LAYOUT_SHOW_HIDDEN": "Show hidden devices",
   "DASHBOARD_LAYOUT_NONE_HIDDEN": "No hidden devices in this layout",
   "DASHBOARD_LAYOUT_CARD_VISIBILITY": "Show {0} on the dashboard",

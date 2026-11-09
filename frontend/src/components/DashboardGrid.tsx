@@ -109,7 +109,7 @@ function LayoutTarget({
 }
 
 export default function DashboardGrid<T>({
-  api, density, items, view, editable, editing, onEditingChange, navigation, roomAction, renderCard,
+  api, density, items, view, editable, editing, onEditingChange, navigation, roomAction, remoteVisibility, renderCard,
 }: {
   api: HomeApi;
   density: 'small' | 'large';
@@ -120,6 +120,7 @@ export default function DashboardGrid<T>({
   onEditingChange: (value: boolean) => void;
   navigation?: ReactNode;
   roomAction?: ReactNode;
+  remoteVisibility?: { shown: boolean; toggle: () => void };
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
 }) {
   const { grid, columns } = useGridColumns(density);
@@ -338,17 +339,31 @@ export default function DashboardGrid<T>({
                     {saving ? t(MSG.SAVING).trim() : t(MSG.SAVE)}
                   </button>
                 ) : !editing && (
-                  <button
-                    type="button"
-                    className="secondary dashboard-layout-icon"
-                    aria-label={t(MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN)}
-                    aria-pressed={showAll}
-                    title={t(hasHiddenDevices ? MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN : MSG.DASHBOARD_LAYOUT_NONE_HIDDEN)}
-                    disabled={!hasHiddenDevices}
-                    onClick={() => setShowAll((value) => !value)}
-                  >
-                    <Icon name={showAll ? 'eye' : 'eye-off'} />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="secondary dashboard-layout-icon"
+                      aria-label={t(MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN)}
+                      aria-pressed={showAll}
+                      title={t(hasHiddenDevices ? MSG.DASHBOARD_LAYOUT_SHOW_HIDDEN : MSG.DASHBOARD_LAYOUT_NONE_HIDDEN)}
+                      disabled={!hasHiddenDevices}
+                      onClick={() => setShowAll((value) => !value)}
+                    >
+                      <Icon name={showAll ? 'eye' : 'eye-off'} />
+                    </button>
+                    {remoteVisibility && (
+                      <button
+                        type="button"
+                        className="secondary dashboard-layout-icon"
+                        aria-label={t(MSG.SHOW_REMOTE_DEVICES)}
+                        aria-pressed={remoteVisibility.shown}
+                        title={t(remoteVisibility.shown ? MSG.HIDE_REMOTE_DEVICES : MSG.SHOW_REMOTE_DEVICES)}
+                        onClick={remoteVisibility.toggle}
+                      >
+                        <Icon name={remoteVisibility.shown ? 'cloud' : 'cloud-off'} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )}

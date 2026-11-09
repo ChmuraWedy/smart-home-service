@@ -1045,6 +1045,8 @@
   "ROOM_NAVIGATION_VISIBILITY": "Показывать «{0}» в списке комнат",
   "EDIT_DASHBOARD_LAYOUT": "Изменить раскладку",
   "RETRY_DASHBOARD_LAYOUT": "Повторить загрузку раскладки",
+  "SHOW_REMOTE_DEVICES": "Показать облачные устройства",
+  "HIDE_REMOTE_DEVICES": "Скрыть облачные устройства",
   "DASHBOARD_LAYOUT_SHOW_HIDDEN": "Показать скрытые устройства",
   "DASHBOARD_LAYOUT_NONE_HIDDEN": "В этой раскладке нет скрытых устройств",
   "DASHBOARD_LAYOUT_CARD_VISIBILITY": "Показывать «{0}» на главном экране",

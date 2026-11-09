@@ -229,6 +229,8 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const building = query.get('building') ?? '';
   const room = dashboardRoom(location.pathname, query);
   const editingLayout = isDashboardLayoutPath(location.pathname);
+  const [showRemote, setShowRemote] = useState(true);
+  const localOnly = !showRemote && !editingLayout;
   const activeRoom = inventory?.rooms.find(({ id }) => String(id) === room);
   const roomLabel = useRoomName();
   const [appearanceRevision, setAppearanceRevision] = useState(0);
@@ -477,7 +479,9 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     const needle = search.trim().normalize('NFC').toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
     const roomBuilding = (id: number | null) => inventory?.rooms.find((item) => item.id === id)?.building_id;
-    const combinedInRoom = combinations.filter((item) => inRoom(item.room_id) && (!building || String(roomBuilding(item.room_id)) === building));
+    const combinedInRoom = combinations.filter((item) => inRoom(item.room_id)
+      && (!building || String(roomBuilding(item.room_id)) === building)
+      && (!localOnly || item.members.some((member) => member.route === 'local')));
     const displayed = combinedInRoom.filter((item) => item.name.normalize('NFC').toLocaleLowerCase().includes(needle)
       || item.aliases?.some((alias) => alias.toLocaleLowerCase().includes(needle))
       || resolvedMembers.get(item.id)?.some(({ device }) => device && matchesDevice(device, needle)));
@@ -493,11 +497,11 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       const placement = placementOf(device);
       const inView = shownMembers.has(device.id) || (!hiddenMembers.has(device.id)
         && (!building || String(placement?.building_id) === building) && inRoom(placement?.room_id ?? null));
-      return inView && matchesDevice(device, needle);
+      return inView && (!localOnly || Boolean(device.local)) && matchesDevice(device, needle);
     });
     const groups = inventory?.groups.filter((item) => inRoom(item.room_id)
       && (!building || String(roomBuilding(item.room_id)) === building) && item.name.toLocaleLowerCase().includes(needle)) ?? [];
-    const videos = devices.flatMap((device) => {
+    const videos = localOnly ? [] : devices.flatMap((device) => {
       const provider = cameraPreviews[cameraRoomPreviewKey(api.baseUrl, device.id)];
       if (provider !== 'sharing' && provider !== 'developer') return [];
       const camera = device.cloud[provider];
@@ -512,7 +516,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
       ...filtered.map((device) => ({ kind: 'device' as const, device })),
       ...videos,
     ];
-  }, [api.baseUrl, devices, inventory, building, room, search, placementOf, combinations, resolvedMembers, cameraPreviews]);
+  }, [api.baseUrl, devices, inventory, building, room, search, placementOf, combinations, resolvedMembers, cameraPreviews, localOnly]);
   const linkedIndex = entries.findIndex((entry) => {
     if (entry.kind === 'device') return entry.device === linked;
     if (entry.kind === 'combined') return entry.combined === (combined ?? combinedParent);
@@ -926,6 +930,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
             editable={Boolean(current && !busy && !detailsOpen && !quick)}
             editing={editingLayout}
             onEditingChange={setEditingLayout}
+            remoteVisibility={{ shown: showRemote, toggle: () => setShowRemote((value) => !value) }}
             navigation={(
               <RoomNavigation
                 api={api}

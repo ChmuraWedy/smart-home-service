@@ -1045,6 +1045,8 @@
   "ROOM_NAVIGATION_VISIBILITY": "Паказваць «{0}» у спісе пакояў",
   "EDIT_DASHBOARD_LAYOUT": "Змяніць раскладку",
   "RETRY_DASHBOARD_LAYOUT": "Паўтарыць загрузку раскладкі",
+  "SHOW_REMOTE_DEVICES": "Паказаць воблачныя прылады",
+  "HIDE_REMOTE_DEVICES": "Схаваць воблачныя прылады",
   "DASHBOARD_LAYOUT_SHOW_HIDDEN": "Паказаць схаваныя прылады",
   "DASHBOARD_LAYOUT_NONE_HIDDEN": "У гэтай раскладцы няма схаваных прылад",
   "DASHBOARD_LAYOUT_CARD_VISIBILITY": "Паказваць «{0}» на галоўным экране",

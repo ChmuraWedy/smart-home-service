@@ -11,6 +11,8 @@ const drawings = {
       <path d="M12 7v5l3 2" />
     </>
   ),
+  cloud: <path d="M7 18a5 5 0 1 1 1.5-9.8 6 6 0 0 1 11.2 2.8 3.5 3.5 0 0 1-.2 7H7Z" />,
+  'cloud-off': <path d="m3 3 18 18M10 6a6 6 0 0 1 9.7 5 3.5 3.5 0 0 1 1.3 6.7M6 8a5 5 0 0 0 1 10h11" />,
   close: <path d="m6 6 12 12M18 6 6 18" />,
   delete: <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 10v7M14 10v7" />,
   edit: (
