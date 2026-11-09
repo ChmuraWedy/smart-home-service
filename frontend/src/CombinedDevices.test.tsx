@@ -803,8 +803,11 @@ describe('combined devices', () => {
       body: { aliases: ['Святло Łódź'] },
     }]);
     await user.click(dialog.getByRole('button', { name: 'Close' }));
-    await user.click(screen.getByRole('button', { name: 'Search' }));
-    const search = screen.getByRole('searchbox');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Kitchen lights' })).toBeNull());
+    const searchToggle = screen.getByRole('button', { name: 'Search' });
+    await waitFor(() => expect(searchToggle).toBeEnabled());
+    await user.click(searchToggle);
+    const search = await screen.findByRole('searchbox');
     fireEvent.change(search, { target: { value: 'ŁÓDŹ' } });
     expect(await screen.findByRole('listitem', { name: 'Kitchen lights' })).toBeInTheDocument();
     expect(screen.queryByRole('listitem', { name: bulbs[2].name })).toBeNull();
