@@ -1201,5 +1201,6 @@
   "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Разрешите доступ панели управления в Smart Life на Android, затем подтвердите здесь. Осталось секунд: {0}.",
   "SMART_LIFE_ANDROID_LOGIN_HELP": "Введите название страны как в Smart Life. Панель управления передаст пароль в Android для входа и удалит его после запроса.",
   "USE_EXISTING_ANDROID_SESSION": "Использовать текущий сеанс Android",
-  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Завершите проверку в Smart Life на Android, затем выберите «Использовать текущий сеанс Android»."
+  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Завершите проверку в Smart Life на Android, затем выберите «Использовать текущий сеанс Android».",
+  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Если на Android не появилось подтверждение, отсканируйте QR-код в Smart Life на другом устройстве с тем же аккаунтом. Осталось секунд: {0}."
 }

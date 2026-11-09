@@ -199,7 +199,7 @@ export class CloudApi {
   connectDeveloper() { return this.json<DeveloperStatus>('/developer/connect', 'POST'); }
   beginQR() { return this.json<QRLogin>('/login/qr', 'POST', {}); }
   loginRedroid(body: RedroidCredentials) { return this.json<{ screen: 'home' | 'verification' }>('/login/redroid/credentials', 'POST', body); }
-  beginRedroidQR() { return this.json<QRLogin>('/login/redroid/qr', 'POST'); }
+  beginRedroidQR() { return this.json<QRLogin & { scan_submitted: boolean }>('/login/redroid/qr', 'POST'); }
   confirmQR(session: string) { return this.json<{ connected: boolean }>('/login/' + encodeURIComponent(session) + '/confirm', 'POST'); }
   devices(provider: Provider, signal?: AbortSignal) { return this.json<CloudDevice[]>('/devices?refresh=true&provider=' + provider, 'GET', undefined, signal); }
   cameraStream(id: string, provider: Provider, signal?: AbortSignal) {

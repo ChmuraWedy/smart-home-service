@@ -1201,5 +1201,6 @@
   "APPROVE_DASHBOARD_ACCESS_ON_ANDROID": "Zatwierdź dostęp panelu w Smart Life na Androidzie, a następnie potwierdź tutaj. Pozostało sekund: {0}.",
   "SMART_LIFE_ANDROID_LOGIN_HELP": "Wpisz nazwę kraju wyświetlaną w Smart Life. Panel przekaże hasło do Androida na czas logowania i usunie je po zakończeniu żądania.",
   "USE_EXISTING_ANDROID_SESSION": "Użyj istniejącej sesji Androida",
-  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Zakończ weryfikację w Smart Life na Androidzie, a następnie wybierz „Użyj istniejącej sesji Androida”."
+  "FINISH_SMART_LIFE_VERIFICATION_ON_ANDROID": "Zakończ weryfikację w Smart Life na Androidzie, a następnie wybierz „Użyj istniejącej sesji Androida”.",
+  "SCAN_DASHBOARD_QR_ON_ANOTHER_DEVICE": "Jeśli na Androidzie nie ma prośby o potwierdzenie, zeskanuj kod QR w Smart Life na innym urządzeniu zalogowanym na to samo konto. Pozostało sekund: {0}."
 }

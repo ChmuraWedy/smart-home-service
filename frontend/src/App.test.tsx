@@ -38,7 +38,7 @@ function fakeApi(initial: Partial<CloudStatus> = {}) {
     }
     if (path.endsWith('/login/qr')) return json({ session_id: 'qr-session', qr_url: '/api/v1/cloud/login/qr-session/qr.svg', expires_in: 120 });
     if (path.endsWith('/login/redroid/credentials')) return json({ screen: 'home' });
-    if (path.endsWith('/login/redroid/qr')) return json({ session_id: 'android-session', expires_in: 90 });
+    if (path.endsWith('/login/redroid/qr')) return json({ session_id: 'android-session', qr_url: '/api/v1/cloud/login/android-session/qr.svg', expires_in: 90, scan_submitted: true });
     if (path.endsWith('/qr.svg')) return new Response('<svg/>', { headers: { 'Content-Type': 'image/svg+xml' } });
     if (path.endsWith('/confirm')) {
       status.connected = true; status.saved_user_code_requires_login = false;

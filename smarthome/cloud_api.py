@@ -365,9 +365,11 @@ def redroid_qr(request: Request, controller=Depends(require_redroid)):
     session = login["session_id"]
     try:
         qr_image = base64.b64encode(bridge.qr_png(session))
-        scanned = redroid_request(controller, "POST", "/v1/scan/qr", qr_image, "text/plain")
-        if scanned.get("status") != "submitted":
-            raise HTTPException(502, "Smart Life on Android did not scan the QR code.")
+        try:
+            scanned = redroid_request(controller, "POST", "/v1/scan/qr?expect_smart_life=true", qr_image, "text/plain")
+            scan_submitted = scanned.get("status") == "submitted"
+        except HTTPException:
+            scan_submitted = False
         remaining = login["expires_in"] - ceil(monotonic() - started)
         if remaining <= 0:
             raise HTTPException(409, "The QR code expired on Android. Start a new connection.")
@@ -375,7 +377,7 @@ def redroid_qr(request: Request, controller=Depends(require_redroid)):
         with bridge.lock:
             bridge.pending.pop(session, None)
         raise
-    return {**login, "expires_in": remaining}
+    return {**login, "expires_in": remaining, "scan_submitted": scan_submitted}
 
 
 @router.get("/login/{session_id}/qr.svg")

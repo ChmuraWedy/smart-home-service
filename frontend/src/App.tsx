@@ -40,7 +40,7 @@ import { createAppStore, selectDashboardLocked, useAppSelector } from './store';
 import { rotateCloudAccountScope } from './cloud-account-scope';
 
 type Notice = { text: string; error?: boolean };
-type QR = { session: string; imageUrl?: string; expiresAt: number };
+type QR = { session: string; imageUrl: string; expiresAt: number; scanSubmitted?: boolean };
 type ConnectionMethod = Provider | 'android';
 type View = keyof typeof appPaths;
 type CardSize = 'large' | 'small';
@@ -250,7 +250,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     };
     update();
     const timer = setInterval(update, 1000);
-    return () => { clearInterval(timer); if (qr.imageUrl) URL.revokeObjectURL(qr.imageUrl); };
+    return () => { clearInterval(timer); URL.revokeObjectURL(qr.imageUrl); };
   }, [qr]);
 
   async function run(work: () => Promise<void>, invalidateOn401 = false) {
@@ -344,7 +344,10 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
     }
     const login = await api.beginRedroidQR();
     if (currentConnection.current !== connection) return;
-    setQR({ session: login.session_id, expiresAt: Date.now() + login.expires_in * 1000 });
+    const expiresAt = Date.now() + login.expires_in * 1000;
+    const image = await api.qrImage(login);
+    if (currentConnection.current !== connection) return;
+    setQR({ session: login.session_id, imageUrl: URL.createObjectURL(image), expiresAt, scanSubmitted: login.scan_submitted });
   }, true);
 
   const confirmQR = () => run(async () => {
@@ -546,7 +549,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   </>
           )}
                     <button className="full-width" disabled={busy || !ready || !status?.has_saved_user_code || showCodeForm} onClick={beginQR}>{t(MSG.GET_QR_CODE)}</button>
-                    {qr?.imageUrl && (
+                    {qr && (
                   <div className="qr-panel">
                     <img src={qr.imageUrl} alt={t(MSG.QR_CODE_FOR_TUYA_SIGN_IN)} />
                     <p className="help">{t(MSG.SCAN_THE_CODE_IN_THE_APP) + " "}{remaining}{" " + t(MSG.SEC)}</p>
@@ -562,7 +565,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       protectedConnection={protectedConnection}
       ready={ready}
       busy={locked}
-      approvalTime={qr ? remaining : null}
+      approval={qr ? { remaining, imageUrl: qr.imageUrl, scanSubmitted: qr.scanSubmitted ?? false } : null}
       onConnect={connectRedroid}
       onConfirm={confirmQR}
     />
