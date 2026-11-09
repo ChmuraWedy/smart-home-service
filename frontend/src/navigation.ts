@@ -6,6 +6,7 @@ export const appPaths = {
   'combined-devices': '/combined-devices',
   settings: '/settings',
   rooms: '/settings/rooms',
+  users: '/settings/users',
   connections: '/settings/connections',
   network: '/network',
   'local-connections': '/local-connections',

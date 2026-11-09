@@ -64,6 +64,12 @@ def add_household_accounts(connection: Connection) -> None:
         )
 
 
+def add_recoverable_member_keys(connection: Connection) -> None:
+    columns = {column[1] for column in connection.exec_driver_sql("PRAGMA table_info(household_members)")}
+    if "sealed_key" not in columns:
+        connection.exec_driver_sql("ALTER TABLE household_members ADD COLUMN sealed_key BLOB")
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
@@ -75,4 +81,5 @@ MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_room_name_translations,
     add_generated_room_names,
     add_household_accounts,
+    add_recoverable_member_keys,
 )

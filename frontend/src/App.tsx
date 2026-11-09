@@ -67,7 +67,7 @@ function screenRoute(path: string, view: View, id = path): RouteObject {
 }
 
 function ownerPage(view: View) {
-  return view === 'network' || view === 'local-connections' || view === 'rooms' || view === 'combined-devices';
+  return view === 'network' || view === 'local-connections' || view === 'rooms' || view === 'combined-devices' || view === 'users';
 }
 
 function AppScreen() {
@@ -96,6 +96,7 @@ export function createAppRouter() {
     screenRoute(appPaths.settings, 'settings'),
     ...(!demo ? [
       screenRoute(appPaths.rooms, 'rooms'),
+      screenRoute(appPaths.users, 'users'),
       screenRoute(appPaths.connections, 'connections'),
       screenRoute(appPaths.network, 'network'),
       screenRoute(appPaths['local-connections'], 'local-connections'),
@@ -419,8 +420,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
               ['network', t(MSG.NETWORK_AND_PACKETS)],
               ['local-connections', t(MSG.LOCAL_CONNECTIONS)],
               ['settings', t(MSG.SETTINGS)],
+              ['users', t(MSG.USERS)],
               ['connections', t(MSG.CONNECTIONS)],
-            ] as const).filter(([key]) => (!demo || key === 'control' || key === 'settings') && (!member || !ownerPage(key))).map(([key, label]) => (
+            ] as const).filter(([key]) => (!demo || key === 'control' || key === 'settings') && (!member || !ownerPage(key)) && (key !== 'users' || owner)).map(([key, label]) => (
               <button type="button" key={key} className="secondary" aria-current={view === key ? 'page' : undefined} disabled={locked} onClick={() => goTo(key)}>
                 {label}
               </button>
@@ -541,7 +543,9 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
           <h1>{t(MSG.SETTINGS)}</h1>
           <div className="app-menu-appearance">{appearance}</div>
           {sessionControls}
+          {owner && <button type="button" className="secondary compact" onClick={() => goTo('users')}>{t(MSG.USERS)}</button>}
         </section>,
+          users: owner ? <HouseholdAccess key={sessionRevision} api={api} onAuthError={invalidateConnection} /> : null,
         network: <NetworkPage api={api} ready={Boolean(status && connection.token)} onAuthError={invalidateConnection} />,
         'local-connections': <LocalConnectionsPage api={api} ready={ready} sharingReady={Boolean(ready && status?.connected)} developerReady={Boolean(ready && developer.connected)} onAuthError={invalidateConnection} onLock={setLocalConnectionLocked} onConnections={() => goTo('connections')} />,
         control: controlCenter,
@@ -549,7 +553,6 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
           'combined-devices': controlCenter,
       } satisfies Record<View, ReactNode> }}
         />
-        {owner && view === 'settings' && <HouseholdAccess key={sessionRevision} api={api} onAuthError={invalidateConnection} />}
         <div className={'notice ' + (notice.error ? 'error' : '')} role={notice.error ? 'alert' : 'status'} aria-live="polite">
           {busy ? (
             <>

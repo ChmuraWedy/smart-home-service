@@ -1,7 +1,7 @@
 import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response
 from pydantic import Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -30,10 +30,15 @@ class MemberCreate(Schema):
 class MemberRead(Schema):
     id: str
     name: str
+    key_available: bool
 
 
-class MemberIssued(MemberRead):
+class MemberKey(Schema):
     access_key: str
+
+
+class MemberIssued(MemberRead, MemberKey):
+    pass
 
 
 @router.get("", response_model=list[MemberRead])
@@ -43,13 +48,31 @@ def list_members(response: Response, session: Session = Depends(get_session)):
 
 
 @router.post("", response_model=MemberIssued, status_code=201)
-def create_member(body: MemberCreate, response: Response, session: Session = Depends(get_session)):
+def create_member(body: MemberCreate, request: Request, response: Response, session: Session = Depends(get_session)):
     token = MEMBER_KEY_PREFIX + secrets.token_urlsafe(32)
-    member = HouseholdMember(id=secrets.token_hex(16), name=body.name, key_digest=key_digest(token))
+    member_id = secrets.token_hex(16)
+    try:
+        sealed = request.app.state.account_key_vault.seal(member_id, token)
+    except (OSError, ValueError):
+        raise HTTPException(503, "User key storage is unavailable") from None
+    member = HouseholdMember(id=member_id, name=body.name, key_digest=key_digest(token), sealed_key=sealed)
     session.add(member)
     commit(session)
     response.headers["Cache-Control"] = "no-store"
-    return MemberIssued(id=member.id, name=member.name, access_key=token)
+    return MemberIssued(id=member.id, name=member.name, key_available=True, access_key=token)
+
+
+@router.get("/{member_id}/key", response_model=MemberKey)
+def reveal_member_key(member_id: MemberId, request: Request, response: Response, session: Session = Depends(get_session)):
+    member = session.get(HouseholdMember, member_id)
+    if member is None or member.sealed_key is None:
+        raise HTTPException(404, "This user key is unavailable", headers={"Cache-Control": "no-store"})
+    try:
+        token = request.app.state.account_key_vault.reveal(member_id, member.sealed_key)
+    except (OSError, ValueError):
+        raise HTTPException(503, "User key storage is unavailable", headers={"Cache-Control": "no-store"}) from None
+    response.headers["Cache-Control"] = "no-store"
+    return MemberKey(access_key=token)
 
 
 @router.delete("/{member_id}", status_code=204)

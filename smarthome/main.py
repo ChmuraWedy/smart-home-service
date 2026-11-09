@@ -659,6 +659,9 @@ def create_app(settings: Settings | None = None, controller=None):
         engine = make_engine(settings.database_path)
         init_db(engine)
         app.state.engine = engine
+        from .account_key_vault import AccountKeyVault
+
+        app.state.account_key_vault = AccountKeyVault(settings.database_path)
         from .commissioning import Observations
 
         app.state.observations = Observations()

@@ -132,6 +132,10 @@ export class HomeApi extends CloudApi {
     return this.request<IssuedMember>('/accounts', 'POST', { name });
   }
 
+  householdMemberKey(id: string) {
+    return this.request<{ 'access_key': string }>(`/accounts/${encodeURIComponent(id)}/key`);
+  }
+
   revokeHouseholdMember(id: string) {
     return this.deleteResource(`/accounts/${encodeURIComponent(id)}`);
   }

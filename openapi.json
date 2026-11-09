@@ -6912,6 +6912,54 @@
           }
         ]
       }
+    },
+    "/api/v1/accounts/{member_id}/key": {
+      "get": {
+        "tags": [
+          "Household access"
+        ],
+        "summary": "Reveal Member Key",
+        "operationId": "reveal_member_key_api_v1_accounts__member_id__key_get",
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "member_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$",
+              "title": "Member Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberKey"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10281,18 +10329,27 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "key_available": {
+            "type": "boolean",
+            "title": "Key Available"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "id",
-          "name"
+          "name",
+          "key_available"
         ],
         "title": "MemberRead"
       },
       "MemberIssued": {
         "properties": {
+          "access_key": {
+            "type": "string",
+            "title": "Access Key"
+          },
           "id": {
             "type": "string",
             "title": "Id"
@@ -10301,6 +10358,23 @@
             "type": "string",
             "title": "Name"
           },
+          "key_available": {
+            "type": "boolean",
+            "title": "Key Available"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "access_key",
+          "id",
+          "name",
+          "key_available"
+        ],
+        "title": "MemberIssued"
+      },
+      "MemberKey": {
+        "properties": {
           "access_key": {
             "type": "string",
             "title": "Access Key"
@@ -10309,11 +10383,9 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "id",
-          "name",
           "access_key"
         ],
-        "title": "MemberIssued"
+        "title": "MemberKey"
       }
     },
     "securitySchemes": {

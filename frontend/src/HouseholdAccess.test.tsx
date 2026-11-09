@@ -8,7 +8,7 @@ import { setLocale } from './i18n';
 const address = 'http://household.test';
 const ownerKey = 'owner-test-key';
 const memberKey = 'member-test-key';
-const member = { id: 'member-id', name: 'Alex' };
+const member = { id: 'member-id', name: 'Alex', key_available: true };
 
 function stored(token: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ baseUrl: address, token }));
@@ -34,6 +34,7 @@ function mockHousehold() {
       exists = true;
       return Response.json({ ...member, access_key: memberKey }, { status: 201 });
     }
+    if (path === `/api/v1/accounts/${member.id}/key`) return Response.json({ access_key: memberKey });
     if (path === `/api/v1/accounts/${member.id}` && method === 'DELETE') {
       exists = false;
       return new Response(null, { status: 204 });
@@ -57,19 +58,29 @@ function mockHousehold() {
   return requests;
 }
 
-it('creates a named member, shows their key once, and confirms revocation', async () => {
+it('creates a named member, reveals the masked key on demand, and confirms revocation', async () => {
   setLocale('en', false);
   stored(ownerKey);
   window.history.replaceState(null, '', '/settings');
   mockHousehold();
   const user = userEvent.setup();
   render(<App />);
-  await screen.findByRole('heading', { name: 'Household access' });
+  await user.click(await screen.findByRole('button', { name: 'Users' }));
+  expect(await screen.findByRole('heading', { name: 'Users' })).toBeVisible();
+  expect(window.location.pathname).toBe('/settings/users');
   await user.type(await screen.findByLabelText('Member name'), ' Alex ');
   await user.click(screen.getByRole('button', { name: 'Create access key' }));
-  expect(await screen.findByLabelText('Access key for Alex')).toHaveValue(memberKey);
+  const key = await screen.findByLabelText('Access key for Alex');
+  expect(key).not.toHaveValue(memberKey);
+  await user.click(screen.getByRole('button', { name: 'Show access key' }));
+  expect(key).toHaveValue(memberKey);
+  await user.click(screen.getByRole('button', { name: 'Hide access key' }));
+  expect(key).not.toHaveValue(memberKey);
   await user.click(screen.getByRole('button', { name: 'Close' }));
   expect(screen.queryByLabelText('Access key for Alex')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Show key for Alex' }));
+  expect(await screen.findByLabelText('Access key for Alex')).toHaveValue(memberKey);
+  await user.click(screen.getByRole('button', { name: 'Close' }));
   await user.click(screen.getByRole('button', { name: 'Revoke access for Alex' }));
   expect(screen.getByText('Revoke access for Alex and delete their saved dashboard layouts?')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Yes' }));
@@ -102,14 +113,14 @@ it('signs out the owner and opens a fresh dashboard for a member without admin l
   expect(nav.queryByRole('button', { name: 'Local connections' })).toBeNull();
   await user.click(nav.getByRole('button', { name: 'Settings' }));
   expect(screen.getByText('Signed in as Alex')).toBeVisible();
-  expect(screen.queryByRole('heading', { name: 'Household access' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Users' })).toBeNull();
   expect(requests.filter(({ token }) => token === memberKey).every(({ path }) => !path.startsWith('/api/v1/accounts'))).toBe(true);
 });
 
 it('returns members who open an owner-only link to their dashboard', async () => {
   setLocale('en', false);
   stored(memberKey);
-  window.history.replaceState(null, '', '/network');
+  window.history.replaceState(null, '', '/settings/users');
   const requests = mockHousehold();
   render(<App />);
   expect(await screen.findByRole('heading', { name: 'Member inventory fixture' })).toBeVisible();

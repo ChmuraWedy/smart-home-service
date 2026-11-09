@@ -36,6 +36,11 @@ class HouseholdMember(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
     key_digest: Mapped[str] = mapped_column(String(64), unique=True)
+    sealed_key: Mapped[bytes | None] = mapped_column(LargeBinary)
+
+    @property
+    def key_available(self) -> bool:
+        return self.sealed_key is not None
 
 
 class AccountDashboardLayout(Base):

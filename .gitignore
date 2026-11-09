@@ -19,3 +19,7 @@ tuya-raw.json
 
 firmware/cyd/.pio/
 firmware/cyd/include/panel_config.h
+
+# Private wrapping key and files used to create it atomically.
+*.account-key-vault
+.account-key-vault-*

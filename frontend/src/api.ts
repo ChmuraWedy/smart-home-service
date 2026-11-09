@@ -10,7 +10,7 @@ export type DeveloperStatus = {
   region?: Region;
   device_count?: number;
 };
-export type HouseholdMember = { id: string; 'name': string };
+export type HouseholdMember = { id: string; 'name': string; 'key_available'?: boolean };
 export type AccountIdentity = HouseholdMember & { role: 'owner' | 'member' };
 export type IssuedMember = HouseholdMember & { 'access_key': string };
 export type CloudStatus = {

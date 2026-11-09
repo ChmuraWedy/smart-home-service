@@ -44,16 +44,46 @@ def test_credentials_are_individual_and_cannot_manage_accounts(secured_app):
         assert alex["name"] == "Alex"
         assert alex["id"] != sam["id"] and alex["access_key"] != sam["access_key"]
         listed = client.get(API + "/accounts", headers=OWNER)
-        assert listed.json() == [{"id": alex["id"], "name": "Alex"}, {"id": sam["id"], "name": "Sam"}]
+        assert listed.json() == [
+            {"id": alex["id"], "name": "Alex", "key_available": True},
+            {"id": sam["id"], "name": "Sam", "key_available": True},
+        ]
         assert listed.headers["Cache-Control"] == "no-store"
         with Session(secured_app.state.engine) as session:
             member = session.get(HouseholdMember, alex["id"])
             assert member.key_digest == hashlib.sha256(alex["access_key"].encode()).hexdigest()
+            assert alex["access_key"].encode() not in member.sealed_key
+        path = API + "/accounts/" + alex["id"] + "/key"
+        assert client.get(path, headers=headers).status_code == 403
+        assert client.get(path).status_code == 401
+        key = client.get(path, headers=OWNER)
+        assert key.json() == {"access_key": alex["access_key"]}
+        assert key.headers["Cache-Control"] == "no-store"
         status = client.get(API + "/cloud/status", headers=headers).json()
         assert status["account"] == {"id": alex["id"], "name": "Alex", "role": "member"}
         assert client.get(API + "/cloud/status", headers=OWNER).json()["account"]["role"] == "owner"
         for method, path in [("GET", "/accounts"), ("POST", "/accounts"), ("DELETE", "/accounts/" + sam["id"])]:
             assert client.request(method, API + path, headers=headers).status_code == 403
+
+
+def test_existing_hashed_keys_keep_working_without_becoming_recoverable(secured_app):
+    token = "shm_" + "a" * 43
+    member_id = "a" * 32
+    with TestClient(secured_app) as client:
+        with Session(secured_app.state.engine) as session:
+            session.add(HouseholdMember(
+                id=member_id, name="Existing member", key_digest=hashlib.sha256(token.encode()).hexdigest(),
+            ))
+            session.commit()
+        listed = client.get(API + "/accounts", headers=OWNER)
+        assert listed.json() == [{"id": member_id, "name": "Existing member", "key_available": False}]
+        assert client.get(API + "/accounts/" + member_id + "/key", headers=OWNER).status_code == 404
+        assert client.get(API + "/cloud/status", headers={"X-API-Key": token}).status_code == 200
+        new_member, _ = create_member(client, "New member")
+
+    with TestClient(secured_app) as client:
+        result = client.get(API + "/accounts/" + new_member["id"] + "/key", headers=OWNER)
+        assert result.json() == {"access_key": new_member["access_key"]}
 
 
 def test_layout_is_private_across_browsers_and_revocation_removes_it(secured_app):

@@ -4,13 +4,15 @@ import { ApiError } from '../api';
 import type { HouseholdMember } from '../api';
 import type { HomeApi } from '../home-api';
 import { MSG, t, translateText } from '../i18n';
+import { Icon } from './ui/icon';
 
 export default function HouseholdAccess({ api, onAuthError }: { api: HomeApi; onAuthError: () => void }) {
   const memberNameId = useId();
   const issuedKeyId = useId();
   const [members, setMembers] = useState<HouseholdMember[]>();
   const [name, setName] = useState('');
-  const [issued, setIssued] = useState<HouseholdMember & { accessKey: string }>();
+  const [visibleKey, setVisibleKey] = useState<string>();
+  const [issued, setIssued] = useState<HouseholdMember>();
   const [revoke, setRevoke] = useState<HouseholdMember>();
   const [busy, setBusy] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -47,11 +49,24 @@ export default function HouseholdAccess({ api, onAuthError }: { api: HomeApi; on
     if (!name.trim() || issued) return;
     change(async () => {
       const result = await api.createHouseholdMember(name.trim());
-      const member = { id: result.id, name: result.name };
-      setIssued({ ...member, accessKey: result.access_key });
+      const member = { id: result.id, name: result.name, key_available: result.key_available };
+      setIssued(member);
       setMembers((rows) => [...(rows ?? []), member]);
       setName('');
     });
+  }
+
+  function revealKey(member: HouseholdMember) {
+    change(async () => {
+      const result = await api.householdMemberKey(member.id);
+      setIssued(member);
+      setVisibleKey(result.access_key);
+    });
+  }
+
+  function closeKey() {
+    setIssued(undefined);
+    setVisibleKey(undefined);
   }
 
   function confirmRevocation() {
@@ -59,7 +74,7 @@ export default function HouseholdAccess({ api, onAuthError }: { api: HomeApi; on
     change(async () => {
       await api.revokeHouseholdMember(revoke.id);
       setMembers((rows) => rows?.filter(({ id }) => id !== revoke.id));
-      if (issued?.id === revoke.id) setIssued(undefined);
+      if (issued?.id === revoke.id) closeKey();
       setRevoke(undefined);
     });
   }
@@ -71,7 +86,7 @@ export default function HouseholdAccess({ api, onAuthError }: { api: HomeApi; on
 
   return (
     <section className="card household-access">
-      <h2>{t(MSG.HOUSEHOLD_ACCESS)}</h2>
+      <h1>{t(MSG.USERS)}</h1>
       <p className="help">{t(MSG.HOUSEHOLD_ACCESS_HELP)}</p>
       {members && (
         <>
@@ -97,14 +112,26 @@ export default function HouseholdAccess({ api, onAuthError }: { api: HomeApi; on
                 {t(MSG.HOUSEHOLD_NEW_KEY, [issued.name])}
                 <input
                   id={issuedKeyId}
-                  value={issued.accessKey}
+                  value={visibleKey ?? '••••••••••••'}
                   readOnly
                   autoComplete="off"
-                  onFocus={(event) => event.currentTarget.select()}
+                  onFocus={(event) => { if (visibleKey) event.currentTarget.select(); }}
                 />
               </label>
+              <button
+                type="button"
+                className="secondary compact"
+                disabled={busy}
+                aria-label={t(visibleKey ? MSG.HIDE_USER_KEY : MSG.SHOW_USER_KEY)}
+                onClick={() => {
+                  if (visibleKey) setVisibleKey(undefined);
+                  else revealKey(issued);
+                }}
+              >
+                <Icon name={visibleKey ? 'eye-off' : 'eye'} />
+              </button>
               <p className="help">{t(MSG.HOUSEHOLD_NEW_KEY_HELP)}</p>
-              <button type="button" className="secondary compact" onClick={() => setIssued(undefined)}>
+              <button type="button" className="secondary compact" disabled={busy} onClick={closeKey}>
                 {t(MSG.CLOSE)}
               </button>
             </div>
@@ -113,6 +140,18 @@ export default function HouseholdAccess({ api, onAuthError }: { api: HomeApi; on
             {members.map((member) => (
               <li key={member.id}>
                 <strong>{member.name}</strong>
+                {member.key_available ? (
+                  <button
+                    type="button"
+                    className="secondary compact"
+                    aria-label={t(MSG.SHOW_KEY_FOR_USER, [member.name])}
+                    title={t(MSG.SHOW_KEY_FOR_USER, [member.name])}
+                    disabled={busy || Boolean(issued || revoke)}
+                    onClick={() => revealKey(member)}
+                  >
+                    <Icon name="eye" />
+                  </button>
+                ) : <small>{t(MSG.USER_KEY_UNAVAILABLE)}</small>}
                 <button
                   type="button"
                   className="secondary compact"
