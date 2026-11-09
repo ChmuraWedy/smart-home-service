@@ -6636,12 +6636,12 @@
       }
     },
     "/api/v1/assistant/embed": {
-      "get": {
+      "post": {
         "tags": [
           "Assistant"
         ],
         "summary": "Chat Embed",
-        "operationId": "chat_embed_api_v1_assistant_embed_get",
+        "operationId": "chat_embed_api_v1_assistant_embed_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -6659,6 +6659,47 @@
             "APIKeyHeader": []
           }
         ]
+      }
+    },
+    "/api/v1/assistant/session": {
+      "post": {
+        "tags": [
+          "Assistant"
+        ],
+        "summary": "Redeem Chat Ticket",
+        "operationId": "redeem_chat_ticket_api_v1_assistant_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatTicket"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -10050,13 +10091,52 @@
               }
             ],
             "title": "Url"
+          },
+          "ticket": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket"
           }
         },
         "type": "object",
         "required": [
-          "url"
+          "url",
+          "ticket"
         ],
         "title": "ChatEmbed"
+      },
+      "ChatTicket": {
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Ticket"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticket"
+        ],
+        "title": "ChatTicket"
+      },
+      "ChatSession": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "ChatSession"
       }
     },
     "securitySchemes": {

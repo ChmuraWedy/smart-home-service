@@ -133,18 +133,13 @@ Cloud and local connections can coexist. A failed command is not automatically r
 
 ### Optional AI chat
 
-Open **AI chat** in the connected dashboard header to use the existing Home Voice
-Classic Chat page. Set `SMART_HOME_AI_CHAT_EMBED_URL` in the backend environment
-to the browser-accessible HTTPS URL of Home Voice, for example
-`https://homeassistant.dom:8011/`. With Compose, use the Smart Home backend's
-existing `.env`. Home Voice must run on a separate origin and permit the dashboard
-to frame it.
-
-Classic Chat uses its existing sign-in, device permissions, and server-side provider
-configuration. If the browser blocks sign-in inside the panel, use **Open Classic Chat**
-to sign in in its own tab. Reopen the panel afterward. If the browser isolates its
-credentials between tabs and frames, use the separate tab. Microphone access requires
-a trusted HTTPS dashboard and Home Voice endpoint, plus browser permission.
+Open **AI chat** in the connected dashboard header to use Home Voice Classic Chat.
+Set `SMART_HOME_AI_CHAT_EMBED_URL` to the HTTPS `/embed` page of a separate Home
+Voice instance configured for this backend. Set a Smart Home service key and
+run a single backend worker so chat tickets and sessions reach the same process.
+The dashboard issues a one-time ticket and Classic Chat receives a temporary
+credential scoped to chat operations. Microphone input requires a trusted HTTPS
+dashboard and Home Voice endpoint, plus browser permission.
 
 ## Development
 

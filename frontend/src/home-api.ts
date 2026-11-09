@@ -79,7 +79,7 @@ export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; v
 
 export class HomeApi extends CloudApi {
   assistantEmbed(signal: AbortSignal) {
-    return this.request<{ url: string | null }>('/assistant/embed', 'GET', undefined, signal);
+    return this.request<{ url: string | null; ticket: string | null }>('/assistant/embed', 'POST', undefined, signal);
   }
 
   lightPresets(device: string, signal: AbortSignal) {
