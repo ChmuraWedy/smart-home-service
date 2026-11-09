@@ -109,7 +109,7 @@ function LayoutTarget({
 }
 
 export default function DashboardGrid<T>({
-  api, density, items, view, editable, editing, onEditingChange, navigation, roomAction, renderCard,
+  api, density, items, view, editable, editing, onEditingChange, navigation, roomAction, emptyState, renderCard,
 }: {
   api: HomeApi;
   density: 'small' | 'large';
@@ -120,6 +120,7 @@ export default function DashboardGrid<T>({
   onEditingChange: (value: boolean) => void;
   navigation?: ReactNode;
   roomAction?: ReactNode;
+  emptyState?: ReactNode;
   renderCard: (item: T, placement: GridCardPlacement) => ReactNode;
 }) {
   const { grid, columns } = useGridColumns(density);
@@ -357,6 +358,7 @@ export default function DashboardGrid<T>({
         </div>
       )}
       {draft && roomAction}
+      {emptyState}
       <div
         className="dashboard-device-grid"
         ref={grid}

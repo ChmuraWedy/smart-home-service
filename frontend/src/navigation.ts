@@ -62,6 +62,14 @@ export function dashboardHref(room: string, query: URLSearchParams, panel: Dashb
   return withQuery(room ? '/rooms/' + encodeURIComponent(room) : appPaths.control, params);
 }
 
+export function dashboardSearchHref(pathname: string, search: string, panel: DashboardPanel, value: string) {
+  const params = new URLSearchParams(search);
+  if (value) params.set('q', value);
+  else params.delete('q');
+  params.delete('page');
+  return dashboardHref(dashboardRoom(pathname, params), params, panel);
+}
+
 export function legacyHref(hash: string) {
   if (hash === '#network') return appPaths.network;
   if (hash === '#local-connections') return appPaths['local-connections'];

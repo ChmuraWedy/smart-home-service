@@ -38,6 +38,7 @@ import { deviceCardId, devicePath, readDeviceLink } from '../device-links';
 import {
   appPaths, combinationEditPattern, combinationEditPreviewPattern, combinationNewPath, combinationNewPreviewPath,
   combinationPattern, combinationQuickPattern, dashboardHref, dashboardRoom, groupPattern, isDashboardLayoutPath, quickPattern, withQuery,
+  dashboardSearchHref,
 } from '../navigation';
 import type { DashboardPanel } from '../navigation';
 import { selectCommandPending, setCommandPending, setDetailsOpen, useAppDispatch, useAppSelector } from '../store';
@@ -262,8 +263,6 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
   const combinedId = combinedNew ? undefined : (combinedQuick ?? combinedEdit ?? combinedDetails)?.params.combinedId;
   const editorPath = combinedNew ? combinationNewPath : combinedId && generatePath(combinationEditPattern, { combinedId });
   const [revision, setRevision] = useState(0);
-  const searchInput = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (dashboardPanel === 'search') searchInput.current?.focus(); }, [dashboardPanel]);
   const selectRoom = useCallback((value: string, params = new URLSearchParams(location.search)) => {
     params.delete('page');
     navigate(dashboardHref(value, params, dashboardPanel));
@@ -288,9 +287,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     navigate(appPaths.rooms);
   }
   function setSearch(value: string) {
-    if (value) query.set('q', value); else query.delete('q');
-    query.delete('page');
-    void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
+    void navigate(dashboardSearchHref(location.pathname, location.search, dashboardPanel, value), { replace: true });
   }
 
   const topology = useTopology(api, ready && sharingReady, () => setRevision(value => value + 1), onAuthError);
@@ -839,6 +836,20 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
     }
   }
 
+  const hasDevices = Boolean(devices.length || inventory?.groups.length);
+  const setupMessage = sharingReady || developerReady ? MSG.ADD_DEVICES_IN_SMART_LIFE_AND_REFRESH_THE : MSG.CONNECT_A_TUYA_ACCOUNT_TO_SEE_YOUR_DEVICES;
+  const emptyState = !busy && current && !entries.length && (
+    <div className="empty-state">
+      <h3>{t(hasDevices ? MSG.NOTHING_FOUND : MSG.NO_DEVICES_YET)}</h3>
+      <p>{t(hasDevices ? MSG.CHANGE_YOUR_FILTERS_OR_SEARCH_QUERY : setupMessage)}</p>
+      {!devices.length && !sharingReady && !developerReady && onConnections && (
+        <button type="button" className="secondary compact" onClick={onConnections}>
+          {t(MSG.SET_UP_CONNECTION)}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <section
       className="card control-center"
@@ -895,20 +906,15 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
                 {filteredRooms.map(item => <option key={item.id} value={item.id}>{roomLabel(item)}</option>)}
               </select>
             </label>
-            <label id="dashboard-search" className="dashboard-search-field">
-              <span>{t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}</span>
-              <input ref={searchInput} type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)} />
-            </label>
+            {dashboardPanel === 'tools' && (
+              <label>
+                <span>{t(MSG.SEARCH_BY_NAME_ALIAS_OR_ID)}</span>
+                <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={t(MSG.FIND_A_DEVICE_OR_GROUP)} />
+              </label>
+            )}
           </div>
           {busy && <p role="status" className="help">{t(MSG.LOADING_LIST)}</p>}
           {current?.errors.map(error => <p key={translateText(error)} role="alert" className="field-error">{translateText(error)}</p>)}
-          {!busy && current && !entries.length && (
-          <div className="empty-state">
-            <h3>{devices.length || inventory?.groups.length ? t(MSG.NOTHING_FOUND) : t(MSG.NO_DEVICES_YET)}</h3>
-            <p>{devices.length || inventory?.groups.length ? t(MSG.CHANGE_YOUR_FILTERS_OR_SEARCH_QUERY) : sharingReady || developerReady ? t(MSG.ADD_DEVICES_IN_SMART_LIFE_AND_REFRESH_THE) : t(MSG.CONNECT_A_TUYA_ACCOUNT_TO_SEE_YOUR_DEVICES)}</p>
-            {!devices.length && !sharingReady && !developerReady && onConnections && <button className="secondary compact" onClick={onConnections}>{t(MSG.SET_UP_CONNECTION)}</button>}
-          </div>
-)}
           <DashboardGrid<DashboardEntry>
             api={api}
             density={cardSize}
@@ -938,6 +944,7 @@ export function ControlCenter({ dashboardPanel = null, cardSize = 'large', api, 
                 } : undefined}
               />
             )}
+            emptyState={emptyState}
             roomAction={roomAction}
             renderCard={(entry, placement) => renderCard(entry, placement)}
           />

@@ -453,7 +453,7 @@ describe('local device and group controls', () => {
   });
   it('uses cached reads while filtering rooms and aliases and opening group members', async () => {
     const server = localServer(); const user = userEvent.setup();
-    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready onAuthError={vi.fn()} />);
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready dashboardPanel="tools" onAuthError={vi.fn()} />);
     await screen.findByText('Лампа кухни');
     expect(server.reads.some(path => path.includes('refresh=true'))).toBe(false);
     await user.selectOptions(screen.getByLabelText('Комната'), '2');

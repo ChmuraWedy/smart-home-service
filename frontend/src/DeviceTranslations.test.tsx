@@ -28,7 +28,7 @@ it('uses originals or the current-language variants and searches both on the das
   renderWithStore(
     <>
       <DeviceTextModeSelector />
-      <ControlCenter api={api} ready dashboardPanel="search" onAuthError={vi.fn()} />
+      <ControlCenter api={api} ready dashboardPanel="tools" onAuthError={vi.fn()} />
     </>,
   );
   expect(await screen.findByRole('listitem', { name: 'Kitchen Lamp' })).toBeVisible();
