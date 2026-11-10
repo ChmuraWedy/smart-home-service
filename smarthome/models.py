@@ -52,6 +52,16 @@ cloud_status_reports = Table(
 )
 
 
+class LocalTimerSuggestion(Base):
+    __tablename__ = "local_timer_suggestions"
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), primary_key=True)
+    dp: Mapped[str] = mapped_column(String(5), primary_key=True)
+    minimum: Mapped[int] = mapped_column()
+    maximum: Mapped[int] = mapped_column()
+    step: Mapped[int] = mapped_column()
+
+
 class DashboardLayout(Base):
     __tablename__ = "dashboard_layouts"
     browser_id: Mapped[str] = mapped_column(String(32), primary_key=True)

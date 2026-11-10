@@ -1,6 +1,5 @@
 import { renderWithStore } from './test/render-with-store';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CloudApi, type CloudDevice, type CloudSnapshot, type CloudFunctions } from './api';
 import { CloudControl } from './components/CloudControl';
@@ -25,21 +24,16 @@ function server() {
   return writes;
 }
 
-describe('channel timer disclosure',()=>{
-  it('preserves a timer edit across collapse and sends only that channel timer automatically',async()=>{
-    const writes=server(),user=userEvent.setup();
+describe('switch countdowns',()=>{
+  it('groups the channel timers and sends only the changed countdown automatically',async()=>{
+    const writes=server();
     renderWithStore(<CloudControl api={new CloudApi(connection)} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />);
-    const clock=await screen.findByRole('button',{name:'Таймер канала 2'});
-    expect(screen.queryByRole('spinbutton',{name:'Таймер канала 2 (с)'})).toBeNull();
-    await user.click(clock);
-    const input=screen.getByRole('spinbutton',{name:'Таймер канала 2 (с)'});
+    const timers = within(await screen.findByRole('region', { name: 'Таймеры' }));
+    expect(timers.getByRole('spinbutton', { name: 'Таймер канала 1 (с)' })).toHaveValue(30);
+    const input = timers.getByRole('spinbutton', { name: 'Таймер канала 2 (с)' });
     expect(input).toHaveValue(60);
-    fireEvent.change(input,{target:{value:'120'}});
-    await user.click(clock);
-    expect(screen.queryByRole('spinbutton',{name:'Таймер канала 2 (с)'})).toBeNull();
-    expect(writes).toEqual([]);
-    await user.click(clock);
-    expect(screen.getByRole('spinbutton',{name:'Таймер канала 2 (с)'})).toHaveValue(120);
+    fireEvent.change(input, { target: { value: '120' } });
+    expect(input).toHaveValue(120);
     expect(screen.getByRole('switch',{name:'Канал 1'})).toHaveAttribute('aria-checked','false');
     expect(screen.getByRole('switch',{name:'Канал 2'})).toHaveAttribute('aria-checked','true');
 

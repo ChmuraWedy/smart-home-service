@@ -21,11 +21,11 @@ const sensor: LocalDevice = { ...child, id: 4, device_id: 'motion-sensor', name:
 const group = { id: 1, name: 'Свет кухни', room_id: 1, device_ids: [1, 2] };
 const cloudDevice = { id: 'cloud-lamp', name: 'Облачная лампа', online: true, has_local_key: false };
 
-function localServer(options: { partial?: boolean; postError?: boolean; disabled?: boolean; stale?: boolean } = {}) {
-  const devices = [light, child, thermostat, sensor];
+function localServer(options: { partial?: boolean; postError?: boolean; disabled?: boolean; stale?: boolean; lamp?: LocalDevice } = {}) {
+  const devices = [options.lamp ?? light, child, thermostat, sensor];
   const states: Record<number, DeviceState> = {};
   for (const device of devices) states[device.id] = { device_id: device.id, name: device.name, enabled: !options.disabled, available: true,
-    values: Object.fromEntries(Object.keys(device.capabilities).map(key => [key, { value: key === 'switch' ? false : key === 'color' ? { h: 0, s: 1000, v: 1000 } : key === 'motion' ? null : key === 'mode' ? 0 : key === 'target_temperature' ? 22.5 : 45,
+    values: Object.fromEntries(Object.keys(device.capabilities).map(key => [key, { value: key === 'switch' ? false : key === 'color' ? { h: 0, s: 1000, v: 1000 } : key === 'motion' ? null : key === 'mode' ? 0 : key === 'target_temperature' ? 22.5 : key === 'bright_value_v2' ? 469 : 45,
       known: key !== 'motion', stale: !!options.stale, observed_at: new Date().toISOString() }])) };
   const writes: { path: string; body?: unknown }[] = [], reads: string[] = [];
   vi.mocked(fetch).mockImplementation(async (input, init) => {
@@ -101,9 +101,8 @@ describe('cloud device control', () => {
     const aliases = await within(screen.getByRole('region', { name: 'Канал 1' })).findByRole('group', { name: 'Алиасы' });
     expect(within(aliases).getByText('Настольный свет', { exact: false })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Настольный свет' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Таймер канала 1' })).toBeNull();
-    await user.click(screen.getByRole('button',{name:'Таймер канала 1'}));
-    expect(screen.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
+    const timers = within(screen.getByRole('region', { name: 'Таймеры' }));
+    expect(timers.getByRole('region', { name: 'Таймер канала 1' })).toBeInTheDocument();
     expect(writes).toEqual([{ method: 'PUT', body: { labels: { switch_1: 'Настольный свет' } } }]);
     view.unmount(); renderWithStore(<CloudControl {...props} />);
     const channel = await screen.findByRole('region', { name: 'Канал 1' });
@@ -409,6 +408,300 @@ describe('cloud device control', () => {
 });
 
 describe('local device and group controls', () => {
+  it('uses the reported LAN vocabulary for switch dropdowns before mapping edits', async () => {
+    const mapping: Capability = { dp: '38', type: 'string', readable: true, writable: true, enum: null };
+    const device = { ...light, capabilities: {
+      switch_1: boolean,
+      relay_status: mapping,
+      switch_type: { ...mapping, dp: '47' },
+    } };
+    const { states, writes } = localServer({ lamp: device });
+    states[device.id].values.relay_status.value = 'memory';
+    states[device.id].values.switch_type.value = 'sync';
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+    const relay = within(await screen.findByRole('region', { name: 'Состояние после подачи питания' }));
+    expect(within(relay.getByRole('combobox')).getByRole('option', { name: 'Восстановить предыдущее состояние' })).toHaveProperty('selected', true);
+    const mode = within(screen.getByRole('region', { name: 'Тип внешнего выключателя' }));
+    expect(within(mode.getByRole('combobox')).getByRole('option', { name: 'Клавиша · по положению выключателя' })).toHaveProperty('selected', true);
+    expect(screen.getAllByText(/Обновлено \d+ с назад/)).toHaveLength(1);
+    const user = userEvent.setup();
+    await user.selectOptions(relay.getByRole('combobox'), '0');
+    await waitFor(() => expect(writes).toEqual([{
+      path: '/api/v1/devices/1/commands/capabilities',
+      body: { values: { relay_status: 'off' } },
+    }]));
+    await user.click(screen.getByText('Локальные сопоставления и команды'));
+    await user.click(screen.getByRole('button', { name: 'Изменить сопоставление: Тип внешнего выключателя' }));
+    const form = within(await screen.findByRole('form', { name: 'Тип внешнего выключателя' }));
+    expect(form.getByRole('textbox', { name: /Допустимые варианты/ })).toHaveValue('flip\nsync\nbutton');
+  });
+
+  it.each(['delayed', 'unchanged', 'cached-match'] as const)(
+    'checks an unacknowledged Inching write without repeating the command (%s)',
+    async (outcome) => {
+      const device = { ...light, capabilities: {
+        switch_1: boolean,
+        switch_inching: { dp: '44', type: 'string', readable: true, writable: true } as const,
+      } };
+      const { states, writes } = localServer({ lamp: device, postError: true });
+      const reading = states[device.id].values.switch_inching;
+      reading.value = 'AAAC';
+      const initialStamp = Date.parse(reading.observed_at!);
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      let refreshed = 0;
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/state') && url.searchParams.get('refresh') === 'true') {
+          refreshed += 1;
+          if (outcome !== 'cached-match') reading.observed_at = new Date(initialStamp + refreshed * 1000).toISOString();
+          if ((outcome === 'delayed' && refreshed === 2) || outcome === 'cached-match') reading.value = 'AAEs';
+        }
+        return original(input, init);
+      });
+      const user = userEvent.setup();
+      renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+      const inching = within(await screen.findByRole('region', { name: 'Автовыключение' }));
+      fireEvent.change(inching.getByRole('spinbutton'), { target: { value: '300' } });
+      await user.click(inching.getByRole('button', { name: 'Применить' }));
+
+      const message = outcome === 'delayed' ? /Устройство сообщило запрошенное значение/ : /Transport timeout/;
+      expect(await screen.findByText(message, {}, { timeout: 3000 })).toBeInTheDocument();
+      expect(refreshed).toBe(2);
+      expect(writes).toEqual([{
+        path: '/api/v1/devices/1/commands/capabilities',
+        body: { values: { switch_inching: 'AAEs' } },
+      }]);
+    },
+  );
+
+  it('decodes local Inching, and sends the reported slot and edited duration only on Apply', async () => {
+    const device = { ...light, capabilities: {
+      switch_1: boolean,
+      switch_inching: { dp: '44', type: 'string', readable: true, writable: true } as const,
+    } };
+    const { states, writes } = localServer({ lamp: device });
+    states[device.id].values.switch_inching.value = 'AAAC';
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
+
+    const timers = within(await screen.findByRole('region', { name: 'Таймеры' }));
+    const inching = within(timers.getByRole('region', { name: 'Автовыключение' }));
+    const enabled = inching.getByRole('switch', { name: 'Канал 1' });
+    const duration = inching.getByRole('spinbutton', { name: 'Задержка выключения (секунды)' });
+    expect(enabled).not.toBeChecked();
+    expect(duration).toHaveValue(2);
+    fireEvent.change(duration, { target: { value: '65536' } });
+    expect(inching.getByRole('button', { name: 'Применить' })).toBeDisabled();
+    fireEvent.change(duration, { target: { value: '60' } });
+    const user = userEvent.setup();
+    await user.click(enabled);
+    expect(writes).toEqual([]);
+    await user.click(inching.getByRole('button', { name: 'Применить' }));
+    await waitFor(() => expect(writes).toEqual([{
+      path: '/api/v1/devices/1/commands/capabilities',
+      body: { values: { switch_inching: 'AQA8' } },
+    }]));
+  });
+
+  it('lists and edits the saved timer mapping in full local settings', async () => {
+    const timer: Capability = { dp: '7', type: 'integer', readable: true, writable: false, unit: 's' };
+    const device = { ...light, capabilities: { switch: boolean, countdown_1: timer } };
+    localServer({ lamp: device });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const edits: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/api/v1/commissioning/devices/1/mappings/countdown_1' && init?.method === 'PATCH') {
+        const body = JSON.parse(String(init.body));
+        edits.push(body);
+        return json({ ...device, capabilities: { ...device.capabilities, countdown_1: body.mapping } });
+      }
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    const setup = vi.fn();
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} onSetup={setup} />);
+    await screen.findByRole('region', { name: 'Таймер канала 1' });
+    const summary = screen.getByText('Локальные сопоставления и команды');
+    await user.click(summary);
+    const mappings = within(summary.closest('details')!);
+    const edit = mappings.getByRole('button', { name: 'Изменить сопоставление: Таймер канала 1' });
+    await user.click(edit);
+    const form = within(await mappings.findByRole('form', { name: 'Таймер канала 1' }));
+    expect(form.getByLabelText('DP')).toHaveValue('7');
+    await user.click(form.getByRole('checkbox', { name: 'Разрешить команды' }));
+    await user.type(form.getByLabelText('Минимальное значение'), '0');
+    await user.type(form.getByLabelText('Максимальное значение'), '86400');
+    await user.type(form.getByLabelText('Шаг'), '1');
+    await user.click(form.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(edits).toEqual([{
+      expected: timer, mapping: { ...timer, writable: true, minimum: 0, maximum: 86400, step: 1 },
+    }]));
+    await waitFor(() => expect(mappings.queryByRole('form')).toBeNull());
+    await user.click(mappings.getByRole('button', { name: 'Настроить функции' }));
+    expect(setup).toHaveBeenCalledOnce();
+  });
+
+  it.each(['matching', 'different-dp', 'offline', 'saved-offline'] as const)(
+    'suggests missing switch timer bounds only for matching Smart Life metadata (%s)',
+    async (metadata) => {
+      const timer: Capability = { dp: '7', type: 'integer', readable: true, writable: false, unit: 's', minimum: 10 };
+      const device = { ...light, capabilities: { switch: boolean, countdown_1: timer } };
+      const cloud = { id: device.device_id, name: device.name, online: true, has_local_key: true };
+      localServer({ lamp: device });
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const saves: unknown[] = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith('/suggestion')) {
+          return json(metadata === 'saved-offline' ? { dp: '7', minimum: 0, maximum: 86400, step: 1 } : null);
+        }
+        if (url.pathname.endsWith('/functions')) {
+          expect(url.searchParams.get('provider')).toBe('sharing');
+          if (metadata === 'offline') return json({ detail: 'Complete QR login first' }, 409);
+          return json({
+            device_id: device.device_id,
+            functions: [{
+              code: 'countdown_1',
+              type: 'Integer',
+              dp_id: metadata === 'matching' ? 7 : 8,
+              values: { min: 0, max: 86400, step: 1, unit: 's' },
+            }],
+          });
+        }
+        if (init?.method === 'PATCH') {
+          const body = JSON.parse(String(init.body));
+          saves.push(body);
+          return json({ ...device, capabilities: { ...device.capabilities, countdown_1: body.mapping } });
+        }
+        return original(input, init);
+      });
+      const user = userEvent.setup();
+      renderWithStore(
+        <LocalControl
+          api={new HomeApi(connection)}
+          device={device}
+          cloudDevice={metadata === 'saved-offline' ? undefined : cloud}
+          routes={['sharing', 'local']}
+          onClose={vi.fn()}
+          onAuthError={vi.fn()}
+        />,
+      );
+      await screen.findByRole('region', { name: 'Таймер канала 1' });
+      await user.click(screen.getByText('Локальные сопоставления и команды'));
+      await user.click(screen.getByRole('button', { name: 'Изменить сопоставление: Таймер канала 1' }));
+      const form = within(await screen.findByRole('form', { name: 'Таймер канала 1' }));
+      const minimum = form.getByLabelText('Минимальное значение');
+      const maximum = form.getByLabelText('Максимальное значение');
+      const step = form.getByLabelText('Шаг');
+      expect(minimum).toHaveValue(10);
+      const suggested = metadata === 'matching' || metadata === 'saved-offline';
+      expect(maximum).toHaveValue(suggested ? 86400 : null);
+      expect(step).toHaveValue(suggested ? 1 : null);
+      expect(form.getByRole('checkbox', { name: 'Разрешить команды' })).not.toBeChecked();
+      expect(saves).toEqual([]);
+      if (!suggested) return;
+
+      await user.clear(maximum);
+      await user.type(maximum, '3600');
+      await user.click(form.getByRole('checkbox', { name: 'Разрешить команды' }));
+      await user.click(form.getByRole('button', { name: 'Сохранить' }));
+      await waitFor(() => expect(saves).toEqual([{
+        expected: timer, mapping: { ...timer, writable: true, maximum: 3600, step: 1 },
+      }]));
+    },
+  );
+
+  it.each(['matching', 'different-dp', 'offline'] as const)(
+    'edits Power-on state choices and uses the saved list for local commands (%s)',
+    async (metadata) => {
+      const mapping: Capability = { dp: '14', type: 'string', readable: true, writable: true, enum: [] };
+      const device = { ...light, capabilities: { relay_status: mapping } };
+      const cloud = { id: device.device_id, name: device.name, online: true, has_local_key: true };
+      const { states, writes } = localServer({ lamp: device });
+      states[device.id].values.relay_status.value = 'last';
+      const original = vi.mocked(fetch).getMockImplementation()!;
+      const edits: unknown[] = [];
+      vi.mocked(fetch).mockImplementation(async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        if (path.endsWith('/functions')) {
+          if (metadata === 'offline') return json({ detail: 'Complete QR login first' }, 409);
+          return json({
+            device_id: device.device_id,
+            functions: [{
+              code: 'relay_status',
+              dp_id: metadata === 'matching' ? 14 : 15,
+              type: 'Enum',
+              values: { range: ['power_off', 'power_on', 'last'] },
+            }],
+          });
+        }
+        if (init?.method === 'PATCH') {
+          const body = JSON.parse(String(init.body));
+          edits.push(body);
+          return json({ ...device, capabilities: { relay_status: body.mapping } });
+        }
+        return original(input, init);
+      });
+      const user = userEvent.setup();
+      renderWithStore(
+        <LocalControl
+          api={new HomeApi(connection)}
+          device={device}
+          cloudDevice={cloud}
+          routes={['sharing', 'local']}
+          onClose={vi.fn()}
+          onAuthError={vi.fn()}
+        />,
+      );
+      const label = 'Состояние после подачи питания';
+      const control = within(await screen.findByRole('region', { name: label }));
+      expect(control.queryByRole('combobox')).toBeNull();
+      await user.click(screen.getByText('Локальные сопоставления и команды'));
+      await user.click(screen.getByRole('button', { name: `Изменить сопоставление: ${label}` }));
+      const form = within(await screen.findByRole('form', { name: label }));
+      const choices = form.getByRole('textbox', { name: /Допустимые варианты/ });
+      expect(choices).toHaveValue(metadata === 'matching' ? 'power_off\npower_on\nlast' : '');
+      expect(edits).toEqual([]);
+      expect(writes).toEqual([]);
+      if (metadata === 'different-dp') return;
+
+      await user.clear(choices);
+      await user.type(choices, 'last{enter}power_on');
+      await user.click(form.getByRole('button', { name: 'Сохранить' }));
+      await waitFor(() => expect(edits).toEqual([{
+        expected: mapping, mapping: { ...mapping, enum: ['last', 'power_on'] },
+      }]));
+      const selector = await control.findByRole('combobox');
+      expect(within(selector).getByRole('option', { name: 'Восстановить предыдущее состояние' })).toBeInTheDocument();
+      expect(within(selector).queryByRole('option', { name: 'Выключено' })).toBeNull();
+      expect(writes).toEqual([]);
+      await user.selectOptions(selector, within(selector).getByRole('option', { name: 'Включено' }));
+      await waitFor(() => expect(writes).toEqual([{
+        path: '/api/v1/devices/1/commands/capabilities', body: { values: { relay_status: 'power_on' } },
+      }]));
+    },
+  );
+
+  it('converts a local brightness percentage back to the mapped units in full settings', async () => {
+    const lamp: LocalDevice = {
+      ...light,
+      capabilities: {
+        bright_value_v2: { type: 'integer', readable: true, writable: true, minimum: 10, maximum: 1000, step: 1 },
+      },
+    };
+    const { writes } = localServer({ lamp });
+    renderWithStore(<LocalControl api={new HomeApi(connection)} device={lamp} onClose={vi.fn()} onAuthError={vi.fn()} />);
+
+    const brightness = await screen.findByRole('region', { name: 'Яркость' });
+    const slider = within(brightness).getByRole('slider');
+    expect(slider).toHaveValue('46.9');
+    fireEvent.change(slider, { target: { value: '63.7' } });
+    await waitFor(() => expect(writes).toEqual([{
+      path: '/api/v1/devices/1/commands/capabilities', body: { values: { bright_value_v2: 637 } },
+    }]));
+  });
+
+
   it.each([light, child])('addresses $transport device by its own inventory ID without parent/key in the browser command', async device => {
     const server = localServer(); const user = userEvent.setup();
     renderWithStore(<LocalControl api={new HomeApi(connection)} device={device} onClose={vi.fn()} onAuthError={vi.fn()} />);
@@ -498,7 +791,7 @@ describe('local device and group controls', () => {
     await waitFor(() => expect(power).toBeEnabled());
     fireEvent.click(power);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('результат команды неизвестен');
+    expect(await screen.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent('результат команды неизвестен');
     expect(server.writes).toHaveLength(1);
   });
 });

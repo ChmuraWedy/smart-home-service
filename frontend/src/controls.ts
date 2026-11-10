@@ -33,6 +33,7 @@ const LABELS: Record<string, string> = localizeMessages({
   voltage: MSG.VOLTAGE, current: MSG.CURRENT, child_lock: MSG.LOCK, command: MSG.COMMAND, press: MSG.PRESS,
   music_data: MSG.MUSIC_LIGHTING, control_data: MSG.LIGHT_TRANSITION, scene_data: MSG.LIGHTING_EFFECT, scene_data_v2: MSG.LIGHTING_EFFECT,
   countdown: MSG.TIMER, relay_status: MSG.POWER_ON_STATE, switch_backlight: MSG.SWITCH_BACKLIGHT,
+  switch_type: MSG.EXTERNAL_SWITCH_TYPE,
   switch_inching: MSG.AUTO_OFF_INCHING_MODE, rhythm_mode: MSG.CIRCADIAN_LIGHTING, sleep_mode: MSG.SLEEP_LIGHT,
   wakeup_mode: MSG.WAKE_UP_LIGHT, power_memory: MSG.POWER_ON_BEHAVIOR,
   do_not_disturb: MSG.DO_NOT_DISTURB, remote_switch: MSG.REMOTE_PARAMETER, random_timing: MSG.RANDOM_SCHEDULE,
@@ -59,11 +60,35 @@ const OPTIONS: Record<string, string> = localizeMessages({
 });
 export const labelFor = (key: string) => LABELS[key] || (/^switch_[1-9][0-9]*$/.test(key) ? t(MSG.CHANNEL, [key.slice(7)]) : /^countdown_[1-9][0-9]*$/.test(key) ? t(MSG.CHANNEL_TIMER, [key.slice(10)]) : /^relay_status_[1-9][0-9]*$/.test(key) ? t(MSG.CHANNEL_POWER_ON_STATE, [key.slice(13)]) : key.replaceAll('_', ' '));
 const RELAY_OPTIONS: Record<string, string> = localizeMessages({ power_off: MSG.OFF, off: MSG.OFF, power_on: MSG.ON, on: MSG.ON, last: MSG.RESTORE_PREVIOUS_STATE, memory: MSG.RESTORE_PREVIOUS_STATE });
-export const optionLabel = (value: JsonValue, key?: string) => typeof value === 'string' ? (key ? CAMERA_OPTIONS[key]?.[value] : undefined) || (key && /^relay_status(?:_[1-9][0-9]*)?$/.test(key) ? RELAY_OPTIONS[value] : undefined) || OPTIONS[value] || value : typeof value === 'boolean' ? (value ? t(MSG.YES) : t(MSG.NO)) : JSON.stringify(value);
+const SWITCH_TYPE_OPTIONS: Record<string, string> = localizeMessages({
+  flip: MSG.SWITCH_TYPE_ROCKER_TOGGLE,
+  sync: MSG.SWITCH_TYPE_ROCKER_SYNC,
+  button: MSG.SWITCH_TYPE_MOMENTARY,
+});
+const powerOnCode = /^relay_status(?:_[1-9][0-9]*)?$/;
+
+export function optionLabel(value: JsonValue, key?: string): string {
+  if (typeof value === 'boolean') return t(value ? MSG.YES : MSG.NO);
+  if (typeof value !== 'string') return JSON.stringify(value);
+  if (key === 'switch_type' && Object.hasOwn(SWITCH_TYPE_OPTIONS, value)) return SWITCH_TYPE_OPTIONS[value];
+  if (key && powerOnCode.test(key) && Object.hasOwn(RELAY_OPTIONS, value)) return RELAY_OPTIONS[value];
+  return (key ? CAMERA_OPTIONS[key]?.[value] : undefined) || OPTIONS[value] || value;
+}
+
+export function localSwitchChoices(key: string, reported: JsonValue | undefined): string[] | undefined {
+  if (typeof reported !== 'string') return undefined;
+  if (key === 'switch_type' && Object.hasOwn(SWITCH_TYPE_OPTIONS, reported)) return ['flip', 'sync', 'button'];
+  // A local report identifies this firmware vocabulary. Smart Life may
+  // translate it to different command values for the very same DP.
+  const localPowerModes = ['off', 'on', 'memory'];
+  if (powerOnCode.test(key) && localPowerModes.includes(reported)) return localPowerModes;
+  return undefined;
+}
 const unitLabel = (unit: string | undefined) => unit === 's' ? t(MSG.S) : unit === '℃' ? '°C' : unit === '℉' ? '°F' : unit;
 function controlHelp(key: string): string | undefined {
   if (CAMERA_HELP[key]) return CAMERA_HELP[key];
   if (key === 'relay_status' || /^relay_status_[1-9][0-9]*$/.test(key)) return t(MSG.WHICH_STATE_TO_RESTORE_AFTER_ELECTRICAL_POWER_IS);
+  if (key === 'switch_type') return t(MSG.EXTERNAL_SWITCH_TYPE_HELP);
   if (key === 'switch_backlight') return t(MSG.TURNS_THE_SWITCH_BUTTON_BACKLIGHT_ON_OR_OFF);
   if (/^countdown(?:_[1-9][0-9]*)?$/.test(key)) return t(MSG.COUNTDOWN_UNTIL_THE_SWITCH_CHANGES_STATE);
   if (key === 'switch_inching') return t(MSG.AFTER_TURNING_ON_THE_SWITCH_TURNS_OFF_AUTOMATICALLY);
@@ -84,10 +109,12 @@ export function limitsOf(value: unknown): Record<string, unknown> {
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const rounded = (value: number) => Number(value.toPrecision(12));
 
-export function localSpec(key: string, cap: Capability): ControlSpec {
+export function localSpec(key: string, cap: Capability, reported?: JsonValue): ControlSpec {
   const base = { key, label: labelFor(key), readable: cap.readable, writable: cap.writable, unit: unitLabel(cap.unit || undefined), help: controlHelp(key),
     indicator: !cap.writable && MOTION_KEYS.has(key) && cap.type === 'boolean' ? 'motion' as const : undefined };
-  if (cap.enum?.length) return { ...base, kind: 'enum', choices: cap.enum };
+  const suggested = cap.type === 'string' ? localSwitchChoices(key, reported) : undefined;
+  const choices = cap.enum?.length ? cap.enum : suggested;
+  if (choices) return { ...base, kind: 'enum', choices };
   switch (cap.type) {
     case 'boolean': return { ...base, kind: 'boolean' };
     case 'integer': case 'number': {

@@ -528,6 +528,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       ready={Boolean(status && connection.token)}
       sharingReady={Boolean(ready && status?.connected)}
       developerReady={Boolean(ready && developer.connected)}
+      localMappingsReady={Boolean(status?.local_mapping_editor_supported)}
       onAuthError={invalidateConnection}
       onConnections={member ? undefined : () => goTo('connections')}
     />
@@ -867,7 +868,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
         <span className={`api-presence ${status ? 'online' : ''}`}>
           <i aria-hidden="true" />{status ? t(MSG.API_CONNECTED) : t(MSG.API_DISCONNECTED)}
         </span>
-        {view === 'control' && status && connection.token && !member && (
+        {view === 'control' && status && connection.token && (!member || status.household_chat_supported) && (
           <AiChatButton api={api} disabled={locked} onAuthError={invalidateConnection}>
             {demo ? <VoiceDemo api={api} /> : null}
           </AiChatButton>

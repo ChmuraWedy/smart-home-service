@@ -294,6 +294,8 @@ def cloud_status(
             "client_id": bridge.settings.cloud_client_id,
             "transport": "internet",
             "scene_edit_supported": False,
+            "household_chat_supported": True,
+            "local_mapping_editor_supported": True,
             "developer": request.app.state.developer_cloud.status(),
             **({"redroid_available": True} if account and account.role == "owner" and request.app.state.settings.redroid_token_file else {}),
             **({"account": asdict(account)} if account else {}),

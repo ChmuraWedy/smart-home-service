@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { ApiError } from '../api';
 import type { CloudDevice, LanDevice, NetworkInterface, NetworkScan, Provider } from '../api';
 import type { ConnectionFinding, HomeApi, Inventory, LocalDevice } from '../home-api';
+import { labelFor } from '../controls';
 import { deviceHref } from '../device-links';
 import useRoomName from '../room-names';
 
@@ -361,6 +362,9 @@ export function LocalConnectionsPage({ api, ready, sharingReady, developerReady,
                 {row.finding.device.aliases.length > 0 && <p className="help">{row.finding.device.aliases.join(' · ')}</p>}
                 {row.finding.action === 'updated' && <p className="help">{t(MSG.CHANGES) + " "}{row.finding.device.changed_fields.map(key => changes[key]).join(', ')}{t(MSG.NAME_ALIASES_ROOM_AND_FUNCTIONS_ARE_PRESERVED)}</p>}
                 {row.finding.action === 'created' && <p className="help">{t(MSG.A_CONNECTION_WILL_BE_CREATED_WITH_THE_SHOWN)}</p>}
+                {Boolean(row.finding.device.timer_mappings?.length) && (
+                  <p className="help">{t(MSG.VERIFIED_TIMER_MAPPINGS, [row.finding.device.timer_mappings?.map(labelFor).join(', ')])}</p>
+                )}
                 <p className="help">{row.expiresAt! > now ? t(MSG.RESULT_VALID_FOR_ANOTHER) + Math.ceil((row.expiresAt! - now) / 1000) + t(MSG.SECONDS_SUFFIX) : t(MSG.THE_RESULT_EXPIRED)}</p>
               </>
 ) :

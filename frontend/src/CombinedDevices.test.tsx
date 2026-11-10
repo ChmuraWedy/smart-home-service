@@ -219,6 +219,75 @@ function cameraWithPrivacy(privateMode: boolean): CloudDevice {
 }
 
 describe('combined devices', () => {
+  it('defaults to the local route when adding a device with both routes', async () => {
+    const { writes } = backend();
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (new URL(String(input)).pathname === '/api/v1/devices') return json([localLamp]);
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    openApp('/combined-devices/new?room=3');
+    await user.click(await screen.findByRole('checkbox', { name: localLamp.name }));
+    await user.click(screen.getByRole('checkbox', { name: bulbs[1].name }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(writes).toContainEqual(expect.objectContaining({
+      path: '/combined-devices',
+      body: expect.objectContaining({
+        members: [
+          { device_id: localLamp.device_id, route: 'local' },
+          { device_id: bulbs[1].id, route: 'sharing' },
+        ],
+      }),
+    })));
+  });
+
+  it('renders and refreshes a combined member through the server-selected fallback', async () => {
+    const { writes } = backend({
+      id: 1, name: 'Kitchen lights', room_id: room.id,
+      members: [
+        { device_id: localLamp.device_id, route: 'sharing', accessible: true, fallback_route: 'local' },
+        { device_id: bulbs[1].id, route: 'sharing', accessible: false },
+      ],
+    });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const localRequests: string[] = [];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/api/v1/cloud/status') return json({ enabled: true, connected: false });
+      if (url.pathname === '/api/v1/devices') return json([localLamp]);
+      if (url.pathname === '/api/v1/devices/7/state') {
+        localRequests.push(url.search);
+        return json({
+          device_id: 7, enabled: true, available: true,
+          values: { switch_led: { value: false, known: true, stale: false, observed_at: new Date().toISOString() } },
+        });
+      }
+      if (url.pathname === '/api/v1/devices/7/commands/capabilities') {
+        localRequests.push(String(init?.body));
+        return json({ acknowledged: true });
+      }
+      return original(input, init);
+    });
+    const user = userEvent.setup();
+    openApp('/rooms/3');
+    const card = within(await screen.findByRole('listitem', { name: 'Kitchen lights' }));
+    const member = within(await card.findByRole('region', { name: localLamp.name }));
+    const power = member.getByRole('switch', { name: 'Power' });
+    await waitFor(() => expect(power).toBeEnabled());
+    await user.click(power);
+    await waitFor(() => expect(localRequests).toContain('{"values":{"switch_led":true}}'));
+
+    const allPower = card.getByRole('switch', { name: 'Power for all devices' });
+    await waitFor(() => expect(allPower).toBeEnabled());
+    const before = localRequests.filter((request) => request.includes('refresh=true')).length;
+    await user.click(allPower);
+    await waitFor(() => expect(writes).toContainEqual(expect.objectContaining({ path: '/combined-devices/1/power/on' })));
+    await waitFor(() => expect(localRequests.filter((request) => request.includes('refresh=true'))).toHaveLength(before + 1));
+  });
+
   it('adds a separate browser-saved video card only to the camera room, even for a hidden combination member', async () => {
     const camera = cameraWithPrivacy(true);
     const { writes } = backend({

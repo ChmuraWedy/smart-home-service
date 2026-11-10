@@ -4,13 +4,20 @@ import { ApiError } from './api';
 import { cloudDeviceCache, cloudDeviceKey, readCloudDevice } from './cloud-device-cache';
 import type combinedLayout from './combined-layout';
 import { isStale } from './controls';
+import { deviceRoutes } from './devices';
 import type { UnifiedDevice } from './devices';
-import type { CombinedMemberInput, HomeApi } from './home-api';
+import type { CombinedMember, CombinedMemberInput, HomeApi } from './home-api';
 import { localDeviceCache, localDeviceKey, readLocalDevice } from './local-device-cache';
 import { useAppDispatch, useAppSelector } from './store';
 import type { AppDispatch, RootState } from './store';
 
 export type ResolvedMember = { member: CombinedMemberInput; device?: UnifiedDevice };
+
+export function resolveCombinedMember(member: CombinedMember, device?: UnifiedDevice): ResolvedMember {
+  const route = member.fallback_route ?? member.route;
+  const available = member.accessible && device && deviceRoutes(device).includes(route);
+  return { member: { ...member, route }, device: available ? device : undefined };
+}
 
 function localReading(state: RootState, api: HomeApi, id: number | undefined) {
   return id === undefined ? undefined : localDeviceCache.endpoints.deviceState.select(localDeviceKey(api, id))(state).data?.reading;

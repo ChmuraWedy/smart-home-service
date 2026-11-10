@@ -1,7 +1,7 @@
 import { MSG, dateLocale, t, translateText } from "../i18n";
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, type CloudApi, type DeviceEvent, type Provider } from '../api';
-import { cloudReading, displayReading, labelFor, optionLabel } from '../controls';
+import { cloudReading, displayReading, labelFor, localReading, optionLabel } from '../controls';
 import type { ControlSpec } from '../controls';
 import { ParameterIcon } from './DevicePresentation';
 
@@ -12,7 +12,11 @@ function eventText(event: DeviceEvent, specs: ControlSpec[]) {
   }
   if (event.code === 'online') return event.value ? t(MSG.DEVICE_ONLINE) : t(MSG.DEVICE_OFFLINE);
   const spec = specs.find(item => item.key === event.code);
-  const value = spec ? displayReading(spec, event.kind === 'local' ? {value:event.value,known:true,stale:false} : cloudReading(spec,event.value)) : optionLabel(event.value);
+  if (!spec) return `${labelFor(event.code)}: ${optionLabel(event.value)}`;
+  const reading = event.kind === 'local'
+    ? localReading(spec, { value: event.value, known: true, stale: false })
+    : cloudReading(spec, event.value);
+  const value = displayReading(spec, reading);
   return labelFor(event.code) + ': ' + value;
 }
 export function DeviceActivity({ api, deviceId, provider, specs, primary = false, onAuthError }: { api: CloudApi; deviceId: string; provider: Provider | 'local'; specs: ControlSpec[]; primary?: boolean; onAuthError: () => void }) {

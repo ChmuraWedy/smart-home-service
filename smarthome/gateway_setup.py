@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from .api_dependencies import authenticate, get_session
 from .cloud_api import Provider, cloud_bridge
 from .cloud_scope import scope_for
+from .commissioning import existing_definitions, verified_countdown_mappings
 from .db import lock_writes
 from .device_aliases import aliases_for_devices
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
@@ -101,6 +102,7 @@ class ConnectionFind(GatewayFind):
 
 class ConnectionPreview(GatewayPreview):
     is_gateway: bool
+    timer_mappings: list[str] = Field(default_factory=list)
 
 
 class ConnectionFindResult(GatewayFindResult):
@@ -122,6 +124,7 @@ class Finding:
     action: str
     expires: float
     requested_device_id: str | None = None
+    timer_definitions: tuple[dict, set] | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -359,6 +362,22 @@ def find_gateway(
         if selected_interface(body.interface_address) != interface:
             raise HTTPException(409, "Выбранная сеть изменилась. Повторите поиск.")
         verified, source = discover(controller, draft, pool)
+        timer_mappings = {}
+        timer_definitions = None
+        if allow_direct and not is_gateway and before is None:
+            try:
+                with bridge.lock:
+                    if scope_for(bridge, body.provider) != scope:
+                        raise HTTPException(409, "Smart Life account changed")
+                    specs, functions = existing_definitions(bridge, verified.device_id)
+                timer_mappings = verified_countdown_mappings(verified, specs, functions, controller)
+                if timer_mappings:
+                    timer_definitions = (specs, functions)
+            except HTTPException:
+                # A failed capability probe does not invalidate an already verified connection.
+                pass
+        if timer_mappings:
+            verified = DeviceCreate.model_validate({**verified.model_dump(), "capabilities": timer_mappings})
         with bridge.lock:
             item = session.scalar(select(Device).where(Device.device_id == body.device_id))
             if fingerprint(item) != before:
@@ -382,6 +401,7 @@ def find_gateway(
                 existing_id=item.id if item else None,
                 is_gateway=is_gateway,
                 changed_fields=list(delta),
+                timer_mappings=list(timer_mappings),
             )
             entry = Finding(
                 proposed,
@@ -394,6 +414,7 @@ def find_gateway(
                 action,
                 store.clock() + FINDING_TTL,
                 requested_device_id=requested_device_id,
+                timer_definitions=timer_definitions,
             )
             check_finding(bridge, entry, session)
             token = store.add(entry)
@@ -425,6 +446,10 @@ def save_gateway(body, session, bridge_for, controller, probe_lock, store):
             bridge = bridge_for(entry.provider)
             with bridge.lock:
                 check_finding(bridge, entry, session)
+                if entry.timer_definitions is not None and existing_definitions(
+                    bridge, entry.proposed.device_id,
+                ) != entry.timer_definitions:
+                    raise HTTPException(409, "Timer definitions changed. Scan for the device again.")
             session.rollback()
             values = device_values(entry.proposed)
             target = Device(**{key: value for key, value in values.items() if key != "aliases"})

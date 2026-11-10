@@ -12,6 +12,7 @@ from .models import (
     HouseholdDeviceKey,
     HouseholdMember,
     HouseholdOwner,
+    LocalTimerSuggestion,
     Room,
     RoomAppearance,
     cloud_status_reports,
@@ -130,6 +131,10 @@ def add_owner_login(connection: Connection) -> None:
         connection.exec_driver_sql("ALTER TABLE household_owner ADD COLUMN login VARCHAR(40) NOT NULL DEFAULT 'root'")
 
 
+def add_local_timer_suggestions(connection: Connection) -> None:
+    LocalTimerSuggestion.__table__.create(connection, checkfirst=True)
+
+
 # The position is the schema version. Append new upgrades and keep old ones in place.
 MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_combined_power_visibility,
@@ -146,4 +151,5 @@ MIGRATIONS: tuple[Callable[[Connection], None], ...] = (
     add_owner_login,
     add_cloud_status_reports,
     add_folded_names,
+    add_local_timer_suggestions,
 )
