@@ -397,6 +397,78 @@ def test_existing_connection_functions_require_separate_review_and_preserve_meta
     assert save(client, token).status_code == 404
 
 
+@pytest.mark.parametrize("old_name", ["countdown_1", "dp_7"])
+def test_resurvey_enriches_a_verified_timer_without_overwriting_existing_mappings(
+    client, observer, factory, old_name
+):
+    _, bridge = observer
+    bridge.device.function["countdown_1"] = SimpleNamespace(
+        code="countdown_1", dp_id=7, type="Integer",
+        values={"min": 0, "max": 86400, "step": 1, "unit": "s"},
+    )
+    item = existing_device(client, capabilities={
+        "switch_led": {"dp": "1", "type": "boolean", "writable": False},
+        old_name: {"dp": "7", "type": "integer", "writable": False, "unit": "s"},
+    })
+    factory.result = {"dps": {"1": True, "7": 0}}
+    token = existing_session(client, item)
+    assert next(row for row in sample(client, token)["readings"] if row["dp"] == "7")["can_write"]
+    result = save(client, token, writable=["dp_1", "dp_7"])
+    assert result.status_code == 200, result.text
+    mappings = result.json()["capabilities"]
+    assert mappings["switch_led"] == item["capabilities"]["switch_led"]
+    assert set(mappings) == {"switch_led", "countdown_1"}
+    timer = mappings["countdown_1"]
+    assert (timer["dp"], timer["minimum"], timer["maximum"], timer["writable"]) == ("7", 0, 86400, True)
+    assert all(command[1] == "status" for command in factory.commands)
+
+
+def test_manual_mapping_edit_validates_timer_and_rejects_stale_edits(client, factory):
+    item = existing_device(client, capabilities={
+        "switch": {"dp": "1", "type": "boolean"},
+        "countdown_1": {"dp": "7", "type": "integer", "writable": False, "unit": "s"},
+    })
+    saved = item["capabilities"]["countdown_1"]
+    url = f'{API}/devices/{item["id"]}/mappings/countdown_1'
+    assert client.patch(url, json={"expected": saved, "mapping": {**saved, "writable": True}}).status_code == 422
+    updated = {**saved, "writable": True, "minimum": 0, "maximum": 86400, "step": 1}
+    result = client.patch(url, json={"expected": saved, "mapping": updated})
+    assert result.status_code == 200, result.text
+    assert result.json()["capabilities"] == {**item["capabilities"], "countdown_1": updated}
+    assert client.patch(url, json={"expected": saved, "mapping": updated}).status_code == 409
+    assert factory.commands == []
+    response = client.post(
+        f'/api/v1/devices/{item["id"]}/commands/capabilities', json={"values": {"countdown_1": 60}},
+    )
+    assert response.status_code == 200, response.text
+    assert factory.commands[-1] == (item["device_id"], "set_dps", {"7": 60})
+
+
+def test_imported_timer_suggestion_is_separate_from_mapping_and_bound_to_dp(client, factory):
+    item = existing_device(client, capabilities={
+        "countdown_1": {"dp": "9", "type": "integer", "writable": False, "unit": "s"},
+    })
+    mapping = item["capabilities"]["countdown_1"]
+    device_url = f'/api/v1/devices/{item["id"]}'
+    mapping_url = f'{API}/devices/{item["id"]}/mappings/countdown_1'
+    url = f"{mapping_url}/suggestion"
+    draft = {"dp": "9", "minimum": 0, "maximum": 86400, "step": 1}
+
+    assert client.get(url).json() is None
+    assert client.put(url, json={**draft, "dp": "7"}).status_code == 409
+    assert client.put(url, json={**draft, "step": 0}).status_code == 422
+    assert client.put(url, json={**draft, "minimum": 86401}).status_code == 422
+    assert client.put(url, json=draft).status_code == 204
+    assert client.put(url, json=draft).status_code == 204
+    assert client.get(url).json() == draft
+    assert client.get(device_url).json()["capabilities"]["countdown_1"] == mapping
+
+    changed = {**mapping, "dp": "10"}
+    assert client.patch(mapping_url, json={"expected": mapping, "mapping": changed}).status_code == 200
+    assert client.get(url).json() is None
+    assert factory.commands == []
+
+
 @pytest.mark.parametrize("confirmation", [False, 1, "true", None])
 def test_existing_function_save_requires_actual_confirmation(
     client, observer, factory, confirmation
@@ -440,13 +512,12 @@ def test_existing_function_setup_rejects_changed_connection_or_functions(
     "change",
     [
         {"is_gateway": True},
-        {"capabilities": {"switch": {"dp": "1", "type": "boolean"}}},
         {"ip": None},
         {"local_key": None},
         {"enabled": False},
     ],
 )
-def test_existing_setup_only_accepts_enabled_unmapped_connections(client, observer, change):
+def test_existing_setup_only_accepts_enabled_device_connections(client, observer, change):
     item = existing_device(client, **change)
     assert (
         client.post(f"{API}/devices/{item['id']}", json={"provider": "sharing"}).status_code == 409

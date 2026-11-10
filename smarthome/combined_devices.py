@@ -52,6 +52,7 @@ class CombinedInput(Schema):
 
 class CombinedMember(Member):
     accessible: bool
+    fallback_route: Literal["local"] | None = None
 
 
 class CombinedRead(Schema):
@@ -83,18 +84,36 @@ def account_scope(request, route):
         return scope_for(bridge, route)
 
 
-def read_combination(request, item, scopes):
+def member_route(request, session, member, scopes):
+    route = member["route"]
+    if route == "local":
+        return route
+    if route not in scopes:
+        try:
+            scopes[route] = account_scope(request, route)
+        except HTTPException:
+            scopes[route] = None
+    scope = scopes[route]
+    if scope is not None:
+        # A different connected account does not make a saved cloud member accessible.
+        return route if scope == member["scope"] else None
+    if route == "sharing":
+        device = local_device(session, member["device_id"])
+        if device is not None and device.enabled:
+            return "local"
+    return None
+
+
+def read_combination(request, session, item, scopes):
     members = []
     for member in item.members:
         route = member["route"]
-        if route != "local" and route not in scopes:
-            try:
-                scopes[route] = account_scope(request, route)
-            except HTTPException:
-                scopes[route] = None
-        accessible = route == "local" or scopes[route] == member["scope"]
+        active_route = member_route(request, session, member, scopes)
         wiring = {"power_source": member["power_source"]} if "power_source" in member else {}
-        members.append(CombinedMember(device_id=member["device_id"], route=route, accessible=accessible, **wiring))
+        fallback = {"fallback_route": "local"} if active_route == "local" and route != "local" else {}
+        members.append(CombinedMember(
+            device_id=member["device_id"], route=route, accessible=active_route is not None, **wiring, **fallback,
+        ))
     return CombinedRead(
         id=item.id,
         name=item.name,
@@ -185,7 +204,7 @@ def configure_combination(session, request, item, body):
 def list_combined(request: Request, session: Session = Depends(get_session)):
     scopes = {}
     items = session.scalars(select(CombinedDevice).order_by(CombinedDevice.id))
-    return [read_combination(request, item, scopes) for item in items]
+    return [read_combination(request, session, item, scopes) for item in items]
 
 
 @router.post("", status_code=201, response_model=CombinedRead, response_model_exclude_unset=True)
@@ -194,7 +213,7 @@ def create_combined(body: CombinedInput, request: Request, session: Session = De
     configure_combination(session, request, item, body)
     session.add(item)
     commit(session)
-    return read_combination(request, item, {})
+    return read_combination(request, session, item, {})
 
 
 @router.put("/{item_id}", response_model=CombinedRead, response_model_exclude_unset=True)
@@ -204,7 +223,7 @@ def update_combined(
     item = get_or_404(session, CombinedDevice, item_id)
     configure_combination(session, request, item, body)
     commit(session)
-    return read_combination(request, item, {})
+    return read_combination(request, session, item, {})
 
 
 @router.put("/{item_id}/aliases", response_model=DeviceAliases)
@@ -266,13 +285,17 @@ def combined_power(
     session: Session = Depends(get_session),
 ):
     members = get_or_404(session, CombinedDevice, item_id).members
+    scopes = {}
+    routes = [member_route(request, session, member, scopes) for member in members]
     # Release the SQLite read transaction before doing network I/O or recording commands.
     session.commit()
     results = []
-    for member in members:
+    for member, route in zip(members, routes, strict=True):
         identifier = member["device_id"]
         try:
-            if member["route"] == "local":
+            if route is None:
+                outcome = "unavailable"
+            elif route == "local":
                 outcome = local_power(request, session, identifier, command == "on")
             else:
                 outcome = cloud_power(request, member, command == "on")

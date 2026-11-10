@@ -211,7 +211,7 @@ it('edits the name and appearance without clearing a grid draft', async () => {
   const heading = editLayout.closest('.dashboard-layout-heading') as HTMLElement;
   expect(within(heading).getByText('Kitchen', { selector: '.room-navigation-heading' })).toBeInTheDocument();
   expect(editLayout.querySelector('[data-icon="edit"]')).toBeInTheDocument();
-  expect(screen.queryByText('Room appearance and name editor')).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText('Room appearance and name editor')).not.toBeInTheDocument());
   await user.click(editLayout);
   expect(window.location.pathname).toBe('/rooms/1/layout/edit');
   fireEvent.click(screen.getByRole('button', { name: 'Move Kitchen lamp (Row 1, column 1)' }));

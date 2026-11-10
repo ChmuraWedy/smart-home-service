@@ -229,6 +229,38 @@ def test_refuses_to_adopt_unversioned_inventory(postgres_url):
         engine.dispose()
 
 
+def test_upgrades_existing_postgres_to_editable_local_timer_mappings(tmp_path, postgres_url):
+    engine = make_engine("", postgres_url)
+    try:
+        init_db(engine)
+        with engine.begin() as connection:
+            connection.exec_driver_sql("DROP TABLE local_timer_suggestions")
+            connection.execute(text("UPDATE smart_home_schema_version SET version = :version"), {
+                "version": len(MIGRATIONS) - 1,
+            })
+    finally:
+        engine.dispose()
+
+    settings = Settings(database_path=str(tmp_path / "unused.db"), database_url=postgres_url)
+    with TestClient(create_app(settings)) as client:
+        device = client.post("/api/v1/devices", json={
+            "name": "Switch", "device_id": "test-switch",
+            "capabilities": {"countdown_1": {"dp": "7", "type": "integer", "writable": False, "unit": "s"}},
+        })
+        assert device.status_code == 201, device.text
+        saved = device.json()
+        mapping = saved["capabilities"]["countdown_1"]
+        path = f'/api/v1/commissioning/devices/{saved["id"]}/mappings/countdown_1'
+        draft = {"dp": "7", "minimum": 0, "maximum": 86400, "step": 1}
+        assert client.put(f"{path}/suggestion", json=draft).status_code == 204
+        assert client.get(f"{path}/suggestion").json() == draft
+        updated = {**mapping, "writable": True, "minimum": 0, "maximum": 86400, "step": 1}
+        result = client.patch(path, json={"expected": mapping, "mapping": updated})
+        assert result.status_code == 200, result.text
+        assert result.json()["capabilities"]["countdown_1"] == updated
+        assert client.patch(path, json={"expected": mapping, "mapping": updated}).status_code == 409
+
+
 def test_migrates_household_keys_and_private_layouts(tmp_path, postgres_url):
     sqlite_path = tmp_path / "household.db"
     owner = {"X-API-Key": "test-owner-key"}

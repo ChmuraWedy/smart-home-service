@@ -17,12 +17,14 @@ export type AccountIdentity = HouseholdMember & {
 export type HouseholdDeviceKey = { id: string; 'name': string; 'key_available': boolean };
 export type IssuedMember = HouseholdMember & { 'key_id': string };
 export type CloudStatus = {
-  'redroid_available'?: boolean;
   account?: AccountIdentity;
+  'household_chat_supported'?: boolean;
+  'local_mapping_editor_supported'?: boolean;
   enabled: boolean;
   connected: boolean;
   has_saved_user_code: boolean;
   saved_user_code_requires_login: boolean;
+  'redroid_available'?: boolean;
   developer: DeveloperStatus;
 };
 export type CodeStatus = Pick<CloudStatus, 'connected' | 'has_saved_user_code' | 'saved_user_code_requires_login'>;

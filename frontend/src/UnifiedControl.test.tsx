@@ -64,6 +64,40 @@ describe('unified device identity and management', () => {
     expect(await screen.findByRole('listitem', { name: cloudOnly.name })).toBeInTheDocument();
   });
 
+  it('toggles remote-only cards independently of devices that have a local connection', async () => {
+    server();
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const combinations = [
+      {
+        id: 1, name: 'Cloud combination', room_id: 2, show_member_cards: false,
+        members: [{ device_id: shared.id, route: 'sharing', accessible: true }],
+      },
+      {
+        id: 2, name: 'Local combination', room_id: 2, show_member_cards: true,
+        members: [{ device_id: local.device_id, route: 'local', accessible: true }],
+      },
+    ];
+    vi.mocked(fetch).mockImplementation(async (input, init) => new URL(String(input)).pathname.endsWith('/combined-devices')
+      ? json(combinations) : original(input, init));
+    const user = userEvent.setup();
+    renderWithStore(<ControlCenter api={new HomeApi(connection)} ready sharingReady onAuthError={vi.fn()} />);
+
+    const cloudCard = await screen.findByRole('listitem', { name: cloudOnly.name });
+    const cloudGroup = await screen.findByRole('listitem', { name: 'Cloud combination' });
+    const toggle = screen.getByRole('button', { name: 'Показать облачные устройства' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(cloudCard).not.toBeInTheDocument();
+    expect(cloudGroup).not.toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: local.name })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Local combination' })).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.getByRole('listitem', { name: cloudOnly.name })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: 'Cloud combination' })).toBeInTheDocument();
+  });
+
   it('puts the disabled presets dropdown in a second bulb header row above the readings', async () => {
     server({ noLocal: true });
     const original = vi.mocked(fetch).getMockImplementation()!;

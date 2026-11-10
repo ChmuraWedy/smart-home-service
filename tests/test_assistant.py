@@ -5,85 +5,101 @@ import pytest
 from fastapi.testclient import TestClient
 
 from smarthome import assistant_sessions
-from smarthome.assistant_sessions import AssistantSessions, fingerprint
+from smarthome.assistant_sessions import AssistantSessions, DashboardCredential
 from smarthome.config import Settings
 from smarthome.main import create_app
 from smarthome.tuya import TuyaController
 
 from .conftest import KEY
+from .test_household_accounts import API, OWNER, OWNER_KEY, create_member
 
-API = "/api/v1"
 EMBED = API + "/assistant/embed"
 SESSION = API + "/assistant/session"
-SERVICE_KEY = "test-service-key"
-OWNER = {"X-API-Key": SERVICE_KEY}
-URL = "https://voice.test:8013/embed"
+URL = "https://voice.test:8012/embed"
 
 
-def test_chat_ticket_has_scoped_access_and_only_works_once(tmp_path, factory):
+@pytest.fixture
+def chat_client(tmp_path, factory):
     settings = Settings(
-        database_path=str(tmp_path / "assistant.db"), api_token=SERVICE_KEY,
-        ai_chat_embed_url=URL, display_poll_interval=0,
+        database_path=str(tmp_path / "assistant.db"),
+        api_token=OWNER_KEY,
+        ai_chat_embed_url=URL,
+        display_poll_interval=0,
     )
     app = create_app(settings, TuyaController(settings, factory))
     with TestClient(app) as client:
-        assert client.post(EMBED).status_code == 401
-        member = client.post(API + "/accounts", headers=OWNER, json={"name": "Alex"})
-        assert member.status_code == 201
-        member_headers = {"X-API-Key": member.json()["access_key"]}
-        assert client.post(EMBED, headers=member_headers).status_code == 403
-        embed = client.post(EMBED, headers=OWNER)
-        assert embed.headers["Cache-Control"] == "no-store"
-        assert embed.json()["url"] == URL
-        ticket = embed.json()["ticket"]
-        assert len(ticket) == 43 and ticket != SERVICE_KEY
-        session = client.post(SESSION, json={"ticket": ticket})
-        assert session.status_code == 200
-        assert session.headers["Cache-Control"] == "no-store"
-        assert client.post(SESSION, json={"ticket": ticket}).status_code == 401
-        chat = {"X-API-Key": session.json()["key"]}
+        yield client
 
-        device = client.post(API + "/devices", headers=OWNER, json={
-            "name": "Outlet", "device_id": "outlet", "ip": "192.168.1.40",
-            "local_key": KEY, "version": "3.5",
-            "capabilities": {"switch": {"dp": "1", "type": "boolean"}},
+
+def sign_in(client, headers):
+    result = client.post(EMBED, headers=headers)
+    assert result.status_code == 200, result.text
+    assert result.headers["Cache-Control"] == "no-store"
+    url, ticket = (result.json()[field] for field in ("url", "ticket"))
+    assert url == URL
+    assert len(ticket) == 43 and ticket != headers["X-API-Key"]
+    credentials = {"ticket": ticket}
+    result = client.post(SESSION, json=credentials)
+    assert result.status_code == 200, result.text
+    assert result.headers["Cache-Control"] == "no-store"
+    assert client.post(SESSION, json=credentials).status_code == 401
+    return {"X-API-Key": result.json()["key"]}
+
+
+def test_owner_chat_is_passwordless_and_limited_to_chat_routes(chat_client):
+    assert chat_client.post(EMBED).status_code == 401
+    chat = sign_in(chat_client, OWNER)
+    assert chat_client.get(API + "/accounts/me", headers=chat).json()["role"] == "owner"
+    assert chat_client.get(API + "/devices", headers=chat).status_code == 200
+    assert chat_client.get(API + "/accounts", headers=chat).status_code == 403
+    assert chat_client.post(EMBED, headers=chat).status_code == 403
+    settings = chat_client.app.state.settings
+    chat_client.app.state.settings = replace(settings, api_token="another-key")
+    assert chat_client.get(API + "/devices", headers=chat).status_code == 401
+
+
+def test_member_chat_keeps_device_permissions_and_revocation(chat_client, factory):
+    member, credentials = create_member(chat_client, "Alex")
+    chat = sign_in(chat_client, credentials)
+    assert chat_client.get(API + "/accounts/me", headers=chat).json()["id"] == member["id"]
+    assert chat_client.get(API + "/accounts/me", headers=chat).json()["role"] == "member"
+
+    def add_device(name, category, ip):
+        created = chat_client.post(API + "/devices", headers=OWNER, json={
+            "name": name, "device_id": name, "category": category, "ip": ip, "local_key": KEY,
+            "version": "3.5", "capabilities": {"switch": {"dp": "1", "type": "boolean"}},
         })
-        assert device.status_code == 201, device.text
-        path = f"{API}/devices/{device.json()['id']}"
-        assert client.get(API + "/devices", headers=chat).status_code == 200
-        assert client.patch(path, headers=chat, json={"name": "Edited"}).status_code == 403
-        assert client.post(EMBED, headers=chat).status_code == 403
-        assert client.get(API + "/accounts", headers=chat).status_code == 403
-        assert client.get(API + "/dashboard-layouts/me", headers=chat).status_code == 403
-        assert client.post(path + "/commands/capabilities", headers=chat, json={
-            "values": {"switch": True},
-        }).status_code == 200
-        assert factory.commands == [("outlet", "set_dps", {"1": True})]
-        app.state.settings = replace(settings, api_token="another-key")
-        assert client.get(API + "/devices", headers=chat).status_code == 401
+        assert created.status_code == 201, created.text
+        return created.json()["id"]
+
+    outlet = add_device("Outlet", "cz", "192.168.1.40")
+    camera = add_device("Camera", "sp", "192.168.1.41")
+    assert [row["id"] for row in chat_client.get(API + "/devices", headers=chat).json()] == [outlet]
+    payload = {"values": {"switch": True}}
+    assert chat_client.post(f"{API}/devices/{camera}/commands/capabilities", headers=chat, json=payload).status_code == 403
+    assert chat_client.get(f"{API}/activity/devices/{outlet}", headers=chat).status_code == 403
+    assert chat_client.post(f"{API}/devices/{outlet}/commands/capabilities", headers=chat, json=payload).status_code == 200
+    assert factory.commands == [("Outlet", "set_dps", {"1": True})]
+
+    key_path = f"{API}/accounts/{member['id']}/keys/{member['key_id']}"
+    assert chat_client.delete(key_path, headers=OWNER).status_code == 204
+    assert chat_client.get(API + "/devices", headers=chat).status_code == 401
 
 
-def test_disabled_chat_and_open_mode_do_not_issue_credentials(tmp_path):
-    settings = Settings(database_path=str(tmp_path / "assistant.db"), display_poll_interval=0)
-    with TestClient(create_app(settings)) as client:
-        assert client.post(EMBED).json() == {"url": None, "ticket": None}
-        client.app.state.settings = replace(settings, ai_chat_embed_url=URL)
-        assert client.post(EMBED).status_code == 403
-
-
-def test_ticket_redemption_is_atomic_and_expires(monkeypatch):
-    monkeypatch.setattr(assistant_sessions, "monotonic", lambda: 10)
-    store = AssistantSessions()
-    credential = fingerprint(SERVICE_KEY)
-    ticket = store.issue_ticket(credential)
+def test_ticket_is_atomic_and_credentials_expire(monkeypatch):
+    clock = iter([10, 10])
+    monkeypatch.setattr(assistant_sessions, "monotonic", lambda: next(clock, 10))
+    sessions = AssistantSessions()
+    source = DashboardCredential("key", "fingerprint")
+    ticket = sessions.issue_ticket(source)
     with ThreadPoolExecutor(max_workers=4) as pool:
-        keys = [key for key in pool.map(store.redeem, [ticket] * 4) if key]
+        keys = [key for key in pool.map(sessions.redeem, [ticket] * 4) if key]
     assert len(keys) == 1
-    assert store.resolve(keys[0]) == credential
-    unused_ticket = store.issue_ticket(credential)
+    assert sessions.resolve(keys[0]) == source
+    expired_ticket = sessions.issue_ticket(source)
     monkeypatch.setattr(assistant_sessions, "monotonic", lambda: 10 + assistant_sessions.SESSION_TTL)
-    assert store.resolve(keys[0]) is None
-    assert store.redeem(unused_ticket) is None
+    assert sessions.resolve(keys[0]) is None
+    assert sessions.redeem(expired_ticket) is None
 
 
 @pytest.mark.parametrize("url", [

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,8 +23,18 @@ from .cloud_scope import scope_for
 from .db import lock_writes
 from .gateway_keys import GATEWAY_CATEGORIES, candidates, discover, validate_target
 from .local_lighting import color_capability
-from .models import Device
-from .schemas import Capability, DeviceCreate, DeviceRead, Name, PositiveID, Schema
+from .models import Device, LocalTimerSuggestion
+from .schemas import (
+    DP,
+    Capability,
+    CapName,
+    DeviceCreate,
+    DevicePatch,
+    DeviceRead,
+    Name,
+    PositiveID,
+    Schema,
+)
 from .service import (
     commit,
     create_device,
@@ -32,6 +42,7 @@ from .service import (
     device_values,
     effective_capabilities,
     get_or_404,
+    patch_device,
     record_observations,
     validate_device,
 )
@@ -41,6 +52,7 @@ router = APIRouter(
 )
 TTL = 900
 MAX_SESSIONS = 16
+COUNTDOWN = re.compile(r"countdown(?:_[1-9][0-9]*)?")
 Action = Literal["observe", "power", "brightness", "temperature", "color", "sensor", "button"]
 PRIVATE = {
     "key",
@@ -82,6 +94,24 @@ class RegisterObservation(Schema):
         if value is not True:
             raise ValueError("Explicit review is required")
         return value
+
+
+class MappingEdit(Schema):
+    expected: Capability
+    mapping: Capability
+
+
+class TimerSuggestion(Schema):
+    dp: DP
+    minimum: int = Field(ge=0, le=2**53 - 1, strict=True)
+    maximum: int = Field(ge=0, le=2**53 - 1, strict=True)
+    step: int = Field(gt=0, le=2**53 - 1, strict=True)
+
+    @model_validator(mode="after")
+    def validate_range(self):
+        if self.minimum > self.maximum:
+            raise ValueError("Minimum must not exceed maximum.")
+        return self
 
 
 @dataclass(repr=False)
@@ -292,6 +322,8 @@ def proposed_capability(entry, row):
             and 0 <= scale <= 9
         )
         writable &= valid_bounds
+        if COUNTDOWN.fullmatch(code or ""):
+            writable &= valid_bounds and 0 <= lo <= value <= hi and scale == 0
         if valid_bounds:
             cap.scale = 10**-scale
             if scale:
@@ -313,6 +345,27 @@ def proposed_capability(entry, row):
     else:
         writable = False
     return cap, bool(writable)
+
+
+def verified_countdown_mappings(draft, specs, functions, controller):
+    timers = {
+        code: str(spec["dp_id"])
+        for code, spec in specs.items()
+        if COUNTDOWN.fullmatch(code) and code in functions and spec.get("dp_id") is not None
+        and sum(row.get("dp_id") == spec["dp_id"] for row in specs.values()) == 1
+    }
+    if not timers:
+        return {}
+    target = Device(**{key: value for key, value in device_values(draft).items() if key != "aliases"})
+    readings = controller.execute(target, None)
+    entry = Observation(draft, None, None, "local", 0, specs, functions)
+    result = {}
+    for code, dp in timers.items():
+        capability, writable = proposed_capability(entry, {"code": code, "dp": dp, "value": readings.get(dp)})
+        if capability and writable:
+            capability.writable = True
+            result[code] = capability
+    return result
 
 
 @router.post("", status_code=201)
@@ -451,9 +504,9 @@ def start_existing(
     """Observe functions of a saved connection without exposing or replacing its key."""
     response.headers["Cache-Control"] = "no-store"
     item = get_or_404(session, Device, device_id)
-    if item.is_gateway or effective_capabilities(session, item):
+    if item.is_gateway:
         raise HTTPException(
-            409, "Этот сценарий предназначен для устройства с ещё не настроенными функциями."
+            409, "This gateway has no local functions to configure."
         )
     source = device_read(session, item).model_dump()
     draft = DeviceCreate.model_validate(
@@ -496,6 +549,118 @@ def start_existing(
     )
     token = store.add(entry)
     return view(store, token, entry)
+
+
+def unverified_timer_mapping(saved, definition):
+    return (
+        saved is not None
+        and not saved.get("writable", True)
+        and saved.get("readable", True)
+        and saved["type"] == "integer"
+        and saved["dp"] == definition["dp"]
+        and saved.get("unit") in (None, definition.get("unit"))
+        and saved.get("minimum") is None
+        and saved.get("maximum") is None
+        and saved.get("read_dp") is None
+        and saved.get("scale", 1) == 1
+        and saved.get("offset", 0) == 0
+        and not saved.get("invert")
+        and not saved.get("value_map")
+        and not saved.get("write_dps")
+    )
+
+
+def merge_detected_capabilities(session, item, detected):
+    current = effective_capabilities(session, item)
+    occupied = {}
+    for name, definition in current.items():
+        occupied.setdefault(definition.get("read_dp") or definition["dp"], set()).add(name)
+    merged = dict(item.capabilities)
+    for name, definition in detected.items():
+        dp = definition["dp"]
+        owners = occupied.get(dp, set())
+        if name not in current and not owners:
+            merged[name] = definition
+            occupied[dp] = {name}
+            continue
+        if not COUNTDOWN.fullmatch(name) or not definition["writable"]:
+            continue
+        previous_name = name if name in current else f"dp_{dp}"
+        if owners == {previous_name} and unverified_timer_mapping(current.get(previous_name), definition):
+            if previous_name != name:
+                # Replace an automatically named placeholder only if it belongs to this device.
+                if previous_name not in merged:
+                    continue
+                del merged[previous_name]
+            merged[name] = definition
+            occupied[dp] = {name}
+    return merged
+
+
+def local_timer_dp(session, device_id, name):
+    item = get_or_404(session, Device, device_id)
+    mapping = effective_capabilities(session, item).get(name)
+    if (
+        not COUNTDOWN.fullmatch(name)
+        or not mapping
+        or mapping["type"] != "integer"
+        or mapping.get("unit") not in (None, "s")
+        or mapping.get("scale", 1) != 1
+        or mapping.get("offset", 0) != 0
+        or mapping.get("read_dp") not in (None, mapping["dp"])
+        or mapping.get("value_map")
+    ):
+        raise HTTPException(404, "Local whole-second timer mapping not found")
+    return mapping["dp"]
+
+
+@router.get("/devices/{device_id}/mappings/{name}/suggestion", response_model=TimerSuggestion | None)
+def read_timer_suggestion(device_id: PositiveID, name: CapName, session: Session = Depends(get_session)):
+    dp = local_timer_dp(session, device_id, name)
+    suggestion = session.get(LocalTimerSuggestion, (device_id, name, dp))
+    if suggestion is None:
+        return None
+    return TimerSuggestion(dp=dp, minimum=suggestion.minimum, maximum=suggestion.maximum, step=suggestion.step)
+
+
+@router.put("/devices/{device_id}/mappings/{name}/suggestion", status_code=204)
+def store_timer_suggestion(
+    device_id: PositiveID, name: CapName, body: TimerSuggestion, session: Session = Depends(get_session),
+):
+    """Import verified Smart Life bounds as a draft, separate from the active mapping."""
+    lock_writes(session)
+    if local_timer_dp(session, device_id, name) != body.dp:
+        raise HTTPException(409, "The suggested DP does not match the local timer mapping.")
+    session.merge(LocalTimerSuggestion(device_id=device_id, code=name, **body.model_dump()))
+    commit(session)
+
+
+@router.patch("/devices/{device_id}/mappings/{name}", response_model=DeviceRead)
+def edit_mapping(
+    device_id: PositiveID, name: CapName, body: MappingEdit, session: Session = Depends(get_session)
+):
+    lock_writes(session)
+    item = get_or_404(session, Device, device_id)
+    saved = effective_capabilities(session, item).get(name)
+    if saved is None:
+        raise HTTPException(404, "Device mapping not found")
+    if Capability.model_validate(saved) != body.expected:
+        raise HTTPException(409, "The device mapping changed. Refresh the settings and try again.")
+    mapping = body.mapping
+    if COUNTDOWN.fullmatch(name) and mapping.writable and (
+        mapping.type != "integer"
+        or mapping.minimum is None
+        or mapping.maximum is None
+        or mapping.minimum < 0
+        or not mapping.minimum.is_integer()
+        or not mapping.maximum.is_integer()
+        or (mapping.step is not None and not mapping.step.is_integer())
+    ):
+        raise HTTPException(422, "A writable timer requires a valid whole-second range.")
+    capabilities = {**item.capabilities, name: mapping.model_dump(mode="json")}
+    patch_device(session, item, DevicePatch(capabilities=capabilities))
+    commit(session)
+    return device_read(session, item)
 
 
 def checked_gateway_key(request, entry):
@@ -692,6 +857,7 @@ def register(
             item = checked_existing(session, entry)
             if not capabilities:
                 raise HTTPException(409, "Поддерживаемые локальные параметры не найдены.")
+            capabilities = merge_detected_capabilities(session, item, capabilities)
             # Only functions change; existing name, aliases, placement and connection survive.
             validate_device(
                 session,

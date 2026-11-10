@@ -3,6 +3,7 @@ import {
 } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from '../api';
+import { resolveCombinedMember } from '../combined-power';
 import {
   deviceRoutes, matchesDevice, useDeviceDisplayName,
 } from '../devices';
@@ -216,8 +217,9 @@ export function CombinedDeviceSettings({
     const { device_id: id, route } = member;
     const device = byId.get(id);
     const saved = existing?.members.find((row) => row.device_id === id && row.route === route);
-    const accessible = saved?.accessible !== false && device && deviceRoutes(device).includes(route);
-    return { member, device: accessible ? device : undefined };
+    return resolveCombinedMember({
+      ...member, accessible: saved?.accessible ?? true, fallback_route: saved?.fallback_route,
+    }, device);
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -335,7 +337,7 @@ export function CombinedDeviceSettings({
               {options.map((id) => {
                 const device = byId.get(id);
                 const choice = selected.get(id);
-                const route = device ? deviceRoutes(device)[0] : undefined;
+                const route = device?.local?.enabled ? 'local' : device && deviceRoutes(device)[0];
                 const label = displayName(device, id);
                 return (
                   <label className="combined-member-option" htmlFor={`${formId}-member-${id}`} key={id}>

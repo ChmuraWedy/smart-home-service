@@ -466,7 +466,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 31
+      "count": 30
     },
     "consistent-return": {
       "count": 1
@@ -484,7 +484,7 @@
       "count": 2
     },
     "key-spacing": {
-      "count": 8
+      "count": 7
     },
     "no-confusing-arrow": {
       "count": 2
@@ -502,7 +502,7 @@
       "count": 6
     },
     "object-curly-spacing": {
-      "count": 8
+      "count": 6
     },
     "object-property-newline": {
       "count": 10
@@ -564,38 +564,15 @@
       "count": 1
     }
   },
-  "src/components/ChannelControl.tsx": {
-    "arrow-parens": {
-      "count": 2
-    },
-    "comma-spacing": {
-      "count": 4
-    },
-    "indent": {
-      "count": 1
-    },
-    "object-curly-spacing": {
-      "count": 2
-    },
-    "one-var": {
-      "count": 1
-    },
-    "one-var-declaration-per-line": {
-      "count": 1
-    },
-    "prefer-template": {
-      "count": 1
-    }
-  },
   "src/components/CloudControl.tsx": {
     "@stylistic/jsx-max-props-per-line": {
       "count": 11
     },
     "@stylistic/max-len": {
-      "count": 13
+      "count": 12
     },
     "arrow-parens": {
-      "count": 25
+      "count": 23
     },
     "arrow-spacing": {
       "count": 8
@@ -604,7 +581,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 19
+      "count": 17
     },
     "curly": {
       "count": 1
@@ -719,7 +696,7 @@
       "count": 8
     },
     "object-curly-newline": {
-      "count": 30
+      "count": 28
     },
     "object-curly-spacing": {
       "count": 2
@@ -865,7 +842,7 @@
       "count": 3
     },
     "comma-spacing": {
-      "count": 25
+      "count": 22
     },
     "consistent-return": {
       "count": 1
@@ -883,7 +860,7 @@
       "count": 1
     },
     "key-spacing": {
-      "count": 7
+      "count": 4
     },
     "no-mixed-operators": {
       "count": 4
@@ -898,7 +875,7 @@
       "count": 10
     },
     "object-curly-spacing": {
-      "count": 4
+      "count": 2
     },
     "one-var": {
       "count": 2
@@ -970,7 +947,7 @@
       "count": 13
     },
     "@stylistic/max-len": {
-      "count": 16
+      "count": 15
     },
     "arrow-parens": {
       "count": 24
@@ -1012,7 +989,7 @@
       "count": 5
     },
     "no-restricted-syntax": {
-      "count": 17
+      "count": 15
     },
     "no-shadow": {
       "count": 10
@@ -1531,28 +1508,25 @@
   },
   "src/components/LocalControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 7
+      "count": 6
     },
     "@stylistic/max-len": {
-      "count": 8
+      "count": 7
     },
     "arrow-parens": {
-      "count": 17
+      "count": 15
     },
     "brace-style": {
       "count": 1
     },
     "comma-spacing": {
-      "count": 6
+      "count": 4
     },
     "curly": {
-      "count": 2
+      "count": 1
     },
     "indent": {
-      "count": 12
-    },
-    "key-spacing": {
-      "count": 1
+      "count": 7
     },
     "no-await-in-loop": {
       "count": 1
@@ -1570,7 +1544,7 @@
       "count": 8
     },
     "object-curly-spacing": {
-      "count": 4
+      "count": 2
     },
     "one-var": {
       "count": 3
@@ -1579,22 +1553,19 @@
       "count": 3
     },
     "prefer-template": {
-      "count": 3
+      "count": 2
     },
     "quotes": {
-      "count": 5
+      "count": 2
     },
     "react/button-has-type": {
-      "count": 4
-    },
-    "react/jsx-boolean-value": {
-      "count": 1
+      "count": 3
     },
     "react/jsx-first-prop-new-line": {
-      "count": 2
+      "count": 1
     },
     "react/jsx-max-props-per-line": {
-      "count": 2
+      "count": 1
     }
   },
   "src/components/NetworkPage.tsx": {
@@ -1815,7 +1786,7 @@
   },
   "src/controls.ts": {
     "@stylistic/max-len": {
-      "count": 9
+      "count": 8
     },
     "arrow-parens": {
       "count": 7
@@ -1839,13 +1810,13 @@
       "count": 3
     },
     "no-confusing-arrow": {
-      "count": 2
+      "count": 1
     },
     "no-mixed-operators": {
       "count": 10
     },
     "no-nested-ternary": {
-      "count": 14
+      "count": 12
     },
     "no-restricted-syntax": {
       "count": 4
@@ -1943,7 +1914,7 @@
       "count": 58
     },
     "lines-between-class-members": {
-      "count": 15
+      "count": 14
     },
     "no-await-in-loop": {
       "count": 1

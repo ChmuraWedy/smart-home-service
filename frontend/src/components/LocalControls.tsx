@@ -1,18 +1,21 @@
 import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { MSG, t } from "../i18n";
-import type { CloudDevice } from '../api';
+import type { CloudDevice, JsonValue } from '../api';
 import type { DeviceRoute } from '../devices';
 import { displayReading, isStale, localCommandValue, localReading, localSpec, validateControlValue } from '../controls';
+import type { ControlSpec } from '../controls';
 import { HomeApi } from '../home-api';
 import type { DeviceState, Group, GroupState, LocalDevice } from '../home-api';
-import { readLocalDevice } from '../local-device-cache';
+import { readLocalDevice, sendLocalCapabilities } from '../local-device-cache';
 import { useAppDispatch, useAppSelector } from '../store';
 import { cacheDeviceMetadata, localMetadataKey, nextDeviceMetadataRevision } from '../device-metadata';
 import { localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
-import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
+import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession, latestReadingTime } from './DeviceControls';
 import DeviceInformation from './DeviceInformation';
+import LocalDeviceMappings from './LocalDeviceMappings';
+import { InchingControl, SwitchTimers, switchTimerControls } from './SwitchTimers';
 import { useAutomaticControls } from '../control-drafts';
 import { DeviceAliases } from './DeviceAliases';
 import DeviceTranslationEditor from './DeviceTranslationEditor';
@@ -23,12 +26,16 @@ import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceCo
 
 export function LocalControl({
   api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup, roomEditor,
+  showMappingEditor = true, onMappingsSaved,
 }: {
   api: HomeApi; device: LocalDevice; gateway?: LocalDevice; cloudDevice?: CloudDevice; routes?: DeviceRoute[];
   onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
   roomEditor?: ReactNode;
+  showMappingEditor?: boolean;
+  onMappingsSaved?: (device: LocalDevice) => void;
 }) {
   const [aliasBusy, setAliasBusy] = useState(false);
+  const [savedMappings, setSavedMappings] = useState<LocalDevice>();
   const dispatch = useAppDispatch();
   const metadataKey = localMetadataKey(api, device.id);
   const identity = useAppSelector(state => state.deviceMetadata.devices[metadataKey]);
@@ -41,9 +48,12 @@ export function LocalControl({
       dispatch(readLocalDevice(api, device.id, refresh, signal, document.visibilityState !== 'hidden')),
     ]);
     if (metadata.id !== device.id) throw new Error(t(MSG.THE_SERVICE_RETURNED_A_DIFFERENT_DEVICE));
-    if (!signal?.aborted) dispatch(cacheDeviceMetadata([{
-      key: metadataKey, revision, name: metadata.name, aliases: metadata.aliases, translations: metadata.translations,
-    }]));
+    if (!signal?.aborted) {
+      setSavedMappings(undefined);
+      dispatch(cacheDeviceMetadata([{
+        key: metadataKey, revision, name: metadata.name, aliases: metadata.aliases, translations: metadata.translations,
+      }]));
+    }
     return { metadata, state };
   }, [api, device.id, dispatch, metadataKey]);
   const poll = useCallback(async (current: {metadata: LocalDevice; state: DeviceState}, signal: AbortSignal) => {
@@ -52,21 +62,52 @@ export function LocalControl({
   }, [api, device.id, dispatch]);
   const session = useControlSession(load, onAuthError, poll), now = useClock();
   const state = cached ?? session.data?.state;
-  const item = session.data?.metadata || device;
+  const item = savedMappings ?? session.data?.metadata ?? device;
   const originalName = identity?.name?.value ?? item.name;
   const translations = identity?.translations?.value ?? item.translations;
   const name = localize(originalName, translationFor(translations, 'name', originalName));
   const pendingScope = localPendingScope(api, item.id);
-  const drafts = useAutomaticControls(changes => session.execute(async () => {
+  const sendLocal = async (values: Record<string, JsonValue>) => {
+    const confirmed = await dispatch(sendLocalCapabilities(api, item.id, values));
+    return { confirmed, text: t(confirmed ? MSG.DEVICE_CONFIRMED_REQUESTED_SETTING : MSG.COMMAND_ACCEPTED_NOTICE) };
+  };
+  const drafts = useAutomaticControls(changes => session.execute(() => {
     for (const change of changes) validateControlValue(change.spec, change.value!);
-    const result = await api.setCapabilities(item.id, Object.fromEntries(changes.map(({ spec, value }) => [spec.key, localCommandValue(spec, value!)])));
-    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
-    return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
+    return sendLocal(Object.fromEntries(changes.map(({ spec, value }) => [spec.key, localCommandValue(spec, value!)])));
   }), !session.busy && !aliasBusy && session.readOK && !!state?.enabled);
-  const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
+  const specs = Object.entries(item.capabilities).map(([key, cap]) => {
+    const reading = state?.values[key];
+    return localSpec(key, cap, reading?.known ? reading.value : undefined);
+  });
+  const lastReadAt = latestReadingTime(state?.values);
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
+  const applySavedMappings = useCallback((updated: LocalDevice) => {
+    setSavedMappings(updated);
+    onMappingsSaved?.(updated);
+  }, [onMappingsSaved]);
+
+  const { countdowns, inching, channels } = switchTimerControls(specs);
+  const regularSpecs = specs.filter((spec) => !isBattery(spec.key) && spec !== inching && !countdowns.includes(spec));
+  const controlsDisabled = session.busy || !session.readOK || !state?.enabled;
+  const sendValue = (spec: ControlSpec, value: JsonValue) => session.execute(() => sendLocal({ [spec.key]: localCommandValue(spec, value) }));
+  const field = (spec: ControlSpec) => (
+    <CapabilityField
+      key={spec.key}
+      spec={spec}
+      pendingScope={pendingScope}
+      stage={item.capabilities[spec.key].type === 'boolean' ? undefined : drafts.stage}
+      immediatePower
+      reading={localReading(spec, state?.values[spec.key])}
+      now={now}
+      local
+      disabled={controlsDisabled}
+      onSend={(value) => sendValue(spec, value)}
+    />
+  );
+
   return (
     <ControlDialog onRefresh={session.refresh}
+      readingAge={lastReadAt ? { at: lastReadAt, now } : undefined}
       information={<DeviceConnectionDescription room={room} route="local" localTransport={item.transport} />}
       statusContent={<BatteryBadge reading={state ? batteryFromSpecs(specs,Object.fromEntries(Object.entries(state.values).filter(([,reading]) => reading.known).map(([key,reading]) => [key,reading.value]))) : undefined} />} className={Object.values(item.capabilities).some(spec => spec.encoding?.startsWith('tuya_')) ? 'bulb-controls' : ''} title={name} busy={session.busy || aliasBusy} onClose={onClose} closeLabel={closeLabel}
       titleContent={<DeviceAliases api={api} deviceId={item.device_id} name={originalName} translations={translations} initialAliases={item.aliases} localId={item.id} disabled={session.busy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
@@ -75,22 +116,35 @@ export function LocalControl({
       {roomEditor}
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
       {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
-      <div className={"capability-grid" + (specs.every(spec => !spec.writable) ? " sensor-grid" : "")}>
-        {session.data && state && specs.filter((spec) => !isBattery(spec.key)).map((spec) => (
-          <CapabilityField pendingScope={pendingScope} key={spec.key} spec={spec} stage={spec.kind === 'boolean' ? undefined : drafts.stage} immediatePower reading={localReading(spec, state.values[spec.key])} now={now} local={true} disabled={session.busy || !session.readOK || !state.enabled} onSend={value => session.execute(async () => {
-      const result = await api.setCapability(item.id, spec.key, localCommandValue(spec, value));
-      if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
-      return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
-    })}
-          />
-))}
+      <div className={`capability-grid${specs.every((spec) => !spec.writable) ? ' sensor-grid' : ''}`}>
+        {session.data && state && regularSpecs.map(field)}
       </div>
+      {session.data && state && (
+        <SwitchTimers
+          countdowns={countdowns}
+          renderCountdown={field}
+          inching={inching && (
+          <InchingControl
+            spec={inching}
+            channels={channels}
+            reading={state.values[inching.key]}
+            pendingScope={pendingScope}
+            disabled={controlsDisabled || !state.available}
+            onSend={(value) => sendValue(inching, value)}
+          />
+          )}
+        />
+      )}
       {session.data && !Object.keys(item.capabilities).length && (
       <div className="saved-summary">
         {item.is_gateway ? <p>{t(MSG.THE_GATEWAY_IS_CONFIGURED_FOR_LOCAL_CHILD_DEVICE)}</p> : (
           <>
             <p>{t(MSG.MAP_LOCAL_PARAMETERS_AFTER_SAVING)}</p>
-            {onSetup && <button disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>{t(MSG.SET_UP_FUNCTIONS)}</button>}
+            {!showMappingEditor && onSetup && (
+              <button disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>
+                {t(MSG.SET_UP_FUNCTIONS)}
+              </button>
+            )}
           </>
     )}
       </div>
@@ -119,6 +173,18 @@ export function LocalControl({
         gateway={gateway}
         onAuthError={onAuthError}
       />
+      )}
+      {showMappingEditor && !api.isMember && !item.is_gateway && (
+        <LocalDeviceMappings
+          api={api}
+          device={item}
+          readings={state?.values}
+          sharingDevice={routes?.includes('sharing') ? cloudDevice : undefined}
+          disabled={session.busy || aliasBusy}
+          onSetup={onSetup}
+          onSaved={applySavedMappings}
+          onAuthError={onAuthError}
+        />
       )}
       <ControlFeedback busy={session.busy} notice={session.notice} />
     </ControlDialog>

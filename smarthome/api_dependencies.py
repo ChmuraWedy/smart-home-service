@@ -9,7 +9,7 @@ from fastapi.security import APIKeyHeader
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .assistant_sessions import CHAT_ROUTES, SESSION_PREFIX, fingerprint
+from .assistant_sessions import CHAT_ROUTES, SESSION_PREFIX, DashboardCredential
 from .models import HouseholdDeviceKey, HouseholdMember, HouseholdOwner
 
 OWNER_ID = "owner"
@@ -41,6 +41,7 @@ MEMBER_ROUTES = {
     }),
     "POST": frozenset({
         "/api/v1/accounts/login",
+        "/api/v1/assistant/embed",
         "/api/v1/accounts/{account_id}/keys",
         "/api/v1/devices/{item_id}/commands/capabilities",
         "/api/v1/groups/{group_id}/commands/{command}",
@@ -83,6 +84,30 @@ def key_digest(token: str) -> str:
 token_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
+def _account_for_device_key(session: Session, credential: HouseholdDeviceKey) -> Account:
+    if credential.member_id is None:
+        return owner_account(session, credential.id)
+    member = session.get(HouseholdMember, credential.member_id)
+    if member is None or not member.login:
+        raise HTTPException(401, "Missing or invalid X-API-Key")
+    return Account(member.id, member.name, "member", member.login, credential.id)
+
+
+def account_for_chat(
+    request: Request, session: Session, credential: DashboardCredential | None,
+) -> Account:
+    if credential is not None:
+        if credential.key_id is None:
+            expected = request.app.state.settings.api_token
+            if expected and hmac.compare_digest(key_digest(expected), credential.digest):
+                return owner_account(session)
+        else:
+            key = session.get(HouseholdDeviceKey, credential.key_id)
+            if key and hmac.compare_digest(key.key_digest, credential.digest):
+                return _account_for_device_key(session, key)
+    raise HTTPException(401, "Chat sign-in expired. Reopen AI chat.")
+
+
 def authenticate(
     request: Request, token: str | None = Depends(token_header), session: Session = Depends(get_session),
 ) -> Account | None:
@@ -95,28 +120,24 @@ def authenticate(
         return None
     if token and hmac.compare_digest(token.encode(), expected.encode()):
         return owner_account(session)
+
+    # FastAPI resolves the route before running dependencies.
+    route = getattr(request.scope.get("route"), "path", None)
     if token and token.startswith(SESSION_PREFIX):
-        chat_credential = request.app.state.assistant_sessions.resolve(token)
-        if chat_credential and hmac.compare_digest(chat_credential, fingerprint(expected)):
-            route = getattr(request.scope.get("route"), "path", None)
-            if route not in CHAT_ROUTES.get(request.method, ()):
-                raise HTTPException(403, "This action is unavailable in AI chat")
-            return None
-    if not token or not MEMBER_KEY.fullmatch(token):
-        raise HTTPException(401, "Missing or invalid X-API-Key")
-    credential = session.scalar(select(HouseholdDeviceKey).where(HouseholdDeviceKey.key_digest == key_digest(token)))
-    if credential is None:
-        raise HTTPException(401, "Missing or invalid X-API-Key")
-    if credential.member_id is None:
-        return owner_account(session, credential.id)
-    member = session.get(HouseholdMember, credential.member_id)
-    if member is None or not member.login:
-        raise HTTPException(401, "Missing or invalid X-API-Key")
-    # FastAPI resolves the route before running dependencies. New routes are owner-only by default.
-    route = request.scope.get("route")
-    if getattr(route, "path", None) not in MEMBER_ROUTES.get(request.method, ()):
+        if route not in CHAT_ROUTES.get(request.method, ()):
+            raise HTTPException(403, "This action is unavailable in AI chat")
+        account = account_for_chat(request, session, request.app.state.assistant_sessions.resolve(token))
+    else:
+        if not token or not MEMBER_KEY.fullmatch(token):
+            raise HTTPException(401, "Missing or invalid X-API-Key")
+        credential = session.scalar(select(HouseholdDeviceKey).where(HouseholdDeviceKey.key_digest == key_digest(token)))
+        if credential is None:
+            raise HTTPException(401, "Missing or invalid X-API-Key")
+        account = _account_for_device_key(session, credential)
+
+    if account.role == "member" and route not in MEMBER_ROUTES.get(request.method, ()):
         raise HTTPException(403, "This action requires the owner account")
-    return Account(member.id, member.name, "member", member.login, credential.id)
+    return account
 
 
 def require_account(account: Account | None = Depends(authenticate)) -> Account:

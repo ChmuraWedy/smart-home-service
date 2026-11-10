@@ -36,7 +36,7 @@ def env(client, monkeypatch):
                 return item
         raise HTTPException(404, "Not in selected account")
 
-    bridge.device = device
+    bridge.device = bridge.writable_device = device
     bridge.devices = lambda: [bridge.gateway, *bridge.children, direct]
     client.app.state.cloud = bridge
     monitor = Monitor()
@@ -91,6 +91,45 @@ def test_wifi_find_is_read_only_and_confirmed_save_assigns_only_own_key(client, 
     with Session(client.app.state.engine) as session:
         assert session.get(Device, device["id"]).local_key == OTHER
     assert save(client, found).status_code == 404 and len(inventory(client)) == 1
+
+
+@pytest.mark.parametrize("value, mapped", [(0, True), (True, False), (86401, False)])
+def test_connection_init_saves_only_verified_timer_mappings(client, env, factory, value, mapped):
+    env.direct.function = {
+        "countdown_1": SimpleNamespace(
+            code="countdown_1", dp_id=7, type="Integer",
+            values={"min": 0, "max": 86400, "step": 1, "unit": "s"},
+        ),
+        "countdown_2": SimpleNamespace(
+            code="countdown_2", dp_id=8, type="Integer",
+            values={"min": 0, "max": 86400, "step": 1, "unit": "s"},
+        ),
+    }
+    factory.result = {"dps": {"7": value}}
+    finding = find(client).json()
+    assert finding["device"]["timer_mappings"] == (["countdown_1"] if mapped else [])
+    assert inventory(client) == []
+    result = save(client, finding)
+    assert result.status_code == 201, result.text
+    mappings = result.json()["device"]["capabilities"]
+    assert list(mappings) == (["countdown_1"] if mapped else [])
+    if mapped:
+        timer = mappings["countdown_1"]
+        assert (timer["dp"], timer["minimum"], timer["maximum"], timer["writable"]) == ("7", 0, 86400, True)
+    assert factory.commands == [(env.direct.id, "status", None)]
+
+
+def test_changed_timer_definition_cannot_be_saved_from_a_stale_finding(client, env, factory):
+    timer = SimpleNamespace(
+        code="countdown_1", dp_id=7, type="Integer", values={"min": 0, "max": 86400, "step": 1},
+    )
+    env.direct.function = {"countdown_1": timer}
+    factory.result = {"dps": {"7": 0}}
+    finding = find(client).json()
+    assert finding["device"]["timer_mappings"] == ["countdown_1"]
+    timer.dp_id = 8
+    assert save(client, finding).status_code == 409
+    assert inventory(client) == []
 
 
 def test_direct_device_uses_actual_controller_read_only_proof(client, env, factory, monkeypatch):

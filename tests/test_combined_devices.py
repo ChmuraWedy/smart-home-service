@@ -105,6 +105,45 @@ def test_combines_cloud_and_lan_devices_and_reports_partial_power_outcomes(
     assert len(bridge.commands) == 2
 
 
+def test_disconnected_sharing_members_use_the_same_local_fallback_for_listing_and_power(
+    client, direct, factory, monkeypatch
+):
+    bridge = CloudFixture()
+    monkeypatch.setattr(client.app.state, "cloud", bridge)
+    identifier = direct["device_id"]
+    combination = create(client, member(identifier), member("cloud-only"))
+    power_url = f'{PATH}/{combination["id"]}/power/on'
+    assert combination["members"][0] == {**member(identifier), "accessible": True}
+
+    bridge.auth = {"token_info": {"uid": "different-account"}}
+    assert client.get(PATH).json()[0]["members"][0] == {**member(identifier), "accessible": False}
+    assert client.post(power_url).json()["results"][0]["outcome"] == "unavailable"
+    assert factory.commands == []
+
+    bridge.auth = None
+    assert client.get(PATH).json()[0]["members"] == [
+        {**member(identifier), "accessible": True, "fallback_route": "local"},
+        {**member("cloud-only"), "accessible": False},
+    ]
+    assert client.post(power_url).json()["results"] == [
+        {"device_id": identifier, "outcome": "accepted"},
+        {"device_id": "cloud-only", "outcome": "unavailable"},
+    ]
+    assert factory.commands == [(identifier, "set_dps", {"1": True})]
+    assert bridge.commands == []
+
+    assert client.patch(f'/api/v1/devices/{direct["id"]}', json={"enabled": False}).status_code == 200
+    assert client.get(PATH).json()[0]["members"][0] == {**member(identifier), "accessible": False}
+    assert client.post(power_url).json()["results"][0]["outcome"] == "unavailable"
+    assert len(factory.commands) == 1
+
+    bridge.auth = {"token_info": {"uid": "fixture-account"}}
+    assert client.get(PATH).json() == [combination]
+    assert client.post(power_url).json()["results"][0]["outcome"] == "accepted"
+    assert bridge.commands[0] == (identifier, [{"code": "switch_led", "value": True}])
+    assert len(factory.commands) == 1
+
+
 def test_membership_edit_survives_server_restart_and_delete_restores_inventory(tmp_path):
     db = str(tmp_path / "combined.sqlite")
     settings = Settings(database_path=db, display_poll_interval=0)

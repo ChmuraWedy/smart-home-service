@@ -10,6 +10,7 @@ import type { DashboardLayout, RoomNavigationLayout } from './dashboard-layout';
 import type { DeviceRoute } from './devices';
 
 export type Capability = {
+  dp?: string; 'read_dp'?: string | null;
   type: 'boolean' | 'integer' | 'number' | 'string' | 'object';
   readable: boolean; writable: boolean; minimum?: number | null; maximum?: number | null;
   step?: number | null; enum?: JsonValue[] | null; unit?: string | null; encoding?: string;
@@ -43,7 +44,7 @@ export type Inventory = { buildings: Building[]; rooms: Room[]; devices: LocalDe
 export type CombinedPowerSource = { 'device_id': string; channel: string };
 export type CombinedMemberInput = { 'device_id': string; route: DeviceRoute; 'power_source'?: CombinedPowerSource | null };
 export type CombinedInput = { 'name': string; 'room_id': number | null; members: CombinedMemberInput[]; 'show_all_power'?: boolean; 'show_member_cards'?: boolean };
-export type CombinedMember = CombinedMemberInput & { accessible: boolean };
+export type CombinedMember = CombinedMemberInput & { accessible: boolean; 'fallback_route'?: 'local' };
 export type CombinedDevice = Omit<CombinedInput, 'members'> & { id: number; members: CombinedMember[]; aliases?: string[] };
 export type CombinedPowerOutcome = 'accepted' | 'unavailable' | 'unsupported' | 'unknown';
 export type CombinedPowerResult = { results: { 'device_id': string; outcome: CombinedPowerOutcome }[] };
@@ -78,7 +79,7 @@ export type ConnectionFinding = {
   requested_device_id: string; connection_device_id: string; route: 'direct' | 'gateway';
   device: { device_id: string; existing_id: number | null; name: string; aliases: string[];
     building_id: number | null; room_id: number | null; ip: string; version: string;
-    changed_fields: ('ip' | 'version' | 'local_key')[]; is_gateway: boolean };
+    changed_fields: ('ip' | 'version' | 'local_key')[]; is_gateway: boolean; 'timer_mappings'?: string[] };
 };
 export type ConnectionSaved = { action: ConnectionAction; device: LocalDevice; verified: true;
   key_source: 'device' | 'child'; interface_address: string };
@@ -273,6 +274,20 @@ export class HomeApi extends CloudApi {
   }
 
   device(id: number, signal?: AbortSignal) { return this.request<LocalDevice>(`/devices/${id}`, 'GET', undefined, signal); }
+
+  localTimerSuggestion(id: number, name: string, signal: AbortSignal) {
+    return this.request<{ dp: string; minimum: number; maximum: number; step: number } | null>(
+      `/commissioning/devices/${id}/mappings/${encodeURIComponent(name)}/suggestion`,
+      'GET',
+      undefined,
+      signal,
+    );
+  }
+
+  editLocalMapping(id: number, name: string, expected: Capability, mapping: Capability) {
+    return this.request<LocalDevice>(`/commissioning/devices/${id}/mappings/${encodeURIComponent(name)}`, 'PATCH', { expected, mapping });
+  }
+
   state(id: number, refresh = false, signal?: AbortSignal, watch = false) {
     return this.request<DeviceState>(`/devices/${id}/state?refresh=${refresh}&max_age=60${watch ? "&watch=true" : ""}`, 'GET', undefined, signal);
   }

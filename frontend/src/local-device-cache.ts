@@ -1,6 +1,7 @@
 import { copyWithStructuralSharing, createApi, fakeBaseQuery } from '@reduxjs/toolkit/query';
 import { ApiError } from './api';
-import type { CloudApi } from './api';
+import type { CloudApi, JsonValue } from './api';
+import { sameValue } from './controls';
 import type { DeviceState, HomeApi } from './home-api';
 import { MSG, t } from './i18n';
 import type { AppDispatch, RootState } from './store';
@@ -102,6 +103,41 @@ export function readLocalDevice(api: HomeApi, deviceId: number, refresh = false,
       return result.data.reading;
     } finally {
       if (--client.readers === 0) clients.delete(key.scope);
+    }
+  };
+}
+
+export function sendLocalCapabilities(api: HomeApi, deviceId: number, values: Record<string, JsonValue>) {
+  return async (dispatch: AppDispatch, getState: () => RootState): Promise<boolean> => {
+    try {
+      const result = await api.setCapabilities(deviceId, values);
+      if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
+      return false;
+    } catch (failure) {
+      if (!(failure instanceof ApiError) || failure.status !== 504) throw failure;
+
+      const key = localDeviceKey(api, deviceId);
+      const baseline = localDeviceCache.endpoints.deviceState.select(key)(getState()).data?.reading.values;
+      async function confirmedByRead() {
+        try {
+          const refreshed = await dispatch(readLocalDevice(api, deviceId, true));
+          // A status request can omit individual DPs. Only a newer
+          // observation of every requested capability confirms the state.
+          return refreshed.available && Object.entries(values).every(([code, expected]) => {
+            const before = Date.parse(baseline?.[code]?.observed_at ?? '');
+            const reading = refreshed.values[code];
+            const after = Date.parse(reading?.observed_at ?? '');
+            return reading?.known && !reading.stale && after > before && sameValue(reading.value, expected);
+          });
+        } catch (readFailure) {
+          if (readFailure instanceof ApiError && readFailure.status === 401) throw readFailure;
+          return false;
+        }
+      }
+      if (await confirmedByRead()) return true;
+      await new Promise<void>((resolve) => { setTimeout(resolve, 1200); });
+      if (await confirmedByRead()) return true;
+      throw failure;
     }
   };
 }

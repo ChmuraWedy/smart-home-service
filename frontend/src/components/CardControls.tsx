@@ -11,7 +11,7 @@ import {
 import type { ControlSpec } from '../controls';
 import type { DeviceRoute, UnifiedDevice } from '../devices';
 import type { DeviceState, HomeApi, Reading } from '../home-api';
-import { readLocalDevice } from '../local-device-cache';
+import { readLocalDevice, sendLocalCapabilities } from '../local-device-cache';
 import { useAppDispatch, useAppSelector } from '../store';
 import { cloudPendingScope, localPendingScope } from '../pending-device-values';
 import { useLocalDeviceState } from '../use-local-device-state';
@@ -125,7 +125,7 @@ export function CardControls(props: CardProps) {
 }
 
 function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'], onBusy: (busy: boolean) => void,
-  send: (spec: ControlSpec, value: JsonValue) => Promise<void>) {
+  send: (spec: ControlSpec, value: JsonValue) => Promise<boolean | void>) {
   const [sending,setSending] = useState(false);
   useEffect(() => { onBusy(sending); return () => onBusy(false); },[sending,onBusy]);
   async function toggle(spec:ControlSpec,value:JsonValue) {
@@ -133,8 +133,8 @@ function useCardCommands(execute: ReturnType<typeof useControlSession>['execute'
     setSending(true);
     try { return await execute(async () => {
       validateControlValue(spec,value);
-      await send(spec,value);
-      return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
+      const confirmed = await send(spec, value) === true;
+      return { confirmed, text: t(confirmed ? MSG.DEVICE_CONFIRMED_REQUESTED_SETTING : MSG.COMMAND_ACCEPTED_NOTICE) };
     }) === true; } finally { setSending(false); }
   }
   return { sending, toggle };
@@ -378,10 +378,8 @@ function LocalCardControls({
   const session = useControlSession(load, onAuthError, visible ? poll : undefined, CARD_CACHE_INTERVAL);
   const state = cached ?? session.data;
   const specs = Object.entries(item.capabilities).map(([key,cap]) => localSpec(key,cap));
-  const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
-    const result = await api.setCapabilities(item.id, { [spec.key]: localCommandValue(spec, value) });
-    if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
-  });
+  const send = (spec: ControlSpec, value: JsonValue) => dispatch(sendLocalCapabilities(api, item.id, { [spec.key]: localCommandValue(spec, value) }));
+  const commands = useCardCommands(session.execute, onBusy, send);
   return (
     <StandardCardControls
       api={api}

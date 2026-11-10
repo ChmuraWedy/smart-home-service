@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from .api_dependencies import authenticate
-from .assistant_sessions import fingerprint
+from .api_dependencies import Account, key_digest, require_account, token_header
+from .assistant_sessions import DashboardCredential
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["Assistant"])
 
@@ -20,16 +20,17 @@ class ChatSession(BaseModel):
     key: str
 
 
-@router.post("/embed", response_model=ChatEmbed, dependencies=[Depends(authenticate)])
-def chat_embed(request: Request, response: Response):
+@router.post("/embed", response_model=ChatEmbed)
+def chat_embed(
+    request: Request, response: Response, account: Account = Depends(require_account),
+    token: str = Depends(token_header),
+):
     response.headers["Cache-Control"] = "no-store"
     url = request.app.state.settings.ai_chat_embed_url
     if not url:
         return ChatEmbed(url=None, ticket=None)
-    key = request.app.state.settings.api_token
-    if not key:
-        raise HTTPException(403, "Set a service access key to use AI chat.")
-    ticket = request.app.state.assistant_sessions.issue_ticket(fingerprint(key))
+    credential = DashboardCredential(account.key_id, key_digest(token))
+    ticket = request.app.state.assistant_sessions.issue_ticket(credential)
     return ChatEmbed(url=url, ticket=ticket)
 
 
