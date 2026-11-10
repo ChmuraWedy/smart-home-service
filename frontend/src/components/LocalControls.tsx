@@ -141,7 +141,7 @@ export function LocalControl({
           <>
             <p>{t(MSG.MAP_LOCAL_PARAMETERS_AFTER_SAVING)}</p>
             {!showMappingEditor && onSetup && (
-              <button disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>
+              <button type="button" disabled={session.busy || aliasBusy || !item.enabled} onClick={onSetup}>
                 {t(MSG.SET_UP_FUNCTIONS)}
               </button>
             )}
