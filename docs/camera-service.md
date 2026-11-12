@@ -21,4 +21,4 @@ The authenticated camera control API remains here under /api/v1/cameras. The exi
 
 Provider access uses thirty-second scope leases renewed every five seconds. Disconnected providers are revoked. If the backend becomes unavailable, the module expires the lease within thirty seconds. This control traffic carries no media.
 
-TRACER FOCUS 3 has been tested in the separate image and a real browser. Sleep Cam's fully local operation remains unverified; its standard Tuya HLS path is retained in the module.
+TRACER FOCUS 3 has been tested in the separate image and a real browser. A separate Sleep Cam research probe starts H.264 WebRTC through authenticated LAN signalling with WAN blocked, including after a fresh client container starts. Camera power-cycle recovery and credential longevity remain unverified. That adapter is not yet part of the module image; the module retains its standard Tuya HLS fallback. See the camera repository's research/sleep-cam.md for evidence.
