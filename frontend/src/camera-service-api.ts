@@ -5,6 +5,7 @@ import type { CameraPlayback } from './camera-stream';
 export type LocalCamera = {
   id:string; 'name':string; host:string; connected:boolean; model?:string; firmware?:string;
   'device_id'?:string; profile?:string; profiles?:{token:string;codec:string|null}[];
+  protocol?:string;
 };
 export type CameraConnectionInput = {
   'device_id'?:string; username:string; password:string; profile?:string; transcode:boolean;

@@ -1,0 +1,35 @@
+# Optional camera module. Build directly from its immutable remote revision.
+# Supply GIT_AUTH_TOKEN only to BuildKit when building the private repository.
+services:
+  cameras:
+    build:
+      context: https://github.com/ChmuraWedy/smart-home-cameras.git#b2831009ecf970f3be5255e10106cd9417abece8
+      secrets:
+        - source: camera-git-auth
+          target: GIT_AUTH_TOKEN
+    image: smart-home-cameras:b2831009ecf9
+    network_mode: host
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      CAMERA_API_TOKEN: ${SMART_HOME_CAMERA_SERVICE_TOKEN:-${SMART_HOME_API_TOKEN:?Reuse the existing access key}}
+      CAMERA_PUBLIC_URL: ${SMART_HOME_CAMERA_PUBLIC_URL:?Set the direct camera origin}
+      CAMERA_CORS_ORIGINS: ${CAMERA_CORS_ORIGINS:?Set dashboard origins}
+      CAMERA_DISCOVERY_INTERFACES: ${CAMERA_DISCOVERY_INTERFACES:-}
+      CAMERA_ICE_CANDIDATES: ${CAMERA_ICE_CANDIDATES:?Set reachable camera media addresses}
+    volumes:
+      - cameras:/data
+    stop_grace_period: 20s
+  backend:
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      SMART_HOME_CAMERA_SERVICE_URL: ${SMART_HOME_CAMERA_SERVICE_URL:-http://host.docker.internal:8095}
+      SMART_HOME_CAMERA_PUBLIC_URL: ${SMART_HOME_CAMERA_PUBLIC_URL:?Set the direct camera origin}
+      SMART_HOME_CAMERA_SERVICE_TOKEN: ${SMART_HOME_CAMERA_SERVICE_TOKEN:-${SMART_HOME_API_TOKEN:?Reuse the existing access key}}
+volumes:
+  cameras:
+secrets:
+  camera-git-auth:
+    environment: GIT_AUTH_TOKEN

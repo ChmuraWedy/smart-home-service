@@ -94,7 +94,7 @@ export default function CameraManagement({ api, onAuthError }:{api:CameraService
                   {row.connected && (
                     <button type="button" className="secondary compact" onClick={() => setWatch(watch === row.id ? null : row.id)}>{t(MSG.WATCH_VIDEO)}</button>
                   )}
-                  <button type="button" className="secondary compact" disabled={busy} onClick={() => edit(row)}>{t(MSG.CAMERA_CONNECT)}</button>
+                  {row.protocol !== 'tuya-lan' && <button type="button" className="secondary compact" disabled={busy} onClick={() => edit(row)}>{t(MSG.CAMERA_CONNECT)}</button>}
                   {row.connected && (
                     <button type="button" className="secondary compact" disabled={busy} onClick={() => disconnect(row)}>{t(MSG.CAMERA_DISCONNECT)}</button>
                   )}
