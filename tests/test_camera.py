@@ -122,6 +122,8 @@ def test_owner_native_preview_does_not_require_cloud_login(cloud_client, monkeyp
     def control(method, path, body=None, **kwargs):
         if path == "/v1/cameras":
             return [{"id": "native", "connected": True, "device_id": "camera-bound-before-logout"}]
+        if path.startswith("/v1/scopes/"):
+            return None
         return {"device_id": body["device_id"], "type": "webrtc",
                 "url": PUBLIC + "/play/native/" + TICKET + "/ws"}
     monkeypatch.setattr(service, "request", control)
