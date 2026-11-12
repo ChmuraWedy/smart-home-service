@@ -1296,5 +1296,19 @@
   "CAMERA_PASSWORD": "Пароль камеры",
   "CAMERA_PROFILE": "Видеопрофиль",
   "CAMERA_BROWSER_COMPATIBILITY": "Преобразовывать видео, только если этого требует браузер",
-  "CAMERA_CONNECTION_FAILED": "Не удалось подключить камеру."
+  "CAMERA_CONNECTION_FAILED": "Не удалось подключить камеру.",
+  "CAMERA_LOCAL_CONTROLS": "Локальное управление",
+  "CAMERA_LOCAL_CONTROLS_DESCRIPTION": "Использует сохранённый ключ LAN. После каждого короткого шага движение останавливается автоматически.",
+  "CAMERA_LAN_UPDATED": "Состояние LAN обновлено: {0}",
+  "CAMERA_LOCAL_UNCONFIRMED": "Камера не подтвердила изменение. Обновите и проверьте состояние.",
+  "CAMERA_MOVEMENT": "Движение камеры",
+  "CAMERA_MOVE_UP": "Вверх",
+  "CAMERA_MOVE_RIGHT": "Вправо",
+  "CAMERA_MOVE_DOWN": "Вниз",
+  "CAMERA_MOVE_LEFT": "Влево",
+  "CAMERA_MOTION_TRACKING": "Слежение за движением",
+  "CAMERA_AUTO_SIREN": "Автоматическая сирена при движении",
+  "CAMERA_SIREN_DURATION": "Длительность сирены (секунды)",
+  "CAMERA_TEST_SIREN": "Включить сирену на 1 секунду",
+  "CAMERA_STOP_SIREN": "Выключить сирену"
 }

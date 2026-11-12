@@ -1296,5 +1296,19 @@
   "CAMERA_PASSWORD": "Пароль камеры",
   "CAMERA_PROFILE": "Відэапрофіль",
   "CAMERA_BROWSER_COMPATIBILITY": "Пераўтвараць відэа, толькі калі гэтага патрабуе браўзер",
-  "CAMERA_CONNECTION_FAILED": "Не атрымалася падключыць камеру."
+  "CAMERA_CONNECTION_FAILED": "Не атрымалася падключыць камеру.",
+  "CAMERA_LOCAL_CONTROLS": "Лакальнае кіраванне",
+  "CAMERA_LOCAL_CONTROLS_DESCRIPTION": "Выкарыстоўвае захаваны ключ LAN. Пасля кожнага кароткага кроку рух спыняецца аўтаматычна.",
+  "CAMERA_LAN_UPDATED": "Стан LAN абноўлены: {0}",
+  "CAMERA_LOCAL_UNCONFIRMED": "Камера не пацвердзіла змену. Абнавіце і праверце стан.",
+  "CAMERA_MOVEMENT": "Рух камеры",
+  "CAMERA_MOVE_UP": "Уверх",
+  "CAMERA_MOVE_RIGHT": "Управа",
+  "CAMERA_MOVE_DOWN": "Уніз",
+  "CAMERA_MOVE_LEFT": "Улева",
+  "CAMERA_MOTION_TRACKING": "Сачэнне за рухам",
+  "CAMERA_AUTO_SIREN": "Аўтаматычная сірэна пры руху",
+  "CAMERA_SIREN_DURATION": "Працягласць сірэны (секунды)",
+  "CAMERA_TEST_SIREN": "Уключыць сірэну на 1 секунду",
+  "CAMERA_STOP_SIREN": "Выключыць сірэну"
 }

@@ -145,3 +145,19 @@ def test_owner_native_preview_respects_cached_camera_privacy(cloud_client, monke
     monkeypatch.setattr(service, "request", control)
     assert cloud_client.post("/api/v1/cameras/native/playback").status_code == 409
     assert calls == ["/v1/cameras"]
+
+
+def test_local_camera_controls_are_owner_only_and_do_not_initialize_cloud(cloud_client, monkeypatch):
+    calls = []
+    service = cloud_client.app.state.camera_service
+    monkeypatch.setattr(service, 'request', lambda method, path, body=None, **kw: calls.append((method,path,body)) or {'transport':'local'})
+    path = '/api/v1/cameras/camera-id/controls'
+    assert cloud_client.get(path, headers={'X-API-Key':'wrong'}).status_code == 401
+    assert cloud_client.get(path).json() == {'transport':'local'}
+    assert cloud_client.post(path+'/move',json={'direction':'right'}).status_code == 200
+    assert cloud_client.post(path+'/move',json={'direction':'forever'}).status_code == 422
+    assert cloud_client.post(path+'/commands',json={'code':'basic_nightvision','value':'2'}).status_code == 200
+    assert cloud_client.post(path+'/siren').status_code == 200
+    assert cloud_client.post(path+'/stop').status_code == 200
+    assert calls == [('GET','/v1/cameras/camera-id/controls',None),('POST','/v1/cameras/camera-id/controls/move',{'direction':'right'}),('POST','/v1/cameras/camera-id/controls/commands',{'code':'basic_nightvision','value':'2'}),('POST','/v1/cameras/camera-id/controls/siren',{}),('POST','/v1/cameras/camera-id/controls/stop',{})]
+    assert cloud_client.app.state.cloud.manager is None

@@ -2157,3 +2157,14 @@ select:not([multiple]):not([size]) {
 .camera-management-list { list-style:none; margin:12px 0; padding:0; }
 .camera-management-list > li { padding:16px 0; border-bottom:1px solid var(--border); }
 .camera-connection-form { display:grid; gap:12px; max-width:520px; padding-block:16px; }
+
+.local-camera-controls { margin-block:16px; }
+.camera-local-settings { display:grid; gap:10px; margin-block:16px; }
+.camera-local-settings label { display:grid; grid-template-columns:minmax(120px,1fr) minmax(80px,180px); align-items:center; gap:12px; margin:0; }
+.camera-local-settings input[type=checkbox] { width:20px; height:20px; justify-self:end; }
+.camera-ptz { display:grid; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(3,44px); gap:6px; margin-block:16px; }
+.camera-ptz-up { grid-area:1/2; }
+.camera-ptz-left { grid-area:2/1; }
+.camera-ptz-stop { grid-area:2/2; }
+.camera-ptz-right { grid-area:2/3; }
+.camera-ptz-down { grid-area:3/2; }

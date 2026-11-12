@@ -5,7 +5,12 @@ import type { CameraPlayback } from './camera-stream';
 export type LocalCamera = {
   id:string; 'name':string; host:string; connected:boolean; model?:string; firmware?:string;
   'device_id'?:string; profile?:string; profiles?:{token:string;codec:string|null}[];
-  protocol?:string;
+  protocol?:string; 'controls_available'?:boolean;
+};
+export type CameraControls = {
+  transport:'local'; 'observed_at':number; confirmed:boolean|null;
+  state:Record<string, boolean|number|string>;
+  functions:Record<string, {'dp_id':number;type:'Boolean'|'Enum'|'Integer';values:{range?:string[];min?:number;max?:number;step?:number}}>;
 };
 export type CameraConnectionInput = {
   'device_id'?:string; username:string; password:string; profile?:string; transcode:boolean;
@@ -31,4 +36,14 @@ export class CameraServiceApi extends CloudApi {
   }
 
   disconnectLocalCamera(id:string) { return this.request(`/cameras/${encodeURIComponent(id)}/connection`, 'DELETE'); }
+
+  localCameraControls(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls`); }
+
+  localCameraCommand(id:string, code:string, value:boolean|number|string) {
+    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/commands`, 'POST', { code, value });
+  }
+
+  localCameraAction(id:string, action:'move'|'stop'|'siren', direction?:string) {
+    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/${action}`, 'POST', direction ? { direction } : {});
+  }
 }

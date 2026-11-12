@@ -28,3 +28,34 @@ The optional compose.cameras.yaml builds the module directly from its pinned Git
 For HTTPS dashboards, serve the camera origin over HTTPS too. The module supports mounted CAMERA_TLS_CERT and CAMERA_TLS_KEY. A backend using a private LAN CA must trust that CA through a combined SSL_CERT_FILE bundle; retain the public roots. Camera playback uses the direct origin and the configured WebRTC media port. An isolated Docker backend should reach the host through its bridge gateway rather than the host's external LAN address.
 
 The 8082 preview preserves its separate PostgreSQL database and existing key. Open Settings, expand Local cameras, and use Watch video on either connected camera. This owner-only path works independently of the preview's disabled cloud session; the production Smart Life connection is unchanged. Camera hardware restart testing is deferred.
+
+
+Owner-only **Local controls** are available beside each provisioned camera in
+Settings → Local cameras. Initial provisioning saves its existing LAN key and
+verified DP schema privately inside the separate camera module; it does not
+rotate the key. Subsequent reads, changes and service restarts need no Smart Life
+login or internet. Re-pairing/resetting hardware can change its key and require
+provisioning again. Video still travels directly to the camera service.
+
+The backend forwards `/api/v1/cameras/{id}/controls`, `/commands`, `/move`, `/stop`
+and `/siren` to the module. No credentials are returned to the browser. Controls
+show fresh LAN readings and report an unconfirmed write explicitly. Movement is
+limited to 300 ms per step with an unconditional Stop; the siren test is one second
+with an unconditional Off. Stop is also available separately. Camera Privacy mode
+must be known to be off before either bounded action is allowed.
+
+TRACER was tested with its WAN blocked: night vision Auto/Off/On, anti-flicker
+Off/50/60 Hz, volume, motion detection, sensitivity and tracking all returned the
+requested settings. Four movement commands returned Stop afterward; physical
+orientation should still be checked visually. The siren On-to-Off interval was
+1.011 seconds with Off readback. Original settings were restored and the temporary
+camera-only firewall rules removed. The other camera remains in Privacy mode and
+was not provisioned for local controls.
+
+
+The deployed owner API also returned fresh LAN readings before and after a
+camera-service restart while TRACER's WAN remained blocked, using only the saved
+configuration. No Smart Life session was created or refreshed. TRACER may omit
+volume from a later full-status query; the UI displays No reading and still lets
+the owner set it. An explicit LAN change report confirms the new volume, while
+an empty command ACK does not. The volume test changed 1 → 2 → 1 offline.

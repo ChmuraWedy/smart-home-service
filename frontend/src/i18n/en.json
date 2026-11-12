@@ -1296,5 +1296,19 @@
   "CAMERA_PASSWORD": "Camera password",
   "CAMERA_PROFILE": "Video profile",
   "CAMERA_BROWSER_COMPATIBILITY": "Convert video only when the browser needs it",
-  "CAMERA_CONNECTION_FAILED": "Could not connect the camera."
+  "CAMERA_CONNECTION_FAILED": "Could not connect the camera.",
+  "CAMERA_LOCAL_CONTROLS": "Local controls",
+  "CAMERA_LOCAL_CONTROLS_DESCRIPTION": "Uses the saved LAN key directly. Movement stops automatically after each short step.",
+  "CAMERA_LAN_UPDATED": "LAN status updated: {0}",
+  "CAMERA_LOCAL_UNCONFIRMED": "The camera has not confirmed the requested setting. Refresh and check its state.",
+  "CAMERA_MOVEMENT": "Camera movement",
+  "CAMERA_MOVE_UP": "Move up",
+  "CAMERA_MOVE_RIGHT": "Move right",
+  "CAMERA_MOVE_DOWN": "Move down",
+  "CAMERA_MOVE_LEFT": "Move left",
+  "CAMERA_MOTION_TRACKING": "Follow movement",
+  "CAMERA_AUTO_SIREN": "Automatic motion siren",
+  "CAMERA_SIREN_DURATION": "Siren duration (seconds)",
+  "CAMERA_TEST_SIREN": "Sound siren for 1 second",
+  "CAMERA_STOP_SIREN": "Stop siren"
 }

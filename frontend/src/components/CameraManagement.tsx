@@ -5,6 +5,7 @@ import type { CloudDevice } from '../api';
 import type { CameraServiceApi, LocalCamera } from '../camera-service-api';
 import { MSG, t } from '../i18n';
 import { CameraLive } from './CameraLive';
+import LocalCameraControls from './LocalCameraControls';
 
 export default function CameraManagement({ api, onAuthError }:{api:CameraServiceApi;onAuthError:()=>void}) {
   const id = useId();
@@ -99,6 +100,7 @@ export default function CameraManagement({ api, onAuthError }:{api:CameraService
                     <button type="button" className="secondary compact" disabled={busy} onClick={() => disconnect(row)}>{t(MSG.CAMERA_DISCONNECT)}</button>
                   )}
                 </div>
+                {row.controls_available && <LocalCameraControls api={api} cameraId={row.id} onAuthError={onAuthError} />}
                 {watch === row.id && (
                   <CameraLive
                     api={api}

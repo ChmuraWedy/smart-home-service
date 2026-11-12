@@ -53,7 +53,7 @@ class CameraService:
         except HTTPError as error:
             if missing and error.code == 404:
                 return None
-            status = error.code if error.code in {400, 404, 409, 429, 503} else 502
+            status = error.code if error.code in {400, 404, 409, 422, 429, 503} else 502
             raise HTTPException(status, "Camera service could not complete the request") from None
         except (URLError, OSError, ValueError):
             raise HTTPException(502, "Camera service is unavailable") from None
@@ -157,6 +157,45 @@ def connect_camera(camera_id: str, body: CameraConnection, request: APIRequest, 
 @router.delete("/{camera_id}/connection")
 def disconnect_camera(camera_id: str, request: APIRequest):
     return request.app.state.camera_service.request("DELETE", "/v1/cameras/" + quote(camera_id, safe="") + "/connection")
+
+
+class CameraCommand(Schema):
+    code: str = Field(min_length=1, max_length=64)
+    value: bool | int | str
+
+
+class CameraMove(Schema):
+    direction: str = Field(pattern="^(up|right|down|left)$")
+
+
+def control_request(camera_id, request, response, method="GET", action="", body=None):
+    response.headers["Cache-Control"] = "no-store"
+    return request.app.state.camera_service.request(method, "/v1/cameras/" + quote(camera_id, safe="") + "/controls" + action, body, timeout=25)
+
+
+@router.get("/{camera_id}/controls")
+def camera_controls(camera_id: str, request: APIRequest, response: Response):
+    return control_request(camera_id, request, response)
+
+
+@router.post("/{camera_id}/controls/commands")
+def camera_command(camera_id: str, body: CameraCommand, request: APIRequest, response: Response):
+    return control_request(camera_id, request, response, "POST", "/commands", body.model_dump())
+
+
+@router.post("/{camera_id}/controls/move")
+def camera_move(camera_id: str, body: CameraMove, request: APIRequest, response: Response):
+    return control_request(camera_id, request, response, "POST", "/move", body.model_dump())
+
+
+@router.post("/{camera_id}/controls/stop")
+def camera_stop(camera_id: str, request: APIRequest, response: Response):
+    return control_request(camera_id, request, response, "POST", "/stop", {})
+
+
+@router.post("/{camera_id}/controls/siren")
+def camera_siren(camera_id: str, request: APIRequest, response: Response):
+    return control_request(camera_id, request, response, "POST", "/siren", {})
 
 
 @router.post("/{camera_id}/playback")

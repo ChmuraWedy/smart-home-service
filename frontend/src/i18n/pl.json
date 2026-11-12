@@ -1296,5 +1296,19 @@
   "CAMERA_PASSWORD": "Hasło kamery",
   "CAMERA_PROFILE": "Profil wideo",
   "CAMERA_BROWSER_COMPATIBILITY": "Konwertuj obraz tylko wtedy, gdy wymaga tego przeglądarka",
-  "CAMERA_CONNECTION_FAILED": "Nie udało się połączyć kamery."
+  "CAMERA_CONNECTION_FAILED": "Nie udało się połączyć kamery.",
+  "CAMERA_LOCAL_CONTROLS": "Sterowanie lokalne",
+  "CAMERA_LOCAL_CONTROLS_DESCRIPTION": "Używa zapisanego klucza LAN. Ruch zatrzymuje się automatycznie po każdym krótkim kroku.",
+  "CAMERA_LAN_UPDATED": "Stan LAN zaktualizowany: {0}",
+  "CAMERA_LOCAL_UNCONFIRMED": "Kamera nie potwierdziła zmiany. Odśwież i sprawdź stan.",
+  "CAMERA_MOVEMENT": "Ruch kamery",
+  "CAMERA_MOVE_UP": "W górę",
+  "CAMERA_MOVE_RIGHT": "W prawo",
+  "CAMERA_MOVE_DOWN": "W dół",
+  "CAMERA_MOVE_LEFT": "W lewo",
+  "CAMERA_MOTION_TRACKING": "Śledzenie ruchu",
+  "CAMERA_AUTO_SIREN": "Automatyczna syrena ruchu",
+  "CAMERA_SIREN_DURATION": "Czas syreny (sekundy)",
+  "CAMERA_TEST_SIREN": "Włącz syrenę na 1 sekundę",
+  "CAMERA_STOP_SIREN": "Zatrzymaj syrenę"
 }
