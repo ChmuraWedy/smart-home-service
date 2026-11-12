@@ -72,13 +72,28 @@ Smart Life reports this camera online and provides a current local key. It has n
 
 WS-Discovery located a different ONVIF camera. Both TinyTuya and the pinned Go probe authenticated it with TRACER's current key on LAN protocol **3.4**, confirming its identity. ONVIF reports model `IPC-G5A1D0F7-TY` and firmware `V3.2.16-Tuya_240109`. Its media endpoint is advertised through `GetCapabilities`; guessing a generic media-service path failed. ONVIF was already enabled.
 
+The user did not find an ONVIF/NVR option in Smart Life. The native service was nevertheless already exposed and required no app setting changes for these tests.
+
 - Native RTSP delivered H.265 video at **2304 × 1296**.
 - With the camera's WAN access blocked, a fresh native RTSP connection delivered **248 video packets over 14.89 seconds**.
 - A separate temporary nftables table ran before the normal established-flow accept rule. Camera MAC and destination-IP rules restricted WAN traffic while preserving LAN access. Its counters recorded 27 outbound and 9 inbound dropped packets before cleanup.
 - Automatic rule removal was scheduled before applying the block; unconditional cleanup then removed the table and stopped the expiry timer.
-- Standard ONVIF `SystemReboot` returned a success response, but the camera's HTTP port never went down during the two-minute observation. This does **not** verify an actual restart or offline startup. A physical power-cycle test is pending.
+- Standard ONVIF `SystemReboot` returned a success response, but the camera's HTTP port never went down during the two-minute observation. That command did not establish an actual restart.
 - After removing the block, a fresh RTSP measurement again delivered 248 video packets over 14.89 seconds.
 - FFmpeg decoded 165 video frames in a separate ten-second online test, with no decoder errors. Frames were discarded.
+
+### Physical restart with WAN access continuously blocked
+
+The user physically unplugged and reconnected TRACER while a fresh camera-specific WAN block was active. The monitor observed its HTTP port go down and return. The camera retained its LAN address. No cloud login, stream allocation, or URI refresh was performed for the following stream: the RTSP URI obtained before the restart was reused.
+
+- A fresh native RTSP connection delivered **246 video packets over 14.77 seconds**, H.265 at **2304 × 1296**.
+- FFmpeg then decoded **164 video frames over ten seconds with no decoder errors**. All frames were discarded.
+- Firewall counters recorded **65 outbound and 108 inbound dropped packets** during this test. The rule remained active throughout power-off, startup, stream measurement, and decoding.
+- Automatic expiry was scheduled for twelve minutes before applying the rule. After the checks, unconditional cleanup removed the table and stopped the timer.
+
+An earlier physical attempt was inconclusive because its five-minute monitoring window ended before the camera returned; its cleanup removed the block. The successful repeat used a longer window and independently verified the continuously active restriction through the post-startup measurements.
+
+**Result:** native TRACER streaming passed online, with internet blocked, and after a physical restart with internet still blocked. This verifies the tested firmware and observation periods; Sleep Cam remains unverified as described above.
 
 TRACER's separately obtained RTC configuration also uses P2P type 4 and lacks the Go library's expected P2P password. Native RTSP avoids that limitation. No media has been recorded. Production camera mappings, application keys, and cloud-session files have not been changed.
 
