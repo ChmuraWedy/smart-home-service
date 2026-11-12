@@ -1,3 +1,4 @@
+import type { CameraPlayback } from './camera-stream';
 import { MSG, t, translateText } from "./i18n";
 import type { DeviceTranslations, TranslationSaved, TranslationWrite } from './device-translations';
 export type Provider = 'sharing' | 'developer';
@@ -215,7 +216,7 @@ export class CloudApi {
   confirmQR(session: string) { return this.json<{ connected: boolean }>('/login/' + encodeURIComponent(session) + '/confirm', 'POST'); }
   devices(provider: Provider, signal?: AbortSignal) { return this.json<CloudDevice[]>('/devices?refresh=true&provider=' + provider, 'GET', undefined, signal); }
   cameraStream(id: string, provider: Provider, signal?: AbortSignal) {
-    return this.json<{device_id:string;type:"hls";url:string}>('/devices/' + encodeURIComponent(id) + '/stream/relay?provider=' + provider, 'POST', {}, signal);
+    return this.json<CameraPlayback>('/devices/' + encodeURIComponent(id) + '/stream/relay?provider=' + provider, 'POST', {}, signal);
   }
   deviceFunctions(id: string, provider: Provider, signal?: AbortSignal) {
     return this.json<CloudFunctions>('/devices/' + encodeURIComponent(id) + '/functions?provider=' + provider, 'GET', undefined, signal);

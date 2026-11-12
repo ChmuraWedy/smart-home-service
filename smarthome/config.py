@@ -11,6 +11,9 @@ class Settings:
     api_token: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_API_TOKEN", ""), repr=False
     )
+    camera_service_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_CAMERA_SERVICE_URL", ""))
+    camera_service_token: str = field(default_factory=lambda: os.getenv("SMART_HOME_CAMERA_SERVICE_TOKEN", ""), repr=False)
+    camera_public_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_CAMERA_PUBLIC_URL", ""))
     setup_code: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_SETUP_CODE", ""), repr=False
     )

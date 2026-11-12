@@ -1282,5 +1282,19 @@
   "INCHING_REPORT_CHANGED": "Urządzenie zgłosiło inne ustawienie. Sprawdź je przed zastosowaniem zmian.",
   "SHOW_REMOTE_DEVICES": "Pokaż urządzenia w chmurze",
   "HIDE_REMOTE_DEVICES": "Ukryj urządzenia w chmurze",
-  "CONNECT_THROUGH_ANDROID": "Połącz przez Androida"
+  "CONNECT_THROUGH_ANDROID": "Połącz przez Androida",
+  "LOCAL_CAMERAS": "Kamery lokalne",
+  "LOCAL_CAMERAS_DESCRIPTION": "Znajdź kamery w sieci, połącz je i oglądaj lokalny obraz.",
+  "CAMERA_SERVICE_NOT_CONFIGURED": "Usługa kamer nie jest jeszcze skonfigurowana na serwerze.",
+  "DISCOVER_CAMERAS": "Znajdź kamery",
+  "NO_DISCOVERED_CAMERAS": "Nie znaleziono jeszcze kamer.",
+  "CAMERA_CONNECT": "Połącz kamerę",
+  "CAMERA_DISCONNECT": "Odłącz kamerę",
+  "CAMERA_DASHBOARD_DEVICE": "Urządzenie na pulpicie",
+  "CAMERA_STANDALONE": "Niezależna kamera",
+  "CAMERA_USERNAME": "Użytkownik kamery",
+  "CAMERA_PASSWORD": "Hasło kamery",
+  "CAMERA_PROFILE": "Profil wideo",
+  "CAMERA_BROWSER_COMPATIBILITY": "Konwertuj obraz tylko wtedy, gdy wymaga tego przeglądarka",
+  "CAMERA_CONNECTION_FAILED": "Nie udało się połączyć kamery."
 }

@@ -4,6 +4,7 @@ import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
 import type Hls from 'hls.js';
 import type { ReactNode } from 'react';
+import { cameraPlaybackUrl, connectCameraWebRTC } from '../camera-stream';
 import { IconGlyph } from './ui/icon';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
@@ -32,6 +33,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
 }) {
   const video = useRef<SafariVideo>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
+  const [sourceType, setSourceType] = useState<'hls' | 'webrtc'>('hls');
   const [source, setSource] = useState<string | null>(null), [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(t(MSG.VIDEO_STARTS_ONLY_WHEN_YOU_REQUEST_IT));
   const [error, setError] = useState(false);
@@ -59,6 +61,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     setPipActive(false);
     setPipError(false);
     let active = true, player: Hls | undefined;
+    let disconnectRTC: (() => void) | undefined;
     const fail = () => {
       if (!active) return;
       setError(true); setMessage(t(MSG.COULD_NOT_PLAY_THE_VIDEO)); setSource(null); resetMetrics();
@@ -88,6 +91,10 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     element.addEventListener('loadedmetadata',dimensions); element.addEventListener('resize',dimensions);
     const play = () => { void element.play().catch(() => { if (active) setMessage(t(MSG.PRESS_IN_THE_PLAYER_TO_WATCH)); }); };
     void (async () => {
+      if (sourceType === 'webrtc') {
+        disconnectRTC = connectCameraWebRTC(element, source, fail, setSpeed);
+        return;
+      }
       const { default: HlsPlayer } = await import('hls.js');
       if (!active) return;
       if (!HlsPlayer.isSupported()) {
@@ -118,9 +125,10 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       presentationEvents.forEach(event => element.removeEventListener(event, presentationChanged));
       void closeFloatingVideo(element).catch(() => {});
       if (hls.current === player) hls.current = null;
+      disconnectRTC?.();
       player?.destroy(); element.pause(); element.removeAttribute('src'); element.load();
     };
-  }, [source,viewingBlocked]);
+  }, [source, sourceType, viewingBlocked]);
   async function togglePictureInPicture() {
     const element = video.current;
     if (!element || !pipMode || viewingBlocked) return;
@@ -142,11 +150,9 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
     try {
       const result = await api.cameraStream(deviceId, provider, controller.signal);
       if (controller.signal.aborted) return;
-      const relayPath = /^\/api\/v1\/camera\/play\/[A-Za-z0-9_-]{43}\/index\.m3u8$/;
-      if (result.device_id !== deviceId || result.type !== 'hls' || !relayPath.test(result.url)) {
-        throw new Error(t(MSG.THE_SERVICE_RETURNED_AN_INVALID_VIDEO_STREAM));
-      }
-      setSource(new URL(result.url, api.baseUrl).href);
+      const url = cameraPlaybackUrl(result, deviceId, api.baseUrl);
+      setSourceType(result.type);
+      setSource(url);
     } catch (failure) {
       if (controller.signal.aborted) return;
       if (failure instanceof ApiError && failure.status === 401) onAuthError();

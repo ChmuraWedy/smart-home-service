@@ -1282,5 +1282,19 @@
   "INCHING_REPORT_CHANGED": "The device reported a different setting. Review it before applying another change.",
   "SHOW_REMOTE_DEVICES": "Show remote devices",
   "HIDE_REMOTE_DEVICES": "Hide remote devices",
-  "CONNECT_THROUGH_ANDROID": "Connect through Android"
+  "CONNECT_THROUGH_ANDROID": "Connect through Android",
+  "LOCAL_CAMERAS": "Local cameras",
+  "LOCAL_CAMERAS_DESCRIPTION": "Discover cameras on your network, connect them and watch their local video.",
+  "CAMERA_SERVICE_NOT_CONFIGURED": "The camera service has not been configured on this server.",
+  "DISCOVER_CAMERAS": "Find cameras",
+  "NO_DISCOVERED_CAMERAS": "No cameras found yet.",
+  "CAMERA_CONNECT": "Connect camera",
+  "CAMERA_DISCONNECT": "Disconnect camera",
+  "CAMERA_DASHBOARD_DEVICE": "Dashboard device",
+  "CAMERA_STANDALONE": "Independent camera",
+  "CAMERA_USERNAME": "Camera username",
+  "CAMERA_PASSWORD": "Camera password",
+  "CAMERA_PROFILE": "Video profile",
+  "CAMERA_BROWSER_COMPATIBILITY": "Convert video only when the browser needs it",
+  "CAMERA_CONNECTION_FAILED": "Could not connect the camera."
 }

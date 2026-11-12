@@ -20,6 +20,8 @@ import {
 import appIcon from './assets/home-power.svg?no-inline';
 import AiChatButton from './components/AiChat';
 import VoiceDemo from './demo/VoiceDemo';
+import CameraManagement from './components/CameraManagement';
+import { CameraServiceApi } from './camera-service-api';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import FirstRunWizard, { setupStep } from './components/FirstRunWizard';
 import type { SetupStep } from './components/FirstRunWizard';
@@ -180,7 +182,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const [qr, setQR] = useState<QR | null>(null);
   const [remaining, setRemaining] = useState(0);
   const api = useMemo(() => new HomeApi(connection, status?.account), [connection, status?.account]);
-  const verificationApi = useMemo(() => new CloudApi(connection), [connection]);
+  const verificationApi = useMemo(() => new CameraServiceApi(connection), [connection]);
   const locked = busy || controlLocked;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
@@ -738,6 +740,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       <section className="card settings-page">
         <h1>{t(MSG.SETTINGS)}</h1>
         <div className="app-menu-appearance settings-appearance">{appearance}</div>
+        {!demo && !member && <CameraManagement api={verificationApi} onAuthError={invalidateConnection} />}
         {!demo && !member && (
           <section className="settings-advanced" aria-labelledby="advanced-settings-heading">
             <h2 id="advanced-settings-heading">{t(MSG.ADVANCED_SETTINGS)}</h2>

@@ -1282,5 +1282,19 @@
   "INCHING_REPORT_CHANGED": "Устройство сообщило о другой настройке. Проверьте её перед применением изменений.",
   "SHOW_REMOTE_DEVICES": "Показать облачные устройства",
   "HIDE_REMOTE_DEVICES": "Скрыть облачные устройства",
-  "CONNECT_THROUGH_ANDROID": "Подключиться через Android"
+  "CONNECT_THROUGH_ANDROID": "Подключиться через Android",
+  "LOCAL_CAMERAS": "Локальные камеры",
+  "LOCAL_CAMERAS_DESCRIPTION": "Найдите камеры в своей сети, подключите их и смотрите локальное видео.",
+  "CAMERA_SERVICE_NOT_CONFIGURED": "Сервис камер ещё не настроен на сервере.",
+  "DISCOVER_CAMERAS": "Найти камеры",
+  "NO_DISCOVERED_CAMERAS": "Камеры пока не найдены.",
+  "CAMERA_CONNECT": "Подключить камеру",
+  "CAMERA_DISCONNECT": "Отключить камеру",
+  "CAMERA_DASHBOARD_DEVICE": "Устройство на панели",
+  "CAMERA_STANDALONE": "Отдельная камера",
+  "CAMERA_USERNAME": "Имя пользователя камеры",
+  "CAMERA_PASSWORD": "Пароль камеры",
+  "CAMERA_PROFILE": "Видеопрофиль",
+  "CAMERA_BROWSER_COMPATIBILITY": "Преобразовывать видео, только если этого требует браузер",
+  "CAMERA_CONNECTION_FAILED": "Не удалось подключить камеру."
 }

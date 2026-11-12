@@ -39,7 +39,7 @@
       "count": 2
     },
     "camelcase": {
-      "count": 54
+      "count": 53
     },
     "import/newline-after-import": {
       "count": 1
@@ -57,7 +57,7 @@
       "count": 22
     },
     "quotes": {
-      "count": 2
+      "count": 1
     }
   },
   "src/camera-area.ts": {
@@ -366,7 +366,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 28
+      "count": 27
     },
     "consistent-return": {
       "count": 1

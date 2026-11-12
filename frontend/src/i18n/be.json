@@ -1282,5 +1282,19 @@
   "INCHING_REPORT_CHANGED": "Прылада паведаміла пра іншую наладу. Праверце яе перад прымяненнем змяненняў.",
   "SHOW_REMOTE_DEVICES": "Паказаць воблачныя прылады",
   "HIDE_REMOTE_DEVICES": "Схаваць воблачныя прылады",
-  "CONNECT_THROUGH_ANDROID": "Падключыцца праз Android"
+  "CONNECT_THROUGH_ANDROID": "Падключыцца праз Android",
+  "LOCAL_CAMERAS": "Лакальныя камеры",
+  "LOCAL_CAMERAS_DESCRIPTION": "Знайдзіце камеры ў сваёй сетцы, падключыце іх і глядзіце лакальнае відэа.",
+  "CAMERA_SERVICE_NOT_CONFIGURED": "Сэрвіс камер яшчэ не наладжаны на серверы.",
+  "DISCOVER_CAMERAS": "Знайсці камеры",
+  "NO_DISCOVERED_CAMERAS": "Камеры пакуль не знойдзены.",
+  "CAMERA_CONNECT": "Падключыць камеру",
+  "CAMERA_DISCONNECT": "Адключыць камеру",
+  "CAMERA_DASHBOARD_DEVICE": "Прылада на панэлі",
+  "CAMERA_STANDALONE": "Асобная камера",
+  "CAMERA_USERNAME": "Імя карыстальніка камеры",
+  "CAMERA_PASSWORD": "Пароль камеры",
+  "CAMERA_PROFILE": "Відэапрофіль",
+  "CAMERA_BROWSER_COMPATIBILITY": "Пераўтвараць відэа, толькі калі гэтага патрабуе браўзер",
+  "CAMERA_CONNECTION_FAILED": "Не атрымалася падключыць камеру."
 }
