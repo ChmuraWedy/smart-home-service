@@ -1,0 +1,4 @@
+camera.json
+*.private.json
+camera-lan-probe
+__pycache__/
