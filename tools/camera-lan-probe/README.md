@@ -34,6 +34,16 @@ docker run --rm --network host --read-only --cap-drop ALL \
 
 The container uses UID 1000. Ensure it owns the configuration. Set the explicit camera protocol from verified metadata. Protocol 3.3 must be selected explicitly for a known camera address because it authenticates differently from 3.4 and 3.5.
 
+### Native ONVIF / RTSP cameras
+
+Use the camera's advertised ONVIF capabilities to find its media endpoint, then `GetProfiles` and `GetStreamUri` to obtain its native RTSP URI. Store that URI in a separate mode-0600 JSON file under the `uri` key. Never commit a stream URI, since it may contain credentials.
+
+```sh
+python3 rtsp_probe.py --config /private/path/stream.private.json
+```
+
+The native probe needs FFmpeg's `ffprobe`. If it is already installed in an existing Docker container with LAN access, add `--container CONTAINER_NAME` and run with the permissions needed for Docker. Only video packets are measured; media is discarded and stream URLs are omitted from output. This path does not use Tuya cloud signalling or the Go probe's P2P credentials.
+
 ## Offline verification sequence
 
 1. Establish sustained local video with the camera online. Save the measurement and library version.
@@ -50,7 +60,7 @@ The upstream implementation reports that a tested camera needed cloud contact on
 - Its usual RTSP and HTTP ports were closed. Its Tuya TCP port was open.
 - The database's saved local key differed from the current key in Tuya's device record. Only the isolated test configuration was updated.
 - The pinned library timed out on LAN authentication using the fresh key with explicitly selected protocols 3.5, 3.4, and 3.3. The installed TinyTuya driver also failed to read local status.
-- Smart Life's Sharing API rejected the tested RTC configuration endpoints. The camera P2P password is not yet available to the probe.
+- Smart Life's Sharing API rejected the tested RTC configuration endpoints. A separately approved camera web-login QR did retrieve the RTC configuration. It reports P2P type 4 and WebRTC credentials, without the P2P `password` field expected by this Go library. RTC `protocolVersion` is not the LAN protocol version.
 - The existing Android session could not complete boot and was unavailable over ADB, so automatic camera web-login approval could not proceed.
 - The associated CamSwitch socket was offline and had no usable local mapping, preventing a remote power cycle.
 
@@ -58,8 +68,18 @@ Sustained local video, camera-WAN-blocked streaming, and streaming after a block
 
 ## Second camera: TRACER FOCUS 3
 
-Smart Life reports this camera online and provides a current local key. It has no saved LAN mapping. Ordinary Tuya discovery on the camera network did not return its device ID. A DHCP entry named `IPCamera` has TCP 6668 open and the usual RTSP and HTTP ports closed, but its identity is **not confirmed**. The probe failed to authenticate that candidate with TRACER's key on protocols 3.5, 3.4, and 3.3; TinyTuya also failed on 3.4 and 3.3, including its device22 query variant.
+Smart Life reports this camera online and provides a current local key. It has no saved LAN mapping. Ordinary Tuya discovery on the camera network did not return its device ID. An initial DHCP candidate named `IPCamera` did not authenticate with TRACER's key and was not identified as TRACER.
 
-TRACER declares a restart capability. No restart or internet restriction has been issued to either camera. Camera web-login QR approval is pending to obtain RTC credentials and continue investigating both cameras. No media has been recorded.
+WS-Discovery located a different ONVIF camera. Both TinyTuya and the pinned Go probe authenticated it with TRACER's current key on LAN protocol **3.4**, confirming its identity. ONVIF reports model `IPC-G5A1D0F7-TY` and firmware `V3.2.16-Tuya_240109`. Its media endpoint is advertised through `GetCapabilities`; guessing a generic media-service path failed. ONVIF was already enabled.
 
-Sources are the [upstream implementation](https://github.com/luukvisser/tuya-lan) and [Tuya's RTC configuration documentation](https://developer.tuya.com/en/docs/cloud/c6370837a8?id=Kag2cwbctsmza).
+- Native RTSP delivered H.265 video at **2304 × 1296**.
+- With the camera's WAN access blocked, a fresh native RTSP connection delivered **248 video packets over 14.89 seconds**.
+- A separate temporary nftables table ran before the normal established-flow accept rule. Camera MAC and destination-IP rules restricted WAN traffic while preserving LAN access. Its counters recorded 27 outbound and 9 inbound dropped packets before cleanup.
+- Automatic rule removal was scheduled before applying the block; unconditional cleanup then removed the table and stopped the expiry timer.
+- Standard ONVIF `SystemReboot` returned a success response, but the camera's HTTP port never went down during the two-minute observation. This does **not** verify an actual restart or offline startup. A physical power-cycle test is pending.
+- After removing the block, a fresh RTSP measurement again delivered 248 video packets over 14.89 seconds.
+- FFmpeg decoded 165 video frames in a separate ten-second online test, with no decoder errors. Frames were discarded.
+
+TRACER's separately obtained RTC configuration also uses P2P type 4 and lacks the Go library's expected P2P password. Native RTSP avoids that limitation. No media has been recorded. Production camera mappings, application keys, and cloud-session files have not been changed.
+
+Sources are the [upstream implementation](https://github.com/luukvisser/tuya-lan), [Tuya's RTC configuration documentation](https://developer.tuya.com/en/docs/cloud/c6370837a8?id=Kag2cwbctsmza), and [TRACER's official manual](https://www.tracer.pl/gfx-base/files/TRA/KAM/47377/inst_47377.pdf), which documents ONVIF on port 80.
