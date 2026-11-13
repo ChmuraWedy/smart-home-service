@@ -59,3 +59,27 @@ configuration. No Smart Life session was created or refreshed. TRACER may omit
 volume from a later full-status query; the UI displays No reading and still lets
 the owner set it. An explicit LAN change report confirms the new volume, while
 an empty command ACK does not. The volume test changed 1 → 2 → 1 offline.
+
+
+Bound cameras show the same owner-only Local controls panel directly beneath the
+video in full device details and dashboard quick views. The panel opens
+immediately; its arrows send bounded LAN movement without replacing the player or
+allocating a second stream. Local Privacy readings gate playback, and enabling
+Privacy in that panel removes the live player. Native camera previews in Settings
+use the same viewer. Unbound cameras retain their existing player and settings;
+household members do not query the owner camera registry.
+
+Some firmware omits the momentary Stop DP while streaming. The module exposes
+`stop_sent` separately from `confirmed`; absent readback is unknown, and an
+explicit mismatch remains a failure. This avoids treating a missing reading as a
+failed motor stop. Automatic Stop is still unconditional after each bounded move.
+
+
+LAN DNS aliases `duszadomu.dom`, `damawik.dom` and `moj.dom` point to the same
+server through the managed resolver at 192.168.70.1. The dashboard certificate
+covers all four names using the existing TLS private key and CA. The camera
+service explicitly accepts the corresponding preview origins. Public DNS cannot
+resolve these private names; clients need the LAN DNS or a `.dom` resolver rule.
+Root-router forwarding for new aliases on retained networks requires router
+administrative access. Each browser origin keeps its own saved service access
+key, so signing into an alias/IP uses the same existing key again.

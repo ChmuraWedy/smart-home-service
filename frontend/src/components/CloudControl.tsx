@@ -25,7 +25,7 @@ import { hasScheduleWizard } from './ScheduleWizard';
 import { ChannelControl } from './ChannelControl';
 import { InchingControl, SwitchTimers, switchTimerControls } from './SwitchTimers';
 import type { ReactNode } from 'react';
-import { CameraLive } from './CameraLive';
+import CameraViewer from './CameraViewer';
 import { CameraSettings } from './CameraSettings';
 import { CameraFormat } from './CameraFormat';
 import { FieldInfo } from './FieldInfo';
@@ -159,7 +159,7 @@ export function CloudControl({
       connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
     >
       {camera && (
-      <CameraLive key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
+      <CameraViewer key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
         headingActions={(
           <>
             {privacy && <div className="camera-header-privacy">{field(privacy)}</div>}

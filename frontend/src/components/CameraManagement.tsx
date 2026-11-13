@@ -4,7 +4,7 @@ import { ApiError } from '../api';
 import type { CloudDevice } from '../api';
 import type { CameraServiceApi, LocalCamera } from '../camera-service-api';
 import { MSG, t } from '../i18n';
-import { CameraLive } from './CameraLive';
+import CameraViewer from './CameraViewer';
 import LocalCameraControls from './LocalCameraControls';
 
 export default function CameraManagement({ api, onAuthError }:{api:CameraServiceApi;onAuthError:()=>void}) {
@@ -100,10 +100,11 @@ export default function CameraManagement({ api, onAuthError }:{api:CameraService
                     <button type="button" className="secondary compact" disabled={busy} onClick={() => disconnect(row)}>{t(MSG.CAMERA_DISCONNECT)}</button>
                   )}
                 </div>
-                {row.controls_available && <LocalCameraControls api={api} cameraId={row.id} onAuthError={onAuthError} />}
+                {row.controls_available && watch !== row.id && <LocalCameraControls api={api} cameraId={row.id} onAuthError={onAuthError} />}
                 {watch === row.id && (
-                  <CameraLive
+                  <CameraViewer
                     api={api}
+                    localCamera={row}
                     deviceId={`local-camera:${row.id}`}
                     provider="sharing"
                     onAuthError={onAuthError}

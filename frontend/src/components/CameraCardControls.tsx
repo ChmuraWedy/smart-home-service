@@ -4,7 +4,7 @@ import { CAMERA_QUICK_LABELS, cameraPrivacyBlock } from '../camera-controls';
 import { usePendingPrivacyState } from '../use-pending-device-value';
 import type { ControlSpec } from '../controls';
 import type { HomeApi, Reading } from '../home-api';
-import { CameraLive } from './CameraLive';
+import CameraViewer from './CameraViewer';
 import { ChannelControl } from './ChannelControl';
 import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
@@ -36,7 +36,7 @@ export function CameraCardControls({
 
   function renderPlayer(privacyState?: boolean | null, changePrivacy?: () => void) {
     return (
-      <CameraLive
+      <CameraViewer
         api={api}
         deviceId={deviceId}
         provider={provider}

@@ -1,4 +1,5 @@
 import type { CameraPlayback } from './camera-stream';
+import type { CameraControls, LocalCamera } from './camera-service-api';
 import { MSG, t, translateText } from "./i18n";
 import type { DeviceTranslations, TranslationSaved, TranslationWrite } from './device-translations';
 export type Provider = 'sharing' | 'developer';
@@ -114,6 +115,18 @@ export class CloudApi {
   }
 
   get isMember() { return this.account?.role === 'member'; }
+
+  localCameras(signal?:AbortSignal) { return this.request<LocalCamera[]>('/cameras', 'GET', undefined, signal); }
+
+  localCameraControls(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls`); }
+
+  localCameraCommand(id:string, code:string, value:boolean|number|string) {
+    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/commands`, 'POST', { code, value });
+  }
+
+  localCameraAction(id:string, action:'move'|'stop'|'siren', direction?:string) {
+    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/${action}`, 'POST', direction ? { direction } : {});
+  }
 
   private url(path: string): string {
     if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {

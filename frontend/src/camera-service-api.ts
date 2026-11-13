@@ -8,7 +8,7 @@ export type LocalCamera = {
   protocol?:string; 'controls_available'?:boolean;
 };
 export type CameraControls = {
-  transport:'local'; 'observed_at':number; confirmed:boolean|null;
+  transport:'local'; 'observed_at':number; confirmed:boolean|null; 'stop_sent'?:boolean;
   state:Record<string, boolean|number|string>;
   functions:Record<string, {'dp_id':number;type:'Boolean'|'Enum'|'Integer';values:{range?:string[];min?:number;max?:number;step?:number}}>;
 };
@@ -27,8 +27,6 @@ export class CameraServiceApi extends CloudApi {
 
   cameraServiceStatus() { return this.request<{configured:boolean}>('/cameras/service'); }
 
-  localCameras() { return this.request<LocalCamera[]>('/cameras'); }
-
   discoverCameras() { return this.request<LocalCamera[]>('/cameras/discovery', 'POST', {}); }
 
   connectLocalCamera(id:string, body:CameraConnectionInput) {
@@ -36,14 +34,4 @@ export class CameraServiceApi extends CloudApi {
   }
 
   disconnectLocalCamera(id:string) { return this.request(`/cameras/${encodeURIComponent(id)}/connection`, 'DELETE'); }
-
-  localCameraControls(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls`); }
-
-  localCameraCommand(id:string, code:string, value:boolean|number|string) {
-    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/commands`, 'POST', { code, value });
-  }
-
-  localCameraAction(id:string, action:'move'|'stop'|'siren', direction?:string) {
-    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/${action}`, 'POST', direction ? { direction } : {});
-  }
 }

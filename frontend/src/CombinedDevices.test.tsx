@@ -343,7 +343,7 @@ describe('combined devices', () => {
       const privacyStatus = await player.findByText('Privacy mode enabled');
       expect(privacyStatus.closest('.camera-frame')).toHaveClass('camera-frame-blocked');
       expect(player.getByRole('button', { name: 'Watch video' })).toBeDisabled();
-      expect(fetch).not.toHaveBeenCalled();
+      expect(vi.mocked(fetch).mock.calls.every(([input, init]) => new URL(String(input)).pathname === '/api/v1/cameras' && init?.method === 'GET')).toBe(true);
     } else {
       await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/cloud/devices/camera/stream/relay?provider=sharing'), expect.objectContaining({ method: 'POST' })));
       expect(await player.findByRole('button', { name: 'Reconnect' })).toBeEnabled();

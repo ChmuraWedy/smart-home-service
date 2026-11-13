@@ -1,25 +1,38 @@
-import { useState } from 'react';
+import {
+  useCallback, useEffect, useId, useState,
+} from 'react';
 import { ApiError } from '../api';
-import type { CameraControls, CameraServiceApi } from '../camera-service-api';
+import type { CloudApi } from '../api';
+import type { CameraControls } from '../camera-service-api';
 import { CAMERA_LABELS, CAMERA_OPTIONS } from '../camera-controls';
 import { MSG, t } from '../i18n';
 
-export default function LocalCameraControls({ api, cameraId, onAuthError }:{api:CameraServiceApi;cameraId:string;onAuthError:()=>void}) {
+export default function LocalCameraControls({
+  api, cameraId, onAuthError, initialOpen = false, onStateChange,
+}:{
+  api:CloudApi;cameraId:string;onAuthError:()=>void;initialOpen?:boolean;onStateChange?:(state:CameraControls)=>void;
+}) {
+  const instance = useId();
+  const [expanded, setExpanded] = useState(initialOpen);
   const [data, setData] = useState<CameraControls|null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  async function run(action:()=>Promise<CameraControls>) {
+  const run = useCallback(async (action:()=>Promise<CameraControls>) => {
     setBusy(true);
     setError('');
     try {
       const result = await action();
       setData(result);
+      onStateChange?.(result);
       if (result.confirmed === false) setError(t(MSG.CAMERA_LOCAL_UNCONFIRMED));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) onAuthError();
       setError(failure instanceof Error ? failure.message : t(MSG.CAMERA_CONNECTION_FAILED));
     } finally { setBusy(false); }
-  }
+  }, [onAuthError, onStateChange]);
+  useEffect(() => {
+    if (expanded) run(() => api.localCameraControls(cameraId));
+  }, [expanded, api, cameraId, run]);
   const labels:Record<string, string> = {
     ...CAMERA_LABELS,
     motion_tracking: t(MSG.CAMERA_MOTION_TRACKING),
@@ -30,9 +43,8 @@ export default function LocalCameraControls({ api, cameraId, onAuthError }:{api:
   return (
     <details
       className="local-camera-controls"
-      onToggle={(event) => {
-        if (event.currentTarget.open && !data && !busy) run(() => api.localCameraControls(cameraId));
-      }}
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
       <summary>{t(MSG.CAMERA_LOCAL_CONTROLS)}</summary>
       <p className="help">{t(MSG.CAMERA_LOCAL_CONTROLS_DESCRIPTION)}</p>
@@ -62,7 +74,7 @@ export default function LocalCameraControls({ api, cameraId, onAuthError }:{api:
           <div className="camera-local-settings">
             {Object.entries(data.functions).filter(([code]) => !['ptz_control', 'ptz_stop', 'siren_switch'].includes(code)).map(([code, spec]) => {
               const value = data.state[code];
-              const id = `camera-${cameraId}-${code}`;
+              const id = `camera-${instance}-${code}`;
               return (
                 <label key={code} htmlFor={id}>
                   <span>{labels[code] || code}</span>
