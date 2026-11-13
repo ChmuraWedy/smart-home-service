@@ -83,3 +83,20 @@ resolve these private names; clients need the LAN DNS or a `.dom` resolver rule.
 Root-router forwarding for new aliases on retained networks requires router
 administrative access. Each browser origin keeps its own saved service access
 key, so signing into an alias/IP uses the same existing key again.
+
+
+The dashboard also loads connected native camera metadata directly from the
+camera service for owners, independently of either cloud connection. These
+camera cards participate in search, pagination, layout and room filters; an
+unassigned camera appears under All rooms/No room. Existing cloud camera cards
+are deduplicated by physical device ID. Native details use `?camera=<registry-id>`
+and allocate video through `/api/v1/cameras/{id}/playback`, without initializing
+a Smart Life session. Listing the cards never starts video or reads camera DPs.
+A local record can provide the room; otherwise the camera remains unassigned.
+
+Private camera HTTPS/WSS requires the client browser to trust the existing LAN
+CA. A server-side TLS verification or a development browser's pinned certificate
+does not prove that the user's browser trusts it. Verify the user's actual
+browser and report certificate-trust failures separately from player or camera
+failures. Importing the public CA requires the user's administrator approval and
+does not rotate the service access key or camera key.
