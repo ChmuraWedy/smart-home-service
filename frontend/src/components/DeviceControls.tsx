@@ -365,7 +365,8 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
           {awaiting && <span className="sr-only" role="status">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>}
         </span>
         <input type="range" aria-label={spec.label} min={minimum} max={maximum} step={spec.step ?? 'any'}
-          value={value ?? minimum} disabled={disabled || value === undefined}
+          value={value ?? minimum} disabled={disabled}
+          aria-valuetext={value === undefined ? t(MSG.NO_DATA) : undefined}
           data-temperature={quickRange === 'temperature' || undefined}
           onChange={event => { rangeEdit.current = event.currentTarget.value; change(event.currentTarget.value); }}
           onPointerUp={commit} onKeyUp={commit} onBlur={commit}

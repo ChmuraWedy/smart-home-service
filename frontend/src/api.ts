@@ -93,7 +93,7 @@ export type NetworkScan = {
 };
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(message: string, public readonly status: number, public readonly deviceOffline = false) {
     super(message);
   }
 }
@@ -168,7 +168,8 @@ export class CloudApi {
       if (!response.ok) {
         let detail: unknown;
         try { detail = (await response.json()).detail; } catch { /* Non-JSON proxy error. */ }
-        throw new ApiError(typeof detail === 'string' ? translateText(detail) : t(MSG.THE_SERVICE_COULD_NOT_COMPLETE_THE_REQUEST, [response.status]), response.status);
+        const message = typeof detail === 'string' ? translateText(detail) : t(MSG.THE_SERVICE_COULD_NOT_COMPLETE_THE_REQUEST, [response.status]);
+        throw new ApiError(message, response.status, response.headers.get('X-Tuya-Device-Offline') === '1');
       }
       return response;
     } catch (error) {

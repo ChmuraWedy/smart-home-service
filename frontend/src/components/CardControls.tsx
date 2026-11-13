@@ -3,9 +3,10 @@ import {
   Fragment, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react';
 import type { ReactNode } from 'react';
+import { sendCloudDeviceCommands } from '../cloud-device-cache';
 import type { CloudDevice, JsonValue, Provider } from '../api';
 import {
-  cloudBatchCommands, cloudReading, cloudSpecs, displayReading, isStale,
+  cloudBatchCommands, cloudSnapshotReading, cloudSpecs, displayReading, isStale,
   localCommandValue, localReading, localSpec, validateControlValue, withChannelLabels,
 } from '../controls';
 import type { ControlSpec } from '../controls';
@@ -323,11 +324,11 @@ function CloudCardControls({
     if (definitions && snapshot) onStatus?.({online:snapshot.online, battery:batteryFromSpecs(cloudSpecs(definitions,snapshot),snapshot.status)});
   },[definitions,snapshot,onStatus]);
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
-    const result = await api.sendDeviceCommands(cloud.id, provider, cloudBatchCommands([{spec,value}], definitions!, snapshot!.status));
+    const result = await dispatch(sendCloudDeviceCommands(api, cloud.id, provider, cloudBatchCommands([{spec,value}], definitions!, snapshot!.status)));
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
   });
   const reading = (spec: ControlSpec) => snapshot
-    ? { ...cloudReading(spec, snapshot.status[spec.key], snapshot.status_observations?.[spec.key]), liveRequestAt }
+    ? { ...cloudSnapshotReading(spec, snapshot), liveRequestAt }
     : undefined;
   const pendingScope = cloudPendingScope(api, provider, cloud.id);
   const controls = {name:displayName ?? cloud.name, pendingScope, paused, sheet, specs, reading, now, busy:session.busy, readOK:session.readOK && !!definitions && !!snapshot,

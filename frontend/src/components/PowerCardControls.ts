@@ -42,5 +42,5 @@ export function usePowerCardControls({
 
 export function powerDisplayOverride(reading: Reading | undefined, online: boolean, supply: SupplyPower) {
   if (supply !== undefined || online) return supply;
-  return reading?.known && typeof reading.value === 'boolean' ? reading.value : null;
+  return reading?.known && typeof reading.value === 'boolean' ? undefined : null;
 }

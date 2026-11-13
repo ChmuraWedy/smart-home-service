@@ -84,6 +84,7 @@ class SharingState:
         self.watched = set()
         self.reports = {}
         self.online = {}
+        self.offline_rejected_at = {}
         self.http_readings = {}
         self.mq = None
         self.store = SharingReports(bridge, engine)
@@ -120,6 +121,7 @@ class SharingState:
         self.metadata.clear()
         self.reports.clear()
         self.online.clear()
+        self.offline_rejected_at.clear()
         self.http_readings.clear()
         if mq is not None:
             mq.stop()  # Do not use Manager.unload(): it revokes the terminal.
@@ -168,6 +170,7 @@ class SharingState:
         self.metadata.intersection_update(devices)
         self.reports = {id: report for id, report in self.reports.items() if id in devices}
         self.online = {id: value for id, value in self.online.items() if id in devices}
+        self.offline_rejected_at = {id: value for id, value in self.offline_rejected_at.items() if id in devices}
         for device in devices.values():
             self.watch(manager, device)
 
@@ -216,6 +219,8 @@ class SharingState:
                     received = now_iso()
                     if properties is None:
                         state.online[reported.id] = bool(reported.online)
+                        if reported.online:
+                            state.offline_rejected_at.pop(reported.id, None)
                         state.history(reported.id, {"online": {"value": bool(reported.online), "observed_at": None, "received_at": received}})
                         return
                     reports = dict(state.reports.get(reported.id, {}))
@@ -241,6 +246,10 @@ class SharingState:
                         previous = reports.get(code, {}).get("observed_at")
                         if observed and previous and previous >= observed:
                             continue  # Delayed delivery must not reverse a newer report.
+                        rejected = state.offline_rejected_at.get(reported.id)
+                        if rejected and (observed is None or observed >= rejected):
+                            state.online[reported.id] = True
+                            state.offline_rejected_at.pop(reported.id, None)
                         reports[code] = {
                             "value": copy.deepcopy(reported.status[code]),
                             "observed_at": observed,
@@ -258,6 +267,7 @@ class SharingState:
                         return
                     state.reports.pop(id, None)
                     state.online.pop(id, None)
+                    state.offline_rejected_at.pop(id, None)
                     state.http_readings.pop(id, None)
                     state.stored("clear", id)
 

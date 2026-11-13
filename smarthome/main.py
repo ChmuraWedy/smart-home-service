@@ -726,7 +726,7 @@ def create_app(settings: Settings | None = None, controller=None):
             allow_origins=list(settings.cors_origins),
             allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["X-API-Key", "Content-Type", "Range"],
-            expose_headers=["Accept-Ranges", "Content-Range"],
+            expose_headers=["Accept-Ranges", "Content-Range", "X-Tuya-Device-Offline"],
             allow_credentials=False,
         )
     app.state.controller = controller or TuyaController(settings)

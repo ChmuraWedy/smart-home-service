@@ -627,3 +627,31 @@ it('updates the tile connection status and battery from cached reports',async()=
     await waitFor(()=>expect(onStatus).toHaveBeenLastCalledWith({online:false,battery:{code:'battery_percentage',value:42,unit:undefined}}));
   } finally {view.unmount();}
 });
+
+it('shows missing white-light readings and lets the user explicitly select a mode before editing',async()=>{
+  const functions=[
+    {code:'switch_led',type:'Boolean',values:{}},
+    {code:'work_mode',type:'Enum',values:{range:['white','colour','scene']}},
+    {code:'bright_value_v2',type:'Integer',values:{min:10,max:1000,scale:0,step:1}},
+    {code:'temp_value_v2',type:'Integer',values:{min:0,max:1000,scale:0,step:1}},
+  ];
+  const latest={...snapshot,status:{switch_led:true}};
+  const writes:unknown[]=[];
+  vi.mocked(fetch).mockImplementation(async(_input,init)=>{
+    if(init?.method==='POST'){writes.push(JSON.parse(String(init.body)));return json({acknowledged:true});}
+    return json(latest);
+  });
+  mount({...lamp,controls:{ready:true,definitions:{device_id:'lamp',functions},snapshot:latest}},'sharing',{open:true,close:vi.fn(),trigger:{current:null}});
+  const sheet=within(await screen.findByRole('dialog',{name:'Лампа'}));
+  const brightness=await sheet.findByRole('slider',{name:'Яркость'});
+  expect(brightness).toBeDisabled();
+  expect(sheet.getAllByText('Нет данных')).toHaveLength(2);
+  expect(writes).toEqual([]);
+  const white=sheet.getByRole('button',{name:'Белый свет'});
+  expect(white).toHaveAttribute('aria-pressed','false');
+  await waitFor(()=>expect(white).toBeEnabled());
+  await userEvent.setup().click(white);
+  await waitFor(()=>expect(brightness).toBeEnabled());
+  expect(sheet.getByRole('slider',{name:'Цветовая температура'})).toBeEnabled();
+  expect(writes).toEqual([{commands:[{code:'work_mode',value:'white'}]}]);
+});

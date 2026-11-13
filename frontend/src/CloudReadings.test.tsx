@@ -116,3 +116,35 @@ describe('cloud readings in the dashboard and details', () => {
     expect(vi.mocked(fetch).mock.calls.every(([input, init]) => new URL(String(input)).pathname === '/api/v1/cameras' && init?.method === 'GET')).toBe(true);
   });
 });
+
+it('marks retained readings stale and updates both details and card after an offline rejection', async () => {
+  const user = (await import('@testing-library/user-event')).default.setup();
+  const api = new HomeApi({baseUrl:'http://cloud.test',token:'key'});
+  let sends=0;
+  vi.mocked(fetch).mockImplementation(async(input,init)=>{
+    if(init?.method==='POST'){
+      sends++;
+      return new Response(JSON.stringify({detail:'Device offline'}),{status:409,headers:{'X-Tuya-Device-Offline':'1'}});
+    }
+    if(String(input).includes('/functions'))return json(definitions);
+    return json({...snapshot(true),online:sends===0});
+  });
+  const view=renderWithStore(<>
+    <CardControls api={api} device={{id:device.id,name:device.name,cloud:{sharing:device}}} route="sharing" now={Date.now()} paused onAuthError={vi.fn()} onBusy={vi.fn()} />
+    <CloudControl api={api} device={device} provider="sharing" onClose={vi.fn()} onAuthError={vi.fn()} />
+  </>);
+  const details=await screen.findByRole('dialog',{name:'Lamp'});
+  const control=within(details).getByRole('switch',{name:'Питание'});
+  await waitFor(()=>expect(control).toBeEnabled());
+  await user.click(control);
+  await within(details).findAllByText('Не в сети',{exact:true});
+  expect(control).toBeEnabled(); // Keep the existing explicit retry action in full details.
+  expect(control).toHaveAttribute('aria-checked','true');
+  expect(within(details).getAllByText('Устарело').length).toBeGreaterThan(0);
+  expect(sends).toBe(1);
+  view.rerender(<CardControls api={api} device={{id:device.id,name:device.name,cloud:{sharing:device}}} route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()} />);
+  const card=await screen.findByRole('group',{name:'Основные параметры: Lamp'});
+  expect(within(card).getByRole('switch',{name:'Питание'})).toBeDisabled();
+  expect(within(card).getByRole('switch',{name:'Питание'})).toHaveAttribute('aria-checked','true');
+  expect(within(card).getByText('Устарело')).toBeInTheDocument();
+});

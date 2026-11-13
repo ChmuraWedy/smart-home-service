@@ -367,3 +367,41 @@ def test_inventory_card_snapshot_does_not_expose_private_status_and_uses_actual_
     assert KEY not in str(snapshot) and 'private-token' not in str(snapshot)
     assert snapshot['status']['switch_2'] is True
     assert snapshot['status_observations']['switch_2']['observed_at']
+
+
+def test_offline_command_rejection_overrides_cached_online_without_inventing_power(lazy_client, monkeypatch):
+    path = API + '/devices/switch-0'
+    lazy_client.get(path + '/status')
+    bridge = lazy_client.app.state.cloud
+    api = bridge.manager.customer_api
+    def reject(*args):
+        error = RuntimeError('private upstream message')
+        error.error_code = '2001'
+        raise error
+    monkeypatch.setattr(api, 'post', reject)
+    result = lazy_client.post(path + '/commands', json={'commands': [{'code': 'switch_1', 'value': True}]})
+    assert result.status_code == 409
+    assert result.headers['X-Tuya-Device-Offline'] == '1'
+    snapshot = lazy_client.get(path + '/status?refresh=true').json()
+    assert snapshot['online'] is False
+    assert snapshot['status']['switch_1'] is False  # Last report; never the rejected target.
+    assert next(d for d in lazy_client.get(API + '/devices?refresh=true').json() if d['id'] == 'switch-0')['online'] is False
+    bridge.state.mq.emit(value=True, timestamp=1)  # Delayed report cannot clear the rejection.
+    assert lazy_client.get(path + '/status').json()['online'] is False
+    bridge.state.mq.emit_other('online')
+    assert lazy_client.get(path + '/status').json()['online'] is True
+
+
+def test_new_device_report_recovers_after_offline_rejection(lazy_client, monkeypatch):
+    path = API + '/devices/switch-0'
+    lazy_client.get(path + '/status')
+    bridge = lazy_client.app.state.cloud
+    def reject(*args):
+        error = RuntimeError()
+        error.error_code = '2001'
+        raise error
+    monkeypatch.setattr(bridge.manager.customer_api, 'post', reject)
+    lazy_client.post(path + '/commands', json={'commands': [{'code': 'switch_1', 'value': True}]})
+    bridge.state.mq.emit(value=True, timestamp=4102444800000)
+    assert lazy_client.get(path + '/status').json()['online'] is True
+    assert not bridge.state.offline_rejected_at

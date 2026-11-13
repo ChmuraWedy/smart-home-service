@@ -1,3 +1,4 @@
+import { sendCloudDeviceCommands } from '../cloud-device-cache';
 import { MSG, dateLocale, t } from "../i18n";
 import {
   useCallback, useId, useMemo, useState,
@@ -6,7 +7,7 @@ import { CloudApi } from '../api';
 import type { CloudDevice, CloudFunctions, JsonValue, Provider } from '../api';
 import type { DeviceRoute } from '../devices';
 import type { LocalDevice } from '../home-api';
-import { cloudBatchCommands, cloudCommands, cloudReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
+import { cloudBatchCommands, cloudCommands, cloudReading, cloudSnapshotReading, cloudSpecs, displayReading, withChannelLabels } from '../controls';
 import type { ControlSpec } from '../controls';
 import { CapabilityField, ControlDialog, ControlFeedback, useClock, useControlSession } from './DeviceControls';
 import { ChannelAliases } from './ChannelAliases';
@@ -102,21 +103,22 @@ export function CloudControl({
   const ensureStorage = (spec:ControlSpec) => {if (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready)) throw new Error(storage.label+t(MSG.COMMAND_UNAVAILABLE));};
   const sendValue = (spec:ControlSpec,value:JsonValue) => session.execute(async () => {
     ensureStorage(spec);
-    const result = await api.sendDeviceCommands(device.id, provider, cloudCommands(spec, value, data!.definitions));
+    const result = await dispatch(sendCloudDeviceCommands(api, device.id, provider, cloudCommands(spec, value, data!.definitions)));
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
     return { text: t(MSG.COMMAND_ACCEPTED_NOTICE) };
   });
   const drafts = useAutomaticControls(changes => session.execute(async () => {
     changes.forEach(change => ensureStorage(change.spec));
     const commands = cloudBatchCommands(changes.map(change => ({spec:change.spec,value:change.value!})), data!.definitions, data!.snapshot.status);
-    const result = await api.sendDeviceCommands(device.id, provider, commands);
+    const result = await dispatch(sendCloudDeviceCommands(api, device.id, provider, commands));
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
     return {text:t(MSG.COMMAND_ACCEPTED_NOTICE)};
   }), !session.busy && !editingBusy && session.readOK);
   const field = (spec: ControlSpec, headingActions?: ReactNode) => {
     const info = camera && spec.help;
     const helpIcon = info ? <FieldInfo label={spec.label} text={info} /> : undefined;
-    const disabled = editingBusy || session.busy || !session.readOK || (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready));
+    const disabled = editingBusy || session.busy || !session.readOK
+      || (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready));
     if (camera && spec.key==='record_switch' && !storage.ready) return (
       <section className="capability camera-record-unavailable" key={spec.key} aria-label={spec.label}>
         <div className="capability-row">
@@ -132,7 +134,7 @@ export function CloudControl({
     );
     if (camera && spec.key === 'sd_format' && spec.writable && spec.kind === 'boolean') return <CameraFormat key={spec.key} information={helpIcon} disabled={disabled} onFormat={()=>sendValue(spec,true)} />;
     const privacyButton = camera && spec.key === 'basic_private' && spec.writable && spec.kind === 'boolean';
-    const reported = cloudReading(spec, data!.snapshot.status[spec.key], data!.snapshot.status_observations?.[spec.key]);
+    const reported = cloudSnapshotReading(spec, data!.snapshot);
     const reading = camera && spec.key === 'sd_status' ? { ...reported, value: storage.label } : { ...reported, liveRequestAt };
     return (
       <CapabilityField pendingScope={pendingScope}
@@ -144,7 +146,7 @@ export function CloudControl({
   };
   const basicField = (spec: ControlSpec) => <ChannelControl key={spec.key} spec={spec} renderField={field} />;
   const inchingReading = inching && data ? {
-    ...cloudReading(inching, data.snapshot.status[inching.key], data.snapshot.status_observations?.[inching.key]),
+    ...cloudSnapshotReading(inching, data.snapshot),
     liveRequestAt,
   } : undefined;
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
@@ -184,6 +186,7 @@ export function CloudControl({
       <div className="control-toolbar">
         <span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span>
       </div>
+      {data && !data.snapshot.online && <p className="help" role="status">{t(MSG.CLOUD_OFFLINE_LAST_REPORTED)}</p>}
       <details className="status-details">
         <summary>{t(MSG.ABOUT_READINGS)}</summary>
         <p className="help">{specs.some(spec => spec.writable) ? t(MSG.CLOUD_STATE_SNAPSHOT) : t(MSG.LAST_KNOWN_CLOUD_STATE)}</p>

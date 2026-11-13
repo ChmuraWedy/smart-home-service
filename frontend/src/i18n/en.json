@@ -1325,5 +1325,7 @@
   "DEVICE_INTERNET_HELP": "Blocks this device’s internet traffic by MAC at the gateway. LAN access stays available; local controls require a configured LAN connection. Restore remote access removes this block.",
   "DEVICE_LOCAL_SETUP_REQUIRED": "Configure a local connection and verified device mappings in Local connections before switching to local control.",
   "DEVICE_LOCAL_UNREACHABLE": "The device did not respond locally. Check its local connection before switching control.",
-  "DEVICE_INTERNET_UNAVAILABLE_HELP": "Internet blocking needs a registered Wi-Fi MAC on this gateway. A Zigbee child shares its gateway’s internet connection."
+  "DEVICE_INTERNET_UNAVAILABLE_HELP": "Internet blocking needs a registered Wi-Fi MAC on this gateway. A Zigbee child shares its gateway’s internet connection.",
+  "LIGHT_MODE_UNREPORTED": "Current light mode was not reported. Choose White to edit brightness and color temperature. Missing values are shown as No data.",
+  "CLOUD_OFFLINE_LAST_REPORTED": "Device offline. These are last reported values; the current physical state is unconfirmed."
 }
