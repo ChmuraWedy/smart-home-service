@@ -26,6 +26,8 @@ import RoomNavigation from './RoomNavigation';
 import useRoomName from '../room-names';
 import { RoomLayoutSettings } from './RoomEditor';
 import DeviceRoomEditor from './DeviceRoomEditor';
+import DeviceLocalControl from './DeviceLocalControl';
+import { DeviceConnectionSummary } from './DeviceConnection';
 import CameraRoomCard, { cameraRoomCardId } from './CameraRoomCard';
 import { cameraRoomPreviewKey, setCameraRoomPreview, useCameraRoomPreviews } from '../camera-room-previews';
 import type { CardStatus } from './CardControls';
@@ -196,7 +198,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           onAuthError={onAuthError}
           onBusy={notifyBusy}
           onStatus={updateStatus}
-          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, presetSlot, onLightFeatures }}
+          sheet={{ open: quickOpen, show: showSheet, close: onQuickClose, trigger: sheetTrigger, presetSlot, onLightFeatures }}
         />
         {routes.length > 1 && (
         <div className="device-card-footer tw:mt-2">
@@ -463,6 +465,24 @@ export function ControlCenter({
       onAuthError={onAuthError}
     />
   );
+  const useLocalDevice = useCallback(async () => {
+    if (!detailDevice?.local) return;
+    const state = await api.state(detailDevice.local.id, true);
+    if (!state.enabled || !state.available) throw new Error(t(MSG.DEVICE_LOCAL_UNREACHABLE));
+    const params = new URLSearchParams(location.search);
+    params.set('route', 'local');
+    navigate(`${devicePath(detailDevice.id)}?${params}`, { replace: true, state: location.state });
+  }, [api, detailDevice, location.search, location.state, navigate]);
+  const localControl = !api.isMember && selected?.kind === 'device' && detailDevice && (
+    <DeviceLocalControl
+      key={detailDevice.id + selected.route}
+      api={api}
+      deviceId={selected.route === 'local' && detailDevice.local ? String(detailDevice.local.id) : detailDevice.id}
+      route={selected.route}
+      onAuthError={onAuthError}
+      onUseLocal={detailDevice.local ? useLocalDevice : undefined}
+    />
+  );
   let detailCloseLabel: string | undefined;
   if (selected?.kind === 'device' && selected.combinedParent) detailCloseLabel = t(MSG.BACK_TO_COMBINATION);
   else if (selected?.kind === 'device' && selected.parent) detailCloseLabel = t(MSG.BACK_TO_GROUP);
@@ -489,8 +509,20 @@ export function ControlCenter({
   const nativeCards = useMemo(() => cameras.flatMap((camera) => {
     const device = devices.find((item) => item.id === camera.device_id);
     if (!localOnly && device && Object.values(device.cloud).some((item) => isCamera(item?.category))) return [];
-    return [{ kind: 'native-camera' as const, camera, roomId: device ? placementOf(device)?.room_id ?? null : null }];
-  }), [cameras, devices, localOnly, placementOf]);
+    let roomId = device ? placementOf(device)?.room_id ?? null : null;
+    if (camera.room_id !== undefined) roomId = inventory?.rooms.some((item) => item.id === camera.room_id) ? camera.room_id : null;
+    return [{ kind: 'native-camera' as const, camera, roomId }];
+  }), [cameras, devices, localOnly, placementOf, inventory?.rooms]);
+  const nativeRoom = nativeCards.find((item) => item.camera.id === nativeCamera?.id)?.roomId ?? null;
+  const saveCameraRoom = useCallback(async (roomId:number|null) => {
+    if (!nativeCamera) return;
+    await api.cameraRoom(nativeCamera.id, roomId);
+    setRecord((value) => {
+      if (!value) return value;
+      const rows = value.cameras?.map((item) => (item.id === nativeCamera.id ? { ...item, room_id: roomId } : item));
+      return { ...value, cameras: rows };
+    });
+  }, [api, nativeCamera]);
   const entries = useMemo(() => {
     const needle = search.trim().normalize('NFC').toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
@@ -665,6 +697,8 @@ export function ControlCenter({
       };
       return (
         <LocalCameraCard
+          api={api}
+          onAuthError={onAuthError}
           camera={entry.camera}
           room={cameraRoom ? roomLabel(cameraRoom) : t(MSG.NO_ROOM)}
           placement={placement}
@@ -1008,7 +1042,26 @@ export function ControlCenter({
         </>
   )}
       {nativeCamera && (
-        <ControlDialog title={nativeCamera.name} busy={false} onClose={closeNativeCamera} className="camera-controls">
+        <ControlDialog
+          title={nativeCamera.name}
+          busy={false}
+          onClose={closeNativeCamera}
+          className="camera-controls"
+          connectionContent={(
+            <DeviceConnectionSummary
+              route="local"
+              localTransport="wifi"
+              room={inventory?.rooms.find((item) => item.id === nativeRoom)?.name ?? t(MSG.NO_ROOM)}
+              status={t(MSG.ON_YOUR_HOME_NETWORK)}
+            />
+          )}
+        >
+          <DeviceRoomEditor
+            rooms={inventory?.rooms ?? []}
+            roomId={nativeRoom}
+            onAuthError={onAuthError}
+            onSave={saveCameraRoom}
+          />
           <CameraViewer
             key={nativeCamera.id}
             api={api}
@@ -1039,6 +1092,7 @@ export function ControlCenter({
           api={api}
           room={roomName(detailDevice)}
           roomEditor={detailRoomEditor}
+          localControl={localControl}
           device={detailDevice.local}
           gateway={detailGateway}
           cloudDevice={detailDevice.cloud.sharing ?? detailDevice.cloud.developer}
@@ -1063,6 +1117,7 @@ export function ControlCenter({
           api={api}
           room={roomName(detailDevice)}
           roomEditor={detailRoomEditor}
+          localControl={localControl}
           displayName={detailDevice.name}
           closeLabel={detailCloseLabel}
           device={detailCloud}

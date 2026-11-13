@@ -38,11 +38,12 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { Switch } from './ui/switch';
 
 export function CloudControl({
-  api, device, provider, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError, roomEditor, roomPreview,
+  api, device, provider, room, displayName, localDevice, gateway, routes, closeLabel, onClose, onAuthError, roomEditor, localControl, roomPreview,
 }: {
   api: CloudApi; device: CloudDevice; provider: Provider; room?: string; displayName?: string;
   localDevice?: LocalDevice; gateway?: LocalDevice; routes?: DeviceRoute[]; closeLabel?: string; onClose: () => void; onAuthError: () => void;
   roomEditor?: ReactNode;
+  localControl?: ReactNode;
   roomPreview?: { enabled: boolean; available: boolean; toggle: (enabled: boolean) => void };
 }) {
   const originalName = displayName || device.name || t(MSG.TUYA_DEVICE);
@@ -159,7 +160,7 @@ export function CloudControl({
       connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
     >
       {camera && (
-      <CameraViewer key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
+      <CameraViewer fallbackLocalControl={localControl} key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
         headingActions={(
           <>
             {privacy && <div className="camera-header-privacy">{field(privacy)}</div>}
@@ -179,6 +180,7 @@ export function CloudControl({
       />
 )}
       {roomEditor}
+      {!camera && localControl}
       <div className="control-toolbar">
         <span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span>
       </div>

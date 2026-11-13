@@ -1,5 +1,6 @@
 import type { CameraPlayback } from './camera-stream';
 import type { CameraControls, LocalCamera } from './camera-service-api';
+import type { DeviceAccess, DeviceInternet } from './device-access';
 import { MSG, t, translateText } from "./i18n";
 import type { DeviceTranslations, TranslationSaved, TranslationWrite } from './device-translations';
 export type Provider = 'sharing' | 'developer';
@@ -117,6 +118,16 @@ export class CloudApi {
   get isMember() { return this.account?.role === 'member'; }
 
   localCameras(signal?:AbortSignal) { return this.request<LocalCamera[]>('/cameras', 'GET', undefined, signal); }
+
+  deviceAccess(route:string, id:string) { return this.request<DeviceAccess>(`/device-access/${encodeURIComponent(route)}/${encodeURIComponent(id)}`); }
+
+  deviceInternet(route:string, id:string, blocked:boolean) {
+    return this.request<DeviceInternet>(`/device-access/${encodeURIComponent(route)}/${encodeURIComponent(id)}/internet`, 'PUT', { blocked });
+  }
+
+  cameraRoom(id:string, roomId:number|null) { return this.request(`/cameras/${encodeURIComponent(id)}/room`, 'PUT', { room_id: roomId }); }
+
+  activateLocalCamera(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/activate`, 'POST', {}); }
 
   localCameraControls(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls`); }
 

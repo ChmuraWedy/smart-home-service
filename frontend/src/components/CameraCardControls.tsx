@@ -1,10 +1,11 @@
 import { MSG, t } from '../i18n';
 import type { JsonValue, Provider } from '../api';
 import { CAMERA_QUICK_LABELS, cameraPrivacyBlock } from '../camera-controls';
-import { usePendingPrivacyState } from '../use-pending-device-value';
+import { usePendingDeviceValue, usePendingPrivacyState } from '../use-pending-device-value';
 import type { ControlSpec } from '../controls';
 import type { HomeApi, Reading } from '../home-api';
 import CameraViewer from './CameraViewer';
+import CameraQuickActions from './CameraQuickActions';
 import { ChannelControl } from './ChannelControl';
 import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
@@ -32,6 +33,7 @@ export function CameraCardControls({
   const reportedPrivacy = privacySpec && reading(privacySpec);
   const privacyReading = privacySpec ? reportedPrivacy?.known && typeof reportedPrivacy.value === 'boolean' ? reportedPrivacy.value : null : undefined;
   const privacyStatus = usePendingPrivacyState(pendingScope, privacyReading);
+  const { begin } = usePendingDeviceValue(pendingScope, 'basic_private', reportedPrivacy);
   const viewingBlocked = cameraPrivacyBlock(readOK ? privacyStatus : null);
 
   function renderPlayer(privacyState?: boolean | null, changePrivacy?: () => void) {
@@ -86,18 +88,24 @@ export function CameraCardControls({
     />
 );
 
+  const changePrivacy = privacy ? async () => {
+    const value = privacyStatus !== true;
+    const accepted = begin(value);
+    if (await toggle(privacy, value)) accepted();
+  } : undefined;
   return (
     <>
       {embeddedQuick && !paused && renderPlayer()}
       <div className="card-primary-controls tw:grid tw:grid-cols-1">
-        {privacy && (
-        <div className="camera-card-privacy">
-          <CapabilityField pendingScope={pendingScope} spec={privacy} reading={reading(privacy)} now={now} local={false} immediatePower booleanButton
-            powerIcon={<Icon name="shield" className="parameter-icon" />}
-            booleanActions={renderPreview} disabled={disabled} onSend={value => toggle(privacy, value)}
-          />
-        </div>
-)}
+        <CameraQuickActions
+          disabled={paused}
+          frameDisabled={!sheet?.show}
+          privacyDisabled={disabled}
+          privacy={privacyStatus}
+          onOpen={() => sheet?.show?.()}
+          onPrivacy={changePrivacy}
+        />
+        {renderPreview(privacyStatus, changePrivacy)}
         {!!switches.length && (
         <div className="camera-card-switches">
           {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
@@ -114,7 +122,6 @@ export function CameraCardControls({
           <IconGlyph name="refresh" />
         </button>
       </div>
-      {!privacy && renderPreview(privacyStatus)}
       {(busy || notice.error) && <ControlFeedback busy={busy} notice={notice} />}
     </>
   );

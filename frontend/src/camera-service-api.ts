@@ -3,7 +3,7 @@ import { CloudApi } from './api';
 export type LocalCamera = {
   id:string; 'name':string; host:string; connected:boolean; model?:string; firmware?:string;
   'device_id'?:string; profile?:string; profiles?:{token:string;codec:string|null}[];
-  protocol?:string; 'controls_available'?:boolean;
+  protocol?:string; 'controls_available'?:boolean; 'room_id'?:number|null;
 };
 export type CameraControls = {
   transport:'local'; 'observed_at':number; confirmed:boolean|null; 'stop_sent'?:boolean;

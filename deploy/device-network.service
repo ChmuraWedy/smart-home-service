@@ -1,0 +1,27 @@
+[Unit]
+Description=Device-specific internet access rules
+After=network-online.target nftables.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/python3 /usr/local/libexec/device-network.py --config /etc/device-network/devices.json --state /var/lib/device-network/state.json --socket /run/device-network/policy.sock
+User=root
+Group=1000
+RuntimeDirectory=device-network
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+StateDirectory=device-network
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/run/device-network /var/lib/device-network
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_CHOWN
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

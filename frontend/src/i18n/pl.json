@@ -1310,5 +1310,20 @@
   "CAMERA_AUTO_SIREN": "Automatyczna syrena ruchu",
   "CAMERA_SIREN_DURATION": "Czas syreny (sekundy)",
   "CAMERA_TEST_SIREN": "Włącz syrenę na 1 sekundę",
-  "CAMERA_STOP_SIREN": "Zatrzymaj syrenę"
+  "CAMERA_STOP_SIREN": "Zatrzymaj syrenę",
+  "CAMERA_ACTIONS": "Sterowanie kamerą",
+  "CAMERA_OPEN_FRAME": "Otwórz w oknie",
+  "LOCAL_CONTROL": "Sterowanie lokalne",
+  "DEVICE_REMOTE_CONTROL": "Zdalne / chmura",
+  "DEVICE_INTERNET_ACCESS": "Dostęp do internetu",
+  "DEVICE_INTERNET_BLOCKED": "Zablokowany na bramie",
+  "DEVICE_INTERNET_ALLOWED": "Dozwolony na bramie",
+  "DEVICE_INTERNET_UNKNOWN": "Nieskonfigurowany / niedostępny",
+  "DEVICE_USE_LOCAL": "Użyj sterowania lokalnego",
+  "DEVICE_BLOCK_INTERNET": "Wyłącz dostęp zdalny",
+  "DEVICE_RESTORE_INTERNET": "Przywróć dostęp zdalny",
+  "DEVICE_INTERNET_HELP": "Blokuje ruch internetowy tego urządzenia według MAC na bramie. Dostęp LAN pozostaje dostępny; sterowanie lokalne wymaga konfiguracji połączenia. Przywrócenie dostępu zdalnego usuwa blokadę.",
+  "DEVICE_LOCAL_SETUP_REQUIRED": "Przed zmianą sterowania skonfiguruj połączenie lokalne i zweryfikowane parametry urządzenia w sekcji Połączenia lokalne.",
+  "DEVICE_LOCAL_UNREACHABLE": "Urządzenie nie odpowiada w sieci lokalnej. Sprawdź połączenie przed zmianą sterowania.",
+  "DEVICE_INTERNET_UNAVAILABLE_HELP": "Blokowanie internetu wymaga zarejestrowanego adresu MAC Wi-Fi na tej bramie. Urządzenie Zigbee współdzieli połączenie internetowe bramy."
 }

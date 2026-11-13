@@ -5,6 +5,7 @@ import { IconGlyph } from './ui/icon';
 
 export type DashboardSheetState = {
   open: boolean;
+  show?: () => void;
   close: () => void;
   trigger: RefObject<HTMLButtonElement | null>;
 };

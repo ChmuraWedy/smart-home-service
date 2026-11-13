@@ -1310,5 +1310,20 @@
   "CAMERA_AUTO_SIREN": "Automatic motion siren",
   "CAMERA_SIREN_DURATION": "Siren duration (seconds)",
   "CAMERA_TEST_SIREN": "Sound siren for 1 second",
-  "CAMERA_STOP_SIREN": "Stop siren"
+  "CAMERA_STOP_SIREN": "Stop siren",
+  "CAMERA_ACTIONS": "Camera actions",
+  "CAMERA_OPEN_FRAME": "Open in a frame",
+  "LOCAL_CONTROL": "Local control",
+  "DEVICE_REMOTE_CONTROL": "Remote / cloud",
+  "DEVICE_INTERNET_ACCESS": "Internet access",
+  "DEVICE_INTERNET_BLOCKED": "Blocked at the gateway",
+  "DEVICE_INTERNET_ALLOWED": "Allowed at the gateway",
+  "DEVICE_INTERNET_UNKNOWN": "Not configured / unavailable",
+  "DEVICE_USE_LOCAL": "Use local control",
+  "DEVICE_BLOCK_INTERNET": "Stop remote access",
+  "DEVICE_RESTORE_INTERNET": "Restore remote access",
+  "DEVICE_INTERNET_HELP": "Blocks this device’s internet traffic by MAC at the gateway. LAN access stays available; local controls require a configured LAN connection. Restore remote access removes this block.",
+  "DEVICE_LOCAL_SETUP_REQUIRED": "Configure a local connection and verified device mappings in Local connections before switching to local control.",
+  "DEVICE_LOCAL_UNREACHABLE": "The device did not respond locally. Check its local connection before switching control.",
+  "DEVICE_INTERNET_UNAVAILABLE_HELP": "Internet blocking needs a registered Wi-Fi MAC on this gateway. A Zigbee child shares its gateway’s internet connection."
 }

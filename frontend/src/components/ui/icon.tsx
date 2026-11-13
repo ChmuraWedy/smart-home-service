@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 const drawings = {
+  frame: <path d="M3 4h18v16H3zM3 8h18M6 6h.01M9 6h.01M9 12l6 3-6 3z" />,
   add: <path d="M12 5v14M5 12h14" />,
   back: <path d="m14 5-7 7 7 7M7 12h14" />,
   chat: <path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 3V6a1 1 0 0 1 1-1Zm3 5h8m-8 3h5" />,

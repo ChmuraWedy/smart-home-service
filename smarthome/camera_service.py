@@ -10,8 +10,9 @@ from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_ope
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi import Request as APIRequest
 from pydantic import Field, SecretStr
+from sqlalchemy.orm import Session
 
-from .api_dependencies import require_owner
+from .api_dependencies import get_session, require_owner
 from .schemas import Schema
 
 
@@ -168,6 +169,19 @@ class CameraMove(Schema):
     direction: str = Field(pattern="^(up|right|down|left)$")
 
 
+class CameraRoom(Schema):
+    room_id: int | None = Field(ge=1)
+
+
+@router.put("/{camera_id}/room")
+def camera_room(camera_id: str, body: CameraRoom, request: APIRequest, response: Response, session: Session = Depends(get_session)):
+    from .models import Room
+    if body.room_id is not None and session.get(Room, body.room_id) is None:
+        raise HTTPException(404, "Room not found")
+    response.headers["Cache-Control"] = "no-store"
+    return request.app.state.camera_service.request("PUT", "/v1/cameras/" + quote(camera_id, safe="") + "/room", body.model_dump())
+
+
 def control_request(camera_id, request, response, method="GET", action="", body=None):
     response.headers["Cache-Control"] = "no-store"
     return request.app.state.camera_service.request(method, "/v1/cameras/" + quote(camera_id, safe="") + "/controls" + action, body, timeout=25)
@@ -175,6 +189,12 @@ def control_request(camera_id, request, response, method="GET", action="", body=
 
 @router.get("/{camera_id}/controls")
 def camera_controls(camera_id: str, request: APIRequest, response: Response):
+    return control_request(camera_id, request, response)
+
+
+@router.post("/{camera_id}/controls/activate")
+def camera_activate(camera_id: str, request: APIRequest, response: Response):
+    # Saved credentials are reused; no cloud login, re-pairing or key rotation.
     return control_request(camera_id, request, response)
 
 

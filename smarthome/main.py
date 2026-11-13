@@ -766,6 +766,8 @@ def create_app(settings: Settings | None = None, controller=None):
     from .camera_service import router as camera_service_router
 
     app.include_router(camera_service_router)
+    from .device_access import router as device_access_router
+    app.include_router(device_access_router)
     from .commissioning import router as commissioning_router
 
     app.include_router(commissioning_router)

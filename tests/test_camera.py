@@ -161,3 +161,18 @@ def test_local_camera_controls_are_owner_only_and_do_not_initialize_cloud(cloud_
     assert cloud_client.post(path+'/stop').status_code == 200
     assert calls == [('GET','/v1/cameras/camera-id/controls',None),('POST','/v1/cameras/camera-id/controls/move',{'direction':'right'}),('POST','/v1/cameras/camera-id/controls/commands',{'code':'basic_nightvision','value':'2'}),('POST','/v1/cameras/camera-id/controls/siren',{}),('POST','/v1/cameras/camera-id/controls/stop',{})]
     assert cloud_client.app.state.cloud.manager is None
+
+
+def test_native_camera_room_checks_existing_rooms_and_never_exposes_credentials(cloud_client, monkeypatch):
+    building = cloud_client.post('/api/v1/buildings', json={'name': 'Home'}).json()
+    room = cloud_client.post('/api/v1/rooms', json={'name': 'Study', 'building_id': building['id']}).json()
+    calls = []
+    monkeypatch.setattr(cloud_client.app.state.camera_service, 'request',
+                        lambda method, path, body=None, **kw: calls.append((method, path, body)) or body)
+    path = '/api/v1/cameras/native/room'
+    assert cloud_client.put(path, json={'room_id': 999999}).status_code == 404
+    assert not calls
+    assert cloud_client.put(path, json={'room_id': None}).status_code == 200
+    assert cloud_client.put(path, json={'room_id': room['id']}).status_code == 200
+    assert calls[-1] == ('PUT', '/v1/cameras/native/room', {'room_id': room['id']})
+    assert cloud_client.put(path, json={'room_id': room['id']}, headers={'X-API-Key': 'wrong'}).status_code == 401
