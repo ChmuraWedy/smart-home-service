@@ -3,11 +3,11 @@
 services:
   cameras:
     build:
-      context: https://github.com/ChmuraWedy/smart-home-cameras.git#1f8eb1c05e8b916ec95d9dc4301c3dcd39b486b7
+      context: https://github.com/ChmuraWedy/smart-home-cameras.git#b931632865cf87d9e78dafa85edd8da41fdb2fdb
       secrets:
         - source: camera-git-auth
           target: GIT_AUTH_TOKEN
-    image: smart-home-cameras:1f8eb1c05e8b
+    image: smart-home-cameras:b931632865cf
     network_mode: host
     restart: unless-stopped
     cap_drop: [ALL]
