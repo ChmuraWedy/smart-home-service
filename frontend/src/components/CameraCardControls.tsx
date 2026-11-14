@@ -16,7 +16,7 @@ import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
 import { CapabilityField, ControlFeedback } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
-import { Icon, IconGlyph } from './ui/icon';
+import { IconGlyph } from './ui/icon';
 
 export function CameraCardControls({
   api, deviceId, name, pendingScope, provider, online, onAuthError, paused, sheet, embeddedQuick, previewOnly,
@@ -98,6 +98,7 @@ export function CameraCardControls({
         sheet
         autoStart={readOK && available && !viewingBlocked}
         extended={false}
+        movement={!previewOnly}
         localCamera={local.camera}
         viewingBlocked={viewingBlocked}
         headingActions={!bound && changePrivacy && (
@@ -168,13 +169,14 @@ export function CameraCardControls({
           privacy={privacyStatus}
           onOpen={(button) => openFrame(button)}
           onPrivacy={changePrivacy}
-        />
+        >
+          {!!switches.length && (
+            <div className="camera-card-switches">
+              {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
+            </div>
+          )}
+        </CameraQuickActions>
         {renderPreview(privacyStatus, changePrivacy)}
-        {!!switches.length && (
-        <div className="camera-card-switches">
-          {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
-        </div>
-)}
         <button
           type="button"
           className="secondary card-refresh"

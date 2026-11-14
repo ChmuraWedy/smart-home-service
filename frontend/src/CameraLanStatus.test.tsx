@@ -39,6 +39,9 @@ describe('shared authenticated LAN camera status', () => {
     await waitFor(()=>expect(privacy).toBeEnabled());
     expect(privacy).toHaveAttribute('aria-pressed','false');
     expect(privacy).toHaveAttribute('data-slot','power-button');
+    expect(privacy.closest('.camera-quick-actions')).toBe(screen.getByRole('switch',{name:t(MSG.MOTION)}).closest('.camera-quick-actions'));
+    expect(Array.from(privacy.closest('.camera-quick-actions')?.querySelectorAll('button.dashboard-power-button') ?? []).map(button=>button.textContent)).toEqual(['','']);
+    expect(privacy.closest('.camera-quick-actions')?.querySelectorAll('button.dashboard-power-button')).toHaveLength(2);
     expect(onStatus).toHaveBeenLastCalledWith(expect.objectContaining({online:true,transport:'local'}));
     const user=userEvent.setup();
     await user.click(screen.getByRole('button',{name:t(MSG.CAMERA_OPEN_FRAME)}));

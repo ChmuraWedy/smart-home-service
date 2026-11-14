@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithStore as render } from './test/render-with-store';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +27,7 @@ beforeEach(()=>{
 });
 
 describe('camera details with local controls',()=>{
-  it('matches by device ID and moves without reconnecting or replacing the video',async()=>{
+  it.each([true, false])('moves without reconnecting or replacing video in extended mode %s',async(extended)=>{
     const calls:{path:string;method:string;body:unknown}[]=[];
     vi.mocked(fetch).mockImplementation(async(input,init)=>{
       const path=new URL(String(input)).pathname;
@@ -36,10 +36,16 @@ describe('camera details with local controls',()=>{
       if(path.endsWith('/playback'))return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
       return json(state);
     });
-    render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact />);
+    render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact extended={extended} movement={!extended} />);
     const up=await screen.findByRole('button',{name:t(MSG.CAMERA_MOVE_UP)});
     await waitFor(()=>expect(connectCameraWebRTC).toHaveBeenCalledOnce());
     const video=screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO));
+    if (!extended) {
+      expect(screen.queryByText(t(MSG.LOCAL_CONTROL))).toBeNull();
+      const stop=within(screen.getByRole('region',{name:t(MSG.CAMERA_VIDEO)})).getByRole('button',{name:t(MSG.STOP)});
+      expect(stop).toHaveClass('secondary','compact');
+      expect(stop).not.toHaveAttribute('data-slot','power-button');
+    }
     await userEvent.setup().click(up);
     await waitFor(()=>expect(calls.some(c=>c.path==='/api/v1/cameras/lan-camera/controls/move'&&JSON.stringify(c.body)==='{"direction":"up"}')).toBe(true));
     expect(screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBe(video);
@@ -83,4 +89,15 @@ it('keeps existing playback and privacy behavior when no LAN binding exists',asy
   expect(screen.queryByText(t(MSG.CAMERA_LOCAL_CONTROLS))).toBeNull();
   await waitFor(()=>expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toHaveAttribute('title',t(MSG.PRIVACY_MODE_IS_ON)));
   expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toBeDisabled();
+});
+
+
+it('keeps popup movement disabled in camera privacy mode',async()=>{
+  vi.mocked(fetch).mockResolvedValue(json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:{...state,state:{basic_private:true}}}}]}));
+  render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing"
+    onAuthError={vi.fn()} extended={false} movement autoStart compact />);
+  expect(await screen.findByRole('button',{name:t(MSG.CAMERA_MOVE_UP)})).toBeDisabled();
+  expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toBeDisabled();
+  expect(screen.queryByText(t(MSG.LOCAL_CONTROL))).toBeNull();
+  expect(vi.mocked(fetch).mock.calls.every(([input,init])=>String(input).endsWith('/cameras/status')&&init?.method==='GET')).toBe(true);
 });

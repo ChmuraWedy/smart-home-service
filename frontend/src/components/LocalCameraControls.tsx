@@ -6,6 +6,7 @@ import type { CloudApi } from '../api';
 import type { CameraControls } from '../camera-service-api';
 import { CAMERA_LABELS, CAMERA_OPTIONS } from '../camera-controls';
 import { MSG, t } from '../i18n';
+import CameraMovementControls from './CameraMovementControls';
 
 export default function LocalCameraControls({
   api, cameraId, onAuthError, initialOpen = false, onStateChange, currentState, managed = false,
@@ -55,23 +56,11 @@ export default function LocalCameraControls({
         <>
           <p role="status" className="help">{t(MSG.CAMERA_LAN_UPDATED, [new Date(data.observed_at * 1000).toLocaleTimeString()])}</p>
           {data.functions.ptz_control && data.functions.ptz_stop && (
-            <div className="camera-ptz" role="group" aria-label={t(MSG.CAMERA_MOVEMENT)}>
-              {([
-                ['up', '↑', MSG.CAMERA_MOVE_UP], ['left', '←', MSG.CAMERA_MOVE_LEFT],
-                ['right', '→', MSG.CAMERA_MOVE_RIGHT], ['down', '↓', MSG.CAMERA_MOVE_DOWN],
-              ] as const).map(([direction, glyph, label]) => (
-                <button
-                  key={direction}
-                  type="button"
-                  className={`secondary camera-ptz-${direction}`}
-                  aria-label={t(label)}
-                  disabled={busy || privateMode}
-                  onClick={() => run(() => api.localCameraAction(cameraId, 'move', direction))}
-                >{glyph}
-                </button>
-              ))}
-              <button type="button" className="secondary camera-ptz-stop" onClick={() => run(() => api.localCameraAction(cameraId, 'stop'))}>{t(MSG.STOP)}</button>
-            </div>
+            <CameraMovementControls
+              disabled={busy || privateMode}
+              onMove={(direction) => run(() => api.localCameraAction(cameraId, 'move', direction))}
+              onStop={() => run(() => api.localCameraAction(cameraId, 'stop'))}
+            />
           )}
           <div className="camera-local-settings">
             {Object.entries(data.functions).filter(([code]) => !['ptz_control', 'ptz_stop', 'siren_switch'].includes(code)).map(([code, spec]) => {
