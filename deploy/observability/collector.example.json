@@ -1,0 +1,22 @@
+{
+  "endpoint": "http://127.0.0.1:9428",
+  "state": "/var/lib/smart-home-logs/queue.sqlite3",
+  "history_adapter": "/usr/local/libexec/smart-home-log-history.py",
+  "interval": 5,
+  "initial_log_hours": 24,
+  "retention_days": 30,
+  "max_queue_bytes": 268435456,
+  "containers": [
+    {"name": "smart-home-service-backend-1", "service": "backend", "environment": "8080", "history": true},
+    {"name": "smart-home-service-frontend-1", "service": "frontend", "environment": "8080"},
+    {"name": "smart-home-postgres-backend-8082", "service": "backend", "environment": "8082", "history": true},
+    {"name": "smart-home-frontend-feat-headless-ui-dashboard", "service": "frontend", "environment": "8082"},
+    {"name": "smart-home-cameras-8082", "service": "cameras", "environment": "8082"},
+    {"name": "smart-home-postgres-8080", "service": "postgres", "environment": "8080"},
+    {"name": "smart-home-postgres-8082", "service": "postgres", "environment": "8082"},
+    {"name": "network-management-dns-1", "service": "dnsmasq", "environment": "lan"},
+    {"name": "smart-home-mqtt-bridge-1", "service": "mqtt", "environment": "lan"},
+    {"name": "smart-home-voice-voice-1", "service": "voice", "environment": "lan"},
+    {"name": "smart-home-service-label-translator-1", "service": "label-translator", "environment": "lan"}
+  ]
+}

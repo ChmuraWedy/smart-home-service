@@ -1,0 +1,50 @@
+name: smart-home-logs
+services:
+  logs:
+    image: ${SMART_HOME_LOGS_IMAGE:-victoriametrics/victoria-logs:v1.54.0}
+    container_name: smart-home-logs
+    restart: unless-stopped
+    network_mode: host
+    user: "1000:1000"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    mem_limit: 384m
+    cpus: 0.5
+    environment:
+      GOMAXPROCS: "2"
+      GOMEMLIMIT: 256MiB
+    command:
+      - -httpListenAddr=127.0.0.1:9428
+      - -storageDataPath=/data
+      - -retentionPeriod=30d
+      - -retention.maxDiskSpaceUsageBytes=8GiB
+      - -memory.allowedBytes=128MiB
+      - -search.maxConcurrentRequests=2
+      - -search.maxQueryDuration=30s
+    volumes:
+      - ${SMART_HOME_LOGS_DATA:?Set a private logs data directory}:/data
+    logging:
+      driver: local
+      options: {max-size: 5m, max-file: "2"}
+  search:
+    image: ${SMART_HOME_LOGS_GATEWAY_IMAGE:?Set a pinned nginx-compatible frontend image}
+    container_name: smart-home-log-search
+    restart: unless-stopped
+    network_mode: host
+    entrypoint: [nginx, -g, "daemon off;", -c, /etc/nginx/log-search.conf]
+    user: "33:33"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    mem_limit: 32m
+    cpus: 0.25
+    volumes:
+      - ./deploy/observability/nginx.conf:/etc/nginx/log-search.conf:ro
+      - ${SMART_HOME_LOGS_AUTH_FILE:?Set owner password hash file}:/etc/nginx/log-users:ro
+      - ${SMART_HOME_LOGS_TLS_DIR:?Set existing LAN TLS directory}/dashboard.crt:/certs/dashboard.crt:ro
+      - ${SMART_HOME_LOGS_TLS_DIR:?Set existing LAN TLS directory}/dashboard.key:/certs/dashboard.key:ro
+    logging:
+      driver: local
+      options: {max-size: 5m, max-file: "2"}
