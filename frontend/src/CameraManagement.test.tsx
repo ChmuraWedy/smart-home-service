@@ -1,4 +1,5 @@
-import { render,screen,waitFor } from '@testing-library/react';
+import {screen,waitFor } from '@testing-library/react';
+import { renderWithStore as render } from './test/render-with-store';
 import userEvent from '@testing-library/user-event';
 import { describe,it,vi,expect } from 'vitest';
 import { CameraServiceApi } from './camera-service-api';

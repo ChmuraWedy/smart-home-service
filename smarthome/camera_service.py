@@ -31,6 +31,8 @@ class CameraService:
         self.salt = secrets.token_hex(16)
         self.stop = threading.Event()
         self.thread = None
+        from .camera_status import CameraStatus
+        self.status = CameraStatus(self)
         self.opener = build_opener(ProxyHandler({}), NoRedirect())
         if self.url:
             parsed = urlsplit(self.url)
@@ -99,6 +101,7 @@ class CameraService:
             raise HTTPException(502, "Camera service returned an invalid playback URL") from None
 
     def close(self):
+        self.status.close()
         self.stop.set()
         if self.thread:
             self.thread.join(timeout=5)
@@ -132,6 +135,12 @@ def service_status(request: APIRequest):
 def cameras(request: APIRequest, response: Response):
     response.headers["Cache-Control"] = "no-store"
     return request.app.state.camera_service.request("GET", "/v1/cameras")
+
+
+@router.get("/status")
+def camera_status(request: APIRequest, response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return request.app.state.camera_service.status.snapshot(request.app.state.network)
 
 
 @router.post("/discovery")
@@ -184,7 +193,10 @@ def camera_room(camera_id: str, body: CameraRoom, request: APIRequest, response:
 
 def control_request(camera_id, request, response, method="GET", action="", body=None):
     response.headers["Cache-Control"] = "no-store"
-    return request.app.state.camera_service.request(method, "/v1/cameras/" + quote(camera_id, safe="") + "/controls" + action, body, timeout=25)
+    service = request.app.state.camera_service
+    result = service.request(method, "/v1/cameras/" + quote(camera_id, safe="") + "/controls" + action, body, timeout=25)
+    service.status.update(camera_id, result)
+    return result
 
 
 @router.get("/{camera_id}/controls")
@@ -226,12 +238,19 @@ def local_camera_playback(camera_id: str, request: APIRequest, response: Respons
         raise HTTPException(404, "Connected camera not found")
     # The owner manages native cameras independently of cloud availability.
     # Respect an already-known privacy state without initializing a cloud session.
-    bridge = request.app.state.cloud
-    with bridge.lock:
-        manager = bridge.manager
-        device = manager.device_map.get(row["device_id"]) if manager is not None else None
-        if device is not None and getattr(device, "status", {}).get("basic_private") is True:
-            raise HTTPException(409, "Camera privacy mode is enabled")
+    if row.get("controls_available"):
+        controls = service.request("GET", "/v1/cameras/" + quote(camera_id, safe="") + "/controls", timeout=12)
+        service.status.update(camera_id, controls)
+        privacy = controls.get("state", {}).get("basic_private")
+        if privacy is not False:
+            raise HTTPException(409, "Camera privacy mode is enabled" if privacy is True else "Camera privacy state is unknown")
+    else:
+        bridge = request.app.state.cloud
+        with bridge.lock:
+            manager = bridge.manager
+            device = manager.device_map.get(row["device_id"]) if manager is not None else None
+            if device is not None and getattr(device, "status", {}).get("basic_private") is True:
+                raise HTTPException(409, "Camera privacy mode is enabled")
     scope = service.scope("local", "owner", service, lambda: not service.stop.is_set())
     result = service.request("POST", "/v1/playbacks/local", {"device_id": row["device_id"], "scope": scope})
     service.validate_playback(result, row["device_id"])

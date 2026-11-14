@@ -45,7 +45,7 @@ function sensorReading(spec: ControlSpec, socket: boolean) {
     && ['number', 'boolean', 'enum', 'text'].includes(spec.kind);
 }
 
-export type CardStatus = {online:boolean;battery?:BatteryReading};
+export type CardStatus = {online:boolean;battery?:BatteryReading;transport?:'local'|'cloud';checking?:boolean};
 
 type QuickSheet = DashboardSheetState & {
   presetSlot?: HTMLDivElement | null;
@@ -69,6 +69,7 @@ function unplacedChannelChildren(children?: ReadonlyMap<string, ReactNode>, chan
 }
 
 type CardProps = EmbeddedControls & {
+  onOpenQuick?:(button:HTMLButtonElement)=>void;
   api: HomeApi;
   device: UnifiedDevice;
   displayName?: string;
@@ -89,7 +90,7 @@ export function CardControls(props: CardProps) {
   const container = useRef<HTMLDivElement>(null);
   const [activated, setActivated] = useState(false), [visible, setVisible] = useState(false);
   const {
-    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren, supplyPower, previewOnly,
+    device, displayName, route, paused, embeddedQuick, sheet, loadWhenPaused, channelChildren, supplyPower, previewOnly, onOpenQuick,
   } = props;
   const sheetOpen = Boolean(sheet?.open && !paused);
   useEffect(() => { if (sheetOpen) setActivated(true); }, [sheetOpen]);
@@ -116,7 +117,15 @@ export function CardControls(props: CardProps) {
   } else if (route === 'local') {
     controls = <LocalCardControls {...props} visible={pollingVisible} />;
   } else if (cloud) {
-    controls = <CloudCardControls {...props} cloud={cloud} provider={route} visible={pollingVisible} />;
+    controls = (
+      <CloudCardControls
+        {...props}
+        onOpenQuick={onOpenQuick}
+        cloud={cloud}
+        provider={route}
+        visible={pollingVisible}
+      />
+    );
   }
   return (
     <div className="card-quick-controls tw:min-w-0 tw:empty:hidden" ref={container} role="group" aria-label={t(MSG.MAIN_CONTROLS_PREFIX) + (displayName ?? device.name)}>
@@ -283,7 +292,7 @@ function StandardCardControls({
 }
 
 function CloudCardControls({
-  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower,
+  api, cloud, displayName, provider, now, visible, paused, sheet, onAuthError, onBusy, onStatus, embeddedQuick, onPower, onOpenQuick,
   channelChildren, powerSide, inlineMemberName, renderQuickTarget, supplyPower, previewOnly,
 }: CardProps & { cloud: CloudDevice; provider: Provider; visible: boolean }) {
   const { snapshot, liveRequestAt, read } = useCloudDeviceSnapshot(api, cloud.id, provider);
@@ -321,8 +330,8 @@ function CloudCardControls({
   const definitions = useMemo(() => baseDefinitions && labels ? withChannelLabels(baseDefinitions, labels) : baseDefinitions, [baseDefinitions, labels]);
   const specs = definitions && snapshot ? cloudSpecs(definitions,snapshot) : [];
   useEffect(() => {
-    if (definitions && snapshot) onStatus?.({online:snapshot.online, battery:batteryFromSpecs(cloudSpecs(definitions,snapshot),snapshot.status)});
-  },[definitions,snapshot,onStatus]);
+    if (!isCamera(cloud.category) && definitions && snapshot) onStatus?.({online:snapshot.online, battery:batteryFromSpecs(cloudSpecs(definitions, snapshot), snapshot.status)});
+  }, [definitions, snapshot, onStatus, cloud.category]);
   const commands = useCardCommands(session.execute, onBusy, async (spec, value) => {
     const result = await dispatch(sendCloudDeviceCommands(api, cloud.id, provider, cloudBatchCommands([{spec,value}], definitions!, snapshot!.status)));
     if (result.acknowledged !== true) throw new Error(t(MSG.THE_SERVICE_DID_NOT_ACKNOWLEDGE_THE_COMMAND));
@@ -337,6 +346,8 @@ function CloudCardControls({
     ? (
       <>
         <CameraCardControls {...controls} api={api} deviceId={cloud.id} provider={provider} onAuthError={onAuthError}
+          onStatus={onStatus}
+          onOpenQuick={onOpenQuick}
           online={snapshot?.online ?? cloud.online}
           paused={paused || supplyPower !== undefined}
           embeddedQuick={embeddedQuick}

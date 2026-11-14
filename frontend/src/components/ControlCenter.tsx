@@ -122,9 +122,11 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const battery = live ? live.battery : initialBattery;
   const enabled = (route === 'local' ? state?.enabled : undefined) ?? local?.enabled;
   const online = route === 'local' ? enabled && state?.available : live?.online ?? cloud?.online;
-  const presenceMessage = cardPresenceMessage({
+  let presenceMessage:Parameters<typeof t>[0] = cardPresenceMessage({
     hasCloud: Boolean(cloud), hasLocal: Boolean(local), enabled, online,
   });
+  if (live?.transport === 'local' && online) presenceMessage = MSG.AVAILABLE_LOCALLY;
+  if (live?.checking) presenceMessage = MSG.CHECKING_CONNECTION;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))

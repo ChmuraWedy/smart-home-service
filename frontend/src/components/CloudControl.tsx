@@ -1,3 +1,5 @@
+import useLocalCamera from '../use-local-camera';
+import { localCameraOnline } from '../camera-status-cache';
 import { sendCloudDeviceCommands } from '../cloud-device-cache';
 import { MSG, dateLocale, t } from "../i18n";
 import {
@@ -50,7 +52,10 @@ export function CloudControl({
   const originalName = displayName || device.name || t(MSG.TUYA_DEVICE);
   const roomPreviewId = useId();
   const localize = useDeviceText();
-  const localTransport = localDevice?.transport;
+  const localCamera = useLocalCamera(api, isCamera(device.category) ? device.id : '', onAuthError);
+  const localCameraBound = Boolean(localCamera.camera?.controls_available);
+  const cameraOnline = localCameraOnline(localCamera.camera);
+  const localTransport = localCameraBound ? 'wifi' : localDevice?.transport;
   const [aliasBusy, setAliasBusy] = useState(false);
   const [labelBusy, setLabelBusy] = useState(false);
   const editingBusy = labelBusy || aliasBusy;
@@ -152,48 +157,57 @@ export function CloudControl({
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
+  const connectionOnline = localCameraBound ? cameraOnline : data?.snapshot.online;
+  let connectionStatus = t(MSG.CHECKING_CONNECTION);
+  if (connectionOnline !== undefined) connectionStatus = t(connectionOnline ? MSG.ONLINE : MSG.OFFLINE);
+  if (localCameraBound && connectionOnline) connectionStatus = t(MSG.AVAILABLE_LOCALLY);
   return (
     <ControlDialog onRefresh={session.refresh}
       readingAge={data && Number.isFinite(reportedAt) ? { at: reportedAt, now } : undefined}
       closeLabel={closeLabel}
-      information={<DeviceConnectionDescription room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} />}
+      information={<DeviceConnectionDescription room={room} route={localCameraBound ? 'local' : provider} throughGateway={device.sub} localTransport={localTransport} />}
       statusContent={<BatteryBadge reading={data ? batteryFromSpecs(specs,data.snapshot.status) : device.battery} />} className={camera ? 'camera-controls' : device.category === 'dj' || specs.some(spec => spec.kind === 'color') ? 'bulb-controls' : ''} title={name} busy={session.busy || editingBusy} onClose={onClose}
       titleContent={<DeviceAliases api={api} deviceId={device.id} name={originalName} translations={translations} initialAliases={device.aliases} provider={provider} localId={localDevice?.id} disabled={session.busy || labelBusy} onBusy={setAliasBusy} onAuthError={onAuthError} />}
-      connectionContent={<DeviceConnectionSummary room={room} route={provider} throughGateway={device.sub} localTransport={localTransport} status={data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)} online={data?.snapshot.online} />}
+      connectionContent={(
+        <DeviceConnectionSummary
+          room={room}
+          route={localCameraBound ? 'local' : provider}
+          throughGateway={device.sub}
+          localTransport={localTransport}
+          status={connectionStatus}
+          online={connectionOnline}
+        />
+      )}
     >
       {camera && (
       <CameraViewer fallbackLocalControl={localControl} key={device.id + provider} api={api} deviceId={device.id} provider={provider} onAuthError={onAuthError} networkSignal={networkSignal} viewingBlocked={privacyBlock}
-        headingActions={(
-          <>
-            {privacy && <div className="camera-header-privacy">{field(privacy)}</div>}
-            {roomPreview && (
-              <label htmlFor={roomPreviewId} className="camera-room-preview-setting" title={roomPreview.available ? undefined : t(MSG.COMBINED_SELECT_ROOM)}>
-                <Switch
-                  id={roomPreviewId}
-                  checked={roomPreview.enabled}
-                  disabled={!roomPreview.available && !roomPreview.enabled}
-                  onChange={roomPreview.toggle}
-                />
-                <span>{t(MSG.SHOW_ROOM_PREVIEW)}</span>
-              </label>
-            )}
-          </>
+        remoteHeadingActions={privacy && <div className="camera-header-privacy">{field(privacy)}</div>}
+        headingActions={roomPreview && (
+        <label htmlFor={roomPreviewId} className="camera-room-preview-setting" title={roomPreview.available ? undefined : t(MSG.COMBINED_SELECT_ROOM)}>
+          <Switch
+            id={roomPreviewId}
+            checked={roomPreview.enabled}
+            disabled={!roomPreview.available && !roomPreview.enabled}
+            onChange={roomPreview.toggle}
+          />
+          <span>{t(MSG.SHOW_ROOM_PREVIEW)}</span>
+        </label>
         )}
       />
 )}
       {roomEditor}
       {!camera && localControl}
       <div className="control-toolbar">
-        <span className={'presence' + (data?.snapshot.online ? ' online' : '')}>{data ? (data.snapshot.online ? t(MSG.ONLINE) : t(MSG.OFFLINE)) : t(MSG.CHECKING_CONNECTION)}</span>
+        <span className={'presence' + (connectionOnline ? ' online' : '')}>{connectionStatus}</span>
       </div>
-      {data && !data.snapshot.online && <p className="help" role="status">{t(MSG.CLOUD_OFFLINE_LAST_REPORTED)}</p>}
+      {data && !data.snapshot.online && !localCameraBound && <p className="help" role="status">{t(MSG.CLOUD_OFFLINE_LAST_REPORTED)}</p>}
       <details className="status-details">
         <summary>{t(MSG.ABOUT_READINGS)}</summary>
         <p className="help">{specs.some(spec => spec.writable) ? t(MSG.CLOUD_STATE_SNAPSHOT) : t(MSG.LAST_KNOWN_CLOUD_STATE)}</p>
         {data && <p className="help">{t(MSG.SNAPSHOT_RECEIVED) + " "}{new Date(data.fetchedAt).toLocaleString(dateLocale())}</p>}
         {provider === 'sharing' && data && <p className="help">{data.snapshot.event_stream_connected ? t(MSG.DEVICE_REPORTS_ARE_CONNECTED) : t(MSG.NO_FRESH_REPORTS_YET_OR_THE_CONNECTION_IS)}</p>}
       </details>
-      {data && !data.snapshot.online && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
+      {data && !data.snapshot.online && !localCameraBound && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
       {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
       {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
       {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.map(basicField)}</div>}

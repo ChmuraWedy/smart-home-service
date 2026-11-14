@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 const drawings = {
+  stop: <path d="M5 5h14v14H5z" />,
   frame: <path d="M3 4h18v16H3zM3 8h18M6 6h.01M9 6h.01M9 12l6 3-6 3z" />,
   add: <path d="M12 5v14M5 12h14" />,
   back: <path d="m14 5-7 7 7 7M7 12h14" />,

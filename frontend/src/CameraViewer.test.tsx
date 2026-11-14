@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithStore as render } from './test/render-with-store';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
@@ -12,7 +13,7 @@ vi.mock('./camera-stream', async importOriginal => ({
 }));
 
 const row={id:'lan-camera',name:'TRACER FOCUS 3',host:'192.168.1.20',device_id:'tracer',connected:true,controls_available:true};
-const state={transport:'local',observed_at:1700000000,confirmed:true,state:{basic_private:false},functions:{
+const state={transport:'local',observed_at:Date.now()/1000,confirmed:true,state:{basic_private:false},functions:{
   basic_private:{dp_id:105,type:'Boolean',values:{}},
   ptz_control:{dp_id:119,type:'Enum',values:{range:['0','2','4','6']}},
   ptz_stop:{dp_id:116,type:'Boolean',values:{}},
@@ -31,8 +32,8 @@ describe('camera details with local controls',()=>{
     vi.mocked(fetch).mockImplementation(async(input,init)=>{
       const path=new URL(String(input)).pathname;
       calls.push({path,method:init?.method||'GET',body:init?.body?JSON.parse(String(init.body)):null});
-      if(path.endsWith('/cameras'))return json([{...row,id:'wrong',device_id:'other'},row]);
-      if(path.endsWith('/stream/relay'))return json({device_id:'tracer',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
+      if(path.endsWith('/cameras/status'))return json({cameras:[{...row,id:'wrong',device_id:'other',lan:{}},{...row,lan:{online:true,checked_at:Date.now()/1000,controls:state}}]});
+      if(path.endsWith('/playback'))return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
       return json(state);
     });
     render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact />);
@@ -43,7 +44,7 @@ describe('camera details with local controls',()=>{
     await waitFor(()=>expect(calls.some(c=>c.path==='/api/v1/cameras/lan-camera/controls/move'&&JSON.stringify(c.body)==='{"direction":"up"}')).toBe(true));
     expect(screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBe(video);
     expect(connectCameraWebRTC).toHaveBeenCalledOnce();
-    expect(calls.filter(c=>c.path.endsWith('/stream/relay'))).toHaveLength(1);
+    expect(calls.filter(c=>c.path.endsWith('/playback'))).toHaveLength(1);
     expect(calls.every(c=>!c.path.includes('/wrong/'))).toBe(true);
   });
 
@@ -53,13 +54,14 @@ describe('camera details with local controls',()=>{
     vi.mocked(fetch).mockImplementation(async(input,init)=>{
       const path=new URL(String(input)).pathname;requests.push(path);
       if(path.endsWith('/commands'))privateMode=JSON.parse(String(init?.body)).value;
-      if(path.endsWith('/stream/relay'))return json({device_id:'tracer',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
+      if(path.endsWith('/playback'))return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
+      if(path.endsWith('/cameras/status'))return json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:{...state,state:{basic_private:privateMode}}}}]});
       return json({...state,state:{basic_private:privateMode}});
     });
     render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} localCamera={row} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact />);
     const privacy=await screen.findByLabelText(t(MSG.PRIVACY_MODE));
     expect(screen.queryByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeNull();
-    expect(requests.some(p=>p.endsWith('/stream/relay'))).toBe(false);
+    expect(requests.some(p=>p.endsWith('/playback'))).toBe(false);
     const user=userEvent.setup();
     await user.click(privacy);
     await waitFor(()=>expect(screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeInTheDocument());

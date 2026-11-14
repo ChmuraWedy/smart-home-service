@@ -12,7 +12,7 @@ vi.mock('./camera-stream',async importOriginal=>({
 }));
 const json=(value:unknown)=>new Response(JSON.stringify(value));
 const camera={id:'lan-tracer',device_id:'physical-camera',name:'TRACER FOCUS 3',host:'192.168.1.20',connected:true,controls_available:true};
-const state={transport:'local',observed_at:1700000000,confirmed:true,state:{basic_private:false},functions:{
+const state={transport:'local',observed_at:Date.now()/1000,confirmed:true,state:{basic_private:false},functions:{
   basic_private:{dp_id:105,type:'Boolean',values:{}},ptz_control:{dp_id:119,type:'Enum',values:{range:['0','2','4','6']}},ptz_stop:{dp_id:116,type:'Boolean',values:{}},
 }};
 function backend(cloud=false) {
@@ -21,6 +21,7 @@ function backend(cloud=false) {
     const path=new URL(String(input)).pathname;
     requests.push({path,method:init?.method||'GET',body:init?.body?JSON.parse(String(init.body)):null});
     if(path==='/api/v1/cameras')return json([camera]);
+    if(path==='/api/v1/cameras/status')return json({cameras:[{...camera,lan:{online:true,checked_at:Date.now()/1000,controls:state}}]});
     if(path.includes('/controls'))return json(state);
     if(path.endsWith('/playback'))return json({device_id:'local-camera:lan-tracer',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
     if(path==='/api/v1/cloud/devices')return json(cloud?[{id:camera.device_id,name:camera.name,category:'sp',online:true,has_local_key:false}]:[]);

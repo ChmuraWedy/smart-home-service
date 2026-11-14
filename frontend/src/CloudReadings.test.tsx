@@ -113,7 +113,7 @@ describe('cloud readings in the dashboard and details', () => {
     view.rerender(card(camera(true, '2026-11-06T10:00:01Z'), true));
     await screen.findByText(/Режим приватности включён/);
     expect(screen.getByRole('button', { name: 'Смотреть видео' })).toBeDisabled();
-    expect(vi.mocked(fetch).mock.calls.every(([input, init]) => new URL(String(input)).pathname === '/api/v1/cameras' && init?.method === 'GET')).toBe(true);
+    expect(vi.mocked(fetch).mock.calls.every(([input, init]) => new URL(String(input)).pathname === '/api/v1/cameras/status' && init?.method === 'GET')).toBe(true);
   });
 });
 

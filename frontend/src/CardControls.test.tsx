@@ -91,7 +91,7 @@ describe('main controls on device cards', () => {
     expect(await screen.findByRole('switch',{name:'Движение'})).toBeEnabled();
     expect(screen.getAllByRole('switch')).toHaveLength(1);
     expect(screen.queryByRole('switch',{name:'Сирена'})).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch).mock.calls.every(([input, init]) => String(input).endsWith('/cameras/status') && init?.method === 'GET')).toBe(true);
   });
   it('sends power immediately without secondary editors or Apply, and retains its target against an old snapshot', async () => {
     const writes:unknown[]=[];

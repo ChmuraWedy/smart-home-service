@@ -5,7 +5,8 @@ import type { Provider } from '../api';
 import type Hls from 'hls.js';
 import type { ReactNode } from 'react';
 import { cameraPlaybackUrl, connectCameraWebRTC } from '../camera-stream';
-import { IconGlyph } from './ui/icon';
+import { Icon, IconGlyph } from './ui/icon';
+import DeviceActionControl from './DeviceActionControl';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
 type SafariVideo = HTMLVideoElement & {
@@ -169,9 +170,30 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       <div className="camera-live-heading">
         {!sheet && <h3>{t(MSG.CAMERA_VIDEO)}</h3>}
         <div className="camera-live-actions">{headingActions}
-          {source && !viewingBlocked && !overlay && pipMode && <button type="button" className="secondary compact" aria-pressed={pipActive} onClick={() => void togglePictureInPicture()}>{t(MSG.PICTURE_IN_PICTURE)}</button>}
-          {source || loading ? <button className="secondary compact" onClick={stop}>{t(MSG.STOP)}</button> :
-          <button className="compact" disabled={!!viewingBlocked} title={viewingBlocked} onClick={() => void start()}>{error ? t(MSG.RECONNECT) : t(MSG.WATCH_VIDEO)}</button>}
+          {source && !viewingBlocked && !overlay && pipMode && (
+          <DeviceActionControl
+            label={t(MSG.PICTURE_IN_PICTURE)}
+            icon={<Icon name="frame" className="parameter-icon" />}
+            toggle
+            checked={pipActive}
+            onClick={() => { void togglePictureInPicture(); }}
+          />
+          )}
+          {source || loading ? (
+            <DeviceActionControl
+              label={t(MSG.STOP)}
+              icon={<Icon name="stop" className="parameter-icon" />}
+              onClick={() => stop()}
+            />
+          ) : (
+            <DeviceActionControl
+              label={error ? t(MSG.RECONNECT) : t(MSG.WATCH_VIDEO)}
+              icon={<Icon name="frame" className="parameter-icon" />}
+              title={viewingBlocked}
+              disabled={!!viewingBlocked}
+              onClick={() => { void start(); }}
+            />
+          )}
         </div>
       </div>
       {!compact && (

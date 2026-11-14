@@ -1,4 +1,5 @@
 import type { CameraPlayback } from './camera-stream';
+import type { CameraStatus } from './camera-status-cache';
 import type { CameraControls, LocalCamera } from './camera-service-api';
 import type { DeviceAccess, DeviceInternet } from './device-access';
 import { MSG, t, translateText } from "./i18n";
@@ -116,6 +117,8 @@ export class CloudApi {
   }
 
   get isMember() { return this.account?.role === 'member'; }
+
+  localCameraStatus() { return this.request<{cameras:CameraStatus[]}>('/cameras/status'); }
 
   localCameras(signal?:AbortSignal) { return this.request<LocalCamera[]>('/cameras', 'GET', undefined, signal); }
 

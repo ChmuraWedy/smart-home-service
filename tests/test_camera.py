@@ -176,3 +176,46 @@ def test_native_camera_room_checks_existing_rooms_and_never_exposes_credentials(
     assert cloud_client.put(path, json={'room_id': room['id']}).status_code == 200
     assert calls[-1] == ('PUT', '/v1/cameras/native/room', {'room_id': room['id']})
     assert cloud_client.put(path, json={'room_id': room['id']}, headers={'X-API-Key': 'wrong'}).status_code == 401
+
+
+def test_native_playback_uses_fresh_lan_privacy_when_cloud_privacy_is_stale(cloud_client, monkeypatch):
+    bridge, _, _ = setup_camera(cloud_client, monkeypatch, native=True)
+    bridge.manager.device_map['gateway'].status['basic_private'] = True
+    calls = []
+    def request(method, path, body=None, **kwargs):
+        calls.append(path)
+        if path == '/v1/cameras':
+            return [{'id': 'native', 'device_id': 'gateway', 'connected': True, 'controls_available': True}]
+        if path.endswith('/controls'):
+            return {'transport': 'local', 'observed_at': 1, 'state': {'basic_private': False}}
+        return {'device_id': 'gateway', 'type': 'webrtc', 'url': PUBLIC + '/play/native/' + TICKET + '/ws'}
+    monkeypatch.setattr(cloud_client.app.state.camera_service, 'request', request)
+    response = cloud_client.post('/api/v1/cameras/native/playback')
+    assert response.status_code == 200
+    assert response.json()['device_id'] == 'local-camera:native'
+    assert calls == ['/v1/cameras', '/v1/cameras/native/controls', '/v1/playbacks/local']
+
+
+def test_batch_status_is_owner_only_and_never_initializes_cloud(cloud_client, monkeypatch):
+    service = cloud_client.app.state.camera_service
+    monkeypatch.setattr(service, 'request', lambda method, path, **kw: [])
+    response = cloud_client.get('/api/v1/cameras/status')
+    assert response.status_code == 200
+    assert response.json() == {'cameras': []}
+    assert response.headers['cache-control'] == 'no-store'
+    assert cloud_client.get('/api/v1/cameras/status', headers={'X-API-Key': 'wrong'}).status_code == 401
+    assert cloud_client.app.state.cloud.manager is None
+
+
+@pytest.mark.parametrize('privacy', [True, None])
+def test_native_playback_does_not_open_media_when_fresh_lan_privacy_is_on_or_unknown(cloud_client, monkeypatch, privacy):
+    service = cloud_client.app.state.camera_service
+    calls = []
+    def request(method, path, **kwargs):
+        calls.append(path)
+        if path == '/v1/cameras':
+            return [{'id': 'native', 'device_id': 'camera', 'connected': True, 'controls_available': True}]
+        return {'transport': 'local', 'observed_at': 1, 'state': {'basic_private': privacy}}
+    monkeypatch.setattr(service, 'request', request)
+    assert cloud_client.post('/api/v1/cameras/native/playback').status_code == 409
+    assert calls == ['/v1/cameras', '/v1/cameras/native/controls']
