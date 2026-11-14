@@ -20,6 +20,22 @@ const status = () => ({ cameras:[{...row,lan:{online:true,checked_at:Date.now()/
 const json = (value:unknown) => new Response(JSON.stringify(value));
 
 describe('shared authenticated LAN camera status', () => {
+  it('uses ordinary text buttons in embedded quick details, with no second open-frame action', async () => {
+    vi.mocked(fetch).mockResolvedValue(json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:controls(true)}}]}));
+    const device={id:'tracer',name:row.name,cloud:{sharing:{id:'tracer',name:row.name,category:'sp',online:false,has_local_key:false,
+      controls:{ready:true,definitions:{device_id:'tracer',functions:[]},snapshot:{device_id:'tracer',online:false,source:'cloud',status:{}}},
+    }}};
+    renderWithStore(<CardControls api={api()} device={device} route="sharing" now={Date.now()} paused={false}
+      embeddedQuick onAuthError={vi.fn()} onBusy={vi.fn()} />);
+    const privacy=await screen.findByRole('button',{name:t(MSG.PRIVACY)});
+    await waitFor(()=>expect(privacy).toBeEnabled());
+    expect(privacy).not.toHaveClass('dashboard-power-button');
+    expect(privacy).toHaveTextContent(t(MSG.ON));
+    expect(screen.getByRole('button',{name:t(MSG.MOTION_DETECTION)})).not.toHaveClass('dashboard-power-button');
+    expect(screen.queryByRole('button',{name:t(MSG.CAMERA_OPEN_FRAME)})).toBeNull();
+    expect(screen.getByRole('group',{name:t(MSG.CAMERA_ACTIONS)}).querySelector('[data-slot="power-button"]')).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.every(([,init])=>!init?.method||init.method==='GET')).toBe(true);
+  });
   it('uses fresh LAN state and commands when Smart Life reports offline, and opens a frame without a parent sheet', async () => {
     const writes:{path:string;body:unknown}[]=[];
     vi.mocked(fetch).mockImplementation(async (input, init) => {

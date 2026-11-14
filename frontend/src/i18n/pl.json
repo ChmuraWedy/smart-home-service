@@ -1335,5 +1335,6 @@
   "DEVICE_LOCAL_CONTROL_UNAVAILABLE": "Sterowanie lokalne niedostępne",
   "CAMERA_LOCAL_VIDEO_ONLY": "Wideo lokalne · sterowanie nieskonfigurowane",
   "CAMERA_LOCAL_VIDEO_ONLY_HELP": "Wideo korzysta z sieci domowej. Sterowanie lokalne kamery nie jest skonfigurowane; ustawienia korzystają z wybranego połączenia z chmurą, jeśli jest dostępne.",
-  "STALE_READING_HELP": "Ostatnio zgłoszona wartość. Bieżący stan fizyczny nie jest potwierdzony: urządzenie jest offline lub odczyt jest za stary."
+  "STALE_READING_HELP": "Ostatnio zgłoszona wartość. Bieżący stan fizyczny nie jest potwierdzony: urządzenie jest offline lub odczyt jest za stary.",
+  "DEVICE_LOCAL_ACTIVE": "Sterowanie lokalne aktywne"
 }

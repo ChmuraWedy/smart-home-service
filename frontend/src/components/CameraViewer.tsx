@@ -55,6 +55,7 @@ export default function CameraViewer({
       <CameraLive
         api={api}
         deviceId={camera?.connected ? `local-camera:${camera.id}` : deviceId}
+        playbackId={camera?.device_id ?? deviceId}
         provider={provider}
         onAuthError={onAuthError}
         compact={compact}

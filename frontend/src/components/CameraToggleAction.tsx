@@ -11,7 +11,7 @@ import { PowerButton } from './PowerButton';
 import { Icon } from './ui/icon';
 
 export default function CameraToggleAction({
-  pendingScope, spec, reading, now, disabled, onSend,
+  pendingScope, spec, reading, now, disabled, onSend, appearance = 'card',
 }: {
   pendingScope: string;
   spec: ControlSpec;
@@ -19,6 +19,7 @@ export default function CameraToggleAction({
   now: number;
   disabled: boolean;
   onSend: (value: JsonValue) => Promise<boolean>;
+  appearance?: 'card' | 'details';
 }) {
   const id = useId();
   const [error, setError] = useState('');
@@ -34,6 +35,7 @@ export default function CameraToggleAction({
   });
   let description = t(MSG.NO_DATA);
   if (state.powerKnown) description = t(state.shownPower ? MSG.ON : MSG.OFF);
+  const stateLabel = description;
   if (state.showStale) description += ` · ${t(MSG.STALE)}`;
   if (state.showPending) description += ` · ${t(MSG.WAITING_FOR_A_NEW_READING)}`;
   let icon = <ParameterIcon code={spec.key} />;
@@ -54,10 +56,11 @@ export default function CameraToggleAction({
         id={id}
         label={spec.label}
         title={`${spec.label}: ${description}`}
-        variant="dashboard-switch"
+        variant={appearance === 'details' ? 'button' : 'dashboard-switch'}
         checked={state.shownPower}
         known={state.powerKnown}
-        icon={icon}
+        icon={appearance === 'details' ? undefined : icon}
+        buttonText={`${spec.label}: ${stateLabel}`}
         disabled={disabled || !state.powerKnown}
         onChange={change}
       />

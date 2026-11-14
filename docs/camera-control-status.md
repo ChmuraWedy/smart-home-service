@@ -1,8 +1,10 @@
 # Camera actions and connection status
 
 Dashboard camera actions use the same full-height icon cells as other device power
-controls, in one uninterrupted row. Labels and On/Off readings are available through
-tooltips and accessible switch state, without extra captions or generic field grids. Motion detection and sound detection
+controls, in one uninterrupted row with equal-width cells filling the card. Labels and On/Off readings are available through
+tooltips and accessible switch state, without extra captions or generic field grids.
+Quick details use ordinary labeled buttons; there is no second Open in a frame
+action inside an already-open camera popup. Motion detection and sound detection
 are settings: On enables detection; they are not live motion/sound event indicators.
 Only advertised writable controls are rendered. Unknown readings remain unknown,
 and existing command confirmation/pending behavior is preserved.
@@ -24,20 +26,29 @@ network endpoint. A verified unblocked result is described as “No device block
 the gateway”; this is not a claim that every possible upstream firewall allows
 internet. Shared Zigbee gateways remain protected from individual-child blocking.
 
+## Manual playback intent
+
+The versioned browser preference `smart-home.ui.camera-playback-stopped.v1` remembers
+an explicit Stop per API server and physical camera. Closing details, hiding and
+remounting a preview, navigating rooms or reloading cannot override it. Watch video
+clears that camera's preference and starts playback explicitly. Native and cloud
+playback IDs share the physical camera identity supplied by CameraViewer. Automatic
+privacy/visibility cleanup is not recorded as a manual Stop. Failed storage writes
+retain the preference in memory for the current page, without claiming persistence
+across a browser reload when storage is unavailable.
+
+The local-control action is disabled and labeled Local control active when the
+selected control route is already local. Refresh controls remains the explicit
+LAN recheck action; the active-route button does not re-activate the device.
+
 ## Validation
 
-- Lint, TypeScript and the production frontend build passed.
-- 33 backend camera/access tests passed.
-- The complete UI suite passed 449/450 tests in one run; the owner-onboarding test
-  passed when rerun with its whole six-test file. An earlier combined-navigation
-  timing failure also passed in isolation. No application behavior was changed to
-  accommodate these timing failures.
-- The follow-up icon-cell correction passed 14 targeted camera tests, including
-  combined-device cases, unknown readings and pending-state confirmation. It removes
-  generic capability grids from the compact camera action row and shares the normal
-  power button sizing. Live visual retesting was unavailable because the browser
-  connector timed out twice; no screenshot of camera imagery was taken.
-- Browser and API checks confirmed local-video/cloud-control labels, the verified
-  unblocked MAC policy for the newly registered endpoint, and TRACER's existing
-  blocked policy. Both Smart Life connections and the existing access key were
-  preserved. No camera settings were changed during live verification.
+Lint, TypeScript, the production frontend build and 46 focused tests passed. Tests cover
+manual Stop across remounts, cloud/native identity changes, aborted allocations,
+storage write failure, privacy cleanup, active local routes, ordinary quick-detail
+buttons and the existing playback/control paths. All live validation preserves
+camera privacy, physical device settings, WAN policies and existing credentials.
+The 8082 browser check confirmed three full-width 64px-high action cells, the
+disabled Local control active action, and manual Stop surviving details navigation
+and a page reload. Both 8080 and 8082 remain healthy and connected to Smart Life;
+the existing API key hashes match the deployment baseline.

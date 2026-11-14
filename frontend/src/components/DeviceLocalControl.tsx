@@ -61,8 +61,13 @@ export default function DeviceLocalControl({
         <dd>{internetLabel}</dd>
       </dl>
       <div className="device-access-actions">
-        <button type="button" className="secondary" disabled={busy || !onUseLocal || !access?.local_available} onClick={() => onUseLocal && run(onUseLocal)}>
-          {t(MSG.DEVICE_USE_LOCAL)}
+        <button
+          type="button"
+          className="secondary"
+          disabled={busy || !onUseLocal || !access?.local_available || access.control === 'local'}
+          onClick={() => onUseLocal && run(onUseLocal)}
+        >
+          {t(access?.control === 'local' ? MSG.DEVICE_LOCAL_ACTIVE : MSG.DEVICE_USE_LOCAL)}
         </button>
         <button type="button" className="secondary" disabled={busy || !available} onClick={() => run(setInternet)}>
           {access?.internet?.blocked ? t(MSG.DEVICE_RESTORE_INTERNET) : t(MSG.DEVICE_BLOCK_INTERNET)}

@@ -39,3 +39,16 @@ it('does not offer an unknown camera reading as an editable off state', async ()
   await userEvent.setup().click(toggle);
   expect(send).not.toHaveBeenCalled();
 });
+
+it('uses an ordinary labeled button in quick details', async () => {
+  const send = vi.fn(async () => true);
+  renderWithStore(<CameraToggleAction pendingScope="details-camera" spec={spec} reading={{ value: false, known: true, stale: false }} now={Date.now()} disabled={false} onSend={send} appearance="details" />);
+  const control = screen.getByRole('button', { name: spec.label });
+  expect(control).not.toHaveClass('dashboard-power-button');
+  expect(control).toHaveTextContent(spec.label);
+  expect(control).toHaveTextContent(t(MSG.OFF));
+  expect(screen.queryByRole('switch')).toBeNull();
+  await userEvent.setup().click(control);
+  await waitFor(() => expect(send).toHaveBeenCalledWith(true));
+  expect(control).toHaveAttribute('aria-pressed', 'true');
+});

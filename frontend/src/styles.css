@@ -2169,12 +2169,17 @@ select:not([multiple]):not([size]) {
 .dashboard-card-footer:has(.camera-quick-actions) {
   padding-top:0;
   margin-inline:calc(-1 * var(--dashboard-card-inset));
+  border-end-start-radius:inherit;
+  border-end-end-radius:inherit;
+  overflow:clip;
 }
 .camera-quick-actions { display:flex; flex-wrap:nowrap; align-items:stretch; gap:0; padding:0; width:100%; min-width:0; }
 .camera-quick-actions > .dashboard-power-button {
-  flex:0 1 var(--dashboard-power-width,var(--dashboard-power-size,64px));
+  flex:1 1 0;
   min-width:44px;
 }
+.dashboard-device:not(.combined-device-card):has(.camera-quick-actions):not(:has(.control-feedback,.error)) { padding-bottom:0; }
+.camera-detail-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-block:8px; }
 .camera-quick-actions > .dashboard-power-button + .dashboard-power-button { border-inline-start:1px solid var(--border); }
 .camera-quick-actions .dashboard-power-button:focus-visible { outline-offset:-4px; }
 .camera-viewer-movement { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-block:12px; }

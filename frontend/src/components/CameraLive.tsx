@@ -1,11 +1,14 @@
 import { MSG, t } from "../i18n";
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, CloudApi } from '../api';
 import type { Provider } from '../api';
 import type Hls from 'hls.js';
 import type { ReactNode } from 'react';
 import { cameraPlaybackUrl, connectCameraWebRTC } from '../camera-stream';
 import { IconGlyph } from './ui/icon';
+import {
+  cameraPlaybackPreferenceKey, cameraPlaybackStopped, setCameraPlaybackStopped, useCameraPlaybackStopped,
+} from '../camera-playback-preferences';
 
 type VideoLevel = {index:number; width:number; height:number; bitrate:number};
 type SafariVideo = HTMLVideoElement & {
@@ -28,9 +31,15 @@ function resolutionLabel(width:number, height:number) {
   return (Math.min(width,height) >= 720 ? 'HD' : 'SD') + ' · ' + width + '×' + height;
 }
 
-export function CameraLive({ api, deviceId, provider, onAuthError, compact = false, sheet = false, autoStart = false, networkSignal, headingActions, overlay, viewingBlocked }: {
+export function CameraLive({
+  api, deviceId, provider, onAuthError, compact = false, sheet = false, autoStart = false,
+  networkSignal, headingActions, overlay, viewingBlocked, playbackId,
+}: {
   api: CloudApi; deviceId: string; provider: Provider; onAuthError: () => void; compact?: boolean; sheet?:boolean; autoStart?: boolean; networkSignal?: string; headingActions?:ReactNode; overlay?:ReactNode; viewingBlocked?:string;
+  playbackId?:string;
 }) {
+  const preferenceKey = cameraPlaybackPreferenceKey(api.baseUrl, playbackId ?? deviceId);
+  const manuallyStopped = useCameraPlaybackStopped(preferenceKey);
   const video = useRef<SafariVideo>(null), pending = useRef<AbortController | null>(null);
   const hls = useRef<Hls | null>(null);
   const [sourceType, setSourceType] = useState<'hls' | 'webrtc'>('hls');
@@ -44,16 +53,18 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
   const [pipMode, setPipMode] = useState<'standard' | 'safari' | null>(null);
   const [pipActive, setPipActive] = useState(false);
   const [pipError, setPipError] = useState(false);
-  function resetMetrics() { setLevels([]); setSelectedLevel(-1); setResolution(''); setSpeed(null); setPlayback(t(MSG.CONNECTION)); }
-  function stop() {
+  const resetMetrics = useCallback(() => {
+    setLevels([]); setSelectedLevel(-1); setResolution(''); setSpeed(null); setPlayback(t(MSG.CONNECTION));
+  }, []);
+  const stop = useCallback(() => {
     pending.current?.abort(); pending.current = null;
     setLoading(false); setSource(null); setError(false); setMessage(t(MSG.PLAYBACK_STOPPED)); resetMetrics();
-  }
+  }, [resetMetrics]);
   useEffect(() => {
     const hide = () => { if (document.hidden && (!video.current || !isFloating(video.current))) stop(); };
     document.addEventListener('visibilitychange', hide);
     return () => { pending.current?.abort(); pending.current = null; document.removeEventListener('visibilitychange', hide); };
-  }, []);
+  }, [stop]);
   useEffect(() => {
     const element = video.current;
     if (viewingBlocked || !source || !element) return;
@@ -128,7 +139,7 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       disconnectRTC?.();
       player?.destroy(); element.pause(); element.removeAttribute('src'); element.load();
     };
-  }, [source, sourceType, viewingBlocked]);
+  }, [source, sourceType, viewingBlocked, resetMetrics, stop]);
   async function togglePictureInPicture() {
     const element = video.current;
     if (!element || !pipMode || viewingBlocked) return;
@@ -143,8 +154,10 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       if (video.current === element) setPipError(true);
     }
   }
-  async function start() {
+  async function start(manual = false) {
     if (viewingBlocked || pending.current || source) return;
+    if (!manual && cameraPlaybackStopped(preferenceKey)) return;
+    if (manual) setCameraPlaybackStopped(preferenceKey, false);
     const controller = new AbortController(); pending.current = controller;
     setLoading(true); setError(false); setMessage(t(MSG.CONNECTING_VIDEO)); resetMetrics();
     try {
@@ -161,9 +174,16 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
       if (pending.current === controller) { pending.current = null; setLoading(false); }
     }
   }
-  useEffect(()=>{ if (viewingBlocked) stop(); },[viewingBlocked]);
-  // Dashboard previews mount after the user opens live view.
-  useEffect(() => { if (autoStart) void start(); }, [autoStart]);
+  useEffect(()=>{ if (viewingBlocked) stop(); },[viewingBlocked, stop]);
+  useEffect(() => { if (manuallyStopped) stop(); }, [manuallyStopped, stop]);
+  function stopByUser() {
+    setCameraPlaybackStopped(preferenceKey, true);
+    stop();
+  }
+  // Auto-start intent can change on remount; the user's durable Stop takes priority.
+  const startLatest = useRef(start);
+  startLatest.current = start;
+  useEffect(() => { if (autoStart) void startLatest.current(); }, [autoStart, preferenceKey]);
   return (
     <section className={"camera-live" + (compact ? " camera-live-compact" : "") + (sheet ? " camera-live-sheet" : "")} aria-label={t(MSG.CAMERA_VIDEO)}>
       <div className="camera-live-heading">
@@ -175,14 +195,14 @@ export function CameraLive({ api, deviceId, provider, onAuthError, compact = fal
             </button>
           )}
           {source || loading ? (
-            <button type="button" className="secondary compact" onClick={() => stop()}>{t(MSG.STOP)}</button>
+            <button type="button" className="secondary compact" onClick={stopByUser}>{t(MSG.STOP)}</button>
           ) : (
             <button
               type="button"
               className="secondary compact"
               disabled={!!viewingBlocked}
               title={viewingBlocked}
-              onClick={() => void start()}
+              onClick={() => void start(true)}
             >
               {error ? t(MSG.RECONNECT) : t(MSG.WATCH_VIDEO)}
             </button>

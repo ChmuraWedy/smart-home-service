@@ -51,7 +51,7 @@ export function PowerButton({
         ? buttonText(known ? checked : null)
         : buttonText || t(checked ? MSG.TURN_OFF : MSG.TURN_ON);
     }
-    const title = known ? t(checked ? MSG.TURN_OFF_PREFIX : MSG.TURN_ON_PREFIX) + label : undefined;
+    const title = controlTitle ?? (known ? t(checked ? MSG.TURN_OFF_PREFIX : MSG.TURN_ON_PREFIX) + label : undefined);
     if (icon) {
       return (
         <DeviceActionButton

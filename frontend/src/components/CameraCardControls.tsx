@@ -158,6 +158,7 @@ export function CameraCardControls({
       {embeddedQuick && !paused && renderPlayer()}
       <div className="card-primary-controls tw:grid tw:grid-cols-1">
         <CameraQuickActions
+          appearance={embeddedQuick ? 'details' : 'card'}
           disabled={paused}
           privacyDisabled={disabled}
           privacy={privacyStatus}
@@ -167,6 +168,7 @@ export function CameraCardControls({
         >
           {switches.map(spec => (
             <CameraToggleAction key={spec.key} pendingScope={pendingScope} spec={spec} reading={reading(spec)}
+              appearance={embeddedQuick ? 'details' : 'card'}
               now={now} disabled={disabled} onSend={value => toggle(spec, value)}
             />
           ))}

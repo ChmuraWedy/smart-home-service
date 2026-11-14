@@ -27,6 +27,24 @@ beforeEach(()=>{
 });
 
 describe('camera details with local controls',()=>{
+  it('preserves manual Stop when the same camera remounts through its native playback identity',async()=>{
+    const api=new CloudApi({baseUrl:'http://api.test',token:'key'});
+    let allocations=0;
+    vi.mocked(fetch).mockImplementation(async(input)=>{
+      const path=new URL(String(input)).pathname;
+      if(path.endsWith('/cameras/status'))return json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:state}}]});
+      if(path.endsWith('/playback')){allocations+=1;return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});}
+      return json([]);
+    });
+    const first=render(<CameraViewer api={api} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact extended={false} />);
+    await screen.findByLabelText(t(MSG.LIVE_CAMERA_VIDEO));
+    await userEvent.setup().click(within(screen.getByRole('region',{name:t(MSG.CAMERA_VIDEO)})).getByRole('button',{name:t(MSG.STOP)}));
+    first.unmount();
+    render(<CameraViewer api={api} localCamera={row} deviceId="local-camera:lan-camera" provider="sharing" onAuthError={vi.fn()} autoStart compact extended={false} />);
+    await waitFor(()=>expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toBeEnabled());
+    expect(allocations).toBe(1);
+    expect(screen.queryByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeNull();
+  });
   it.each([true, false])('moves without reconnecting or replacing video in extended mode %s',async(extended)=>{
     const calls:{path:string;method:string;body:unknown}[]=[];
     vi.mocked(fetch).mockImplementation(async(input,init)=>{

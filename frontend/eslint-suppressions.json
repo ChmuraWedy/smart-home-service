@@ -404,9 +404,6 @@
     "quotes": {
       "count": 9
     },
-    "react-hooks/exhaustive-deps": {
-      "count": 4
-    },
     "react/jsx-first-prop-new-line": {
       "count": 2
     },

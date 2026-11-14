@@ -9,6 +9,16 @@ const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{statu
 const status={host:'192.168.40.50',control:'remote',local_available:true,internet:{available:true,blocked:false,verified:true}};
 
 describe('shared local control section',()=>{
+  it('marks an already-local route active and does not re-activate it',async()=>{
+    vi.mocked(fetch).mockResolvedValue(json({...status,control:'local'}));
+    const activate=vi.fn(async()=>{});
+    render(<DeviceLocalControl api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="camera" route="native" onAuthError={vi.fn()} onUseLocal={activate} />);
+    const local=await screen.findByRole('button',{name:t(MSG.DEVICE_LOCAL_ACTIVE)});
+    expect(local).toBeDisabled();
+    await userEvent.setup().click(local);
+    expect(activate).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch).mock.calls.every(([,init])=>!init?.method||init.method==='GET')).toBe(true);
+  });
   it('switches through the supplied local device route and blocks/restores a non-camera device',async()=>{
     const writes:unknown[]=[];
     vi.mocked(fetch).mockImplementation(async(input,init)=>{
