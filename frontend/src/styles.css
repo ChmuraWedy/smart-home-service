@@ -1871,7 +1871,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-view:not([data-dashboard-panel="tools"]) .combined-device-card .dashboard-power-state-summary,
 .combined-device-card .camera-card-privacy { margin-inline:0; }
-.combined-device-card :is(.camera-card-switches, .card-sensor-values) { padding-inline:var(--dashboard-card-inset); }
+.combined-device-card .card-sensor-values { padding-inline:var(--dashboard-card-inset); }
 .combined-device-card .combined-member-header { @apply tw:border-b tw:border-(--border) tw:pb-1; }
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
 .combined-member-source { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
@@ -2166,20 +2166,17 @@ select:not([multiple]):not([size]) {
 .device-access-info dd { margin:0; overflow-wrap:anywhere; }
 .device-access-actions { display:flex; flex-wrap:wrap; gap:8px; }
 
-.camera-quick-actions { --dashboard-power-size:44px; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); align-items:start; gap:4px; padding-block:8px; width:100%; }
-.camera-quick-actions .dashboard-power-button .parameter-icon { width:24px; height:24px; }
-.camera-action { display:grid; justify-items:center; grid-template-rows:44px minmax(28px,auto) 16px; gap:4px; min-width:0; text-align:center; }
-.camera-action-label { display:block; font-size:11px; line-height:14px; overflow-wrap:anywhere; margin:0; }
-.camera-action-state { font-size:11px; line-height:16px; color:var(--muted); }
-.camera-card-switches { display:contents; }
-.camera-card-switches .channel-control, .camera-card-switches .capability { margin:0; padding:0; border:0; }
-.camera-card-switches .capability-boolean > .capability-row { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:44px minmax(28px,auto) 16px; justify-items:center; gap:4px; text-align:center; }
-.camera-card-switches .capability-heading, .camera-card-switches .power-actions { margin:0; padding:0; }
-.camera-card-switches .capability-heading { grid-row:2; grid-column:1; align-self:start; }
-.camera-card-switches .power-actions { grid-row:1; grid-column:1; }
-.camera-card-switches .dashboard-power-state { grid-row:3; grid-column:1; font-size:11px; line-height:16px; }
-.camera-card-switches .reading-meta:empty { display:none; }
-.camera-card-switches .capability-heading h3 { font-size:11px; line-height:14px; white-space:normal; overflow-wrap:anywhere; }
+.dashboard-card-footer:has(.camera-quick-actions) {
+  padding-top:0;
+  margin-inline:calc(-1 * var(--dashboard-card-inset));
+}
+.camera-quick-actions { display:flex; flex-wrap:nowrap; align-items:stretch; gap:0; padding:0; width:100%; min-width:0; }
+.camera-quick-actions > .dashboard-power-button {
+  flex:0 1 var(--dashboard-power-width,var(--dashboard-power-size,64px));
+  min-width:44px;
+}
+.camera-quick-actions > .dashboard-power-button + .dashboard-power-button { border-inline-start:1px solid var(--border); }
+.camera-quick-actions .dashboard-power-button:focus-visible { outline-offset:-4px; }
 .camera-viewer-movement { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-block:12px; }
 .camera-viewer-movement h3 { margin:0; font-size:14px; }
 .camera-viewer-movement .camera-ptz { grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,36px); gap:4px; margin:0; }

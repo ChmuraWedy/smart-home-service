@@ -15,31 +15,25 @@ export default function CameraQuickActions({
   if (typeof privacy === 'boolean') privacyState = t(privacy ? MSG.ON : MSG.OFF);
   return (
     <div className="camera-quick-actions" role="group" aria-label={t(MSG.CAMERA_ACTIONS)}>
-      <div className="camera-action">
-        <DeviceActionButton
-          label={t(MSG.CAMERA_OPEN_FRAME)}
-          title={t(MSG.CAMERA_OPEN_FRAME)}
-          icon={<Icon name="frame" className="parameter-icon" />}
-          disabled={disabled || frameDisabled}
-          onClick={(event) => onOpen(event.currentTarget)}
-        />
-        <span className="camera-action-label">{t(MSG.CAMERA_OPEN_FRAME)}</span>
-      </div>
+      <DeviceActionButton
+        label={t(MSG.CAMERA_OPEN_FRAME)}
+        title={t(MSG.CAMERA_OPEN_FRAME)}
+        icon={<Icon name="frame" className="parameter-icon" />}
+        disabled={disabled || frameDisabled}
+        onClick={(event) => onOpen(event.currentTarget)}
+      />
       {showPrivacy && (
-        <div className="camera-action" title={`${t(MSG.PRIVACY)}: ${privacyState}`}>
-          <PowerButton
-            id={privacyId}
-            label={t(MSG.PRIVACY)}
-            variant="dashboard-switch"
-            checked={privacy === true}
-            known={typeof privacy === 'boolean'}
-            icon={<Icon name="shield" className="parameter-icon" />}
-            disabled={disabled || privacyDisabled || !onPrivacy || typeof privacy !== 'boolean'}
-            onChange={() => onPrivacy?.()}
-          />
-          <label className="camera-action-label" htmlFor={privacyId}>{t(MSG.PRIVACY)}</label>
-          <span className="camera-action-state">{privacyState}</span>
-        </div>
+        <PowerButton
+          id={privacyId}
+          label={t(MSG.PRIVACY)}
+          title={`${t(MSG.PRIVACY)}: ${privacyState}`}
+          variant="dashboard-switch"
+          checked={privacy === true}
+          known={typeof privacy === 'boolean'}
+          icon={<Icon name="shield" className="parameter-icon" />}
+          disabled={disabled || privacyDisabled || !onPrivacy || typeof privacy !== 'boolean'}
+          onChange={() => onPrivacy?.()}
+        />
       )}
       {children}
     </div>

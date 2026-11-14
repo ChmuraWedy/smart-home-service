@@ -27,7 +27,7 @@ export function DeviceActionButton({
 export type PowerButtonVariant = 'switch' | 'dashboard-switch' | 'button';
 
 export function PowerButton({
-  id, label, checked, disabled, variant, icon, known, buttonText, onChange,
+  id, label, checked, disabled, variant, icon, known, buttonText, onChange, title: controlTitle,
 }: {
   id: string;
   label: string;
@@ -36,6 +36,7 @@ export function PowerButton({
   variant: PowerButtonVariant;
   icon?: ReactNode;
   known: boolean;
+  title?: string;
   buttonText?: string | ((value: boolean | null) => string);
   onChange: (checked: boolean) => void;
 }) {
@@ -87,6 +88,7 @@ export function PowerButton({
       <Switch
         id={id}
         aria-label={label}
+        title={controlTitle}
         powerIcon={icon}
         checked={checked}
         disabled={disabled}

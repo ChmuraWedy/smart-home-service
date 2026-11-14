@@ -1,7 +1,8 @@
 # Camera actions and connection status
 
-Dashboard camera actions use the shared square icon switch component, with visible
-labels and On/Off readings in a single row. Motion detection and sound detection
+Dashboard camera actions use the same full-height icon cells as other device power
+controls, in one uninterrupted row. Labels and On/Off readings are available through
+tooltips and accessible switch state, without extra captions or generic field grids. Motion detection and sound detection
 are settings: On enables detection; they are not live motion/sound event indicators.
 Only advertised writable controls are rendered. Unknown readings remain unknown,
 and existing command confirmation/pending behavior is preserved.
@@ -31,8 +32,11 @@ internet. Shared Zigbee gateways remain protected from individual-child blocking
   passed when rerun with its whole six-test file. An earlier combined-navigation
   timing failure also passed in isolation. No application behavior was changed to
   accommodate these timing failures.
-- On 8082, browser DOM geometry confirmed three 44px camera action buttons at the
-  same vertical position, with Motion detection and its On/Off state visible.
+- The follow-up icon-cell correction passed 14 targeted camera tests, including
+  combined-device cases, unknown readings and pending-state confirmation. It removes
+  generic capability grids from the compact camera action row and shares the normal
+  power button sizing. Live visual retesting was unavailable because the browser
+  connector timed out twice; no screenshot of camera imagery was taken.
 - Browser and API checks confirmed local-video/cloud-control labels, the verified
   unblocked MAC policy for the newly registered endpoint, and TRACER's existing
   blocked policy. Both Smart Life connections and the existing access key were

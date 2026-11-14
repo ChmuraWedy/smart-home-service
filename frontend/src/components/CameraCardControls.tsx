@@ -11,13 +11,12 @@ import type { ControlSpec } from '../controls';
 import type { HomeApi, Reading } from '../home-api';
 import CameraViewer from './CameraViewer';
 import CameraQuickActions from './CameraQuickActions';
-import { ChannelControl } from './ChannelControl';
+import CameraToggleAction from './CameraToggleAction';
 import { DashboardSheet } from './DashboardSheet';
 import type { DashboardSheetState } from './DashboardSheet';
-import { CapabilityField, ControlFeedback } from './DeviceControls';
+import { ControlFeedback } from './DeviceControls';
 import type { ControlNotice } from './DeviceControls';
-import { Icon, IconGlyph } from './ui/icon';
-import { ParameterIcon } from './DevicePresentation';
+import { IconGlyph } from './ui/icon';
 
 export function CameraCardControls({
   api, deviceId, name, pendingScope, provider, online, onAuthError, paused, sheet, embeddedQuick, previewOnly,
@@ -149,17 +148,6 @@ export function CameraCardControls({
   }
   if (!busy && readOK && !controls.length && !notice.error && !sheet?.open && !embeddedQuick) return null;
 
-  const field = (spec: ControlSpec) => {
-    let icon = <ParameterIcon code={spec.key} />;
-    if (spec.key === 'decibel_switch') icon = <Icon name="speaker" className="parameter-icon" />;
-    if (spec.key === 'siren_switch') icon = <Icon name="siren" className="parameter-icon" />;
-    return (
-      <CapabilityField pendingScope={pendingScope} spec={spec} reading={reading(spec)} now={now} local={false}
-        powerIcon={icon} immediatePower dashboardSwitch disabled={disabled} onSend={value => toggle(spec, value)}
-      />
-    );
-  };
-
   const changePrivacy = privacy ? async () => {
     const value = privacyStatus !== true;
     const accepted = begin(value);
@@ -177,11 +165,11 @@ export function CameraCardControls({
           onOpen={(button) => openFrame(button)}
           onPrivacy={changePrivacy}
         >
-          {!!switches.length && (
-            <div className="camera-card-switches">
-              {switches.map(spec => <ChannelControl key={spec.key} spec={spec} renderField={field} />)}
-            </div>
-          )}
+          {switches.map(spec => (
+            <CameraToggleAction key={spec.key} pendingScope={pendingScope} spec={spec} reading={reading(spec)}
+              now={now} disabled={disabled} onSend={value => toggle(spec, value)}
+            />
+          ))}
         </CameraQuickActions>
         {renderPreview(privacyStatus, changePrivacy)}
         <button
