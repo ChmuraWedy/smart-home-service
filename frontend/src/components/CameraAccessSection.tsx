@@ -5,9 +5,9 @@ import DeviceLocalControl from './DeviceLocalControl';
 import LocalCameraControls from './LocalCameraControls';
 
 export default function CameraAccessSection({
-  api, camera, onAuthError, onStateChange,
+  api, camera, onAuthError, onStateChange, currentState,
 }:{
-  api:CloudApi;camera:LocalCamera;onAuthError:()=>void;onStateChange:(value:CameraControls)=>void;
+  api:CloudApi;camera:LocalCamera;onAuthError:()=>void;onStateChange:(value:CameraControls)=>void;currentState?:CameraControls;
 }) {
   const [revision, setRevision] = useState(0);
   const activate = useCallback(async () => {
@@ -30,6 +30,8 @@ export default function CameraAccessSection({
           cameraId={camera.id}
           onAuthError={onAuthError}
           initialOpen
+          managed
+          currentState={currentState}
           onStateChange={onStateChange}
         />
       )}

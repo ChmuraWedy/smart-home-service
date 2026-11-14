@@ -53,6 +53,7 @@ export default function CameraViewer({
           camera={camera}
           onAuthError={onAuthError}
           onStateChange={updateState}
+          currentState={local.camera?.lan.controls}
         />
       )}
     </div>

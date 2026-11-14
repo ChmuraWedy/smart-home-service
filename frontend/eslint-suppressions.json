@@ -626,7 +626,7 @@
       "count": 1
     },
     "space-infix-ops": {
-      "count": 10
+      "count": 9
     }
   },
   "src/components/ConnectionSettings.tsx": {

@@ -8,13 +8,15 @@ import { CAMERA_LABELS, CAMERA_OPTIONS } from '../camera-controls';
 import { MSG, t } from '../i18n';
 
 export default function LocalCameraControls({
-  api, cameraId, onAuthError, initialOpen = false, onStateChange,
+  api, cameraId, onAuthError, initialOpen = false, onStateChange, currentState, managed = false,
 }:{
   api:CloudApi;cameraId:string;onAuthError:()=>void;initialOpen?:boolean;onStateChange?:(state:CameraControls)=>void;
+  currentState?:CameraControls;managed?:boolean;
 }) {
   const instance = useId();
   const [expanded, setExpanded] = useState(initialOpen);
-  const [data, setData] = useState<CameraControls|null>(null);
+  const [observed, setData] = useState<CameraControls|null>(null);
+  const data = currentState && currentState.observed_at >= (observed?.observed_at ?? 0) ? currentState : observed;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const run = useCallback(async (action:()=>Promise<CameraControls>) => {
@@ -31,8 +33,8 @@ export default function LocalCameraControls({
     } finally { setBusy(false); }
   }, [onAuthError, onStateChange]);
   useEffect(() => {
-    if (expanded) run(() => api.localCameraControls(cameraId));
-  }, [expanded, api, cameraId, run]);
+    if (expanded && !managed) run(() => api.localCameraControls(cameraId));
+  }, [expanded, api, cameraId, run, managed]);
   const labels:Record<string, string> = {
     ...CAMERA_LABELS,
     motion_tracking: t(MSG.CAMERA_MOTION_TRACKING),

@@ -2,10 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, vi, expect } from 'vitest';
 import { CameraServiceApi } from './camera-service-api';
+import type { CameraControls } from './camera-service-api';
 import LocalCameraControls from './components/LocalCameraControls';
 import { MSG, t } from './i18n';
 
-const state = { transport:'local', observed_at:1700000000, confirmed:null, state:{basic_private:false, basic_nightvision:'0'}, functions:{
+const state:CameraControls = { transport:'local', observed_at:1700000000, confirmed:null, state:{basic_private:false, basic_nightvision:'0'}, functions:{
   basic_private:{dp_id:105,type:'Boolean',values:{}}, basic_nightvision:{dp_id:108,type:'Enum',values:{range:['0','1','2']}},
   ptz_control:{dp_id:119,type:'Enum',values:{range:['0','2','4','6']}}, ptz_stop:{dp_id:116,type:'Boolean',values:{}},
 } };
@@ -26,4 +27,16 @@ describe('local camera controls', () => {
     await waitFor(() => expect(calls[2]).toEqual({path:'/api/v1/cameras/camera-id/controls/move',body:{direction:'up'}}));
     expect(calls.every(call=>!call.path.includes('/cloud/'))).toBe(true);
   });
+});
+
+it('updates extended controls from the shared LAN poll without sending its own status requests', () => {
+  const api=new CameraServiceApi({baseUrl:'http://api.test',token:'test'}), onAuthError=vi.fn();
+  const view=render(<LocalCameraControls api={api} cameraId="camera-id" onAuthError={onAuthError} initialOpen managed currentState={state} />);
+  expect(screen.getByLabelText(t(MSG.PRIVACY_MODE))).not.toBeChecked();
+  expect(fetch).not.toHaveBeenCalled();
+  view.rerender(<LocalCameraControls api={api} cameraId="camera-id" onAuthError={onAuthError} initialOpen managed
+    currentState={{...state,observed_at:state.observed_at+5,state:{...state.state,basic_private:true}}} />);
+  expect(screen.getByLabelText(t(MSG.PRIVACY_MODE))).toBeChecked();
+  expect(screen.getByRole('button',{name:t(MSG.CAMERA_MOVE_UP)})).toBeDisabled();
+  expect(fetch).not.toHaveBeenCalled();
 });

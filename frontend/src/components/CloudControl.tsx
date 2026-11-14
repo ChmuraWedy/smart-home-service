@@ -122,7 +122,7 @@ export function CloudControl({
   const field = (spec: ControlSpec, headingActions?: ReactNode) => {
     const info = camera && spec.help;
     const helpIcon = info ? <FieldInfo label={spec.label} text={info} /> : undefined;
-    const disabled = editingBusy || session.busy || !session.readOK
+    const disabled = editingBusy || session.busy || !session.readOK || (localCameraBound && !data?.snapshot.online)
       || (camera && isStorageSetting(spec.key) && !(spec.key==='sd_format' ? storage.canFormat : storage.ready));
     if (camera && spec.key==='record_switch' && !storage.ready) return (
       <section className="capability camera-record-unavailable" key={spec.key} aria-label={spec.label}>
@@ -157,6 +157,12 @@ export function CloudControl({
   const primaryActivity = specs.some(spec => spec.indicator === 'motion');
   const signal = specs.find(spec => ['wifi_signal','signal_strength','rssi'].includes(spec.key) && spec.readable && spec.kind === 'number');
   const networkSignal = signal && data ? displayReading(signal,cloudReading(signal,data.snapshot.status[signal.key])) : undefined;
+  const cameraSettings = camera && (
+    <CameraSettings
+      specs={specs.filter(spec => !isBattery(spec.key) && spec !== privacy && !(localCameraBound && localCamera.camera?.lan.controls?.functions[spec.key]))}
+      renderField={field}
+    />
+  );
   const connectionOnline = localCameraBound ? cameraOnline : data?.snapshot.online;
   let connectionStatus = t(MSG.CHECKING_CONNECTION);
   if (connectionOnline !== undefined) connectionStatus = t(connectionOnline ? MSG.ONLINE : MSG.OFFLINE);
@@ -209,7 +215,13 @@ export function CloudControl({
       </details>
       {data && !data.snapshot.online && !localCameraBound && <p className="saved-summary">{t(MSG.TUYA_REPORTS_THIS_DEVICE_OFFLINE)}</p>}
       {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={device.id} provider={provider} specs={specs} primary onAuthError={onAuthError} />}
-      {camera && <CameraSettings specs={specs.filter(spec => !isBattery(spec.key) && spec!==privacy)} renderField={field} />}
+      {cameraSettings && (localCameraBound ? (
+        <details className="additional-settings">
+          <summary>{t(MSG.DEVICE_REMOTE_CONTROL)}</summary>
+          {data && !data.snapshot.online && <p className="help">{t(MSG.CLOUD_OFFLINE_LAST_REPORTED)}</p>}
+          {cameraSettings}
+        </details>
+      ) : cameraSettings)}
       {basic.length > 0 && <div className={"capability-grid" + (basic.every(spec => !spec.writable) ? " sensor-grid" : "")}>{basic.map(basicField)}</div>}
       <SwitchTimers
         countdowns={countdowns}
