@@ -36,12 +36,19 @@ export default function DeviceLocalControl({
   const available = access?.internet?.available && access.internet.verified;
   let internetLabel = t(MSG.DEVICE_INTERNET_UNKNOWN);
   if (available) internetLabel = access.internet.blocked ? t(MSG.DEVICE_INTERNET_BLOCKED) : t(MSG.DEVICE_INTERNET_ALLOWED);
+  else if (access?.internet?.reason === 'not_registered') internetLabel = t(MSG.DEVICE_POLICY_NOT_REGISTERED);
+  else if (access?.internet?.reason === 'service_unavailable') internetLabel = t(MSG.DEVICE_POLICY_UNAVAILABLE);
+  else if (access?.internet?.reason === 'no_endpoint') internetLabel = t(MSG.DEVICE_POLICY_NO_ENDPOINT);
+  let controlLabel = t(MSG.CHECKING_CONNECTION);
+  if (access?.control === 'local') controlLabel = t(MSG.LOCAL_CONTROL);
+  else if (access?.control === 'remote') controlLabel = t(MSG.DEVICE_REMOTE_CONTROL);
+  else if (access) controlLabel = t(MSG.DEVICE_LOCAL_CONTROL_UNAVAILABLE);
   return (
     <section className="device-local-control" aria-label={t(MSG.LOCAL_CONTROL)}>
       <h3>{t(MSG.LOCAL_CONTROL)}</h3>
       <dl className="device-access-info">
         <dt>{t(MSG.CONTROL)}</dt>
-        <dd>{t(route === 'native' || route === 'local' ? MSG.LOCAL_CONTROL : MSG.DEVICE_REMOTE_CONTROL)}</dd>
+        <dd>{controlLabel}</dd>
         <dt>{t(MSG.CONFIGURED_IP)}</dt>
         <dd>{access?.host || t(MSG.NOT_SET)}</dd>
         {access?.mac && (
@@ -62,7 +69,7 @@ export default function DeviceLocalControl({
         </button>
       </div>
       <p className="help">{t(MSG.DEVICE_INTERNET_HELP)}</p>
-      {!available && <p className="help">{t(MSG.DEVICE_INTERNET_UNAVAILABLE_HELP)}</p>}
+      {!available && <p className="help">{t(MSG.DEVICE_POLICY_UNVERIFIED_HELP)} {t(MSG.DEVICE_INTERNET_UNAVAILABLE_HELP)}</p>}
       {access && !access.local_available && <p className="help">{t(MSG.DEVICE_LOCAL_SETUP_REQUIRED)}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {children}

@@ -50,4 +50,13 @@ describe('shared local control section',()=>{
     expect(screen.getByRole('button',{name:t(MSG.DEVICE_USE_LOCAL)})).toBeDisabled();
     expect(screen.getByRole('button',{name:t(MSG.DEVICE_BLOCK_INTERNET)})).toBeDisabled();
   });
+
+  it('shows missing registration without claiming the device is blocked or locally controllable',async()=>{
+    vi.mocked(fetch).mockResolvedValue(json({...status,control:'unavailable',local_available:false,internet:{available:false,blocked:null,verified:false,reason:'not_registered'}}));
+    render(<DeviceLocalControl api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="camera" route="native" onAuthError={vi.fn()} />);
+    expect(await screen.findByText(t(MSG.DEVICE_POLICY_NOT_REGISTERED))).toBeVisible();
+    expect(screen.getByText(t(MSG.DEVICE_LOCAL_CONTROL_UNAVAILABLE))).toBeVisible();
+    expect(screen.getByText(new RegExp(t(MSG.DEVICE_POLICY_UNVERIFIED_HELP).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')))).toBeVisible();
+    expect(screen.queryByText(t(MSG.DEVICE_INTERNET_BLOCKED))).toBeNull();
+  });
 });

@@ -1675,6 +1675,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-light-value { @apply tw:text-sm tw:font-semibold tw:text-(--text-strong); }
 .dashboard-light-presets { @apply tw:m-0 tw:min-h-0 tw:w-full tw:cursor-default tw:px-2 tw:py-1 tw:text-xs; }
 .dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
+.dashboard-power-state-summary > .stale-tag { align-self:center; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
   @apply tw:row-start-1 tw:row-end-3 tw:self-stretch;
   grid-column:var(--power-column,1);
@@ -2165,13 +2166,20 @@ select:not([multiple]):not([size]) {
 .device-access-info dd { margin:0; overflow-wrap:anywhere; }
 .device-access-actions { display:flex; flex-wrap:wrap; gap:8px; }
 
-.camera-quick-actions { --dashboard-power-size:44px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding-block:8px; }
+.camera-quick-actions { --dashboard-power-size:44px; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); align-items:start; gap:4px; padding-block:8px; width:100%; }
 .camera-quick-actions .dashboard-power-button .parameter-icon { width:24px; height:24px; }
-.camera-card-switches { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-inline-start:auto; }
+.camera-action { display:grid; justify-items:center; grid-template-rows:44px minmax(28px,auto) 16px; gap:4px; min-width:0; text-align:center; }
+.camera-action-label { display:block; font-size:11px; line-height:14px; overflow-wrap:anywhere; margin:0; }
+.camera-action-state { font-size:11px; line-height:16px; color:var(--muted); }
+.camera-card-switches { display:contents; }
 .camera-card-switches .channel-control, .camera-card-switches .capability { margin:0; padding:0; border:0; }
-.camera-card-switches .capability-boolean > .capability-row { display:flex; align-items:center; gap:8px; min-height:44px; }
+.camera-card-switches .capability-boolean > .capability-row { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:44px minmax(28px,auto) 16px; justify-items:center; gap:4px; text-align:center; }
 .camera-card-switches .capability-heading, .camera-card-switches .power-actions { margin:0; padding:0; }
-.camera-card-switches .capability-heading h3 { font-size:12px; white-space:normal; }
+.camera-card-switches .capability-heading { grid-row:2; grid-column:1; align-self:start; }
+.camera-card-switches .power-actions { grid-row:1; grid-column:1; }
+.camera-card-switches .dashboard-power-state { grid-row:3; grid-column:1; font-size:11px; line-height:16px; }
+.camera-card-switches .reading-meta:empty { display:none; }
+.camera-card-switches .capability-heading h3 { font-size:11px; line-height:14px; white-space:normal; overflow-wrap:anywhere; }
 .camera-viewer-movement { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-block:12px; }
 .camera-viewer-movement h3 { margin:0; font-size:14px; }
 .camera-viewer-movement .camera-ptz { grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,36px); gap:4px; margin:0; }

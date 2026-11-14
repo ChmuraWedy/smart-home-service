@@ -85,6 +85,7 @@ export default function CameraViewer({
           onAuthError={onAuthError}
           onStateChange={updateState}
           currentState={local.camera?.lan.controls}
+          remoteControl={deviceId === camera.device_id ? { deviceId, provider } : undefined}
         />
       )}
     </div>

@@ -1317,8 +1317,8 @@
   "DEVICE_REMOTE_CONTROL": "Remote / cloud",
   "DEVICE_INTERNET_ACCESS": "Internet access",
   "DEVICE_INTERNET_BLOCKED": "Blocked at the gateway",
-  "DEVICE_INTERNET_ALLOWED": "Allowed at the gateway",
-  "DEVICE_INTERNET_UNKNOWN": "Not configured / unavailable",
+  "DEVICE_INTERNET_ALLOWED": "No device block at the gateway",
+  "DEVICE_INTERNET_UNKNOWN": "Not verified",
   "DEVICE_USE_LOCAL": "Use local control",
   "DEVICE_BLOCK_INTERNET": "Stop remote access",
   "DEVICE_RESTORE_INTERNET": "Restore remote access",
@@ -1327,5 +1327,13 @@
   "DEVICE_LOCAL_UNREACHABLE": "The device did not respond locally. Check its local connection before switching control.",
   "DEVICE_INTERNET_UNAVAILABLE_HELP": "Internet blocking needs a registered Wi-Fi MAC on this gateway. A Zigbee child shares its gateway’s internet connection.",
   "LIGHT_MODE_UNREPORTED": "Current light mode was not reported. Choose White to edit brightness and color temperature. Missing values are shown as No data.",
-  "CLOUD_OFFLINE_LAST_REPORTED": "Device offline. These are last reported values; the current physical state is unconfirmed."
+  "CLOUD_OFFLINE_LAST_REPORTED": "Device offline. These are last reported values; the current physical state is unconfirmed.",
+  "DEVICE_POLICY_NOT_REGISTERED": "Device not registered for internet controls",
+  "DEVICE_POLICY_UNAVAILABLE": "Gateway policy unavailable",
+  "DEVICE_POLICY_NO_ENDPOINT": "No separate network endpoint",
+  "DEVICE_POLICY_UNVERIFIED_HELP": "An unverified policy does not mean internet is blocked. The gateway has not confirmed this device’s internet policy.",
+  "DEVICE_LOCAL_CONTROL_UNAVAILABLE": "Local controls unavailable",
+  "CAMERA_LOCAL_VIDEO_ONLY": "Local video · controls not configured",
+  "CAMERA_LOCAL_VIDEO_ONLY_HELP": "Video uses your home network. This camera has no configured local controls; settings use the selected cloud connection when available.",
+  "STALE_READING_HELP": "Last reported value. The current physical state is unconfirmed because the device is offline or the reading is too old."
 }

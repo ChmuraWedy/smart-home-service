@@ -108,7 +108,7 @@ describe('cloud readings in the dashboard and details', () => {
         route="sharing" now={Date.now()} paused={false} onAuthError={vi.fn()} onBusy={vi.fn()}
         sheet={{ open, close: vi.fn(), trigger: { current: null } }} />;
     const view = renderWithStore(card(camera(false, '2026-11-06T10:00:00Z'), false));
-    expect(await screen.findByRole('button', { name: 'Приватность' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await screen.findByRole('switch', { name: 'Приватность' })).toHaveAttribute('aria-checked', 'false');
     view.rerender(<></>);
     view.rerender(card(camera(true, '2026-11-06T10:00:01Z'), true));
     await screen.findByText(/Режим приватности включён/);

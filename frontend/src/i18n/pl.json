@@ -1317,8 +1317,8 @@
   "DEVICE_REMOTE_CONTROL": "Zdalne / chmura",
   "DEVICE_INTERNET_ACCESS": "Dostęp do internetu",
   "DEVICE_INTERNET_BLOCKED": "Zablokowany na bramie",
-  "DEVICE_INTERNET_ALLOWED": "Dozwolony na bramie",
-  "DEVICE_INTERNET_UNKNOWN": "Nieskonfigurowany / niedostępny",
+  "DEVICE_INTERNET_ALLOWED": "Brak indywidualnej blokady na bramie",
+  "DEVICE_INTERNET_UNKNOWN": "Niezweryfikowane",
   "DEVICE_USE_LOCAL": "Użyj sterowania lokalnego",
   "DEVICE_BLOCK_INTERNET": "Wyłącz dostęp zdalny",
   "DEVICE_RESTORE_INTERNET": "Przywróć dostęp zdalny",
@@ -1327,5 +1327,13 @@
   "DEVICE_LOCAL_UNREACHABLE": "Urządzenie nie odpowiada w sieci lokalnej. Sprawdź połączenie przed zmianą sterowania.",
   "DEVICE_INTERNET_UNAVAILABLE_HELP": "Blokowanie internetu wymaga zarejestrowanego adresu MAC Wi-Fi na tej bramie. Urządzenie Zigbee współdzieli połączenie internetowe bramy.",
   "LIGHT_MODE_UNREPORTED": "Nie otrzymano bieżącego trybu światła. Wybierz Białe światło, aby zmienić jasność i temperaturę barwową. Brakujące odczyty są oznaczone jako Brak danych.",
-  "CLOUD_OFFLINE_LAST_REPORTED": "Urządzenie jest offline. To ostatnie zgłoszone wartości; bieżący stan fizyczny nie jest potwierdzony."
+  "CLOUD_OFFLINE_LAST_REPORTED": "Urządzenie jest offline. To ostatnie zgłoszone wartości; bieżący stan fizyczny nie jest potwierdzony.",
+  "DEVICE_POLICY_NOT_REGISTERED": "Urządzenie niezarejestrowane do zarządzania internetem",
+  "DEVICE_POLICY_UNAVAILABLE": "Polityka bramy niedostępna",
+  "DEVICE_POLICY_NO_ENDPOINT": "Brak osobnego adresu sieciowego",
+  "DEVICE_POLICY_UNVERIFIED_HELP": "Niezweryfikowana polityka nie oznacza blokady internetu. Brama nie potwierdziła polityki dostępu tego urządzenia.",
+  "DEVICE_LOCAL_CONTROL_UNAVAILABLE": "Sterowanie lokalne niedostępne",
+  "CAMERA_LOCAL_VIDEO_ONLY": "Wideo lokalne · sterowanie nieskonfigurowane",
+  "CAMERA_LOCAL_VIDEO_ONLY_HELP": "Wideo korzysta z sieci domowej. Sterowanie lokalne kamery nie jest skonfigurowane; ustawienia korzystają z wybranego połączenia z chmurą, jeśli jest dostępne.",
+  "STALE_READING_HELP": "Ostatnio zgłoszona wartość. Bieżący stan fizyczny nie jest potwierdzony: urządzenie jest offline lub odczyt jest za stary."
 }

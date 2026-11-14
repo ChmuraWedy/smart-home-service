@@ -9,13 +9,16 @@ export function connectionLabel({ route, throughGateway, localTransport }: Conne
   return route === 'local' ? local : throughGateway === true ? t(MSG.VIA_GATEWAY) : throughGateway === false ? t(MSG.DIRECT_CONNECTION) : local;
 }
 
-export function DeviceConnectionSummary(props: ConnectionDetails & { status: string; online?: boolean }) {
+export function DeviceConnectionSummary(props: ConnectionDetails & { status: string; online?: boolean;controlLabel?:string }) {
+  const {
+    room, route, controlLabel, status, online,
+  } = props;
   return (
     <section className="device-connection-summary" aria-label={t(MSG.DEVICE_CONNECTION)}>
       <dl>
         <div>
           <dt>{t(MSG.ROOM)}</dt>
-          <dd>{props.room || t(MSG.NO_ROOM)}</dd>
+          <dd>{room || t(MSG.NO_ROOM)}</dd>
         </div>
         <div>
           <dt>{t(MSG.CONNECTION)}</dt>
@@ -23,11 +26,11 @@ export function DeviceConnectionSummary(props: ConnectionDetails & { status: str
         </div>
         <div>
           <dt>{t(MSG.CONTROL)}</dt>
-          <dd>{routeLabel[props.route]}</dd>
+          <dd>{controlLabel ?? routeLabel[route]}</dd>
         </div>
         <div>
           <dt>{t(MSG.CONNECTION_STATUS)}</dt>
-          <dd className={'presence' + (props.online ? ' online' : '')}>{props.status}</dd>
+          <dd className={'presence' + (online ? ' online' : '')}>{status}</dd>
         </div>
       </dl>
     </section>
@@ -35,7 +38,9 @@ export function DeviceConnectionSummary(props: ConnectionDetails & { status: str
 }
 
 export function DeviceConnectionDescription(props: ConnectionDetails) {
-  const { route, room, throughGateway, localTransport } = props;
+  const {
+    route, room, throughGateway, localTransport,
+  } = props;
   const gateway = route === 'local' || throughGateway === undefined ? localTransport === 'zigbee' : throughGateway;
   const known = route === 'local' ? !!localTransport : throughGateway !== undefined || !!localTransport;
   return (

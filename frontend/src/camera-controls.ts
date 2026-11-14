@@ -52,7 +52,7 @@ export const CAMERA_HELP: Record<string, string> = localizeMessages({
 });
 
 export const CAMERA_QUICK_LABELS: Record<string, string> = localizeMessages({
-  basic_private:MSG.PRIVACY, motion_switch:MSG.MOTION, decibel_switch:MSG.SOUND, siren_switch:MSG.SIREN,
+  basic_private:MSG.PRIVACY, motion_switch:MSG.MOTION_DETECTION, decibel_switch:MSG.SOUND_DETECTION, siren_switch:MSG.SIREN,
 });
 
 const GROUPS = localizeMessages([

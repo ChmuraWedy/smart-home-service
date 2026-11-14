@@ -1055,6 +1055,7 @@ export function ControlCenter({
               localTransport="wifi"
               room={inventory?.rooms.find((item) => item.id === nativeRoom)?.name ?? t(MSG.NO_ROOM)}
               status={t(MSG.ON_YOUR_HOME_NETWORK)}
+              controlLabel={!nativeCamera.controls_available ? t(MSG.CAMERA_LOCAL_VIDEO_ONLY) : undefined}
             />
           )}
         >

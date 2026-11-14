@@ -101,3 +101,19 @@ it('keeps popup movement disabled in camera privacy mode',async()=>{
   expect(screen.queryByText(t(MSG.LOCAL_CONTROL))).toBeNull();
   expect(vi.mocked(fetch).mock.calls.every(([input,init])=>String(input).endsWith('/cameras/status')&&init?.method==='GET')).toBe(true);
 });
+
+it('keeps local video separate from the cloud settings route when no local controls exist',async()=>{
+  const requests:string[]=[];
+  vi.mocked(fetch).mockImplementation(async(input)=>{
+    const path=new URL(String(input)).pathname;requests.push(path);
+    if(path.endsWith('/cameras/status')) return json({cameras:[{...row,controls_available:false,lan:{}}]});
+    if(path.includes('/device-access/'))return json({control:'remote',host:row.host,local_available:false,internet:{available:true,blocked:false,verified:true}});
+    return json([]);
+  });
+  render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} />);
+  expect(await screen.findByText(t(MSG.DEVICE_REMOTE_CONTROL))).toBeVisible();
+  expect(screen.getByText(t(MSG.CAMERA_LOCAL_VIDEO_ONLY_HELP))).toBeVisible();
+  expect(requests).toContain('/api/v1/device-access/sharing/tracer');
+  expect(requests.every(path=>!path.includes('/device-access/native/')&&!path.endsWith('/playback'))).toBe(true);
+  expect(screen.getByRole('button',{name:t(MSG.DEVICE_USE_LOCAL)})).toBeDisabled();
+});

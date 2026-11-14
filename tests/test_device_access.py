@@ -1,7 +1,7 @@
-from dataclasses import replace
 import importlib.util
-import json
+from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -78,7 +78,7 @@ def test_unavailable_policy_does_not_claim_allowed(client, direct, monkeypatch):
     monkeypatch.setattr(device_access, "host_request", lambda *_: (_ for _ in ()).throw(HTTPException(503, "offline")))
     path = f'/api/v1/device-access/local/{direct["id"]}'
     result = client.get(path).json()
-    assert result["internet"] == {"available": False, "blocked": None, "verified": False}
+    assert result["internet"] == {"available": False, "blocked": None, "verified": False, "reason": "service_unavailable"}
     assert client.put(path + "/internet", json={"blocked": True}).status_code == 503
 
 
@@ -89,3 +89,27 @@ def test_shared_gateway_is_not_blocked_for_one_child(client, gateway, child, mon
     path = f'/api/v1/device-access/local/{child["id"]}'
     assert client.get(path).json()["internet"]["available"] is False
     assert client.put(path + "/internet", json={"blocked": True}).status_code == 409
+
+
+def test_unregistered_endpoint_is_distinct_from_blocked_or_an_unavailable_service(client, direct, monkeypatch):
+    client.app.state.settings = replace(client.app.state.settings, api_token="owner-test-key")
+    client.headers["X-API-Key"] = "owner-test-key"
+    def missing(*_):
+        raise HTTPException(409, "Not registered", headers={"X-Device-Policy-Reason": "not_registered"})
+    monkeypatch.setattr(device_access, "host_request", missing)
+    result = client.get(f'/api/v1/device-access/local/{direct["id"]}').json()
+    assert result["internet"] == {"available": False, "blocked": None, "verified": False, "reason": "not_registered"}
+
+
+@pytest.mark.parametrize("controls,expected", [(True, "local"), (False, "unavailable")])
+def test_native_video_binding_does_not_imply_local_controls(client, monkeypatch, controls, expected):
+    client.app.state.settings = replace(client.app.state.settings, api_token="owner-test-key")
+    client.headers["X-API-Key"] = "owner-test-key"
+    client.app.state.camera_service = SimpleNamespace(request=lambda *_: [
+        {"id": "camera", "device_id": "camera-device", "connected": True,
+         "host": "192.168.40.12", "controls_available": controls}], close=lambda: None)
+    monkeypatch.setattr(device_access, "host_request", lambda *_: {"available": True, "blocked": False, "verified": True})
+    result = client.get('/api/v1/device-access/native/camera').json()
+    assert result["control"] == expected
+    assert result["local_available"] is controls
+    assert result["internet"]["blocked"] is False

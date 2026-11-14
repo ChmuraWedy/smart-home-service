@@ -41,7 +41,8 @@ def host_request(host, blocked=None):
                        headers={"Content-Type": "application/json"})
         response = client.getresponse()
         if response.status != 200:
-            raise HTTPException(409 if response.status == 404 else 503, "Device MAC policy is not configured or could not be verified")
+            raise HTTPException(409 if response.status == 404 else 503, "Device MAC policy is not configured or could not be verified",
+                                headers={"X-Device-Policy-Reason": "not_registered" if response.status == 404 else "service_unavailable"})
         result = json.loads(response.read(4096))
         if not isinstance(result, dict) or type(result.get("blocked")) is not bool or result.get("verified") is not True:
             raise ValueError()
@@ -99,18 +100,18 @@ def target(request, session, route, device_id):
 def status(route: Route, device_id: str, request: Request, response: Response, session: Session = Depends(get_session)):
     host, local, camera = target(request, session, route, device_id)
     response.headers["Cache-Control"] = "no-store"
-    internet = {"available": False, "blocked": None, "verified": False}
+    internet = {"available": False, "blocked": None, "verified": False, "reason": "no_endpoint"}
     if host:
         try:
             internet = host_request(host)
-        except HTTPException:
-            pass
+        except HTTPException as error:
+            internet["reason"] = (error.headers or {}).get("X-Device-Policy-Reason", "service_unavailable")
     endpoint = session.get(Device, local.parent_id) if local and local.parent_id else local
     local_ready = bool(local and local.enabled and endpoint and endpoint.enabled and endpoint.ip
                        and endpoint.local_key and endpoint.version and effective_capabilities(session, local))
     return {"host": host, "mac": internet.get("mac") or (local.mac if local else None), "internet": internet,
             "local_available": bool(camera and camera.get("controls_available")) or local_ready,
-            "control": "local" if route in {"local", "native"} else "remote"}
+            "control": ("local" if camera and camera.get("controls_available") else "unavailable") if route == "native" else "local" if route == "local" else "remote"}
 
 
 @router.put("/{route}/{device_id}/internet")

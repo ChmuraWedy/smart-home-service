@@ -286,9 +286,6 @@
     "import/prefer-default-export": {
       "count": 1
     },
-    "indent": {
-      "count": 1
-    },
     "no-void": {
       "count": 1
     },
@@ -914,17 +911,11 @@
     "no-nested-ternary": {
       "count": 5
     },
-    "object-curly-newline": {
-      "count": 2
-    },
     "prefer-template": {
       "count": 2
     },
     "quotes": {
       "count": 2
-    },
-    "react/destructuring-assignment": {
-      "count": 4
     },
     "react/no-unused-prop-types": {
       "count": 2

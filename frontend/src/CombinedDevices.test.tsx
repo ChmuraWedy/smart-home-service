@@ -478,7 +478,7 @@ describe('combined devices', () => {
     const child = screen.getByRole('region', { name: camera.name });
     expect(child).not.toHaveAttribute('data-unavailable');
     expect(screen.getByRole('listitem', { name: 'Wired devices' })).not.toHaveAttribute('data-unavailable');
-    expect(await within(child).findByRole('button', { name: 'Privacy' })).toBeEnabled();
+    expect(await within(child).findByRole('switch', { name: 'Privacy' })).toBeEnabled();
     expect(vi.mocked(fetch).mock.calls.every(([input, init]) => String(input).endsWith('/cameras/status') && init?.method === 'GET')).toBe(true);
   });
 
