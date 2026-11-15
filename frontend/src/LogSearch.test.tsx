@@ -1,9 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { CloudApi } from './api';
 import LogSearchButton from './components/LogSearchButton';
 import { setLocale } from './i18n';
+import { App } from './test/App';
+import { STORAGE_KEY } from './connection';
 
 it('posts a short-lived ticket to the secure log console without putting credentials in its URL', async () => {
   setLocale('en', false);
@@ -50,8 +52,6 @@ it('closes a blank tab when sign-in fails or the destination is unsafe', async (
 });
 
 it.each(['owner', 'member'] as const)('shows the menu entry only to an owner (%s)', async (role) => {
-  const { App } = await import('./test/App');
-  const { STORAGE_KEY } = await import('./connection');
   setLocale('en', false);
   localStorage.setItem(STORAGE_KEY, JSON.stringify({baseUrl:'http://api.test:8765',token:'test-key'}));
   vi.mocked(fetch).mockImplementation(async input => {
@@ -64,7 +64,6 @@ it.each(['owner', 'member'] as const)('shows the menu entry only to an owner (%s
   const user = userEvent.setup();
   render(<App />);
   const menu = await screen.findByRole('button', {name:'Menu'});
-  const { waitFor } = await import('@testing-library/react');
   await waitFor(() => expect(menu).toBeEnabled());
   await user.click(menu);
   if (role === 'owner') expect(screen.getByRole('button', {name:'Log search'})).toBeInTheDocument();
