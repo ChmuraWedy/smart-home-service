@@ -39,7 +39,7 @@
       "count": 2
     },
     "camelcase": {
-      "count": 54
+      "count": 53
     },
     "import/newline-after-import": {
       "count": 1
@@ -57,7 +57,7 @@
       "count": 22
     },
     "quotes": {
-      "count": 2
+      "count": 1
     }
   },
   "src/camera-area.ts": {
@@ -275,21 +275,15 @@
   },
   "src/components/CameraCardControls.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 4
+      "count": 2
     },
     "arrow-parens": {
-      "count": 8
+      "count": 7
     },
     "implicit-arrow-linebreak": {
       "count": 1
     },
     "import/prefer-default-export": {
-      "count": 1
-    },
-    "indent": {
-      "count": 3
-    },
-    "no-nested-ternary": {
       "count": 1
     },
     "no-void": {
@@ -299,13 +293,10 @@
       "count": 1
     },
     "react/jsx-first-prop-new-line": {
-      "count": 2
+      "count": 1
     },
     "react/jsx-max-props-per-line": {
-      "count": 4
-    },
-    "react/jsx-no-bind": {
-      "count": 1
+      "count": 2
     }
   },
   "src/components/CameraFormat.tsx": {
@@ -357,7 +348,7 @@
       "count": 2
     },
     "@stylistic/max-len": {
-      "count": 5
+      "count": 4
     },
     "arrow-parens": {
       "count": 5
@@ -366,7 +357,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 28
+      "count": 27
     },
     "consistent-return": {
       "count": 1
@@ -407,20 +398,11 @@
     "one-var-declaration-per-line": {
       "count": 7
     },
-    "operator-linebreak": {
-      "count": 1
-    },
     "prefer-template": {
       "count": 5
     },
     "quotes": {
       "count": 9
-    },
-    "react-hooks/exhaustive-deps": {
-      "count": 4
-    },
-    "react/button-has-type": {
-      "count": 2
     },
     "react/jsx-first-prop-new-line": {
       "count": 2
@@ -466,7 +448,7 @@
       "count": 2
     },
     "comma-spacing": {
-      "count": 30
+      "count": 25
     },
     "consistent-return": {
       "count": 1
@@ -566,10 +548,10 @@
   },
   "src/components/CloudControl.tsx": {
     "@stylistic/jsx-max-props-per-line": {
-      "count": 11
+      "count": 10
     },
     "@stylistic/max-len": {
-      "count": 12
+      "count": 11
     },
     "arrow-parens": {
       "count": 23
@@ -602,10 +584,10 @@
       "count": 1
     },
     "no-nested-ternary": {
-      "count": 8
+      "count": 6
     },
     "no-restricted-syntax": {
-      "count": 6
+      "count": 5
     },
     "object-curly-newline": {
       "count": 10
@@ -638,7 +620,7 @@
       "count": 1
     },
     "space-infix-ops": {
-      "count": 10
+      "count": 9
     }
   },
   "src/components/ConnectionSettings.tsx": {
@@ -926,17 +908,11 @@
     "no-nested-ternary": {
       "count": 5
     },
-    "object-curly-newline": {
-      "count": 2
-    },
     "prefer-template": {
       "count": 2
     },
     "quotes": {
       "count": 2
-    },
-    "react/destructuring-assignment": {
-      "count": 4
     },
     "react/no-unused-prop-types": {
       "count": 2

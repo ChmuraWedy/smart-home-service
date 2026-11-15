@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
 
 const drawings = {
+  stop: <path d="M5 5h14v14H5z" />,
+  speaker: <path d="M4 10v4h4l5 4V6l-5 4H4M16 9a5 5 0 0 1 0 6M19 6a9 9 0 0 1 0 12" />,
+  siren: <path d="M5 17h14M7 17v-6a5 5 0 0 1 10 0v6M9 21h6M12 1v2M3 5l2 2M21 5l-2 2" />,
+  frame: <path d="M3 4h18v16H3zM3 8h18M6 6h.01M9 6h.01M9 12l6 3-6 3z" />,
   add: <path d="M12 5v14M5 12h14" />,
   back: <path d="m14 5-7 7 7 7M7 12h14" />,
   chat: <path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 3V6a1 1 0 0 1 1-1Zm3 5h8m-8 3h5" />,

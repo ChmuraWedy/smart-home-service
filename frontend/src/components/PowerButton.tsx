@@ -1,11 +1,33 @@
-import type { ReactNode } from 'react';
+import type { MouseEventHandler, ReactNode } from 'react';
 import { MSG, t } from '../i18n';
 import { Switch } from './ui/switch';
+
+export function DeviceActionButton({
+  id, label, icon, disabled, onClick, pressed, title,
+}:{
+  id?:string;label:string;icon:ReactNode;disabled?:boolean;onClick:MouseEventHandler<HTMLButtonElement>;pressed?:boolean;title?:string;
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      className="dashboard-power-button"
+      data-slot="power-button"
+      data-checked={pressed ? '' : undefined}
+      aria-label={label}
+      aria-pressed={pressed}
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+    >{icon}
+    </button>
+  );
+}
 
 export type PowerButtonVariant = 'switch' | 'dashboard-switch' | 'button';
 
 export function PowerButton({
-  id, label, checked, disabled, variant, icon, known, buttonText, onChange,
+  id, label, checked, disabled, variant, icon, known, buttonText, onChange, title: controlTitle,
 }: {
   id: string;
   label: string;
@@ -14,6 +36,7 @@ export function PowerButton({
   variant: PowerButtonVariant;
   icon?: ReactNode;
   known: boolean;
+  title?: string;
   buttonText?: string | ((value: boolean | null) => string);
   onChange: (checked: boolean) => void;
 }) {
@@ -28,7 +51,20 @@ export function PowerButton({
         ? buttonText(known ? checked : null)
         : buttonText || t(checked ? MSG.TURN_OFF : MSG.TURN_ON);
     }
-    const title = known ? t(checked ? MSG.TURN_OFF_PREFIX : MSG.TURN_ON_PREFIX) + label : undefined;
+    const title = controlTitle ?? (known ? t(checked ? MSG.TURN_OFF_PREFIX : MSG.TURN_ON_PREFIX) + label : undefined);
+    if (icon) {
+      return (
+        <DeviceActionButton
+          id={id}
+          label={label}
+          icon={icon}
+          pressed={checked}
+          title={title}
+          disabled={disabled || !known}
+          onClick={() => toggle()}
+        />
+      );
+    }
     return (
       <button
         id={id}
@@ -40,7 +76,7 @@ export function PowerButton({
         aria-label={label}
         aria-pressed={checked}
         disabled={disabled || !known}
-        onClick={toggle}
+        onClick={() => toggle()}
       >
         {content}
       </button>
@@ -52,6 +88,7 @@ export function PowerButton({
       <Switch
         id={id}
         aria-label={label}
+        title={controlTitle}
         powerIcon={icon}
         checked={checked}
         disabled={disabled}
@@ -69,7 +106,7 @@ export function PowerButton({
       aria-label={label}
       aria-checked={checked}
       disabled={disabled}
-      onClick={toggle}
+      onClick={() => toggle()}
     >
       <span />
     </button>

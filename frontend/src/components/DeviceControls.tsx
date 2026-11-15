@@ -16,6 +16,7 @@ import { hasLightEffectWizard, LightEffectWizard } from './LightEffectWizard';
 import { ParameterIcon } from './DevicePresentation';
 import { PowerButton } from './PowerButton';
 import ControlRow from './ControlRow';
+import StaleTag from './StaleTag';
 import type { PowerSide } from './ControlRow';
 import type { PowerButtonVariant } from './PowerButton';
 import { Icon, IconGlyph } from './ui/icon';
@@ -365,7 +366,8 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
           {awaiting && <span className="sr-only" role="status">{t(MSG.WAITING_FOR_A_NEW_READING)}</span>}
         </span>
         <input type="range" aria-label={spec.label} min={minimum} max={maximum} step={spec.step ?? 'any'}
-          value={value ?? minimum} disabled={disabled || value === undefined}
+          value={value ?? minimum} disabled={disabled}
+          aria-valuetext={value === undefined ? t(MSG.NO_DATA) : undefined}
           data-temperature={quickRange === 'temperature' || undefined}
           onChange={event => { rangeEdit.current = event.currentTarget.value; change(event.currentTarget.value); }}
           onPointerUp={commit} onKeyUp={commit} onBlur={commit}
@@ -396,7 +398,7 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
   const state = powerIcon && (
     <span className={`dashboard-power-state${powerSummary ? ' dashboard-power-state-summary' : ''}`}>
       {powerSummary ? powerSummary(powerKnown ? shownPower : null) : powerKnown ? t(shownPower ? MSG.ON : MSG.OFF) : t(MSG.NO_DATA)}
-      {showStale && <span className="stale-tag">{t(MSG.STALE)}</span>}
+      {showStale && <StaleTag />}
       <span role="status" className="dashboard-power-pending" title={showPending ? t(MSG.WAITING_FOR_A_NEW_READING) : undefined}>
         {showPending && (
           <>
@@ -423,7 +425,7 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
             onChange={changePower}
           />
           {!powerIcon && !dirty && !awaiting && !reading?.known && <span className="power-selection">{t(MSG.NO_DATA)}</span>}
-          {!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <span className="stale-tag">{t(MSG.STALE)}</span>}
+          {!powerIcon && reading?.known && !fresh && !dirty && !awaiting && <StaleTag />}
           {(dirty || awaiting) && (
             <span className="help">
               {dirty ? t(MSG.MODIFIED) : t(MSG.WAITING_FOR_A_READING)}
@@ -481,7 +483,7 @@ export function CapabilityField({ pendingScope, spec, reading, now, local, disab
         {spec.readable && !spec.writable && (
         <p className={'reading' + (!fresh ? ' unknown' : '')}>
           {motion !== undefined && <span className={'sensor-indicator ' + (!fresh || motion === null ? 'unknown' : motion ? 'active' : 'clear')} aria-hidden="true" />}{displayReading(spec, reading)}
-          {reading?.known && isStale(reading, now, local) && <span className="stale-tag">{t(MSG.STALE)}</span>}
+          {reading?.known && isStale(reading, now, local) && <StaleTag />}
         </p>
 )}
         {spec.writable && spec.kind !== 'boolean' && (

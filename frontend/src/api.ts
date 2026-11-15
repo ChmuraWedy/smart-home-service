@@ -1,3 +1,7 @@
+import type { CameraPlayback } from './camera-stream';
+import type { CameraStatus } from './camera-status-cache';
+import type { CameraControls, LocalCamera } from './camera-service-api';
+import type { DeviceAccess, DeviceInternet } from './device-access';
 import { MSG, t, translateText } from "./i18n";
 import type { DeviceTranslations, TranslationSaved, TranslationWrite } from './device-translations';
 export type Provider = 'sharing' | 'developer';
@@ -20,6 +24,7 @@ export type CloudStatus = {
   account?: AccountIdentity;
   'household_chat_supported'?: boolean;
   'local_mapping_editor_supported'?: boolean;
+  'log_search_supported'?: boolean;
   enabled: boolean;
   connected: boolean;
   has_saved_user_code: boolean;
@@ -90,7 +95,7 @@ export type NetworkScan = {
 };
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status: number) {
+  constructor(message: string, public readonly status: number, public readonly deviceOffline = false) {
     super(message);
   }
 }
@@ -113,6 +118,32 @@ export class CloudApi {
   }
 
   get isMember() { return this.account?.role === 'member'; }
+
+  logSearchTicket() { return this.request<{url:string; ticket:string}>('/log-search/ticket', 'POST'); }
+
+  localCameraStatus() { return this.request<{cameras:CameraStatus[]}>('/cameras/status'); }
+
+  localCameras(signal?:AbortSignal) { return this.request<LocalCamera[]>('/cameras', 'GET', undefined, signal); }
+
+  deviceAccess(route:string, id:string) { return this.request<DeviceAccess>(`/device-access/${encodeURIComponent(route)}/${encodeURIComponent(id)}`); }
+
+  deviceInternet(route:string, id:string, blocked:boolean) {
+    return this.request<DeviceInternet>(`/device-access/${encodeURIComponent(route)}/${encodeURIComponent(id)}/internet`, 'PUT', { blocked });
+  }
+
+  cameraRoom(id:string, roomId:number|null) { return this.request(`/cameras/${encodeURIComponent(id)}/room`, 'PUT', { room_id: roomId }); }
+
+  activateLocalCamera(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/activate`, 'POST', {}); }
+
+  localCameraControls(id:string) { return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls`); }
+
+  localCameraCommand(id:string, code:string, value:boolean|number|string) {
+    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/commands`, 'POST', { code, value });
+  }
+
+  localCameraAction(id:string, action:'move'|'stop'|'siren', direction?:string) {
+    return this.request<CameraControls>(`/cameras/${encodeURIComponent(id)}/controls/${action}`, 'POST', direction ? { direction } : {});
+  }
 
   private url(path: string): string {
     if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {
@@ -143,7 +174,8 @@ export class CloudApi {
       if (!response.ok) {
         let detail: unknown;
         try { detail = (await response.json()).detail; } catch { /* Non-JSON proxy error. */ }
-        throw new ApiError(typeof detail === 'string' ? translateText(detail) : t(MSG.THE_SERVICE_COULD_NOT_COMPLETE_THE_REQUEST, [response.status]), response.status);
+        const message = typeof detail === 'string' ? translateText(detail) : t(MSG.THE_SERVICE_COULD_NOT_COMPLETE_THE_REQUEST, [response.status]);
+        throw new ApiError(message, response.status, response.headers.get('X-Tuya-Device-Offline') === '1');
       }
       return response;
     } catch (error) {
@@ -215,7 +247,11 @@ export class CloudApi {
   confirmQR(session: string) { return this.json<{ connected: boolean }>('/login/' + encodeURIComponent(session) + '/confirm', 'POST'); }
   devices(provider: Provider, signal?: AbortSignal) { return this.json<CloudDevice[]>('/devices?refresh=true&provider=' + provider, 'GET', undefined, signal); }
   cameraStream(id: string, provider: Provider, signal?: AbortSignal) {
-    return this.json<{device_id:string;type:"hls";url:string}>('/devices/' + encodeURIComponent(id) + '/stream/relay?provider=' + provider, 'POST', {}, signal);
+    if (id.startsWith('local-camera:')) {
+      const cameraId = encodeURIComponent(id.slice('local-camera:'.length));
+      return this.request<CameraPlayback>(`/cameras/${cameraId}/playback`, 'POST', {}, signal);
+    }
+    return this.json<CameraPlayback>('/devices/' + encodeURIComponent(id) + '/stream/relay?provider=' + provider, 'POST', {}, signal);
   }
   deviceFunctions(id: string, provider: Provider, signal?: AbortSignal) {
     return this.json<CloudFunctions>('/devices/' + encodeURIComponent(id) + '/functions?provider=' + provider, 'GET', undefined, signal);

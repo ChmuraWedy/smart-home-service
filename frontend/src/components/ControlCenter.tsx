@@ -5,6 +5,7 @@ import {
 } from 'react-router';
 import { ApiError } from '../api';
 import type { CloudDevice, Provider } from '../api';
+import type { LocalCamera } from '../camera-service-api';
 import { localSpec } from '../controls';
 import { resolveCombinedMember } from '../combined-power';
 import { deviceAliases, deviceRoutes, deviceTextVariants, matchesDevice, mergeDevices, routeLabel } from '../devices';
@@ -15,7 +16,9 @@ import { CloudControl } from './CloudControl';
 import CombinedDeviceCard from './CombinedDeviceCard';
 import { CombinedDeviceDetails, CombinedDeviceList, CombinedDeviceSettings } from './CombinedDeviceSettings';
 import { GroupControl, LocalControl, groupSummary } from './LocalControls';
-import { useClock } from './DeviceControls';
+import { ControlDialog, useClock } from './DeviceControls';
+import CameraViewer from './CameraViewer';
+import LocalCameraCard, { localCameraCardId } from './LocalCameraCard';
 import { DeviceSurvey } from './DeviceSurvey';
 import { BatteryBadge, batteryFromSpecs, DeviceIcon, isCamera } from './DevicePresentation';
 import { useTopology } from '../use-topology';
@@ -23,6 +26,8 @@ import RoomNavigation from './RoomNavigation';
 import useRoomName from '../room-names';
 import { RoomLayoutSettings } from './RoomEditor';
 import DeviceRoomEditor from './DeviceRoomEditor';
+import DeviceLocalControl from './DeviceLocalControl';
+import { DeviceConnectionSummary } from './DeviceConnection';
 import CameraRoomCard, { cameraRoomCardId } from './CameraRoomCard';
 import { cameraRoomPreviewKey, setCameraRoomPreview, useCameraRoomPreviews } from '../camera-room-previews';
 import type { CardStatus } from './CardControls';
@@ -52,10 +57,15 @@ import { useRoomAppearance } from '../room-appearance';
 
 type Selection = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice; route: DeviceRoute; parent?: Group; combinedParent?: CombinedDevice } | { kind: 'survey'; device?: CloudDevice; provider?: Provider; existing: LocalDevice };
 type DashboardEntry = { kind: 'group'; group: Group } | { kind: 'device'; device: UnifiedDevice }
-  | { kind: 'combined'; combined: CombinedDevice } | { kind: 'camera-video'; device: UnifiedDevice; provider: Provider };
-type Loaded = { api: HomeApi; mask: string; inventory: Inventory | null; combinations?: CombinedDevice[]; cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[] };
+  | { kind: 'combined'; combined: CombinedDevice } | { kind: 'camera-video'; device: UnifiedDevice; provider: Provider }
+  | { kind: 'native-camera'; camera: LocalCamera; roomId:number|null };
+type Loaded = {
+  api: HomeApi; mask: string; inventory: Inventory | null; combinations?: CombinedDevice[]; cameras?:LocalCamera[];
+  cloud: Partial<Record<Provider, CloudDevice[]>>; errors: string[];
+};
 const PAGE_SIZE = 24;
 const NO_COMBINATIONS: CombinedDevice[] = [];
+const NO_CAMERAS: LocalCamera[] = [];
 const NO_CLOUD: Partial<Record<Provider, CloudDevice[]>> = {};
 
 function openCard(event:MouseEvent<HTMLLIElement>,open:()=>void) {
@@ -112,9 +122,11 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
   const battery = live ? live.battery : initialBattery;
   const enabled = (route === 'local' ? state?.enabled : undefined) ?? local?.enabled;
   const online = route === 'local' ? enabled && state?.available : live?.online ?? cloud?.online;
-  const presenceMessage = cardPresenceMessage({
+  let presenceMessage:Parameters<typeof t>[0] = cardPresenceMessage({
     hasCloud: Boolean(cloud), hasLocal: Boolean(local), enabled, online,
   });
+  if (live?.transport === 'local' && online) presenceMessage = MSG.AVAILABLE_LOCALLY;
+  if (live?.checking) presenceMessage = MSG.CHECKING_CONNECTION;
   const definitions = cloud?.controls?.definitions;
   const codes = [...Object.keys(local?.capabilities || {}), ...Object.keys(cloud?.controls?.snapshot.status || {}), ...(definitions?.functions || []).map(fn => fn.code), ...(definitions?.status_range || []).map(fn => fn.code)];
   const climate = codes.some(code => /^(temperature|va_temperature|temp_current)$/.test(code))
@@ -188,7 +200,7 @@ function DeviceCard({ api, device, room, now, paused, quickRoute, onAuthError, o
           onAuthError={onAuthError}
           onBusy={notifyBusy}
           onStatus={updateStatus}
-          sheet={{ open: quickOpen, close: onQuickClose, trigger: sheetTrigger, presetSlot, onLightFeatures }}
+          sheet={{ open: quickOpen, show: showSheet, close: onQuickClose, trigger: sheetTrigger, presetSlot, onLightFeatures }}
         />
         {routes.length > 1 && (
         <div className="device-card-footer tw:mt-2">
@@ -217,9 +229,12 @@ export function ControlCenter({
   const inventory = current?.inventory;
   const cloud = current?.cloud || NO_CLOUD;
   const combinations = current?.combinations ?? NO_COMBINATIONS;
+  const cameras = api.isMember ? NO_CAMERAS : current?.cameras ?? NO_CAMERAS;
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
+  const cameraId = query.get('camera');
+  const nativeCamera = cameras.find((camera) => camera.id === cameraId);
   const building = query.get('building') ?? '';
   const room = dashboardRoom(location.pathname, query);
   const editingLayout = isDashboardLayoutPath(location.pathname);
@@ -366,8 +381,19 @@ export function ControlCenter({
         if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
       }
     };
+    const readCameras = async () => {
+      try {
+        const result = await api.localCameras(controller.signal);
+        if (controller.signal.aborted || !Array.isArray(result)) return;
+        const connected = result.filter((camera) => camera.connected === true && typeof camera.id === 'string'
+          && typeof camera.device_id === 'string' && typeof camera.name === 'string' && typeof camera.host === 'string');
+        setRecord((previous) => (previous?.api === api && previous.mask === mask ? { ...previous, cameras: connected } : previous));
+      } catch (failure) {
+        if (!controller.signal.aborted && failure instanceof ApiError && failure.status === 401) onAuthError();
+      }
+    };
     const requests = [handle(t(MSG.HOME_NETWORK), () => api.inventory(controller.signal))];
-    if (!api.isMember) requests.push(readCombinations());
+    if (!api.isMember) requests.push(readCombinations(), readCameras());
     if (sharingReady) requests.push(handle('Smart Life', () => api.devices('sharing', controller.signal), 'sharing'));
     if (developerReady) requests.push(handle('Tuya Developer', () => api.devices('developer', controller.signal), 'developer'));
     void Promise.all(requests).finally(() => { if (!controller.signal.aborted) setBusy(false); });
@@ -441,6 +467,24 @@ export function ControlCenter({
       onAuthError={onAuthError}
     />
   );
+  const useLocalDevice = useCallback(async () => {
+    if (!detailDevice?.local) return;
+    const state = await api.state(detailDevice.local.id, true);
+    if (!state.enabled || !state.available) throw new Error(t(MSG.DEVICE_LOCAL_UNREACHABLE));
+    const params = new URLSearchParams(location.search);
+    params.set('route', 'local');
+    navigate(`${devicePath(detailDevice.id)}?${params}`, { replace: true, state: location.state });
+  }, [api, detailDevice, location.search, location.state, navigate]);
+  const localControl = !api.isMember && selected?.kind === 'device' && detailDevice && (
+    <DeviceLocalControl
+      key={detailDevice.id + selected.route}
+      api={api}
+      deviceId={selected.route === 'local' && detailDevice.local ? String(detailDevice.local.id) : detailDevice.id}
+      route={selected.route}
+      onAuthError={onAuthError}
+      onUseLocal={detailDevice.local ? useLocalDevice : undefined}
+    />
+  );
   let detailCloseLabel: string | undefined;
   if (selected?.kind === 'device' && selected.combinedParent) detailCloseLabel = t(MSG.BACK_TO_COMBINATION);
   else if (selected?.kind === 'device' && selected.parent) detailCloseLabel = t(MSG.BACK_TO_GROUP);
@@ -454,7 +498,7 @@ export function ControlCenter({
   const knownGatewayId = detailCloud?.gateway_id || detailDevice?.cloud.developer?.gateway_id;
   const detailGateway = inventory?.devices.find((device) => device.id === detailDevice?.local?.parent_id)
     ?? inventory?.devices.find((device) => device.device_id === knownGatewayId);
-  const detailsOpen = selected !== null || Boolean(combined && !combinedEdit);
+  const detailsOpen = selected !== null || Boolean(combined && !combinedEdit) || Boolean(nativeCamera);
   useEffect(() => {
     if (!detailsOpen) return;
     dispatch(setDetailsOpen(true));
@@ -464,6 +508,23 @@ export function ControlCenter({
     () => inventory?.rooms.filter((item) => !building || String(item.building_id) === building) ?? [],
     [building, inventory?.rooms],
   );
+  const nativeCards = useMemo(() => cameras.flatMap((camera) => {
+    const device = devices.find((item) => item.id === camera.device_id);
+    if (!localOnly && device && Object.values(device.cloud).some((item) => isCamera(item?.category))) return [];
+    let roomId = device ? placementOf(device)?.room_id ?? null : null;
+    if (camera.room_id !== undefined) roomId = inventory?.rooms.some((item) => item.id === camera.room_id) ? camera.room_id : null;
+    return [{ kind: 'native-camera' as const, camera, roomId }];
+  }), [cameras, devices, localOnly, placementOf, inventory?.rooms]);
+  const nativeRoom = nativeCards.find((item) => item.camera.id === nativeCamera?.id)?.roomId ?? null;
+  const saveCameraRoom = useCallback(async (roomId:number|null) => {
+    if (!nativeCamera) return;
+    await api.cameraRoom(nativeCamera.id, roomId);
+    setRecord((value) => {
+      if (!value) return value;
+      const rows = value.cameras?.map((item) => (item.id === nativeCamera.id ? { ...item, room_id: roomId } : item));
+      return { ...value, cameras: rows };
+    });
+  }, [api, nativeCamera]);
   const entries = useMemo(() => {
     const needle = search.trim().normalize('NFC').toLocaleLowerCase();
     const inRoom = (id: number | null) => !room || (room === 'none' ? id === null : String(id) === room);
@@ -482,7 +543,9 @@ export function ControlCenter({
         if (device) members.add(device.id);
       }
     }
+    const nativeIds = new Set(nativeCards.map((item) => item.camera.device_id));
     const filtered = devices.filter((device) => {
+      if (nativeIds.has(device.id)) return false;
       const placement = placementOf(device);
       const inView = shownMembers.has(device.id) || (!hiddenMembers.has(device.id)
         && (!building || String(placement?.building_id) === building) && inRoom(placement?.room_id ?? null));
@@ -502,11 +565,14 @@ export function ControlCenter({
     return [
       ...groups.map((item) => ({ kind: 'group' as const, group: item })),
       ...displayed.map((item) => ({ kind: 'combined' as const, combined: item })),
+      ...nativeCards.filter((item) => inRoom(item.roomId) && (!building || String(roomBuilding(item.roomId)) === building)
+        && [item.camera.name, item.camera.host, item.camera.device_id || ''].some((value) => value.toLocaleLowerCase().includes(needle))),
       ...filtered.map((device) => ({ kind: 'device' as const, device })),
       ...videos,
     ];
-  }, [api.baseUrl, devices, inventory, building, room, search, placementOf, combinations, resolvedMembers, cameraPreviews, localOnly]);
+  }, [api.baseUrl, devices, inventory, building, room, search, placementOf, combinations, resolvedMembers, cameraPreviews, localOnly, nativeCards]);
   const linkedIndex = entries.findIndex((entry) => {
+    if (entry.kind === 'native-camera') return entry.camera.id === nativeCamera?.id;
     if (entry.kind === 'device') return entry.device === linked;
     if (entry.kind === 'combined') return entry.combined === (combined ?? combinedParent);
     return entry.kind === 'group' && entry.group === group;
@@ -583,8 +649,15 @@ export function ControlCenter({
     if (combinedParent) { navigate(overlayHref(`/combined-devices/${combinedParent.id}`), { replace: true }); return; }
     if (page > 0) query.set('page', String(page + 1));
     query.delete('member');
+    query.delete('camera');
     void navigate(dashboardHref(room, query, dashboardPanel), { replace: true });
   }
+  const closeNativeCamera = useCallback(() => {
+    if (location.state?.dashboardOverlay) { navigate(-1); return; }
+    const params = new URLSearchParams(location.search);
+    params.delete('camera');
+    navigate(dashboardHref(room, params, dashboardPanel), { replace: true });
+  }, [location.state, location.search, navigate, room, dashboardPanel]);
   function close() {
     if (activeSurvey) setSurvey(null); else closeOverlay();
     setRevision(value => value + 1);
@@ -617,6 +690,26 @@ export function ControlCenter({
     else closeManagement();
   }, [api, closeManagement, combined?.id, mask, navigate]);
   function renderCard(entry: DashboardEntry, placement: GridCardPlacement) {
+    if (entry.kind === 'native-camera') {
+      const cameraRoom = inventory?.rooms.find((item) => item.id === entry.roomId);
+      const openCamera = () => {
+        const params = new URLSearchParams(query);
+        params.set('camera', entry.camera.id);
+        openOverlay(dashboardHref(room, params, dashboardPanel));
+      };
+      return (
+        <LocalCameraCard
+          api={api}
+          onAuthError={onAuthError}
+          camera={entry.camera}
+          room={cameraRoom ? roomLabel(cameraRoom) : t(MSG.NO_ROOM)}
+          placement={placement}
+          paused={detailsOpen || Boolean(placement.inert)}
+          onOpen={openCamera}
+        />
+      );
+    }
+
     if (entry.kind === 'camera-video') {
       const { device, provider } = entry;
       return (
@@ -719,6 +812,11 @@ export function ControlCenter({
 
   const canUseLayout = !search.trim() && !(quick && linkedIndex < 0) && !(combinedQuickOpen && linkedIndex < 0);
   const gridItems = visible.map((entry) => {
+    if (entry.kind === 'native-camera') {
+      return {
+        id: localCameraCardId(entry.camera.id), cardName: entry.camera.name, entry, hideable: true, forceVisible: entry.camera.id === nativeCamera?.id,
+      };
+    }
     if (entry.kind === 'group') return { id: `group-${entry.group.id}`, cardName: entry.group.name, entry };
     if (entry.kind === 'combined') return { id: `combined-${entry.combined.id}`, cardName: entry.combined.name, entry };
     if (entry.kind === 'camera-video') return { id: cameraRoomCardId(entry.device.id), cardName: `${entry.device.name} · ${t(MSG.CAMERA_VIDEO)}`, entry };
@@ -840,13 +938,14 @@ export function ControlCenter({
     }
   }
 
-  const hasDevices = Boolean(devices.length || inventory?.groups.length);
+  const additionalCameras = nativeCards.filter((camera) => !devices.some((device) => device.id === camera.camera.device_id)).length;
+  const hasDevices = Boolean(devices.length || nativeCards.length || inventory?.groups.length);
   const setupMessage = sharingReady || developerReady ? MSG.ADD_DEVICES_IN_SMART_LIFE_AND_REFRESH_THE : MSG.CONNECT_A_TUYA_ACCOUNT_TO_SEE_YOUR_DEVICES;
   const emptyState = !busy && current && !entries.length && (
     <div className="empty-state">
       <h3>{t(hasDevices ? MSG.NOTHING_FOUND : MSG.NO_DEVICES_YET)}</h3>
       <p>{t(hasDevices ? MSG.CHANGE_YOUR_FILTERS_OR_SEARCH_QUERY : setupMessage)}</p>
-      {!devices.length && !sharingReady && !developerReady && onConnections && (
+      {!hasDevices && !sharingReady && !developerReady && onConnections && (
         <button type="button" className="secondary compact" onClick={onConnections}>
           {t(MSG.SET_UP_CONNECTION)}
         </button>
@@ -869,7 +968,7 @@ export function ControlCenter({
         <div>
           <p className="eyebrow">{t(MSG.YOUR_HOME)}</p>
           <h2 id="control-center-heading">{t(MSG.DEVICES_AND_GROUPS)}
-            {current && <span className="count">{devices.length + (inventory?.groups.length || 0)}</span>}
+            {current && <span className="count">{devices.length + additionalCameras + (inventory?.groups.length || 0)}</span>}
           </h2>
         </div>
         <div className="survey-toolbar dashboard-actions">
@@ -944,6 +1043,40 @@ export function ControlCenter({
 )}
         </>
   )}
+      {nativeCamera && (
+        <ControlDialog
+          title={nativeCamera.name}
+          busy={false}
+          onClose={closeNativeCamera}
+          className="camera-controls"
+          connectionContent={(
+            <DeviceConnectionSummary
+              route="local"
+              localTransport="wifi"
+              room={inventory?.rooms.find((item) => item.id === nativeRoom)?.name ?? t(MSG.NO_ROOM)}
+              status={t(MSG.ON_YOUR_HOME_NETWORK)}
+              controlLabel={!nativeCamera.controls_available ? t(MSG.CAMERA_LOCAL_VIDEO_ONLY) : undefined}
+            />
+          )}
+        >
+          <DeviceRoomEditor
+            rooms={inventory?.rooms ?? []}
+            roomId={nativeRoom}
+            onAuthError={onAuthError}
+            onSave={saveCameraRoom}
+          />
+          <CameraViewer
+            key={nativeCamera.id}
+            api={api}
+            localCamera={nativeCamera}
+            deviceId={`local-camera:${nativeCamera.id}`}
+            provider="sharing"
+            onAuthError={onAuthError}
+            autoStart
+            compact
+          />
+        </ControlDialog>
+      )}
       {combined && combinedDetails && (
         <CombinedDeviceDetails
           api={api}
@@ -962,6 +1095,7 @@ export function ControlCenter({
           api={api}
           room={roomName(detailDevice)}
           roomEditor={detailRoomEditor}
+          localControl={localControl}
           device={detailDevice.local}
           gateway={detailGateway}
           cloudDevice={detailDevice.cloud.sharing ?? detailDevice.cloud.developer}
@@ -986,6 +1120,7 @@ export function ControlCenter({
           api={api}
           room={roomName(detailDevice)}
           roomEditor={detailRoomEditor}
+          localControl={localControl}
           displayName={detailDevice.name}
           closeLabel={detailCloseLabel}
           device={detailCloud}

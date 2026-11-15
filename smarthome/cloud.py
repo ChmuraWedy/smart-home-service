@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 
-from .sharing_state import SharingState, missing_light_reading
+from .sharing_state import SharingState, missing_light_reading, now_iso
 
 INVENTORY_REFRESH_INTERVAL = 60
 MISSING_LIGHT_REFRESH_INTERVAL = 60
@@ -402,8 +402,11 @@ class CloudBridge:
             except Exception as error:
                 code = str(getattr(error, "error_code", ""))
                 if code == "2001":
+                    self.state.online[id] = False
+                    self.state.offline_rejected_at[id] = now_iso()
                     raise HTTPException(
-                        409, "Устройство не в сети по данным Tuya (код 2001). Команда отклонена."
+                        409, "Устройство не в сети по данным Tuya (код 2001). Команда отклонена.",
+                        headers={"X-Tuya-Device-Offline": "1"},
                     ) from None
                 if code.isascii() and code.isdecimal() and len(code) <= 12:
                     raise HTTPException(502, f"Tuya rejected the cloud command (code {code})") from None

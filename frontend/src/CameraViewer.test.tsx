@@ -1,0 +1,137 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import { renderWithStore as render } from './test/render-with-store';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CloudApi } from './api';
+import CameraViewer from './components/CameraViewer';
+import { connectCameraWebRTC } from './camera-stream';
+import { MSG, t } from './i18n';
+
+vi.mock('./camera-stream', async importOriginal => ({
+  ...await importOriginal<typeof import('./camera-stream')>(),
+  connectCameraWebRTC:vi.fn(()=>vi.fn()),
+}));
+
+const row={id:'lan-camera',name:'TRACER FOCUS 3',host:'192.168.1.20',device_id:'tracer',connected:true,controls_available:true};
+const state={transport:'local',observed_at:Date.now()/1000,confirmed:true,state:{basic_private:false},functions:{
+  basic_private:{dp_id:105,type:'Boolean',values:{}},
+  ptz_control:{dp_id:119,type:'Enum',values:{range:['0','2','4','6']}},
+  ptz_stop:{dp_id:116,type:'Boolean',values:{}},
+}};
+const json=(value:unknown)=>new Response(JSON.stringify(value));
+
+beforeEach(()=>{
+  vi.mocked(connectCameraWebRTC).mockClear();
+  vi.spyOn(HTMLMediaElement.prototype,'pause').mockImplementation(()=>{});
+  vi.spyOn(HTMLMediaElement.prototype,'load').mockImplementation(()=>{});
+});
+
+describe('camera details with local controls',()=>{
+  it('preserves manual Stop when the same camera remounts through its native playback identity',async()=>{
+    const api=new CloudApi({baseUrl:'http://api.test',token:'key'});
+    let allocations=0;
+    vi.mocked(fetch).mockImplementation(async(input)=>{
+      const path=new URL(String(input)).pathname;
+      if(path.endsWith('/cameras/status'))return json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:state}}]});
+      if(path.endsWith('/playback')){allocations+=1;return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});}
+      return json([]);
+    });
+    const first=render(<CameraViewer api={api} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact extended={false} />);
+    await screen.findByLabelText(t(MSG.LIVE_CAMERA_VIDEO));
+    await userEvent.setup().click(within(screen.getByRole('region',{name:t(MSG.CAMERA_VIDEO)})).getByRole('button',{name:t(MSG.STOP)}));
+    first.unmount();
+    render(<CameraViewer api={api} localCamera={row} deviceId="local-camera:lan-camera" provider="sharing" onAuthError={vi.fn()} autoStart compact extended={false} />);
+    await waitFor(()=>expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toBeEnabled());
+    expect(allocations).toBe(1);
+    expect(screen.queryByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeNull();
+  });
+  it.each([true, false])('moves without reconnecting or replacing video in extended mode %s',async(extended)=>{
+    const calls:{path:string;method:string;body:unknown}[]=[];
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      const path=new URL(String(input)).pathname;
+      calls.push({path,method:init?.method||'GET',body:init?.body?JSON.parse(String(init.body)):null});
+      if(path.endsWith('/cameras/status'))return json({cameras:[{...row,id:'wrong',device_id:'other',lan:{}},{...row,lan:{online:true,checked_at:Date.now()/1000,controls:state}}]});
+      if(path.endsWith('/playback'))return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
+      return json(state);
+    });
+    render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact extended={extended} movement={!extended} />);
+    const up=await screen.findByRole('button',{name:t(MSG.CAMERA_MOVE_UP)});
+    await waitFor(()=>expect(connectCameraWebRTC).toHaveBeenCalledOnce());
+    const video=screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO));
+    if (!extended) {
+      expect(screen.queryByText(t(MSG.LOCAL_CONTROL))).toBeNull();
+      const stop=within(screen.getByRole('region',{name:t(MSG.CAMERA_VIDEO)})).getByRole('button',{name:t(MSG.STOP)});
+      expect(stop).toHaveClass('secondary','compact');
+      expect(stop).not.toHaveAttribute('data-slot','power-button');
+    }
+    await userEvent.setup().click(up);
+    await waitFor(()=>expect(calls.some(c=>c.path==='/api/v1/cameras/lan-camera/controls/move'&&JSON.stringify(c.body)==='{"direction":"up"}')).toBe(true));
+    expect(screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBe(video);
+    expect(connectCameraWebRTC).toHaveBeenCalledOnce();
+    expect(calls.filter(c=>c.path.endsWith('/playback'))).toHaveLength(1);
+    expect(calls.every(c=>!c.path.includes('/wrong/'))).toBe(true);
+  });
+
+  it('waits for LAN privacy and removes the player when local privacy is enabled',async()=>{
+    let privateMode=true;
+    const requests:string[]=[];
+    vi.mocked(fetch).mockImplementation(async(input,init)=>{
+      const path=new URL(String(input)).pathname;requests.push(path);
+      if(path.endsWith('/commands'))privateMode=JSON.parse(String(init?.body)).value;
+      if(path.endsWith('/playback'))return json({device_id:'local-camera:lan-camera',type:'webrtc',url:'http://media.test/play/native/'+'a'.repeat(43)+'/ws'});
+      if(path.endsWith('/cameras/status'))return json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:{...state,state:{basic_private:privateMode}}}}]});
+      return json({...state,state:{basic_private:privateMode}});
+    });
+    render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} localCamera={row} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} autoStart compact />);
+    const privacy=await screen.findByLabelText(t(MSG.PRIVACY_MODE));
+    expect(screen.queryByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeNull();
+    expect(requests.some(p=>p.endsWith('/playback'))).toBe(false);
+    const user=userEvent.setup();
+    await user.click(privacy);
+    await waitFor(()=>expect(screen.getByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeInTheDocument());
+    await user.click(privacy);
+    await waitFor(()=>expect(screen.queryByLabelText(t(MSG.LIVE_CAMERA_VIDEO))).toBeNull());
+  });
+
+  it('does not request the owner camera registry for household members',async()=>{
+    render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'},{id:'member',name:'Member',login:'member',role:'member'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} />);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(screen.queryByText(t(MSG.CAMERA_LOCAL_CONTROLS))).toBeNull();
+  });
+});
+
+it('keeps existing playback and privacy behavior when no LAN binding exists',async()=>{
+  vi.mocked(fetch).mockResolvedValue(json([]));
+  render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="unbound" provider="sharing" onAuthError={vi.fn()} viewingBlocked={t(MSG.PRIVACY_MODE_IS_ON)} />);
+  await waitFor(()=>expect(fetch).toHaveBeenCalledOnce());
+  expect(screen.queryByText(t(MSG.CAMERA_LOCAL_CONTROLS))).toBeNull();
+  await waitFor(()=>expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toHaveAttribute('title',t(MSG.PRIVACY_MODE_IS_ON)));
+  expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toBeDisabled();
+});
+
+
+it('keeps popup movement disabled in camera privacy mode',async()=>{
+  vi.mocked(fetch).mockResolvedValue(json({cameras:[{...row,lan:{online:true,checked_at:Date.now()/1000,controls:{...state,state:{basic_private:true}}}}]}));
+  render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing"
+    onAuthError={vi.fn()} extended={false} movement autoStart compact />);
+  expect(await screen.findByRole('button',{name:t(MSG.CAMERA_MOVE_UP)})).toBeDisabled();
+  expect(screen.getByRole('button',{name:t(MSG.WATCH_VIDEO)})).toBeDisabled();
+  expect(screen.queryByText(t(MSG.LOCAL_CONTROL))).toBeNull();
+  expect(vi.mocked(fetch).mock.calls.every(([input,init])=>String(input).endsWith('/cameras/status')&&init?.method==='GET')).toBe(true);
+});
+
+it('keeps local video separate from the cloud settings route when no local controls exist',async()=>{
+  const requests:string[]=[];
+  vi.mocked(fetch).mockImplementation(async(input)=>{
+    const path=new URL(String(input)).pathname;requests.push(path);
+    if(path.endsWith('/cameras/status')) return json({cameras:[{...row,controls_available:false,lan:{}}]});
+    if(path.includes('/device-access/'))return json({control:'remote',host:row.host,local_available:false,internet:{available:true,blocked:false,verified:true}});
+    return json([]);
+  });
+  render(<CameraViewer api={new CloudApi({baseUrl:'http://api.test',token:'key'})} deviceId="tracer" provider="sharing" onAuthError={vi.fn()} />);
+  expect(await screen.findByText(t(MSG.DEVICE_REMOTE_CONTROL))).toBeVisible();
+  expect(screen.getByText(t(MSG.CAMERA_LOCAL_VIDEO_ONLY_HELP))).toBeVisible();
+  expect(requests).toContain('/api/v1/device-access/sharing/tracer');
+  expect(requests.every(path=>!path.includes('/device-access/native/')&&!path.endsWith('/playback'))).toBe(true);
+  expect(screen.getByRole('button',{name:t(MSG.DEVICE_USE_LOCAL)})).toBeDisabled();
+});

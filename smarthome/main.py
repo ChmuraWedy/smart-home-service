@@ -689,10 +689,9 @@ def create_app(settings: Settings | None = None, controller=None):
         from .developer_cloud import DeveloperBridge
 
         app.state.developer_cloud = DeveloperBridge(settings)
-        from .camera_playback import PlaybackStore, install_access_log_filter
+        from .camera_service import CameraService
 
-        app.state.camera_playback = PlaybackStore()
-        install_access_log_filter()
+        app.state.camera_service = CameraService(settings)
         from .poller import DisplayPoller
 
         app.state.poller = DisplayPoller(app)
@@ -704,6 +703,7 @@ def create_app(settings: Settings | None = None, controller=None):
         try:
             yield
         finally:
+            app.state.camera_service.close()
             app.state.network.close()
             app.state.visible_status.stop()
             app.state.poller.stop()
@@ -726,7 +726,7 @@ def create_app(settings: Settings | None = None, controller=None):
             allow_origins=list(settings.cors_origins),
             allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
             allow_headers=["X-API-Key", "Content-Type", "Range"],
-            expose_headers=["Accept-Ranges", "Content-Range"],
+            expose_headers=["Accept-Ranges", "Content-Range", "X-Tuya-Device-Offline"],
             allow_credentials=False,
         )
     app.state.controller = controller or TuyaController(settings)
@@ -763,9 +763,13 @@ def create_app(settings: Settings | None = None, controller=None):
     from .camera_api import router as camera_router
 
     app.include_router(camera_router)
-    from .camera_playback import router as playback_router
+    from .camera_service import router as camera_service_router
 
-    app.include_router(playback_router)
+    app.include_router(camera_service_router)
+    from .device_access import router as device_access_router
+    app.include_router(device_access_router)
+    from .log_search import router as log_search_router
+    app.include_router(log_search_router)
     from .commissioning import router as commissioning_router
 
     app.include_router(commissioning_router)

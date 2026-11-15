@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { shallowEqual } from 'react-redux';
+import { localCameraEntry, localCameraOnline } from './camera-status-cache';
 import { ApiError } from './api';
 import { cloudDeviceCache, cloudDeviceKey, readCloudDevice } from './cloud-device-cache';
 import type combinedLayout from './combined-layout';
@@ -29,6 +30,8 @@ function cloudReading(state: RootState, api: HomeApi, entry: ResolvedMember) {
 }
 
 export function memberOnline(state: RootState, api: HomeApi, entry: ResolvedMember) {
+  const camera = localCameraEntry(state, api, entry.member.device_id);
+  if (camera?.controls_available) return localCameraOnline(camera);
   if (entry.member.route !== 'local') return cloudReading(state, api, entry)?.online ?? entry.device?.cloud[entry.member.route]?.online;
   const local = localReading(state, api, entry.device?.local?.id);
   return local && local.enabled && local.available;

@@ -1,7 +1,7 @@
 import { Switch as HeadlessSwitch } from '@headlessui/react';
 import type { ComponentProps, KeyboardEvent, ReactNode } from 'react';
 
-export function Switch({ powerIcon, ...props }: ComponentProps<typeof HeadlessSwitch> & { powerIcon?: ReactNode }) {
+export function Switch({ powerIcon, ...props }: ComponentProps<typeof HeadlessSwitch> & { powerIcon?: ReactNode; title?: string }) {
   return (
     <HeadlessSwitch
       data-slot={powerIcon ? 'power-button' : 'switch'}

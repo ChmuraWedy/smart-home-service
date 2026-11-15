@@ -356,3 +356,8 @@ export function hexToHsv(hex: string): HSV {
   if (h < 0) h += 360;
   return { h: Math.round(h), s: Math.round((max ? delta / max : 0) * 1000), v: Math.round(max * 1000) };
 }
+
+export function cloudSnapshotReading(spec:ControlSpec, snapshot:CloudSnapshot):Reading {
+  const reading = cloudReading(spec, snapshot.status[spec.key], snapshot.status_observations?.[spec.key]);
+  return { ...reading, stale: !snapshot.online || reading.stale };
+}

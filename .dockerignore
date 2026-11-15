@@ -9,6 +9,7 @@
 smarthome/**/__pycache__/
 !deploy/
 !deploy/nginx.conf
+!deploy/nginx-api.conf
 !deploy/docker-entrypoint.sh
 !frontend/
 !frontend/package.json

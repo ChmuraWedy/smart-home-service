@@ -1,0 +1,28 @@
+[Unit]
+Description=Central device, service and DNS log collector
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/libexec/smart-home-log-collector.py /etc/smart-home-logs/collector.json
+User=root
+UMask=0077
+StateDirectory=smart-home-logs
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=35
+MemoryMax=128M
+CPUQuota=25%
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/smart-home-logs
+
+[Install]
+WantedBy=multi-user.target

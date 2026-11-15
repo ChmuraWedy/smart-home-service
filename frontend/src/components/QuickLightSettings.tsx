@@ -82,7 +82,8 @@ export default function QuickLightSettings({
       {choices.some((value) => value === active && !hasModeContent(value)) && (
         <p className="help">{t(MSG.UNAVAILABLE)}</p>
       )}
-      {active === 'white' && white.map((spec) => {
+      {mode && active == null && <p className="help" role="status">{t(MSG.LIGHT_MODE_UNREPORTED)}</p>}
+      {(active === 'white' || active == null) && white.map((spec) => {
         const adjustable = spec.writable && spec.minimum !== undefined && spec.maximum !== undefined && spec.minimum < spec.maximum;
         const range = /^(brightness|bright_value(?:_v2)?)$/.test(spec.key) ? 'brightness' : 'temperature';
         return (
@@ -94,7 +95,7 @@ export default function QuickLightSettings({
             now={now}
             local={local}
             quickRange={adjustable ? range : undefined}
-            disabled={disabled || !adjustable}
+            disabled={disabled || !adjustable || active == null}
             onSend={(value) => send(spec, value)}
           />
         );

@@ -20,6 +20,8 @@ import {
 import appIcon from './assets/home-power.svg?no-inline';
 import AiChatButton from './components/AiChat';
 import VoiceDemo from './demo/VoiceDemo';
+import CameraManagement from './components/CameraManagement';
+import { CameraServiceApi } from './camera-service-api';
 import { ConnectionSettings } from './components/ConnectionSettings';
 import FirstRunWizard, { setupStep } from './components/FirstRunWizard';
 import type { SetupStep } from './components/FirstRunWizard';
@@ -38,6 +40,7 @@ import RoomEditor from './components/RoomEditor';
 import AppTutorial from './components/AppTutorial';
 import DashboardTour from './components/DashboardTour';
 import SmartLifeRoomsPage from './components/SmartLifeRoomsPage';
+import LogSearchButton from './components/LogSearchButton';
 import { Icon, IconGlyph } from './components/ui/icon';
 import { Switch } from './components/ui/switch';
 import {
@@ -180,7 +183,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
   const [qr, setQR] = useState<QR | null>(null);
   const [remaining, setRemaining] = useState(0);
   const api = useMemo(() => new HomeApi(connection, status?.account), [connection, status?.account]);
-  const verificationApi = useMemo(() => new CloudApi(connection), [connection]);
+  const verificationApi = useMemo(() => new CameraServiceApi(connection), [connection]);
   const locked = busy || controlLocked;
   const developer = status?.developer || { configured: false, connected: false };
   const ready = Boolean(status?.enabled && connection.token);
@@ -738,6 +741,7 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
       <section className="card settings-page">
         <h1>{t(MSG.SETTINGS)}</h1>
         <div className="app-menu-appearance settings-appearance">{appearance}</div>
+        {!demo && !member && <CameraManagement api={verificationApi} onAuthError={invalidateConnection} />}
         {!demo && !member && (
           <section className="settings-advanced" aria-labelledby="advanced-settings-heading">
             <h2 id="advanced-settings-heading">{t(MSG.ADVANCED_SETTINGS)}</h2>
@@ -818,6 +822,11 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   ))}
                 </div>
               ))}
+              {!demo && !member && status?.log_search_supported && (
+                <div className="app-menu-group">
+                  <LogSearchButton api={api} disabled={locked} />
+                </div>
+              )}
               {!demo && !member && networkMonitoring && (
                 <div className="app-menu-group">
                   <span className="app-menu-group-heading">{t(MSG.ADVANCED_SETTINGS)}</span>

@@ -151,3 +151,18 @@ describe('shared cloud readings', () => {
     expect(cached(store, key)).toBeUndefined();
   });
 });
+
+it('an offline rejection preserves relay values and prevents an earlier in-flight poll restoring Online',async()=>{
+  const {sendCloudDeviceCommands}=await import('./cloud-device-cache');
+  const store=createAppStore(),client=api(),key=cloudDeviceKey(client,'lamp','sharing');
+  await store.dispatch(readCloudDevice(client,key,{seed:snapshot('lamp',true)}));
+  const old=delayedResponse();
+  vi.mocked(fetch).mockReturnValueOnce(old.response).mockResolvedValueOnce(new Response(JSON.stringify({detail:'offline'}),{status:409,headers:{'X-Tuya-Device-Offline':'1'}}));
+  const poll=store.dispatch(readCloudDevice(client,key));
+  await expect(store.dispatch(sendCloudDeviceCommands(client,'lamp','sharing',[{code:'switch_led',value:false}]))).rejects.toHaveProperty('deviceOffline',true);
+  expect(cached(store,key)?.snapshot.online).toBe(false);
+  old.resolve(json(snapshot('lamp',true)));
+  await poll;
+  expect(cached(store,key)?.snapshot.online).toBe(false);
+  expect(cached(store,key)?.snapshot.status.switch_led).toBe(true);
+});

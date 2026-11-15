@@ -118,6 +118,7 @@ function MemberControls({
           paused={paused}
           loadWhenPaused={preview}
           embeddedQuick={quick}
+          onOpenQuick={onOpen}
           onPower={quick ? undefined : recordPower}
           onBusy={recordBusy}
           onAuthError={onAuthError}

@@ -3,6 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { localDeviceCache } from './local-device-cache';
 import { cloudDeviceCache } from './cloud-device-cache';
+import { cameraStatusCache } from './camera-status-cache';
 import { pendingDeviceValuesReducer } from './pending-device-values';
 import { deviceMetadataReducer } from './device-metadata';
 
@@ -39,8 +40,9 @@ export function createAppStore() {
       pendingDeviceValues: pendingDeviceValuesReducer,
       [localDeviceCache.reducerPath]: localDeviceCache.reducer,
       [cloudDeviceCache.reducerPath]: cloudDeviceCache.reducer,
+      [cameraStatusCache.reducerPath]: cameraStatusCache.reducer,
     },
-    middleware: defaults => defaults().concat(localDeviceCache.middleware, cloudDeviceCache.middleware),
+    middleware: defaults => defaults().concat(localDeviceCache.middleware, cloudDeviceCache.middleware, cameraStatusCache.middleware),
     devTools: import.meta.env.DEV,
   });
 }

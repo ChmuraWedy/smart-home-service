@@ -1596,12 +1596,12 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device :is(.device-setup-action, .device-card-footer, .card-refresh) { @apply tw:hidden; }
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device .card-primary-controls { @apply tw:min-h-0 tw:pr-0; }
-.capability-row .power-actions .dashboard-power-button {
+:is(.capability-row .power-actions, .camera-quick-actions) .dashboard-power-button {
   @apply tw:grid tw:place-items-center tw:rounded-none tw:border-0 tw:bg-(--surface-raised) tw:p-0 tw:text-(--muted);
   width:var(--dashboard-power-width,var(--dashboard-power-size,64px));
   height:var(--dashboard-power-size,64px);
 }
-.capability-row .power-actions .dashboard-power-button[data-checked] {
+:is(.capability-row .power-actions, .camera-quick-actions) .dashboard-power-button[data-checked] {
   @apply tw:bg-(--toggle-on) tw:text-(--toggle-thumb-on);
 }
 .dashboard-power-button:hover:enabled { filter:brightness(.93); }
@@ -1620,16 +1620,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-card-footer:has(.camera-card-privacy) { @apply tw:pt-0; }
 .camera-card-privacy { margin-inline-start:calc(-1 * var(--dashboard-card-inset)); }
 .camera-card-privacy .capability { @apply tw:p-0; }
-.camera-card-switches { @apply tw:flex tw:gap-2; }
-.camera-card-privacy + .camera-card-switches { @apply tw:border-t tw:border-(--border) tw:pt-1; }
-.camera-card-switches > .channel-control { @apply tw:min-w-0 tw:flex-1; }
-.camera-card-switches .capability-boolean > .capability-row {
-  @apply tw:grid-cols-[minmax(0,1fr)] tw:justify-items-center tw:gap-0;
-}
-.camera-card-switches .capability-label-line { @apply tw:text-center; }
-.camera-card-switches .capability-row > .power-actions {
-  @apply tw:col-start-1 tw:row-start-2 tw:flex-col tw:items-center;
-}
 .dashboard-view:not([data-dashboard-panel="tools"]) .dashboard-device:has([data-power-layout]):not(:has(.card-sensor-values, .control-feedback)) {
   @apply tw:pb-0;
 }
@@ -1685,6 +1675,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 .dashboard-light-value { @apply tw:text-sm tw:font-semibold tw:text-(--text-strong); }
 .dashboard-light-presets { @apply tw:m-0 tw:min-h-0 tw:w-full tw:cursor-default tw:px-2 tw:py-1 tw:text-xs; }
 .dashboard-power-state-summary .dashboard-power-pending { @apply tw:absolute tw:top-0.5 tw:right-0.5; }
+.dashboard-power-state-summary > .stale-tag { align-self:center; }
 .dashboard-device :is([data-power-layout], .camera-card-privacy) .capability-boolean > .capability-row > .power-actions {
   @apply tw:row-start-1 tw:row-end-3 tw:self-stretch;
   grid-column:var(--power-column,1);
@@ -1767,7 +1758,6 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
     .dashboard-light-swatch { @apply tw:block tw:size-3 tw:rounded-sm tw:border tw:border-(--border-strong); }
     .dashboard-light-value:has(.dashboard-light-swatch) .dashboard-light-value-text { @apply tw:sr-only; }
     :is(.device-card-title h3, .card-sensor-value, .dashboard-power-state) { @apply tw:min-w-0 tw:wrap-anywhere; }
-    .camera-card-switches { @apply tw:grid tw:grid-cols-[repeat(auto-fit,minmax(44px,1fr))] tw:gap-0; }
     &[data-dashboard-panel="tools"] .dashboard-device .card-primary-controls { @apply tw:pr-0; }
     &[data-dashboard-panel="tools"] .dashboard-device .card-refresh {
       position:static;
@@ -1881,7 +1871,7 @@ button.dashboard-alias-more { @apply tw:grid tw:h-7 tw:place-items-center tw:p-0
 }
 .dashboard-view:not([data-dashboard-panel="tools"]) .combined-device-card .dashboard-power-state-summary,
 .combined-device-card .camera-card-privacy { margin-inline:0; }
-.combined-device-card :is(.camera-card-switches, .card-sensor-values) { padding-inline:var(--dashboard-card-inset); }
+.combined-device-card .card-sensor-values { padding-inline:var(--dashboard-card-inset); }
 .combined-device-card .combined-member-header { @apply tw:border-b tw:border-(--border) tw:pb-1; }
 .combined-member-name { @apply tw:m-0 tw:px-3 tw:pt-2 tw:text-sm; }
 .combined-member-source { @apply tw:m-0 tw:px-3 tw:pb-2 tw:text-xs tw:text-(--muted); }
@@ -2151,3 +2141,48 @@ select:not([multiple]):not([size]) {
 .dashboard-tour-practice p { margin: 0; }
 .dashboard-tour-practice .dashboard-tour-actions { margin-top: 8px; }
 [data-tour-highlight] { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.camera-management { margin-block: 20px; }
+.camera-management summary { cursor:pointer; font-weight:600; }
+.camera-management-list { list-style:none; margin:12px 0; padding:0; }
+.camera-management-list > li { padding:16px 0; border-bottom:1px solid var(--border); }
+.camera-connection-form { display:grid; gap:12px; max-width:520px; padding-block:16px; }
+
+.local-camera-controls { margin-block:16px; }
+.camera-local-settings { display:grid; gap:10px; margin-block:16px; }
+.camera-local-settings label { display:grid; grid-template-columns:minmax(120px,1fr) minmax(80px,180px); align-items:center; gap:12px; margin:0; }
+.camera-local-settings input[type=checkbox] { width:20px; height:20px; justify-self:end; }
+.camera-ptz { display:grid; grid-template-columns:repeat(3,64px); grid-template-rows:repeat(3,44px); gap:6px; margin-block:16px; }
+.camera-ptz-up { grid-area:1/2; }
+.camera-ptz-left { grid-area:2/1; }
+.camera-ptz-stop { grid-area:2/2; }
+.camera-ptz-right { grid-area:2/3; }
+.camera-ptz-down { grid-area:3/2; }
+
+.device-local-control { border-top:1px solid var(--border); margin-top:16px; padding-top:16px; }
+.device-local-control h3 { margin:0 0 12px; }
+.device-access-info { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:6px 16px; margin:0 0 12px; }
+.device-access-info dt { color:var(--muted); }
+.device-access-info dd { margin:0; overflow-wrap:anywhere; }
+.device-access-actions { display:flex; flex-wrap:wrap; gap:8px; }
+
+.dashboard-card-footer:has(.camera-quick-actions) {
+  padding-top:0;
+  margin-inline:calc(-1 * var(--dashboard-card-inset));
+  border-end-start-radius:inherit;
+  border-end-end-radius:inherit;
+  overflow:clip;
+}
+.camera-quick-actions { display:flex; flex-wrap:nowrap; align-items:stretch; gap:0; padding:0; width:100%; min-width:0; }
+.camera-quick-actions > .dashboard-power-button {
+  flex:1 1 0;
+  min-width:44px;
+}
+.dashboard-device:not(.combined-device-card):has(.camera-quick-actions):not(:has(.control-feedback,.error)) { padding-bottom:0; }
+.camera-detail-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-block:8px; }
+.camera-quick-actions > .dashboard-power-button + .dashboard-power-button { border-inline-start:1px solid var(--border); }
+.camera-quick-actions .dashboard-power-button:focus-visible { outline-offset:-4px; }
+.camera-viewer-movement { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-block:12px; }
+.camera-viewer-movement h3 { margin:0; font-size:14px; }
+.camera-viewer-movement .camera-ptz { grid-template-columns:repeat(3,44px); grid-template-rows:repeat(3,36px); gap:4px; margin:0; }
+.camera-viewer-movement .error { flex-basis:100%; }

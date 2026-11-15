@@ -191,8 +191,8 @@ describe('camera live viewing',()=>{
   it('opens a privacy-blocked camera sheet without allocating a stream',async()=>{
     mountTiles(true); const user=userEvent.setup();
     const card=await screen.findByRole('listitem',{name:'Sleep Cam'});
-    const privacy=await within(card).findByRole('button',{name:'Приватность'});
-    await waitFor(()=>expect(privacy).toHaveAttribute('aria-pressed','true'));
+    const privacy=await within(card).findByRole('switch',{name:'Приватность'});
+    await waitFor(()=>expect(privacy).toHaveAttribute('aria-checked','true'));
     await user.click(card);
     const sheet=screen.getByRole('dialog',{name:'Sleep Cam'});
     expect(within(sheet).getByRole('button',{name:'Смотреть видео'})).toBeDisabled();

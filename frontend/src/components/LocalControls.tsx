@@ -25,12 +25,13 @@ import { DeviceActivity } from './DeviceActivity';
 import { DeviceConnectionDescription, DeviceConnectionSummary } from './DeviceConnection';
 
 export function LocalControl({
-  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup, roomEditor,
+  api, device, gateway, cloudDevice, routes, onClose, onAuthError, closeLabel, room, onSetup, roomEditor, localControl,
   showMappingEditor = true, onMappingsSaved,
 }: {
   api: HomeApi; device: LocalDevice; gateway?: LocalDevice; cloudDevice?: CloudDevice; routes?: DeviceRoute[];
   onClose: () => void; onAuthError: () => void; closeLabel?: string; room?: string; onSetup?: () => void;
   roomEditor?: ReactNode;
+  localControl?: ReactNode;
   showMappingEditor?: boolean;
   onMappingsSaved?: (device: LocalDevice) => void;
 }) {
@@ -114,6 +115,7 @@ export function LocalControl({
       connectionContent={<DeviceConnectionSummary room={room} route="local" localTransport={item.transport} status={!state ? t(MSG.CHECKING_CONNECTION) : !state.enabled ? t(MSG.DISABLED_IN_SETTINGS) : state.available ? t(MSG.AVAILABLE_LOCALLY) : t(MSG.STATUS_UNKNOWN)} online={state?.enabled && state?.available} />}
     >
       {roomEditor}
+      {localControl}
       {state && !state.enabled && <p className="saved-summary">{t(MSG.THIS_DEVICE_OR_ITS_GATEWAY_IS_DISABLED_IN)}</p>}
       {!api.isMember && primaryActivity && <DeviceActivity api={api} deviceId={String(item.id)} provider="local" specs={specs} primary onAuthError={onAuthError} />}
       <div className={`capability-grid${specs.every((spec) => !spec.writable) ? ' sensor-grid' : ''}`}>

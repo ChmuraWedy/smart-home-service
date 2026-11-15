@@ -13,7 +13,7 @@ Run it on your own server with Docker, or run the Python API and React interface
 - Control power and individual switch channels directly from device cards. Tap a supported light card for quick brightness and white temperature controls. Open full details for color, timers, and supported lighting schedules and effects.
 - Read temperature, humidity, motion, and battery information; inspect the device activity log and the source and age of readings.
 - Search by name or alias, filter by room/building, edit device and channel aliases inline, and link directly to a device's details.
-- Open compatible camera HLS streams from the dashboard, with privacy and detection controls when the device exposes them.
+- Watch local camera WebRTC streams or cloud HLS through the separate [camera module](docs/camera-service.md), with privacy and detection controls when exposed by the device.
 - Discover LAN announcements and configure local device connections with separate discovery, verification, and confirmation before saving.
 - Manage buildings, rooms, device types, groups, capabilities, and imports through the REST API.
 
@@ -203,6 +203,7 @@ The guides below are in English. Interface language selection is independent of 
 | LAN discovery and packet observation | [Network guide](docs/packet-capture.md) |
 | Lighting, switch channels, and aliases | [Switch controls](docs/switch-controls.md) · [Aliases](docs/device-aliases.md) · [Lighting and device parameters](docs/device-linkage.md) |
 | Camera controls and limitations | [Camera guide](docs/camera-controls.md) |
+| Camera module, discovery and direct streaming | [Camera service](docs/camera-service.md) |
 | Groups and room displays | [Displays](docs/displays.md) · [CYD firmware](firmware/cyd/README.md) |
 | UI translation | [Localization guide](frontend/src/i18n/README.md) |
 | Integration choices and supported profiles | [Integrations](docs/integrations.md) |

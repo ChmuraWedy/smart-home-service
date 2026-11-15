@@ -149,3 +149,24 @@ export const readCloudDevice = (api: CloudApi, key: CloudDeviceKey, {
     if (--client.readers === 0) clients.delete(key.scope);
   }
 };
+
+// A rejected offline command is availability evidence, never a relay-state report.
+type DeviceCommands = Parameters<CloudApi['sendDeviceCommands']>[2];
+export const sendCloudDeviceCommands = (api:CloudApi, deviceId:string, provider:Provider, commands:DeviceCommands) => async (dispatch:AppDispatch, getState:()=>RootState) => {
+  const key = cloudDeviceKey(api, deviceId, provider);
+  try {
+    return await api.sendDeviceCommands(deviceId, provider, commands);
+  } catch (failure) {
+    if (failure instanceof ApiError && failure.deviceOffline && key.scope === cloudAccountScope(api, provider)) {
+      const current = cloudDeviceCache.endpoints.deviceSnapshot.select(key)(getState()).data;
+      if (current) {
+        dispatch(cloudDeviceCache.util.upsertQueryEntries([{
+          endpointName: 'deviceSnapshot',
+          arg: key,
+          value: { ...current, sequence: sequence += 1, snapshot: { ...current.snapshot, online: false } },
+        }]));
+      }
+    }
+    throw failure;
+  }
+};

@@ -11,6 +11,10 @@ class Settings:
     api_token: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_API_TOKEN", ""), repr=False
     )
+    camera_service_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_CAMERA_SERVICE_URL", ""))
+    camera_service_token: str = field(default_factory=lambda: os.getenv("SMART_HOME_CAMERA_SERVICE_TOKEN", ""), repr=False)
+    camera_public_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_CAMERA_PUBLIC_URL", ""))
+    log_search_url: str = field(default_factory=lambda: os.getenv("SMART_HOME_LOG_SEARCH_URL", "").rstrip("/"))
     setup_code: str = field(
         default_factory=lambda: os.getenv("SMART_HOME_SETUP_CODE", ""), repr=False
     )
@@ -95,6 +99,10 @@ class Settings:
             self._http_url(self.ai_chat_embed_url)
             if urlsplit(self.ai_chat_embed_url).scheme != "https":
                 raise ValueError("AI chat embedding requires an HTTPS URL")
+        if self.log_search_url:
+            self._http_url(self.log_search_url, origin_only=True)
+            if urlsplit(self.log_search_url).scheme != "https":
+                raise ValueError("Log search requires an HTTPS origin")
         for origin in self.cors_origins:
             self._http_url(origin, origin_only=True)
         if self.frontend_url:
