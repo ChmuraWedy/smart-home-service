@@ -1336,5 +1336,7 @@
   "CAMERA_LOCAL_VIDEO_ONLY": "Local video · controls not configured",
   "CAMERA_LOCAL_VIDEO_ONLY_HELP": "Video uses your home network. This camera has no configured local controls; settings use the selected cloud connection when available.",
   "STALE_READING_HELP": "Last reported value. The current physical state is unconfirmed because the device is offline or the reading is too old.",
-  "DEVICE_LOCAL_ACTIVE": "Local control active"
+  "DEVICE_LOCAL_ACTIVE": "Local control active",
+  "LOG_SEARCH": "Log search",
+  "LOG_SEARCH_OPEN_FAILED": "Could not open Log search. Allow a new tab and try again."
 }

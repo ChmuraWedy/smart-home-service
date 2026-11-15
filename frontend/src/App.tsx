@@ -40,6 +40,7 @@ import RoomEditor from './components/RoomEditor';
 import AppTutorial from './components/AppTutorial';
 import DashboardTour from './components/DashboardTour';
 import SmartLifeRoomsPage from './components/SmartLifeRoomsPage';
+import LogSearchButton from './components/LogSearchButton';
 import { Icon, IconGlyph } from './components/ui/icon';
 import { Switch } from './components/ui/switch';
 import {
@@ -821,6 +822,11 @@ function AppContent({ resetSessionStore }: { resetSessionStore: () => void }) {
                   ))}
                 </div>
               ))}
+              {!demo && !member && status?.log_search_supported && (
+                <div className="app-menu-group">
+                  <LogSearchButton api={api} disabled={locked} />
+                </div>
+              )}
               {!demo && !member && networkMonitoring && (
                 <div className="app-menu-group">
                   <span className="app-menu-group-heading">{t(MSG.ADVANCED_SETTINGS)}</span>

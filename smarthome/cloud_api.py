@@ -296,6 +296,7 @@ def cloud_status(
             "scene_edit_supported": False,
             "household_chat_supported": True,
             "local_mapping_editor_supported": True,
+            **({"log_search_supported": True} if account and account.role == "owner" and request.app.state.settings.log_search_url else {}),
             "developer": request.app.state.developer_cloud.status(),
             **({"redroid_available": True} if account and account.role == "owner" and request.app.state.settings.redroid_token_file else {}),
             **({"account": asdict(account)} if account else {}),

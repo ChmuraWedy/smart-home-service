@@ -768,6 +768,8 @@ def create_app(settings: Settings | None = None, controller=None):
     app.include_router(camera_service_router)
     from .device_access import router as device_access_router
     app.include_router(device_access_router)
+    from .log_search import router as log_search_router
+    app.include_router(log_search_router)
     from .commissioning import router as commissioning_router
 
     app.include_router(commissioning_router)

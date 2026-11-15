@@ -117,3 +117,33 @@ only the two `smart-home-logs` Compose containers to remove central search, keep
 their data/spool for recovery. DNS query logging can be reverted with the saved
 compiler/config/image backup followed by a DNS-container restart. Never recreate
 app containers or log out Smart Life as part of this rollback.
+
+## App menu sign-in
+
+On an owner dashboard, **Menu → Log search** opens the console in a new tab and
+signs in automatically. Household members do not see this entry and cannot obtain
+a handoff ticket. Set `SMART_HOME_LOG_SEARCH_URL=https://homeassistant.dom:8096`
+on the backend serving the handoff and point the gateway's `/session` and internal
+authorization subrequest at that backend. The example gateway uses preview 8082.
+
+The owner key stays in the app's existing API request header. The app receives a
+60-second, HMAC-signed ticket and submits it in an HTTPS POST body to `/session`.
+The gateway exchanges it for a 30-minute signed cookie scoped to `/select/`, with
+Secure, HttpOnly and SameSite=Lax. Tickets and cookies use distinct signing contexts
+and are bound to the configured console origin. Neither contains the owner key;
+no credentials appear in URLs or are forwarded to VictoriaLogs. This cookie only
+authorizes the log console and cannot authenticate application API calls. Once it
+expires, reopen Log search from the menu. App sign-out does not immediately revoke
+an already-open console session; its maximum remaining lifetime is 30 minutes.
+Existing owner Basic sign-in remains available, including if app handoff is down.
+
+The backend and gateway must both be updated before enabling the menu capability.
+No existing keys are rotated and no database migration is needed.
+
+Validation: five backend tests cover owner/member access, expiration, tampering,
+cookie scope, disabled setup and malformed handoffs. Nine UI tests cover the menu,
+new-tab handoff, popup failure and existing tutorial navigation. Lint, TypeScript
+and the frontend build pass. On 8082, the live menu click opened authenticated query
+results without a credential prompt. Gateway checks also verified unauthenticated
+rejection, Basic fallback and non-search route isolation. Both Smart Life sessions
+and the existing key were preserved; production 8080 containers were unchanged.

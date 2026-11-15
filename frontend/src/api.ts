@@ -24,6 +24,7 @@ export type CloudStatus = {
   account?: AccountIdentity;
   'household_chat_supported'?: boolean;
   'local_mapping_editor_supported'?: boolean;
+  'log_search_supported'?: boolean;
   enabled: boolean;
   connected: boolean;
   has_saved_user_code: boolean;
@@ -117,6 +118,8 @@ export class CloudApi {
   }
 
   get isMember() { return this.account?.role === 'member'; }
+
+  logSearchTicket() { return this.request<{url:string; ticket:string}>('/log-search/ticket', 'POST'); }
 
   localCameraStatus() { return this.request<{cameras:CameraStatus[]}>('/cameras/status'); }
 

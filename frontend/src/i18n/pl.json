@@ -1336,5 +1336,7 @@
   "CAMERA_LOCAL_VIDEO_ONLY": "Wideo lokalne · sterowanie nieskonfigurowane",
   "CAMERA_LOCAL_VIDEO_ONLY_HELP": "Wideo korzysta z sieci domowej. Sterowanie lokalne kamery nie jest skonfigurowane; ustawienia korzystają z wybranego połączenia z chmurą, jeśli jest dostępne.",
   "STALE_READING_HELP": "Ostatnio zgłoszona wartość. Bieżący stan fizyczny nie jest potwierdzony: urządzenie jest offline lub odczyt jest za stary.",
-  "DEVICE_LOCAL_ACTIVE": "Sterowanie lokalne aktywne"
+  "DEVICE_LOCAL_ACTIVE": "Sterowanie lokalne aktywne",
+  "LOG_SEARCH": "Przeszukaj logi",
+  "LOG_SEARCH_OPEN_FAILED": "Nie udało się otworzyć logów. Zezwól na nową kartę i spróbuj ponownie."
 }
